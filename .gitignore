@@ -32,6 +32,7 @@ migrate_working_dir/
 
 # ==================== Android 签名 ====================
 android/key.properties
+android/release.jks
 android/app/keystore
 *.jks
 *.keystore
