@@ -6,7 +6,6 @@ on:
       - 'v*'   # v1.0.0, v1.2.3-beta 等
 
 env:
-  # 从 tag 提取版本号，如 v1.0.0 → 1.0.0
   VERSION: ${{ github.ref_name }}
 
 jobs:
@@ -36,8 +35,8 @@ jobs:
 
       - name: Update version
         run: |
-          V="${VERSION#v}"                          # v1.0.0 → 1.0.0
-          VC=$(echo "$V" | sed 's/[^0-9]//g')      # 1.0.0 → 100
+          V="${VERSION#v}"
+          VC=$(echo "$V" | sed 's/[^0-9]//g')
           sed -i "s/^version:.*/version: $V+$VC/" pubspec.yaml
 
       - name: Install dependencies
@@ -49,75 +48,11 @@ jobs:
       - name: Build APK (x86_64)
         run: flutter build apk --release --target-platform android-x64
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: mtbbs-android-x64
-          path: build/app/outputs/flutter-apk/app-release.apk
-
-  # ==================== Windows x64（不签名）====================
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: Update version
-        shell: pwsh
-        run: |
-          $v = "$env:VERSION" -replace '^v', ''    # v1.0.0 → 1.0.0
-          (Get-Content pubspec.yaml) -replace '^version:.*', "version: $v+1" | Set-Content pubspec.yaml
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze lib/
-
-      - name: Build Windows x64
-        run: flutter build windows --release
-
-      - name: Zip build
-        shell: pwsh
-        run: |
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath mtbbs-windows-x64.zip
-
-      - name: Upload Windows zip
-        uses: actions/upload-artifact@v4
-        with:
-          name: mtbbs-windows-x64
-          path: mtbbs-windows-x64.zip
-
-  # ==================== 创建 Release ====================
-  release:
-    needs: [android, windows]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download Android APK
-        uses: actions/download-artifact@v4
-        with:
-          name: mtbbs-android-x64
-          path: release
-
-      - name: Download Windows zip
-        uses: actions/download-artifact@v4
-        with:
-          name: mtbbs-windows-x64
-          path: release
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: MT论坛 ${{ github.ref_name }}
           body_path: CHANGELOG.md
-          files: |
-            release/app-release.apk
-            release/mtbbs-windows-x64.zip
+          files: build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
