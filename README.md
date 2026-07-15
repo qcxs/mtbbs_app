@@ -112,49 +112,6 @@ SiteConfig.sites[0] = SiteInfo(
 );
 ```
 
-### 4. 配置 GitHub Secrets（用于自动签名打包）
-
-> 如果你不使用 Action 自动打包，可以跳过这一步，直接在本地 `flutter build apk --release`。
-
-在 GitHub 仓库 → **Settings → Secrets and variables → Actions** 添加：
-
-| Secret | 用途 |
-|--------|------|
-| `KEYSTORE_B64` | base64 编码的安卓签名文件（.jks） |
-| `KEYSTORE_PASSWORD` | keystore 密码 |
-| `KEY_ALIAS` | 别名 |
-| `KEY_PASSWORD` | key 密码 |
-
-如何生成 keystore 和 base64：
-
-```powershell
-# 生成签名文件（如果还没有）
-keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias my_alias
-
-# 编码为 base64（复制输出内容存入 KEYSTORE_B64）
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("release.jks")) | clip
-```
-
-### 5. 发布 Release
-
-推送 git tag 即可触发自动构建：
-
-```powershell
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-GitHub Actions 会自动完成：
-1. Android：解码 keystore → 注入版本号 → `flutter build apk`（已签名）
-2. Windows：注入版本号 → `flutter build windows` → 打包 zip
-3. 创建 GitHub Release，上传 APK + Windows zip
-
-你可以在 **Actions** 标签页查看构建进度，构建完成后 **Releases** 页面会出现下载链接。
-
-> 如需修改构建流程，编辑 `.github/workflows/release.yml`。
-
----
-
 ## 文档
 
 ```

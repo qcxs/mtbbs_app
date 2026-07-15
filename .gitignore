@@ -1,4 +1,29 @@
-# ==================== Flutter / Dart ====================
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -8,47 +33,13 @@
 /build/
 /coverage/
 
-# ==================== IDE ====================
-.idea/
-*.iml
-*.ipr
-*.iws
-.vscode/
-
-# ==================== 系统文件 ====================
-.DS_Store
-*.class
-*.log
-*.pyc
-*.swp
-*.swp
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-
-# ==================== Android 签名 ====================
-android/key.properties
-android/release.jks
-android/app/keystore
-*.jks
-*.keystore
-
-# ==================== Windows 构建产物 ====================
-windows/runner/Release/
-
-# ==================== 符号文件 ====================
+# Symbolication related
 app.*.symbols
+
+# Obfuscation related
 app.*.map.json
 
-# ==================== Android Studio ====================
+# Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-# ==================== 本地环境 ====================
-# 本地文档临时文件
-docs/*.ps1
