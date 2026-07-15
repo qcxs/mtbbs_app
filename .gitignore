@@ -1,0 +1,53 @@
+# ==================== Flutter / Dart ====================
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# ==================== IDE ====================
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# ==================== 系统文件 ====================
+.DS_Store
+*.class
+*.log
+*.pyc
+*.swp
+*.swp
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# ==================== Android 签名 ====================
+android/key.properties
+android/app/keystore
+*.jks
+*.keystore
+
+# ==================== Windows 构建产物 ====================
+windows/runner/Release/
+
+# ==================== 符号文件 ====================
+app.*.symbols
+app.*.map.json
+
+# ==================== Android Studio ====================
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ==================== 本地环境 ====================
+# 本地文档临时文件
+docs/*.ps1
