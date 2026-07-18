@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../config/site_config.dart';
 import '../../services/space_api.dart';
 import '../../providers/settings_provider.dart';
@@ -189,7 +190,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
       color: Colors.white,
       child: Row(
         children: [
-          UserAvatar(uid: uid, nickname: nickname, radius: 32, disableTap: true),
+          UserAvatar(
+            uid: uid,
+            nickname: nickname,
+            radius: 32,
+            disableTap: true,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -344,6 +350,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final stats = _profile!['stats'] as Map<String, dynamic>?;
     if (stats == null) return const SizedBox.shrink();
 
+    final uid = widget.uid;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       color: Colors.white,
@@ -351,16 +358,24 @@ class _UserProfilePageState extends State<UserProfilePage> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _activityStatItem('好友', stats['friends']?.toString() ?? '0'),
-          _activityStatItem('回帖', stats['replies']?.toString() ?? '0'),
-          _activityStatItem('主题', stats['threads']?.toString() ?? '0'),
+          _activityStatItem(
+            '回帖',
+            stats['replies']?.toString() ?? '0',
+            onTap: () => context.push('/my-threads?type=reply&uid=$uid'),
+          ),
+          _activityStatItem(
+            '主题',
+            stats['threads']?.toString() ?? '0',
+            onTap: () => context.push('/my-threads?uid=$uid'),
+          ),
           _activityStatItem('分享', stats['shares']?.toString() ?? '0'),
         ],
       ),
     );
   }
 
-  Widget _activityStatItem(String label, String value) {
-    return Column(
+  Widget _activityStatItem(String label, String value, {VoidCallback? onTap}) {
+    final content = Column(
       children: [
         Text(
           value,
@@ -372,6 +387,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
         ),
       ],
     );
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: content,
+        ),
+      );
+    }
+    return content;
   }
 
   // ==================== 积分分析弹窗 ====================
@@ -380,9 +406,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void _showCreditDialog() {
     final settings = context.read<SettingsProvider>();
     if (settings.creditFormula.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请登录后在设置页面中刷新积分公式后使用')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请登录后在设置页面中刷新积分公式后使用')));
       return;
     }
 

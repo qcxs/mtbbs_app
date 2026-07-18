@@ -55,6 +55,9 @@ class PostItem {
   final String kickUrl;
   final bool isLiked;
 
+  /// 评分记录，结构 {header, detailUrl, totalScore, entries: [{username, uid, score, reason}]}
+  final Map<String, dynamic>? rating;
+
   const PostItem({
     this.pid = '',
     this.floor = 0,
@@ -73,6 +76,7 @@ class PostItem {
     this.favoriteUrl = '',
     this.kickUrl = '',
     this.isLiked = false,
+    this.rating,
   });
 
   bool get isMainPost => isOp;
@@ -96,6 +100,9 @@ class PostItem {
     favoriteUrl: p['favoriteUrl']?.toString() ?? '',
     kickUrl: p['kickUrl']?.toString() ?? '',
     isLiked: p['isLiked'] == true,
+    rating: p['rating'] != null
+        ? Map<String, dynamic>.from(p['rating'] as Map)
+        : null,
   );
 
   Map<String, dynamic> toMap() => {
@@ -116,6 +123,7 @@ class PostItem {
     'favoriteUrl': favoriteUrl,
     'kickUrl': kickUrl,
     'isLiked': isLiked,
+    'rating': rating,
   };
 }
 

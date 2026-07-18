@@ -262,6 +262,7 @@ Map<String, dynamic> _extractPost(
       source = '',
       bbcode = '',
       rateUrl = '';
+  Map<String, dynamic>? rating;
 
   if (plc != null) {
     // 楼层标签
@@ -311,6 +312,19 @@ Map<String, dynamic> _extractPost(
       bbcode = converter.convertElementContent(msgEl);
     }
 
+    // 附件区 div.pattl — 未插入正文的附件，追加到正文末尾
+    // 使用与正文相同的 converter 将 ignore_js_op 转为 [appdata] BBCode
+    final pattl = plc.querySelector('div.pattl');
+    if (pattl != null) {
+      final ops = pattl.querySelectorAll('ignore_js_op');
+      for (final op in ops) {
+        final attachBbcode = converter.convertElement(op);
+        if (attachBbcode.isNotEmpty) {
+          bbcode += '\n$attachBbcode';
+        }
+      }
+    }
+
     // 评分 URL
     final rateLink = plc.querySelector('.po .pob.cl a[onclick*="action=rate"]');
     if (rateLink != null) {
@@ -319,6 +333,71 @@ Map<String, dynamic> _extractPost(
       if (m != null) {
         rateUrl = _resolveUrl(m.group(1)!);
       }
+    }
+
+    // 评分记录 dl.rate / dl[id^="ratelog_"]
+    final rateDl = plc.querySelector('dl.rate, dl[id^="ratelog_"]');
+    if (rateDl != null) {
+      final headerLink = rateDl.querySelector('th a[href*="viewratings"]');
+      final headerText = headerLink?.text.trim() ?? '';
+      final detailUrl = _resolveUrl(headerLink?.attributes['href'] ?? '');
+
+      // 汇总行
+      String totalScore = '';
+      final p = rateDl.querySelector('p.ratc');
+      if (p != null) {
+        totalScore = p.text.trim();
+      }
+
+      // 列出每条评分
+      final entries = <Map<String, dynamic>>[];
+
+      // 解析表头确定列结构：th[0]=用户, th[1..n-2]=评分列, th[n-1]=理由
+      // 注：页面源码中头行在 <tbody> 里而非 <thead>，用 tr th 定位
+      final headerThs = rateDl.querySelectorAll('table.ratl tr th');
+      final reasonColIndex = headerThs.length > 1 ? headerThs.length - 1 : null;
+      final scoreColIndices = <int>[
+        for (int i = 1; i < headerThs.length - 1; i++) i,
+      ];
+      // 评分列名（去除字体图标后的纯文本）
+      final columns = scoreColIndices
+          .map((i) => sanitizeText(headerThs[i].text))
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final rows = rateDl.querySelectorAll('tbody.ratl_l tr');
+      for (final row in rows) {
+        final allTds = row.querySelectorAll('td');
+        if (allTds.isEmpty) continue;
+        // 用户名列：第一个 td 中的 a.xg1
+        final nameLink = allTds[0].querySelector('a.xg1');
+        // 评分列：按表头位置逐个取 td
+        final scores = scoreColIndices
+            .map((i) => i < allTds.length ? allTds[i].text.trim() : '')
+            .toList();
+        // 理由列：最后一列
+        final reason = reasonColIndex != null && reasonColIndex < allTds.length
+            ? allTds[reasonColIndex].text.trim()
+            : '';
+        if (nameLink != null) {
+          final href = nameLink.attributes['href'] ?? '';
+          final uidMatch = RegExp(r'space-uid-(\d+)').firstMatch(href);
+          entries.add({
+            'username': nameLink.text.trim(),
+            'uid': uidMatch?.group(1) ?? '',
+            'scores': scores,
+            'reason': reason,
+          });
+        }
+      }
+
+      rating = {
+        'header': headerText,
+        'detailUrl': detailUrl,
+        'totalScore': totalScore,
+        'columns': columns,
+        'entries': entries,
+      };
     }
   }
 
@@ -336,6 +415,7 @@ Map<String, dynamic> _extractPost(
     'bbcode': bbcode,
     'rateUrl': rateUrl,
     'followUrl': followUrl,
+    'rating': rating,
   };
 }
 

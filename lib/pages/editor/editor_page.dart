@@ -154,6 +154,9 @@ class _EditorPageState extends State<EditorPage> {
       pid: widget.pid,
     );
 
+    // 初始化表情映射
+    _emojiMap = Map<String, String>.from(EmojiService().map);
+
     _submitHelper = EditorSubmitHelper(
       context: context,
       editorType: widget.type,
@@ -618,6 +621,12 @@ class _EditorPageState extends State<EditorPage> {
         _focusContent();
       case ToolbarAction.quote:
         _contentCtl.wrapBlock('[quote]', '[/quote]');
+        _focusContent();
+      case ToolbarAction.hide:
+        _contentCtl.wrapBlock('[hide]', '[/hide]');
+        _focusContent();
+      case ToolbarAction.free:
+        _contentCtl.wrapBlock('[free]', '[/free]');
         _focusContent();
       case ToolbarAction.code:
         _contentCtl.wrapBlock('[code]', '[/code]');

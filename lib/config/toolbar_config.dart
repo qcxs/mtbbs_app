@@ -19,6 +19,8 @@ enum ToolbarAction {
   underline,
   strikethrough,
   quote,
+  hide,
+  free,
   code,
   link,
   image,
@@ -86,6 +88,8 @@ const allToolbarItemConfigs = [
   ToolbarItemConfig(action: ToolbarAction.image, id: 'image', name: '图片'),
   ToolbarItemConfig(action: ToolbarAction.emoji, id: 'emoji', name: '表情'),
   ToolbarItemConfig(action: ToolbarAction.quote, id: 'quote', name: '引用'),
+  ToolbarItemConfig(action: ToolbarAction.hide, id: 'hide', name: '隐藏'),
+  ToolbarItemConfig(action: ToolbarAction.free, id: 'free', name: '免费'),
   ToolbarItemConfig(action: ToolbarAction.code, id: 'code', name: '代码'),
   ToolbarItemConfig(action: ToolbarAction.history, id: 'history', name: '历史'),
   ToolbarItemConfig(

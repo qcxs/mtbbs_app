@@ -43,17 +43,32 @@ ThreadItem _parseItem(dom.Element li) {
   int? threadId;
   final titleEl = li.querySelector('.mmlist_li_box h2');
   if (titleEl != null) {
-    title = sanitizeText(_cleanText(titleEl, excludeTags: {'span', 'i'}));
-    threadUrl = titleEl.querySelector('a')?.attributes['href'];
-    threadId = _extractThreadId(threadUrl ?? '');
+    // 标准模板：<div.mmlist_li_box><h2><a>标题</a></h2><div.list_body>摘要</div>
+    // 注意：span/i 可能嵌套在 <a> 内部（精/热度等），需对 <a> 做清洗而非 h2
+    final titleLink = titleEl.querySelector('a');
+    if (titleLink != null) {
+      title = sanitizeText(_cleanText(titleLink, excludeTags: {'span', 'i'}));
+      threadUrl = titleLink.attributes['href'];
+      threadId = _extractThreadId(threadUrl ?? '');
+    }
     if (threadUrl != null && !threadUrl.startsWith('http')) {
       threadUrl = '${SiteConfig.baseUrl}/$threadUrl';
     }
+    // 摘要（独立于标题）
+    final summaryEl = li.querySelector('.list_body');
+    if (summaryEl != null) summary = sanitizeText(summaryEl.text);
+  } else {
+    // 我的帖子模板：无 h2，<div.mmlist_li_box><div.list_body><a>标题</a></div>
+    final bodyLink = li.querySelector('.mmlist_li_box .list_body a');
+    if (bodyLink != null) {
+      title = sanitizeText(bodyLink.text);
+      threadUrl = bodyLink.attributes['href'];
+      threadId = _extractThreadId(threadUrl ?? '');
+      if (threadUrl != null && !threadUrl.startsWith('http')) {
+        threadUrl = '${SiteConfig.baseUrl}/$threadUrl';
+      }
+    }
   }
-
-  // 摘要
-  final summaryEl = li.querySelector('.list_body');
-  if (summaryEl != null) summary = sanitizeText(summaryEl.text);
 
   // 版块（排除 i 字体图标文本）
   // 优先标准版块链接，其次 time div 内的 forumdisplay 链接（部分模板）

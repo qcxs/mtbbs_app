@@ -16,10 +16,13 @@ import '../pages/thread/thread_view_page.dart';
 import '../pages/editor/editor_page.dart';
 import '../pages/editor/editor_history_page.dart';
 import '../pages/user/user_profile_page.dart';
+import '../pages/user/my_thread_page.dart';
 import '../pages/browser/browser_page.dart';
 import '../pages/search/search_page.dart';
 import '../pages/history/history_page.dart';
 import '../pages/darkroom_page.dart';
+import '../pages/online/online_page.dart';
+import '../pages/favorite/favorite_page.dart';
 import '../widgets/image_preview/gallery_viewer.dart';
 
 GoRouter buildRouter({String initialLocation = '/'}) {
@@ -63,11 +66,16 @@ GoRouter buildRouter({String initialLocation = '/'}) {
             path: '/thread/:tid',
             pageBuilder: (_, state) {
               final pageStr = state.uri.queryParameters['page'];
-              final initialPage = int.tryParse(pageStr ?? '') ?? 1;
+              final pid = state.uri.queryParameters['pid'];
+              // pid 优先级高于 page，两者不共存
+              final initialPage = pid != null && pid.isNotEmpty
+                  ? 1
+                  : (int.tryParse(pageStr ?? '') ?? 1);
               return NoTransitionPage(
                 child: ThreadViewPage(
                   tid: state.pathParameters['tid'] ?? '',
                   initialPage: initialPage,
+                  pid: pid,
                 ),
               );
             },
@@ -133,6 +141,25 @@ GoRouter buildRouter({String initialLocation = '/'}) {
             path: '/darkroom',
             pageBuilder: (_, __) =>
                 const NoTransitionPage(child: DarkroomPage()),
+          ),
+          GoRoute(
+            path: '/online',
+            pageBuilder: (_, __) => const NoTransitionPage(child: OnlinePage()),
+          ),
+          GoRoute(
+            path: '/favorite',
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: FavoritePage()),
+          ),
+          GoRoute(
+            path: '/my-threads',
+            pageBuilder: (_, state) {
+              final type = state.uri.queryParameters['type'];
+              final uid = state.uri.queryParameters['uid'];
+              return NoTransitionPage(
+                child: MyThreadPage(type: type, uid: uid),
+              );
+            },
           ),
           GoRoute(
             path: '/image-viewer',

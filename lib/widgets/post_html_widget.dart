@@ -308,10 +308,18 @@ class _UrlActionDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      constraints: const BoxConstraints(maxWidth: 360),
+      constraints: const BoxConstraints(maxWidth: 360, maxHeight: 280),
       title: Row(
         children: [
           const Expanded(child: Text('链接', style: TextStyle(fontSize: 16))),
+          IconButton(
+            icon: const Icon(Icons.open_in_browser, size: 20),
+            tooltip: '外部打开',
+            onPressed: () => Navigator.of(context).pop('__external__'),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.close, size: 20),
             onPressed: () => Navigator.of(context).pop(),
@@ -320,21 +328,17 @@ class _UrlActionDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: SelectableText(url, style: const TextStyle(fontSize: 12)),
-      actionsOverflowAlignment: OverflowBarAlignment.start,
+      content: SingleChildScrollView(
+        child: SelectableText(url, style: const TextStyle(fontSize: 12)),
+      ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop('__external__'),
-          child: const Text('外部打开'),
-        ),
-        const Spacer(),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop('__app__'),
-          child: const Text('App打开'),
+          child: const Text('打开'),
         ),
       ],
     );

@@ -72,7 +72,12 @@ class BBCodeToolbar extends StatelessWidget {
         ToolbarAction.strikethrough,
       },
       {ToolbarAction.color, ToolbarAction.backcolor},
-      {ToolbarAction.quote, ToolbarAction.code},
+      {
+        ToolbarAction.quote,
+        ToolbarAction.hide,
+        ToolbarAction.free,
+        ToolbarAction.code,
+      },
       {
         ToolbarAction.alignLeft,
         ToolbarAction.alignCenter,
@@ -163,6 +168,20 @@ class BBCodeToolbar extends StatelessWidget {
       case ToolbarAction.quote:
         return _toolBtn(
           icon: Icons.format_quote,
+          tooltip: tooltip,
+          action: action,
+          name: item.name,
+        );
+      case ToolbarAction.hide:
+        return _toolBtn(
+          icon: Icons.visibility_off,
+          tooltip: tooltip,
+          action: action,
+          name: item.name,
+        );
+      case ToolbarAction.free:
+        return _toolBtn(
+          icon: Icons.card_giftcard,
           tooltip: tooltip,
           action: action,
           name: item.name,

@@ -32,12 +32,13 @@ class UrlRouteResult {
 /// 同时检测 URL 是否属于当前站点，若属于其他站点则标记但不阻止返回路由路径。
 ///
 /// 支持的 URL 模式：
-/// - 帖子详情：`forum.php?mod=viewthread&tid=123` / `thread-123-1-1.html`
-/// - 用户主页：`home.php?mod=space&uid=456` / `space-uid-456.html`
-/// - 发新帖：  `forum.php?mod=post&action=newthread&fid=41`
-/// - 回复帖子：`forum.php?mod=post&action=reply&tid=123`（评论）
-/// - 引用回复：`forum.php?mod=post&action=reply&tid=123&pid=456`
-/// - 编辑帖子：`forum.php?mod=post&action=edit&tid=123&pid=456`
+/// - 帖子详情：      `forum.php?mod=viewthread&tid=123` / `thread-123-1-1.html`
+/// - 帖子定位回复：  `forum.php?mod=redirect&goto=findpost&pid=X&ptid=Y`
+/// - 用户主页：      `home.php?mod=space&uid=456` / `space-uid-456.html`
+/// - 发新帖：        `forum.php?mod=post&action=newthread&fid=41`
+/// - 回复帖子：      `forum.php?mod=post&action=reply&tid=123`（评论）
+/// - 引用回复：      `forum.php?mod=post&action=reply&tid=123&pid=456`
+/// - 编辑帖子：      `forum.php?mod=post&action=edit&tid=123&pid=456`
 ///
 /// 页码处理：
 /// - `thread-{tid}-{page}-{ordertype}.html` → 从路径提取 page
@@ -106,6 +107,31 @@ class UrlRouter {
         }
         return UrlRouteResult(
           label: '帖子详情（缺少 tid）',
+          appPath: null,
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
+
+      if (mod == 'redirect') {
+        final goto = query['goto'];
+        if (goto == 'findpost') {
+          final pid = query['pid'];
+          final ptid = query['ptid'];
+          if (pid != null &&
+              pid.isNotEmpty &&
+              ptid != null &&
+              ptid.isNotEmpty) {
+            return UrlRouteResult(
+              label: '帖子详情（定位回复）',
+              appPath: '/thread/$ptid?pid=$pid',
+              siteHost: otherSiteHost,
+              siteName: otherSiteName,
+            );
+          }
+        }
+        return UrlRouteResult(
+          label: '帖子详情（缺少参数）',
           appPath: null,
           siteHost: otherSiteHost,
           siteName: otherSiteName,

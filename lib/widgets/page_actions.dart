@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
 /// 通用页面顶部操作组件
@@ -44,35 +43,8 @@ class PageActions extends StatelessWidget {
     this.onExtraSelected,
   });
 
-  Future<void> _openInBrowser(BuildContext context) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !await canLaunchUrl(uri)) return;
-
-    if (!context.mounted) return;
-    final choice = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('打开方式'),
-        content: const Text('选择打开链接的方式：'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(0),
-            child: const Text('内置浏览器'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(1),
-            child: const Text('外部浏览器'),
-          ),
-        ],
-      ),
-    );
-
-    if (choice == null) return;
-    if (choice == 0 && context.mounted) {
-      context.push('/browser?url=${Uri.encodeComponent(url)}');
-    } else if (choice == 1) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  void _openInBrowser(BuildContext context) {
+    context.push('/browser?url=${Uri.encodeComponent(url)}');
   }
 
   void _copyLink(BuildContext context) {

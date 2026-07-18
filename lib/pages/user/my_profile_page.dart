@@ -71,10 +71,38 @@ class ProfilePage extends StatelessWidget {
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(
+                  leading: const Icon(Icons.people_alt_outlined),
+                  title: const Text('在线用户'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/online'),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
                   leading: const Icon(Icons.history_outlined),
                   title: const Text('浏览记录'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/history'),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.forum_outlined),
+                  title: const Text('我的帖子'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/my-threads'),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.reply_outlined),
+                  title: const Text('最近回复'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/my-threads?type=reply'),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.bookmark_outline),
+                  title: const Text('我的收藏'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/favorite'),
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(

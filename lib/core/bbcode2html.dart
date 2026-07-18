@@ -75,8 +75,26 @@ class BBCode2Html {
 
     // ========== 3. 替换 BBCode 标签 ==========
 
-    // 字体尺寸 [size=N]
-    html = _replaceTag(html, 'size', (_, v) => '<font size="$v">', '</font>');
+    // 字体尺寸 [size=N] — 1~9 映射到 CSS px，支持直接写 xxpx
+    html = _replaceTag(html, 'size', (_, v) {
+      final trimmed = v.trim();
+      if (trimmed.endsWith('px')) {
+        return '<span style="font-size:$trimmed">';
+      }
+      final px = switch (trimmed) {
+        '1' => '10',
+        '2' => '12',
+        '3' => '14',
+        '4' => '18',
+        '5' => '24',
+        '6' => '32',
+        '7' => '48',
+        '8' => '64',
+        '9' => '80',
+        _ => trimmed,
+      };
+      return '<span style="font-size:${px}px">';
+    }, '</span>');
 
     // 颜色 [color=...]
     html = _replaceTag(html, 'color', (_, v) => '<font color="$v">', '</font>');
@@ -112,8 +130,13 @@ class BBCode2Html {
       (_) => '</i>',
     );
 
-    // 字体 [font=...]
-    html = _replaceTag(html, 'font', (_, v) => '<font face="$v">', '</font>');
+    // 字体 [font=xxx]
+    html = _replaceTag(
+      html,
+      'font',
+      (_, v) => '<span style="font-family:${v.trim()}">',
+      '</span>',
+    );
 
     // 下划线
     html = html.replaceAllMapped(
@@ -144,20 +167,19 @@ class BBCode2Html {
     // 引用 [quote]...[/quote]
     html = html.replaceAllMapped(
       RegExp(r'\[quote\]([\s\S]*?)\[/quote\]', caseSensitive: false),
-      (m) => '<blockquote>${m.group(1)}</blockquote>',
+      (m) => '<blockquote>${_labelBlock('引用', m.group(1)!)}</blockquote>',
     );
 
     // 免费信息 [free]...[/free]
     html = html.replaceAllMapped(
       RegExp(r'\[free\]([\s\S]*?)\[/free\]', caseSensitive: false),
-      (m) => '<div class="bbcode-free">${m.group(1)}</div>',
+      (m) => '<blockquote>${_labelBlock('免费内容', m.group(1)!)}</blockquote>',
     );
 
     // 隐藏内容 [hide]...[/hide]（支持 [hide=参数]）
     html = html.replaceAllMapped(
       RegExp(r'\[hide(?:=[^\]]*)?\]([\s\S]*?)\[/hide\]', caseSensitive: false),
-      (m) =>
-          '<div class="bbcode-hide"><span>隐藏内容:</span><br>${m.group(1)}</div>',
+      (m) => '<blockquote>${_labelBlock('隐藏内容', m.group(1)!)}</blockquote>',
     );
 
     // 列表 [list] / [list=1] / [list=a]
@@ -525,5 +547,11 @@ class BBCode2Html {
     }
 
     return html;
+  }
+
+  /// 内容块标识 — 橙色标签 + 换行 + 内容
+  /// 用于 quote / free / hide 等块级 BBCode
+  String _labelBlock(String label, String content) {
+    return '<span style="color:#FF9900">$label:</span><br>$content';
   }
 }

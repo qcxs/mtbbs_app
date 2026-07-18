@@ -3,14 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:html/parser.dart' as htmlParser;
+import 'package:dio/dio.dart';
 import '../../widgets/page_actions.dart';
 import '../../config/site_config.dart';
 import '../../widgets/rate_dialog.dart';
 import '../../widgets/kick_dialog.dart';
 import '../../widgets/favorite_dialog.dart';
-import '../../widgets/thread_post_card.dart';
-import '../../widgets/thread_comment_list.dart';
 import '../../widgets/page_error_widget.dart';
+import '../../widgets/thread_post_card.dart';
 import '../../services/thread_detail_api.dart';
 import '../../services/api_service.dart';
 import '../../core/logger.dart';
@@ -19,88 +19,127 @@ import '../../models/browse_record.dart';
 import '../../providers/history_provider.dart';
 import '../../api/forum/viewthread/action/export.dart' as action_api;
 import '../../auth/providers/auth_provider.dart';
-import '../../providers/settings_provider.dart';
+import 'thread_view_comment_section.dart';
+import 'thread_view_main_post.dart';
 
 /// 帖子浏览页（渲染 BBCode）
 ///
 /// 宽屏（> 600px）时评论显示在右侧，窄屏时显示在底部。
-/// 加载策略：不论指定 [initialPage] 为何值，先加载第 1 页获取帖子信息和总页数，
-/// 若 [initialPage] > 1 且不超过总页数，再加载该页的评论替换第 1 页的评论。
+///
+/// 参数组合：
+/// - 只有 [tid]：显示帖子标题 + 主帖占位 + 第 1 页评论。
+/// - [tid] + [initialPage]：加载指定页评论。
+/// - [tid] + [pid]：通过 redirect 解析实际 page，自动跳到对应页。
 class ThreadViewPage extends StatefulWidget {
   final String tid;
-
-  /// 目标页码。默认 1。
-  /// 设为 > 1 时：先加载第 1 页获取帖子信息，再加载此页评论。
   final int initialPage;
+  final String? pid;
 
-  const ThreadViewPage({super.key, required this.tid, this.initialPage = 1});
+  const ThreadViewPage({
+    super.key,
+    required this.tid,
+    this.initialPage = 1,
+    this.pid,
+  });
 
   @override
   State<ThreadViewPage> createState() => _ThreadViewPageState();
 }
 
 class _ThreadViewPageState extends State<ThreadViewPage> {
-  ThreadViewData? _data; // 帖子信息（来自第 1 页）
-  List<PostItem> _allPosts = []; // 评论列表（来自目标页 + 加载更多）
+  // ---- 帖子基本信息（加载一次，来自第 1 页） ----
+  ThreadViewData? _data;
   bool _loading = true;
-  bool _isLoadingMore = false;
-  bool _hasMore = false;
   String? _error;
 
-  /// 当前评论列表所在的页码（区别于 _data.currentPage 来自第 1 页）
-  int _commentsPage = 0;
+  // ---- 主帖 ----
+  bool _mainPostLoaded = false;
 
-  // 操作状态
+  // ---- 评论分页 ----
+  final Map<int, List<PostItem>> _commentPages = {};
+  int _currentPage = 1;
+  int _totalPages = 1;
+  bool _pageLoading = false;
+
+  // ---- 预加载 ----
+  bool _preloading = false;
+
+  // ---- 滚动 ----
+  final ScrollController _scrollController = ScrollController();
+
+  // ---- pid 定位 ----
+  final Map<String, GlobalKey> _postKeys = {};
+
+  // ---- 操作状态 ----
   bool _liked = false;
   bool _favorited = false;
 
   @override
   void initState() {
     super.initState();
-    _loadThread();
+    _loadInitial();
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _navigateReply(String pid, String username) {
-    if (_data == null) return;
-    context.push('/editor?type=reply&tid=${widget.tid}&pid=$pid');
+  // ==================== 加载逻辑 ====================
+
+  /// 通过 redirect（允许重定向）获取 pid 对应的真实 page
+  Future<int> _resolveRedirectPage() async {
+    final pid = widget.pid;
+    if (pid == null || pid.isEmpty) return 1;
+    try {
+      final dio = ApiService().dio;
+      final response = await dio.get(
+        '/forum.php?mod=redirect&goto=findpost&pid=$pid&ptid=${widget.tid}',
+        options: Options(validateStatus: (status) => true),
+      );
+      for (final r in response.redirects.reversed) {
+        final pageStr = r.location.queryParameters['page'];
+        if (pageStr != null && pageStr.isNotEmpty) {
+          final p = int.tryParse(pageStr) ?? 1;
+          AppLogger.i('PAGE', 'redirect pid=$pid → page=$p');
+          return p;
+        }
+      }
+      return 1;
+    } catch (e) {
+      AppLogger.w('PAGE', 'resolve redirect page error: $e');
+      return 1;
+    }
   }
 
-  void _navigateComment() {
-    if (_data == null) return;
-    context.push('/editor?type=comment&tid=${widget.tid}');
-  }
-
-  /// 两步加载：
-  /// 1. 始终加载第 1 页 → 获取帖子信息、总页数
-  /// 2. 若 initialPage > 1 且 <= 总页数，加载对应页的评论
-  Future<void> _loadThread() async {
+  /// 初始加载
+  Future<void> _loadInitial() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
-      // Step 1：加载第 1 页（帖子信息）
+      int targetPage = widget.initialPage;
+      bool pidMode = false;
+      if (widget.pid != null && widget.pid!.isNotEmpty) {
+        targetPage = await _resolveRedirectPage();
+        pidMode = true;
+      }
       final page1Data = await ThreadDetailApi.fetch(widget.tid, page: 1);
       if (!mounted) return;
       final d = page1Data!;
+      _totalPages = d.totalPages;
+      _data = d;
+      _liked = d.mainPost?.isLiked ?? false;
 
-      // 保存帖子信息和浏览记录
       final title = d.title.isNotEmpty ? d.title : '帖子${widget.tid}';
-      final routePath = widget.initialPage > 1
-          ? '/thread/${widget.tid}?page=${widget.initialPage}'
-          : '/thread/${widget.tid}';
       context.read<HistoryProvider>().addRecord(
         BrowseRecord(
           id: 'thread_${widget.tid}',
           type: 'thread',
           title: title,
-          routePath: routePath,
+          routePath: '/thread/${widget.tid}',
           timestamp: DateTime.now(),
           info: {
             'tid': widget.tid,
@@ -114,66 +153,21 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         ),
       );
 
+      _commentPages[1] = List<PostItem>.from(d.posts);
+      _currentPage = targetPage.clamp(1, _totalPages);
+      _mainPostLoaded = _currentPage == 1;
+
       AppLogger.i(
         'PAGE',
-        'ThreadViewPage loaded: tid=${widget.tid}, title=$title, totalPages=${d.totalPages}',
+        'ThreadViewPage init: tid=${widget.tid}, title=$title, '
+            'totalPages=$_totalPages, targetPage=$_currentPage${pidMode ? ' (pid)' : ''}',
       );
 
       setState(() {
-        _data = d;
-        _liked = d.mainPost?.isLiked ?? false;
+        _loading = false;
       });
-
-      // Step 2：确定评论来自哪一页
-      int targetPage;
-      if (widget.initialPage > 1 && widget.initialPage <= d.totalPages) {
-        targetPage = widget.initialPage;
-      } else {
-        targetPage = 1;
-      }
-
-      if (targetPage == 1) {
-        // 直接使用第 1 页的评论
-        setState(() {
-          _allPosts = List<PostItem>.from(d.posts);
-          _commentsPage = 1;
-          _hasMore = d.totalPages > 1;
-          _loading = false;
-        });
-      } else {
-        // 加载目标页的评论（忽略第 1 页的评论）
-        try {
-          final targetData = await ThreadDetailApi.fetch(
-            widget.tid,
-            page: targetPage,
-          );
-          if (!mounted) return;
-
-          // 论坛对超出范围的 page 会返回最后一页，用实际返回的 page 更新
-          final actualPage = targetData!.currentPage;
-          setState(() {
-            _allPosts = List<PostItem>.from(targetData.posts);
-            _commentsPage = actualPage;
-            _hasMore = actualPage < targetData.totalPages;
-            _loading = false;
-          });
-
-          AppLogger.i(
-            'PAGE',
-            'ThreadViewPage target page: requested=$targetPage, actual=$actualPage, ${targetData.posts.length} posts',
-          );
-        } catch (e) {
-          // 目标页加载失败，回退到第 1 页的评论
-          if (!mounted) return;
-          AppLogger.w('PAGE', 'ThreadViewPage target page load failed: $e');
-          setState(() {
-            _allPosts = List<PostItem>.from(d.posts);
-            _commentsPage = 1;
-            _hasMore = d.totalPages > 1;
-            _loading = false;
-          });
-        }
-      }
+      if (_currentPage > 1) await _loadCommentPage(_currentPage);
+      if (pidMode) _scrollToPid();
     } catch (e) {
       if (mounted) {
         final msg = e.toString();
@@ -189,14 +183,129 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     }
   }
 
-  /// 刷新：重新执行完整两步加载
-  Future<void> _onRefresh() => _loadThread();
+  Future<void> _loadCommentPage(int page) async {
+    if (_commentPages.containsKey(page) || _pageLoading) return;
+    setState(() {
+      _pageLoading = true;
+    });
+    try {
+      final data = await ThreadDetailApi.fetch(widget.tid, page: page);
+      if (!mounted) return;
+      final actualPage = data!.currentPage;
+      _commentPages[actualPage] = List<PostItem>.from(data.posts);
+      _currentPage = actualPage;
+      AppLogger.i(
+        'PAGE',
+        'loaded comment page $actualPage (${data.posts.length} posts)',
+      );
+    } catch (e) {
+      AppLogger.w('PAGE', 'load comment page $page error: $e');
+    }
+    if (mounted)
+      setState(() {
+        _pageLoading = false;
+      });
+  }
+
+  void _preloadAdjacentPages() {
+    if (_preloading) return;
+    final next = _currentPage + 1;
+    if (next <= _totalPages && !_commentPages.containsKey(next)) {
+      _doPreload(next);
+      return;
+    }
+    final prev = _currentPage - 1;
+    if (prev >= 1 && !_commentPages.containsKey(prev)) _doPreload(prev);
+  }
+
+  void _doPreload(int page) {
+    _preloading = true;
+    ThreadDetailApi.fetch(widget.tid, page: page)
+        .then((data) {
+          if (data != null && mounted) {
+            _commentPages[data.currentPage] = List<PostItem>.from(data.posts);
+            if (mounted) setState(() {});
+          }
+          _preloading = false;
+        })
+        .catchError((_) {
+          _preloading = false;
+        });
+  }
+
+  void _goToPage(int page) {
+    if (page < 1 || page > _totalPages || page == _currentPage) return;
+    setState(() {
+      _currentPage = page;
+    });
+    if (!_commentPages.containsKey(page)) _loadCommentPage(page);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final posts = _commentPages[_currentPage];
+      if (posts != null && posts.isNotEmpty) {
+        final firstKey = _postKeys[posts.first.pid];
+        if (firstKey?.currentContext != null) {
+          Scrollable.ensureVisible(
+            firstKey!.currentContext!,
+            duration: const Duration(milliseconds: 200),
+            alignment: 0.0,
+          );
+        }
+      }
+    });
+  }
+
+  void _scrollToPid() {
+    final pid = widget.pid;
+    if (pid == null || pid.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _postKeys[pid];
+      if (key?.currentContext == null) return;
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 300),
+        alignment: 0.3,
+      );
+    });
+  }
+
+  Future<void> _onRefresh() async {
+    if (_loading || _pageLoading) return;
+    AppLogger.i('PAGE', 'refresh: page1 + page$_currentPage');
+    if (_currentPage == 1) {
+      _commentPages.remove(1);
+      await _loadInitial();
+      return;
+    }
+    _commentPages.remove(1);
+    _data = null;
+    try {
+      final d = await ThreadDetailApi.fetch(widget.tid, page: 1);
+      if (d != null && mounted) {
+        _commentPages[1] = List<PostItem>.from(d.posts);
+        _totalPages = d.totalPages;
+        _data = d;
+        _liked = d.mainPost?.isLiked ?? false;
+      }
+    } catch (_) {}
+    _commentPages.remove(_currentPage);
+    if (mounted) await _loadCommentPage(_currentPage);
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollEndNotification) {
+      final metrics = notification.metrics;
+      if (metrics.maxScrollExtent > 0 &&
+          metrics.pixels >= metrics.maxScrollExtent - 280) {
+        _preloadAdjacentPages();
+      }
+    }
+    return false;
+  }
 
   // ==================== 帖子操作 ====================
 
   Future<void> _handleRecommend(PostItem post) async {
     if (post.recommendUrl.isEmpty) return;
-
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       ScaffoldMessenger.of(
@@ -204,16 +313,13 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       ).showSnackBar(const SnackBar(content: Text('请先登录')));
       return;
     }
-
     try {
       final result = await action_api.doRecommend(
         ApiService().dio,
         post.recommendUrl,
       );
       if (!mounted) return;
-      if (result.success) {
-        setState(() => _liked = !_liked);
-      }
+      if (result.success) setState(() => _liked = !_liked);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result.message.isNotEmpty ? result.message : '操作成功'),
@@ -229,7 +335,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   Future<void> _handleFavorite(PostItem post) async {
     if (post.favoriteUrl.isEmpty) return;
-
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       ScaffoldMessenger.of(
@@ -237,16 +342,12 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       ).showSnackBar(const SnackBar(content: Text('请先登录')));
       return;
     }
-
     final result = await showFavoriteDialog(context, '', post.favoriteUrl);
-    if (result == true && mounted) {
-      setState(() => _favorited = true);
-    }
+    if (result == true && mounted) setState(() => _favorited = true);
   }
 
   Future<void> _handleRate(PostItem post) async {
     if (post.rateUrl.isEmpty) return;
-
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       ScaffoldMessenger.of(
@@ -254,13 +355,11 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       ).showSnackBar(const SnackBar(content: Text('请先登录')));
       return;
     }
-
     await showRateDialog(context, '', post.rateUrl);
   }
 
   Future<void> _handleKick(PostItem post) async {
     if (post.kickUrl.isEmpty) return;
-
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       ScaffoldMessenger.of(
@@ -268,11 +367,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       ).showSnackBar(const SnackBar(content: Text('请先登录')));
       return;
     }
-
     final result = await showKickDialog(context, '', post.kickUrl);
-    if (result == true && mounted) {
-      _loadThread();
-    }
+    if (result == true && mounted) _loadInitial();
   }
 
   void _showBbcodeDialog(PostItem post) {
@@ -325,11 +421,11 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   void _editPost(PostItem post) {
     final isOp = post.pid == _data?.mainPost?.pid;
-    final type = isOp ? 'editPost' : 'editReply';
-    context.push('/editor?type=$type&tid=${widget.tid}&pid=${post.pid}');
+    context.push(
+      '/editor?type=${isOp ? 'editPost' : 'editReply'}&tid=${widget.tid}&pid=${post.pid}',
+    );
   }
 
-  /// 通过 repquote 获取帖子/评论的详细时间信息
   Future<void> _fetchPostDetailInfo(PostItem post) async {
     final url =
         '/forum.php?mod=post&action=reply&fid=2&tid=${widget.tid}&repquote=${post.pid}&page=1';
@@ -338,29 +434,20 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       if (!mounted) return;
       final body = resp.data is String ? (resp.data as String) : '';
       final doc = htmlParser.parse(body);
-
-      String? extractField(String name) {
-        final el = doc.querySelector('input[name="$name"]');
-        return el?.attributes['value'];
-      }
-
+      String? extractField(String name) =>
+          doc.querySelector('input[name="$name"]')?.attributes['value'];
       final noticetrimstr = extractField('noticetrimstr') ?? '';
-
       String? postTime;
       final timeMatch = RegExp(
         r'发表于\s+(\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2})',
       ).firstMatch(noticetrimstr);
-      if (timeMatch != null) {
-        postTime = timeMatch.group(1);
-      }
-
+      if (timeMatch != null) postTime = timeMatch.group(1);
       if (mounted) {
         final time = postTime ?? post.postTime;
-        if (time.isNotEmpty) {
+        if (time.isNotEmpty)
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text('发表于 $time')));
-        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -370,8 +457,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     }
   }
 
-  // ==================== 回复/编辑/动作 ====================
-
   void _copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -379,40 +464,47 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     );
   }
 
-  void _onLoadMore() async {
-    if (_isLoadingMore || !_hasMore || _data == null) return;
-    final nextPage = _commentsPage + 1;
-    if (nextPage > _data!.totalPages) return;
-
-    setState(() => _isLoadingMore = true);
-
-    try {
-      final data = await ThreadDetailApi.fetch(widget.tid, page: nextPage);
-      if (!mounted) return;
-      final d = data!;
-      setState(() {
-        _allPosts.addAll(d.posts);
-        _commentsPage = d.currentPage; // 使用实际返回的页码
-        _hasMore = d.currentPage < d.totalPages;
-        _isLoadingMore = false;
-      });
-    } catch (e) {
-      if (mounted) {
-        AppLogger.w('PAGE', 'ThreadViewPage load more error: $e');
-        setState(() => _isLoadingMore = false);
-      }
-    }
+  void _showPagePicker() {
+    final controller = TextEditingController(text: '$_currentPage');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('跳转页码'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入页码',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final p = int.tryParse(controller.text);
+              if (p != null && p >= 1 && p <= _totalPages) {
+                Navigator.of(ctx).pop();
+                _goToPage(p);
+              }
+            },
+            child: const Text('跳转'),
+          ),
+        ],
+      ),
+    );
   }
 
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollEndNotification) {
-      final metrics = notification.metrics;
-      if (metrics.maxScrollExtent > 0 &&
-          metrics.pixels >= metrics.maxScrollExtent - 280) {
-        _onLoadMore();
-      }
-    }
-    return false;
+  // ==================== 导航 ====================
+
+  void _navigateComment() {
+    if (_data == null) return;
+    context.push('/editor?type=comment&tid=${widget.tid}');
   }
 
   // ==================== Build ====================
@@ -433,7 +525,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         actions: [
           PageActions(
             url: _threadUrl,
-            onRefresh: () => _loadThread(),
+            onRefresh: () => _loadInitial(),
             loading: _loading,
             copyLabel: '复制帖子链接',
           ),
@@ -441,19 +533,16 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          if (_loading) {
+          if (_loading)
             return const Center(
               child: CircularProgressIndicator(strokeWidth: 2),
             );
-          }
-          if (_error != null) {
+          if (_error != null)
             return PageErrorWidget(
               message: _error!,
-              onRetry: () => _loadThread(),
+              onRetry: () => _loadInitial(),
             );
-          }
           if (_data == null) return const Center(child: Text('暂无数据'));
-
           final isWide = constraints.maxWidth > 600;
           if (isWide) return _buildWideLayout();
           return _buildNarrowLayout();
@@ -463,7 +552,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     );
   }
 
-  // ==================== 宽屏布局 ====================
+  // ==================== 布局 ====================
 
   Widget _buildWideLayout() {
     return Row(
@@ -475,71 +564,54 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
             padding: const EdgeInsets.all(8),
             children: [
               if (_data!.title.isNotEmpty) _buildTitleSection(),
-              if (_data!.mainPost != null) ...[
-                _buildMainPostCard(_data!.mainPost!),
-                const Divider(height: 1),
-              ],
+              if (_data!.mainPost != null) _buildMainPostSection(),
             ],
           ),
         ),
         Container(width: 1, color: Colors.grey.shade300),
-        Expanded(flex: 2, child: _buildCommentSection()),
+        Expanded(flex: 2, child: _buildCommentColumn()),
       ],
     );
   }
 
-  // ==================== 窄屏布局 ====================
-
   Widget _buildNarrowLayout() {
-    if (_allPosts.isEmpty && _data!.mainPost == null) {
+    final currentPosts = _commentPages[_currentPage];
+    if ((currentPosts == null || currentPosts.isEmpty) &&
+        _data!.mainPost == null &&
+        !_pageLoading) {
       return const Center(child: Text('暂无数据'));
     }
-
-    final auth = context.watch<AuthProvider>();
-    final settings = context.watch<SettingsProvider>();
-
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: RefreshIndicator(
         onRefresh: _onRefresh,
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             if (_data!.title.isNotEmpty)
               SliverToBoxAdapter(child: _buildTitleSection()),
             if (_data!.mainPost != null) ...[
-              SliverToBoxAdapter(child: _buildMainPostCard(_data!.mainPost!)),
+              SliverToBoxAdapter(child: _buildMainPostSection()),
               SliverToBoxAdapter(child: const Divider(height: 1)),
             ],
-            SliverToBoxAdapter(
-              child: ThreadCommentList(
-                posts: _allPosts,
-                tid: widget.tid,
-                isLoadingMore: _isLoadingMore,
-                hasMore: _hasMore,
-                isLoggedIn: auth.isLoggedIn,
-                currentUid: auth.uid,
-                globalDisabledTags: settings.disabledBbcodeTags,
-                scrollable: false,
-                onRefresh: _onRefresh,
-                onLoadMore: _onLoadMore,
-                onReply: (post) => _navigateReply(post.pid, post.username),
-                onRecommend: _handleRecommend,
-                onFavorite: _handleFavorite,
-                onRate: _handleRate,
-                onKick: _handleKick,
-                onPopupAction: (action, post) {
-                  switch (action) {
-                    case PostCardAction.showBbcode:
-                      _showBbcodeDialog(post);
-                    case PostCardAction.editPost:
-                      _editPost(post);
-                    case PostCardAction.viewTime:
-                      _fetchPostDetailInfo(post);
-                  }
-                },
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: CommentHeaderDelegate(
+                child: CommentSection.buildHeader(
+                  currentPage: _currentPage,
+                  totalPages: _totalPages,
+                  pageLoading: _pageLoading,
+                  onPrev: _currentPage > 1
+                      ? () => _goToPage(_currentPage - 1)
+                      : null,
+                  onNext: _currentPage < _totalPages
+                      ? () => _goToPage(_currentPage + 1)
+                      : null,
+                  onPageTap: _showPagePicker,
+                ),
               ),
             ),
-            // 底部留白，避免被回复栏遮挡最后一条
+            SliverToBoxAdapter(child: _buildCommentContent()),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: MediaQuery.of(context).padding.bottom + 60,
@@ -551,23 +623,24 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     );
   }
 
-  // ==================== 评论区组件（供宽屏使用）====================
+  // ==================== 评论区 ====================
 
-  Widget _buildCommentSection() {
-    final auth = context.watch<AuthProvider>();
-    final settings = context.watch<SettingsProvider>();
-    return ThreadCommentList(
-      posts: _allPosts,
+  Widget _buildCommentContent() {
+    final currentPosts = _commentPages[_currentPage];
+    if (currentPosts == null && _pageLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    return CommentSection(
+      posts: currentPosts ?? [],
+      postKeys: _postKeys,
+      currentPage: _currentPage,
+      totalPages: _totalPages,
+      pageLoading: _pageLoading,
       tid: widget.tid,
-      isLoadingMore: _isLoadingMore,
-      hasMore: _hasMore,
-      isLoggedIn: auth.isLoggedIn,
-      currentUid: auth.uid,
-      globalDisabledTags: settings.disabledBbcodeTags,
-      onRefresh: _onRefresh,
       onScrollNotification: _handleScrollNotification,
-      onLoadMore: _onLoadMore,
-      onReply: (post) => _navigateReply(post.pid, post.username),
       onRecommend: _handleRecommend,
       onFavorite: _handleFavorite,
       onRate: _handleRate,
@@ -585,20 +658,41 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     );
   }
 
-  // ==================== 主帖卡片 ====================
+  Widget _buildCommentColumn() {
+    return Column(
+      children: [
+        CommentSection.buildHeader(
+          currentPage: _currentPage,
+          totalPages: _totalPages,
+          pageLoading: _pageLoading,
+          onPrev: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
+          onNext: _currentPage < _totalPages
+              ? () => _goToPage(_currentPage + 1)
+              : null,
+          onPageTap: _showPagePicker,
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: _buildCommentContent(),
+          ),
+        ),
+      ],
+    );
+  }
 
-  Widget _buildMainPostCard(PostItem post) {
-    final auth = context.watch<AuthProvider>();
-    final settings = context.watch<SettingsProvider>();
-    return ThreadPostCard(
+  // ==================== 主帖 ====================
+
+  Widget _buildMainPostSection() {
+    final post = _data!.mainPost!;
+    return MainPostSection(
       post: post,
-      index: 0,
-      tid: widget.tid,
+      isLoaded: _mainPostLoaded,
       isLiked: _liked,
       isFavorited: _favorited,
-      isLoggedIn: auth.isLoggedIn,
-      currentUid: auth.uid,
-      globalDisabledTags: settings.disabledBbcodeTags,
+      tid: widget.tid,
+      onTap: () => setState(() => _mainPostLoaded = true),
       onRecommend: () => _handleRecommend(post),
       onFavorite: () => _handleFavorite(post),
       onRate: () => _handleRate(post),
@@ -615,6 +709,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       },
     );
   }
+
+  // ==================== 杂项组件 ====================
 
   Widget _buildReplyBar() {
     if (_data == null) return const SizedBox.shrink();
