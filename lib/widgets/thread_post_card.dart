@@ -94,7 +94,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
         children: [
           if (totalScore.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 totalScore,
                 style: TextStyle(
@@ -104,61 +104,88 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                 ),
               ),
             ),
-          // 表头
-          _rateRow([
-            _rateCell(Text('用户', style: _rateHeaderStyle)),
-            ...columns.map(
-              (c) => _rateCell(Text(c.toString(), style: _rateHeaderStyle)),
-            ),
-            if (hasReason) _rateCell(Text('理由', style: _rateHeaderStyle)),
-          ]),
-          const Divider(height: 1, color: Colors.orange),
-          // 数据行
-          ...entries.map((e) {
-            final m = e as Map<String, dynamic>;
-            final username = m['username'] as String? ?? '';
-            final uid = m['uid'] as String? ?? '';
-            final scores = m['scores'] as List<dynamic>? ?? [];
-            final reason = m['reason'] as String? ?? '';
-            return _rateRow([
-              _rateCell(
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Table(
+              border: TableBorder.all(
+                color: Colors.orange.shade200,
+                width: 0.5,
+              ),
+              defaultColumnWidth: const IntrinsicColumnWidth(),
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              children: [
+                // 表头行
+                TableRow(
+                  decoration: BoxDecoration(color: Colors.orange.shade100),
                   children: [
-                    UserAvatar(uid: uid, nickname: username, radius: 10),
-                    const SizedBox(width: 4),
-                    Text(
-                      username,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade700,
+                    _rateCell(Text('用户', style: _rateHeaderStyle)),
+                    ...columns.map(
+                      (c) => _rateCell(
+                        Text(c.toString(), style: _rateHeaderStyle),
                       ),
                     ),
+                    if (hasReason)
+                      _rateCell(Text('理由', style: _rateHeaderStyle)),
                   ],
                 ),
-              ),
-              ...scores.map(
-                (s) => _rateCell(
-                  Text(
-                    s.toString(),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.orange.shade700,
-                    ),
-                  ),
-                ),
-              ),
-              if (hasReason)
-                _rateCell(
-                  Text(
-                    reason,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ]);
-          }),
+                // 数据行
+                ...entries.map((e) {
+                  final m = e as Map<String, dynamic>;
+                  final username = m['username'] as String? ?? '';
+                  final uid = m['uid'] as String? ?? '';
+                  final scores = m['scores'] as List<dynamic>? ?? [];
+                  final reason = m['reason'] as String? ?? '';
+                  return TableRow(
+                    children: [
+                      _rateCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            UserAvatar(
+                              uid: uid,
+                              nickname: username,
+                              radius: 10,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              username,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ...scores.map(
+                        (s) => _rateCell(
+                          Text(
+                            s.toString(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (hasReason)
+                        _rateCell(
+                          Text(
+                            reason,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -167,29 +194,15 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
   TextStyle get _rateHeaderStyle => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: Colors.grey.shade600,
+    color: Colors.orange.shade800,
   );
 
-  /// 单行横向排列
-  Widget _rateRow(List<Widget> cells) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: cells
-            .map(
-              (c) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: c,
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-
-  /// 评分表格中的单元格
+  /// 评分表格单元格
   Widget _rateCell(Widget child) {
-    return child;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: child,
+    );
   }
 
   @override

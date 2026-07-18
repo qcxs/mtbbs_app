@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/site_config.dart';
 import '../config/toolbar_config.dart';
 import '../core/shortcut_helper.dart';
-import '../services/credit_api.dart';
+import '../api/home/credit/export.dart' as credit_api;
+import '../services/api_service.dart';
 import '../models/managed_item.dart';
 
 /// 设置管理
@@ -656,7 +657,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<String?> fetchAndUpdateFormula() async {
     try {
-      final result = await CreditApi.fetch();
+      final result = await credit_api.fetch(ApiService().dio);
       if (result['success'] == true && result['formula'] != null) {
         _creditFormula = result['formula'] as String;
         final prefs = await SharedPreferences.getInstance();

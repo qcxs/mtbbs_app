@@ -1,12 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_html/flutter_html.dart';
 import '../core/bbcode2html.dart';
+import '../core/emoji_loader.dart';
 import '../core/url_router.dart';
 import '../config/site_config.dart';
+import '../providers/settings_provider.dart';
+import 'bbcode_table.dart';
+import 'bbcode_code_block.dart';
 import 'image_preview/image_preview.dart';
+
+/// 渲染段类型
+sealed class _Segment {}
+
+class _HtmlSegment extends _Segment {
+  final String content;
+  _HtmlSegment(this.content);
+}
+
+class _TableSegment extends _Segment {
+  final String content;
+  _TableSegment(this.content);
+}
+
+class _CodeSegment extends _Segment {
+  final String content;
+  _CodeSegment(this.content);
+}
 
 /// 可被全局/局部禁用的 BBCode 样式标签（从旧 PostAstWidget 迁移）
 const bbcodeStyleTags = <String>{
@@ -55,7 +78,87 @@ class PostHtmlWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. BBCode → HTML
+    final settings = context.watch<SettingsProvider>();
+    final effectiveDisabled = disabledTags ?? settings.disabledBbcodeTags;
+
+    // 1. 先按 [code] 分割，再对非 code 段按 [table] 分割
+    final segments = _buildSegments(bbcode);
+    if (segments.length == 1 && segments.first is _HtmlSegment) {
+      // 无 code 也无 table：保持原有路径（单个 Html widget）
+      return _buildHtmlSegment(
+        context,
+        bbcode,
+        fontSize,
+        emojiMap,
+        smilieIdMap,
+        effectiveDisabled,
+        autoDetectUrls,
+      );
+    }
+
+    // 有 code/table 时分段渲染
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final segment in segments)
+          switch (segment) {
+            _HtmlSegment(:final content) => _buildHtmlSegment(
+              context,
+              content,
+              fontSize,
+              emojiMap,
+              smilieIdMap,
+              effectiveDisabled,
+              autoDetectUrls,
+            ),
+            _TableSegment(:final content) => BbcodeTableWidget(
+              bbcode: content,
+              fontSize: fontSize,
+              emojiMap: emojiMap,
+              smilieIdMap: smilieIdMap ?? EmojiService().smilieIdMap,
+              disabledTags: effectiveDisabled,
+              autoDetectUrls: autoDetectUrls,
+            ),
+            _CodeSegment(:final content) => BbcodeCodeBlock(
+              code: content,
+              fontSize: fontSize.clamp(11, 16).toDouble(),
+            ),
+          },
+      ],
+    );
+  }
+
+  /// 生成渲染段列表：先按 [code] 分割，再对非 code 段按 [table] 分割
+  List<_Segment> _buildSegments(String bbcode) {
+    final result = <_Segment>[];
+    for (final codeSeg in splitByCode(bbcode)) {
+      if (codeSeg.isCode) {
+        result.add(_CodeSegment(codeSeg.content));
+      } else {
+        // 非 code 段，按 [table] 进一步分割
+        for (final tableSeg in splitByTable(codeSeg.content)) {
+          if (tableSeg.isTable) {
+            result.add(_TableSegment(tableSeg.content));
+          } else {
+            result.add(_HtmlSegment(tableSeg.content));
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  /// 构建一段纯 HTML/BBCode 渲染（不含表格）
+  static Widget _buildHtmlSegment(
+    BuildContext context,
+    String bbcodeContent,
+    double fontSize,
+    Map<String, String>? emojiMap,
+    Map<String, String>? smilieIdMap,
+    Set<String> disabledTags,
+    bool autoDetectUrls,
+  ) {
     final converter = BBCode2Html(
       emojiMap: emojiMap,
       smilieIdMap: smilieIdMap,
@@ -63,53 +166,43 @@ class PostHtmlWidget extends StatelessWidget {
       baseUrl: SiteConfig.baseUrl,
       autoDetectUrls: autoDetectUrls,
     );
-    final html = converter.convert(bbcode);
-
-    // 2. 使用 flutter_html 渲染
+    final html = converter.convert(bbcodeContent);
     return Html(
       data: html,
       style: {
-        // 全局基础样式
         'body': Style(
           fontSize: FontSize(fontSize),
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
         ),
-        // 引用块 - 移除默认margin/padding避免背景空白
         'blockquote': Style(
           backgroundColor: const Color(0xFFFFF8E1),
           margin: Margins.zero,
           padding: HtmlPaddings.only(left: 12, top: 8, bottom: 8),
         ),
-        // 代码块
         'pre': Style(
           backgroundColor: const Color(0xFF1E1E1E),
           margin: Margins.zero,
         ),
         'code': Style(color: const Color(0xFF98C379), fontFamily: 'monospace'),
-        // 隐藏内容
         '.bbcode-hide': Style(
           backgroundColor: const Color(0xFFFFF8E1),
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
         ),
-        // 免费信息 - 移除默认margin避免背景空白
         '.bbcode-free': Style(
           backgroundColor: const Color(0xFFF0FFF0),
           margin: Margins.zero,
           padding: HtmlPaddings.all(8),
         ),
-        // 附件
         '.bbcode-attach': Style(
           backgroundColor: const Color(0xFFE3F2FD),
           margin: Margins.zero,
           padding: HtmlPaddings.all(8),
         ),
-        // 列表 - 移除默认padding避免缩进累加
         'ul': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
         'ol': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
         'li': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
-        // 分割线 — flutter_html 默认用 Border.all() 导致高度异常
         'hr': Style(
           height: Height(1),
           backgroundColor: Colors.grey.shade300,
@@ -117,20 +210,16 @@ class PostHtmlWidget extends StatelessWidget {
           margin: Margins.symmetric(vertical: 8),
           padding: HtmlPaddings.zero,
         ),
-        // 链接
         'a': Style(
           color: const Color(0xFF336699),
           textDecoration: TextDecoration.underline,
         ),
       },
-      // 图片长按查看（点击不消费事件，穿透给父级链接）
       extensions: [
         ImageExtension(
           builder: (ctx) {
             final src = ctx.attributes['src'] ?? '';
             if (src.isEmpty) return const SizedBox.shrink();
-
-            // 优先使用 width 属性（普通图片），否则解析 style 中的 height（表情）
             final w = ctx.attributes['width'];
             final width = w != null ? double.tryParse(w) : null;
             double? height;
@@ -147,7 +236,6 @@ class PostHtmlWidget extends StatelessWidget {
                 }
               }
             }
-
             return GestureDetector(
               onLongPress: () => showImageActions(
                 context,
@@ -165,7 +253,6 @@ class PostHtmlWidget extends StatelessWidget {
           },
         ),
       ],
-      // 链接点击
       onLinkTap: (link, attributes, element) {
         if (link != null && link.isNotEmpty) {
           _handleLinkTap(context, link);
@@ -174,7 +261,7 @@ class PostHtmlWidget extends StatelessWidget {
     );
   }
 
-  void _handleLinkTap(BuildContext context, String url) {
+  static void _handleLinkTap(BuildContext context, String url) {
     // QQ 链接特殊处理
     if (url.contains('wpa.qq.com')) {
       final qqMatch = RegExp(r'uin=(\d+)').firstMatch(url);
@@ -219,7 +306,7 @@ class PostHtmlWidget extends StatelessWidget {
     _showUrlEditDialog(context, url);
   }
 
-  Future<void> _showActionDialog(
+  static Future<void> _showActionDialog(
     BuildContext context, {
     required String title,
     required String message,
@@ -276,7 +363,10 @@ class PostHtmlWidget extends StatelessWidget {
   }
 
   /// 链接确认弹窗 — App打开（路由匹配）/ 外部浏览器 / 取消
-  Future<void> _showUrlEditDialog(BuildContext context, String url) async {
+  static Future<void> _showUrlEditDialog(
+    BuildContext context,
+    String url,
+  ) async {
     final action = await showDialog<String>(
       context: context,
       builder: (_) => _UrlActionDialog(url: url),

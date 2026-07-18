@@ -224,8 +224,23 @@ class BBCode2Html {
     // 表格
     html = html.replaceAllMapped(
       RegExp(r'\[td\]([\s\S]*?)\[\/td\]', caseSensitive: false),
-      (m) =>
-          '<td style="border:1px solid #E3EDF5;padding:4px 8px;">${m.group(1)}</td>',
+      (m) {
+        var content = m.group(1)!;
+        // 检测 td 内容是否被 <div align="XXX">...</div> 包裹
+        // 将 text-align 直接加到 td 样式上，避免 flutter_html 对 td 内块级元素的渲染问题
+        final trimmed = content.trim();
+        if (trimmed.startsWith('<div align="') && trimmed.endsWith('</div>')) {
+          final attrMatch = RegExp(
+            r'^<div\s+align="([^"]+)"\s*>',
+          ).firstMatch(trimmed);
+          if (attrMatch != null) {
+            final align = attrMatch.group(1)!;
+            final inner = trimmed.substring(attrMatch.end, trimmed.length - 6);
+            return '<td style="border:1px solid #E3EDF5;padding:4px 8px;text-align:$align">$inner</td>';
+          }
+        }
+        return '<td style="border:1px solid #E3EDF5;padding:4px 8px;">$content</td>';
+      },
     );
     html = html.replaceAllMapped(
       RegExp(r'\[tr\]([\s\S]*?)\[\/tr\]', caseSensitive: false),

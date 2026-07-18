@@ -69,6 +69,11 @@ dependencies:
   # HTML 渲染（BBCode → HTML → Widget）
   flutter_html: ^3.0.0
 
+  # 代码语法高亮
+  highlight: ^0.7.0
+  flutter_highlight: ^0.7.0
+  re_highlight: ^0.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

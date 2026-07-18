@@ -69,7 +69,7 @@ class Html2BBCode {
 
   String _format(String text) {
     return text
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .replaceAll(RegExp(r'\n{2,}'), '\n')
         .replaceAll(RegExp(r'[ \t]+'), ' ')
         .trim();
   }
@@ -382,6 +382,13 @@ class Html2BBCode {
 
     // 水平线
     if (tag == 'hr') return '[hr]';
+    // 表格
+    if (tag == 'table') return '[table]${_parseChildren(el)}[/table]';
+    if (tag == 'tr') return '[tr]${_parseChildren(el)}[/tr]';
+    if (tag == 'td' || tag == 'th') {
+      return '[$tag]${_parseChildren(el)}[/$tag]';
+    }
+    if (tag == 'tbody') return _parseChildren(el);
     // 嵌入对象（跳过）
     if (tag == 'embed' || tag == 'object') return '';
     // 换行

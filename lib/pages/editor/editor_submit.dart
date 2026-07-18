@@ -7,7 +7,7 @@ import 'package:mtbbs/core/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/forum/post/export.dart' as post_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
-import 'package:mtbbs/pages/editor/editor_page.dart';
+import 'package:mtbbs/models/editor_snapshot.dart';
 import 'package:mtbbs/widgets/bbcode_controller.dart';
 
 /// 编辑器页面加载和提交逻辑

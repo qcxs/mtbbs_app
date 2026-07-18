@@ -3,7 +3,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/site_config.dart';
-import '../../services/space_api.dart';
+import '../../api/home/space/export.dart' as space_api;
+import '../../services/api_service.dart';
+import '../../models/user_profile.dart';
 import '../../providers/settings_provider.dart';
 import '../../models/browse_record.dart';
 import '../../providers/history_provider.dart';
@@ -39,7 +41,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
       _error = null;
     });
     try {
-      final profile = await SpaceApi.fetch(uid: widget.uid);
+      final raw = await space_api.getUserProfile(
+        ApiService().dio,
+        uid: widget.uid,
+      );
+      final profile = raw['success'] == true && raw['profile'] != null
+          ? UserProfile.fromMap(raw['profile'] as Map<String, dynamic>)
+          : null;
       if (profile == null) {
         setState(() {
           _error = '加载失败';

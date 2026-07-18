@@ -36,10 +36,7 @@ import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
 
-/// 编辑器类型
-enum EditorType { post, comment, reply, editPost, editReply }
-
-/// 统一编辑器页面
+/// 编辑器页面
 ///
 /// 参数（通过 query parameters 传入）：
 ///   type — post（发帖）/ comment（评论）/ reply（回复评论）
@@ -70,6 +67,13 @@ class _ImageSheetData {
   const _ImageSheetData(this.images, this.loading);
 }
 
+/// 预览数据（防抖后更新）
+class _PreviewData {
+  final String title;
+  final String content;
+  const _PreviewData(this.title, this.content);
+}
+
 class _EditorPageState extends State<EditorPage> {
   // ==================== 核心控制器 ====================
   final _titleCtl = TextEditingController();
@@ -78,6 +82,10 @@ class _EditorPageState extends State<EditorPage> {
   final _undoController = UndoHistoryController();
   Map<String, String> _emojiMap = {};
   bool _showPreview = false;
+  Timer? _previewDebounce;
+  final ValueNotifier<_PreviewData> _previewData = ValueNotifier(
+    const _PreviewData('', ''),
+  );
   bool _isSubmitting = false;
   bool _loadingPage = false;
   String? _pageError;
@@ -285,6 +293,22 @@ class _EditorPageState extends State<EditorPage> {
     _updateHasChanges();
     _updateEmojiWarning();
     _resetAutoSaveTimer();
+    _schedulePreviewUpdate();
+  }
+
+  void _schedulePreviewUpdate() {
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final title = _titleCtl.text.trim();
+      final content = _contentCtl.text.trim();
+      final processed = _preparePreviewBbcode(content);
+      final newData = _PreviewData(title, processed);
+      if (_previewData.value.title != newData.title ||
+          _previewData.value.content != newData.content) {
+        _previewData.value = newData;
+      }
+    });
   }
 
   void _updateHasChanges() {
@@ -1221,6 +1245,8 @@ class _EditorPageState extends State<EditorPage> {
     _contentCtl.dispose();
     _contentFocusNode.dispose();
     _undoController.dispose();
+    _previewDebounce?.cancel();
+    _previewData.dispose();
     _autoSaveTimer?.cancel();
     if (!_isLeavingNormally && _hasUnsavedChanges) {
       try {
@@ -1416,8 +1442,10 @@ class _EditorPageState extends State<EditorPage> {
 
   // ==================== 布局 ====================
 
-  Widget _buildNarrowLayout() =>
-      _showPreview ? _buildPreview() : _buildEditor();
+  Widget _buildNarrowLayout() => IndexedStack(
+    index: _showPreview ? 1 : 0,
+    children: [_buildEditor(), _buildPreview()],
+  );
 
   Widget _buildWideLayout() => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1514,47 +1542,52 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildPreview() {
-    final title = _titleCtl.text.trim();
-    final content = _contentCtl.text.trim();
-    if (title.isEmpty && content.isEmpty) {
-      return Center(
-        child: Text('输入内容后即可预览', style: TextStyle(color: Colors.grey.shade400)),
-      );
-    }
-    final settings = context.read<SettingsProvider>();
-    final previewBbcode = _preparePreviewBbcode(content);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
+    return ValueListenableBuilder<_PreviewData>(
+      valueListenable: _previewData,
+      builder: (context, data, _) {
+        final settings = context.read<SettingsProvider>();
+        if (data.title.isEmpty && data.content.isEmpty) {
+          return Center(
+            child: Text(
+              '输入内容后即可预览',
+              style: TextStyle(color: Colors.grey.shade400),
             ),
-          content.isNotEmpty
-              ? GestureDetector(
-                  onLongPress: () =>
-                      _showRawBbcodeDialog(context, previewBbcode),
-                  child: PostHtmlWidget(
-                    bbcode: previewBbcode,
-                    emojiMap: _emojiMap,
-                    smilieIdMap: EmojiService().smilieIdMap,
-                    disabledTags: settings.disabledBbcodeTags,
-                    autoDetectUrls: settings.autoDetectUrls,
+          );
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (data.title.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    data.title,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
                   ),
-                )
-              : Text('暂无内容', style: TextStyle(color: Colors.grey.shade400)),
-        ],
-      ),
+                ),
+              data.content.isNotEmpty
+                  ? GestureDetector(
+                      onLongPress: () =>
+                          _showRawBbcodeDialog(context, data.content),
+                      child: PostHtmlWidget(
+                        bbcode: data.content,
+                        emojiMap: _emojiMap,
+                        smilieIdMap: EmojiService().smilieIdMap,
+                        disabledTags: settings.disabledBbcodeTags,
+                        autoDetectUrls: settings.autoDetectUrls,
+                      ),
+                    )
+                  : Text('暂无内容', style: TextStyle(color: Colors.grey.shade400)),
+            ],
+          ),
+        );
+      },
     );
   }
 

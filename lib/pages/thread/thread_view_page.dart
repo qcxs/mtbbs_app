@@ -11,13 +11,13 @@ import '../../widgets/kick_dialog.dart';
 import '../../widgets/favorite_dialog.dart';
 import '../../widgets/page_error_widget.dart';
 import '../../widgets/thread_post_card.dart';
-import '../../services/thread_detail_api.dart';
+import '../../api/forum/viewthread/detail/export.dart' as detail_api;
+import '../../api/forum/viewthread/action/export.dart' as action_api;
 import '../../services/api_service.dart';
 import '../../core/logger.dart';
 import '../../models/thread_detail.dart';
 import '../../models/browse_record.dart';
 import '../../providers/history_provider.dart';
-import '../../api/forum/viewthread/action/export.dart' as action_api;
 import '../../auth/providers/auth_provider.dart';
 import 'thread_view_comment_section.dart';
 import 'thread_view_main_post.dart';
@@ -126,9 +126,17 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         targetPage = await _resolveRedirectPage();
         pidMode = true;
       }
-      final page1Data = await ThreadDetailApi.fetch(widget.tid, page: 1);
+      final page1Result = await detail_api.getThreadDetail(
+        ApiService().dio,
+        tid: widget.tid,
+        page: 1,
+      );
+      if (page1Result['success'] != true) {
+        throw Exception(page1Result['message']?.toString() ?? '加载失败');
+      }
+      final page1Data = ThreadViewData.fromMap(page1Result, widget.tid);
       if (!mounted) return;
-      final d = page1Data!;
+      final d = page1Data;
       _totalPages = d.totalPages;
       _data = d;
       _liked = d.mainPost?.isLiked ?? false;
@@ -189,9 +197,17 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       _pageLoading = true;
     });
     try {
-      final data = await ThreadDetailApi.fetch(widget.tid, page: page);
+      final raw = await detail_api.getThreadDetail(
+        ApiService().dio,
+        tid: widget.tid,
+        page: page,
+      );
+      if (raw['success'] != true) {
+        throw Exception(raw['message']?.toString() ?? '加载失败');
+      }
+      final data = ThreadViewData.fromMap(raw, widget.tid);
       if (!mounted) return;
-      final actualPage = data!.currentPage;
+      final actualPage = data.currentPage;
       _commentPages[actualPage] = List<PostItem>.from(data.posts);
       _currentPage = actualPage;
       AppLogger.i(
@@ -220,9 +236,12 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   void _doPreload(int page) {
     _preloading = true;
-    ThreadDetailApi.fetch(widget.tid, page: page)
-        .then((data) {
-          if (data != null && mounted) {
+    detail_api
+        .getThreadDetail(ApiService().dio, tid: widget.tid, page: page)
+        .then((raw) {
+          if (raw['success'] == true && mounted) {
+            final data = ThreadViewData.fromMap(raw, widget.tid);
+            if (!mounted) return;
             _commentPages[data.currentPage] = List<PostItem>.from(data.posts);
             if (mounted) setState(() {});
           }
@@ -279,8 +298,14 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     _commentPages.remove(1);
     _data = null;
     try {
-      final d = await ThreadDetailApi.fetch(widget.tid, page: 1);
-      if (d != null && mounted) {
+      final raw = await detail_api.getThreadDetail(
+        ApiService().dio,
+        tid: widget.tid,
+        page: 1,
+      );
+      if (raw['success'] == true && mounted) {
+        final d = ThreadViewData.fromMap(raw, widget.tid);
+        if (!mounted) return;
         _commentPages[1] = List<PostItem>.from(d.posts);
         _totalPages = d.totalPages;
         _data = d;
@@ -675,7 +700,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         Expanded(
           child: NotificationListener<ScrollNotification>(
             onNotification: _handleScrollNotification,
-            child: _buildCommentContent(),
+            child: SingleChildScrollView(child: _buildCommentContent()),
           ),
         ),
       ],

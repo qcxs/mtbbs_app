@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/ranklist_api.dart';
+import '../api/forum/ranklist/export.dart' as ranklist_api;
+import '../services/api_service.dart';
 import 'rank_tile.dart';
 
 /// 帖子排行区块
@@ -47,7 +48,11 @@ class _RanklistSectionState extends State<RanklistSection> {
     });
     try {
       final view = _views[tab];
-      final result = await RanklistApi.fetch(view: view, orderby: 'thisweek');
+      final result = await ranklist_api.getRanklist(
+        ApiService().dio,
+        view: view,
+        orderby: 'thisweek',
+      );
       if (!mounted) return;
       if (result['success'] == true) {
         _everLoaded = true;

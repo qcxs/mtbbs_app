@@ -24,6 +24,32 @@ class ThreadViewData {
     this.mainPost,
     this.posts = const [],
   });
+
+  /// 从 API 解析返回的 Map 构建
+  factory ThreadViewData.fromMap(Map<String, dynamic> result, String tid) {
+    final _fromJson = (dynamic p) =>
+        PostItem.fromMap(p as Map<String, dynamic>);
+
+    final mainPost = (result['mainPost'] as Map<String, dynamic>?)?.let(
+      (m) => _fromJson(m),
+    );
+
+    final posts =
+        (result['posts'] as List<dynamic>?)
+            ?.map((p) => _fromJson(p))
+            .toList() ??
+        [];
+
+    return ThreadViewData(
+      title: result['title']?.toString() ?? '',
+      tid: result['tid']?.toString() ?? tid,
+      currentPage: result['currentPage'] as int? ?? 1,
+      totalPages: result['totalPages'] as int? ?? 1,
+      mainPost: mainPost,
+      posts: posts,
+      formhash: result['formhash']?.toString() ?? '',
+    );
+  }
 }
 
 /// 单帖数据模型（楼主和评论共用）

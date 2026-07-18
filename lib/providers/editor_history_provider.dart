@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:mtbbs/pages/editor/editor_page.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
 
 // ==================== 会话摘要 ====================

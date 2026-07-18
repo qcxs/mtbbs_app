@@ -207,96 +207,29 @@ class _AppShellState extends State<AppShell> {
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Row(
         children: [
-          NavigationRail(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: _onTap,
-            labelType: NavigationRailLabelType.all,
-            leading: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 8),
-                UserAvatar(
-                  uid: auth.uid,
-                  nickname: auth.username,
-                  radius: 18,
-                  onTap: () => showDialog(
-                    context: context,
-                    builder: (_) => const UserManagementDialog(),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                IconButton(
-                  icon: Icon(
-                    Icons.edit_outlined,
-                    size: 20,
-                    color: Colors.grey.shade600,
-                  ),
-                  tooltip: '发帖',
-                  onPressed: () {
-                    final forums = SiteConfig.forums;
-                    if (forums.isEmpty) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text('无可发帖的版块')));
-                      return;
-                    }
-                    if (forums.length == 1) {
-                      context.push(
-                        '/editor?type=post&fid=${forums.keys.first}',
-                      );
-                      return;
-                    }
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('选择版块'),
-                        content: SizedBox(
-                          width: double.maxFinite,
-                          child: ListView(
-                            shrinkWrap: true,
-                            children: SiteConfig.defaultForumOrder
-                                .where((fid) => forums.containsKey(fid))
-                                .map(
-                                  (fid) => ListTile(
-                                    leading: const Icon(Icons.forum),
-                                    title: Text(forums[fid] ?? fid),
-                                    onTap: () {
-                                      Navigator.of(ctx).pop();
-                                      context.push(
-                                        '/editor?type=post&fid=$fid',
-                                      );
-                                    },
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(),
-                            child: const Text('取消'),
-                          ),
+          SizedBox(
+            width: 80,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // 顶部固定区域（头像/发帖/搜索）
+                  _buildSideRailLeading(context, auth),
+                  const Divider(height: 1),
+                  // 导航项（可滚动）
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (int i = 0; i < navItems.length; i++)
+                            _buildSideRailDestination(i, navItems[i]),
                         ],
                       ),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.search, color: Colors.grey.shade600),
-                  tooltip: '搜索',
-                  onPressed: () => context.push('/search'),
-                ),
-              ],
-            ),
-            destinations: navItems
-                .map(
-                  (e) => NavigationRailDestination(
-                    icon: Icon(e.icon),
-                    selectedIcon: Icon(e.iconFilled),
-                    label: Text(e.label),
+                    ),
                   ),
-                )
-                .toList(),
+                ],
+              ),
+            ),
           ),
           Container(width: 1, color: Colors.grey.shade300),
           Expanded(
@@ -305,6 +238,116 @@ class _AppShellState extends State<AppShell> {
                 : widget.child,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSideRailLeading(BuildContext context, AuthProvider auth) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 8),
+        UserAvatar(
+          uid: auth.uid,
+          nickname: auth.username,
+          radius: 18,
+          onTap: () => showDialog(
+            context: context,
+            builder: (_) => const UserManagementDialog(),
+          ),
+        ),
+        const SizedBox(height: 4),
+        IconButton(
+          icon: Icon(
+            Icons.edit_outlined,
+            size: 20,
+            color: Colors.grey.shade600,
+          ),
+          tooltip: '发帖',
+          onPressed: () {
+            final forums = SiteConfig.forums;
+            if (forums.isEmpty) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('无可发帖的版块')));
+              return;
+            }
+            if (forums.length == 1) {
+              context.push('/editor?type=post&fid=${forums.keys.first}');
+              return;
+            }
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('选择版块'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: SiteConfig.defaultForumOrder
+                        .where((fid) => forums.containsKey(fid))
+                        .map(
+                          (fid) => ListTile(
+                            leading: const Icon(Icons.forum),
+                            title: Text(forums[fid] ?? fid),
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              context.push('/editor?type=post&fid=$fid');
+                            },
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('取消'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.search, color: Colors.grey.shade600),
+          tooltip: '搜索',
+          onPressed: () => context.push('/search'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSideRailDestination(int index, NavItem item) {
+    final selected = index == _currentIndex;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: InkWell(
+        onTap: () => _onTap(index),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? item.iconFilled : item.icon,
+                size: 24,
+                color: selected ? Colors.deepPurple : Colors.grey.shade600,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  color: selected ? Colors.deepPurple : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

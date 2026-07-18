@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../services/darkroom_api.dart';
-import '../widgets/user_avatar.dart';
-import '../widgets/page_error_widget.dart';
+import '../../api/forum/darkroom/export.dart' as darkroom_api;
+import '../../services/api_service.dart';
+import '../../widgets/user_avatar.dart';
+import '../../widgets/page_error_widget.dart';
 
 /// 小黑屋页面
 ///
@@ -57,7 +58,7 @@ class _DarkroomPageState extends State<DarkroomPage> {
 
     try {
       // 第 1 页：不传 cid
-      final result = await DarkroomApi.fetch();
+      final result = await darkroom_api.getList(ApiService().dio);
       if (!mounted) return;
 
       if (result['success'] != true) {
@@ -76,7 +77,10 @@ class _DarkroomPageState extends State<DarkroomPage> {
 
       // 第 2 页：如果还有下一页，立即再取一页
       if (hasMore && nextCid.isNotEmpty) {
-        final result2 = await DarkroomApi.fetch(cid: nextCid);
+        final result2 = await darkroom_api.getList(
+          ApiService().dio,
+          cid: nextCid,
+        );
         if (!mounted) return;
 
         if (result2['success'] == true) {
@@ -118,7 +122,10 @@ class _DarkroomPageState extends State<DarkroomPage> {
     setState(() => _isLoadingMore = true);
 
     try {
-      final result = await DarkroomApi.fetch(cid: _nextCid);
+      final result = await darkroom_api.getList(
+        ApiService().dio,
+        cid: _nextCid,
+      );
       if (!mounted) return;
 
       if (result['success'] != true) {

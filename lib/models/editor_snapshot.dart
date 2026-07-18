@@ -3,6 +3,17 @@ import 'dart:math';
 
 import 'package:mtbbs/core/page_fetcher.dart';
 
+// ==================== 编辑器类型 ====================
+
+/// 编辑器操作类型
+enum EditorType {
+  post,
+  comment,
+  reply,
+  editPost,
+  editReply,
+}
+
 /// 生成唯一 ID（基于时间戳 + 随机数，不依赖 uuid 包）
 String _generateId() {
   final ts = DateTime.now().millisecondsSinceEpoch;

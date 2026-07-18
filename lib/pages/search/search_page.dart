@@ -5,7 +5,9 @@ import '../../config/site_config.dart';
 import '../../core/url_router.dart';
 import '../../core/username_validator.dart';
 import '../../providers/search_history_provider.dart';
-import '../../services/space_api.dart';
+import '../../api/home/space/export.dart' as space_api;
+import '../../services/api_service.dart';
+import '../../models/user_profile.dart';
 
 /// 搜索页面
 ///
@@ -145,7 +147,13 @@ class _SearchPageState extends State<SearchPage> {
     } else {
       // 按用户名查询，获取 uid
       try {
-        final profile = await SpaceApi.fetch(username: input);
+        final raw = await space_api.getUserProfile(
+          ApiService().dio,
+          username: input,
+        );
+        final profile = raw['success'] == true && raw['profile'] != null
+            ? UserProfile.fromMap(raw['profile'] as Map<String, dynamic>)
+            : null;
         uid = profile?.uid;
       } catch (_) {
         uid = null;

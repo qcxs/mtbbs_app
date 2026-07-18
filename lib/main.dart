@@ -12,7 +12,7 @@ import 'config/nav_config.dart';
 import 'config/router.dart';
 import 'core/emoji_loader.dart';
 import 'api/forum/misc/export.dart' as forum_misc;
-import 'services/credit_api.dart';
+import 'api/home/credit/export.dart' as credit_api;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -95,7 +95,7 @@ Future<void> _runSettingsGuard(SettingsProvider settings) async {
           needsRefresh: () =>
               settings.creditFormula == SettingsProvider.defaultFormula,
           refresh: () async {
-            final result = await CreditApi.fetch();
+            final result = await credit_api.fetch(ApiService().dio);
             if (result['success'] == true && result['formula'] != null) {
               await settings.setCreditFormula(result['formula'] as String);
             }

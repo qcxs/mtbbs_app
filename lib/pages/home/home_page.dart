@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/site_config.dart';
+import '../../core/url_router.dart';
 import '../../models/managed_item.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/page_actions.dart';
@@ -122,7 +123,13 @@ class _ShortcutTile extends StatelessWidget {
       onTap: url.isNotEmpty
           ? () {
               if (url.startsWith('http://') || url.startsWith('https://')) {
-                context.push('/browser?url=${Uri.encodeComponent(url)}');
+                // 优先使用 URL 路由匹配，没有匹配才在内置浏览器中打开
+                final routeResult = UrlRouter.parse(url);
+                if (routeResult.appPath != null && !routeResult.isOtherSite) {
+                  context.push(routeResult.appPath!);
+                } else {
+                  context.push('/browser?url=${Uri.encodeComponent(url)}');
+                }
               } else {
                 context.push(url);
               }
