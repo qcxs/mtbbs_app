@@ -9,6 +9,30 @@ import '../../widgets/user_avatar.dart';
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  /// 显示退出确认弹窗
+  static void _confirmLogout(BuildContext context, AuthProvider auth) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('退出登录'),
+        content: Text('确定退出 ${auth.username} 吗？\n将清除该账号的登录状态。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              auth.logout();
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('退出'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -130,7 +154,7 @@ class ProfilePage extends StatelessWidget {
               child: ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text('退出登录', style: TextStyle(color: Colors.red)),
-                onTap: () => auth.logout(),
+                onTap: () => _confirmLogout(context, auth),
               ),
             ),
           ],

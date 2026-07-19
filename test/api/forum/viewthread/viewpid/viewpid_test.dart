@@ -66,18 +66,12 @@ void _printResult(Map<String, dynamic> result) {
   }
 
   print('  PID:      ${post['pid']}');
-  print('  昵称:     ${post['nickname']}');
+  print('  用户名:   ${post['username']}');
   print('  UID:      ${post['uid']}');
-  print('  等级:     ${post['level']}');
-  print('  时间:     ${post['time']}');
+  print('  时间:     ${post['postTime']}');
   print('  IP属地:   ${post['ipLocation']}');
-  print('  戳记:     ${post['stamp']}');
-  print('  标记:     ${post['badge']}');
-  print('  操作:     ${post['modAction']}');
-  if (post['verifyBadge'] != null &&
-      (post['verifyBadge'] as String).isNotEmpty) {
-    print('  认证:     ${post['verifyBadge']}');
-  }
+  print('  楼层:     ${post['floorLabel']} (${post['floor']})');
+  print('  用户组:   ${post['usergroup']}');
   final bbcode = post['bbcode'] as String? ?? '';
   print('  BBCode(${bbcode.length}):');
   final preview =

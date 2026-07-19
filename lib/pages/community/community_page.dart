@@ -6,11 +6,15 @@ import '../../controllers/thread_list_controller.dart';
 import '../../widgets/thread_grid.dart';
 import '../../widgets/tab_page_layout.dart';
 
-/// 社区页面 — 按版块浏览帖子
+/// 版块页面
 ///
-/// 由 _AppShell 提供 Scaffold 外壳，本组件只返回 TabPageLayout。
+/// 路径: /forum?fid=xxx
+/// - 带 fid：显示对应版块的帖子列表，标题为版块名
+/// - 不带 fid：显示所有版块标签页（仅通过直接导航访问）
 class CommunityPage extends StatefulWidget {
-  const CommunityPage({super.key});
+  final String fid;
+
+  const CommunityPage({super.key, this.fid = ''});
 
   @override
   State<CommunityPage> createState() => _CommunityPageState();
@@ -145,8 +149,25 @@ class _CommunityPageState extends State<CommunityPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  // ==================== 单版块模式 ====================
+
+  Widget _buildSingleForum() {
+    final fid = widget.fid;
+    _activeKey = fid;
+    _ensureCtls();
+    final ctrl = _ctrlMap[fid];
+    if (ctrl != null && ctrl.state == LoadState.initial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.loadInitial());
+    }
+    if (ctrl == null) {
+      return const Center(child: Text('版块不存在'));
+    }
+    return ThreadGrid(controller: ctrl, visible: true);
+  }
+
+  // ==================== 标签页模式 ====================
+
+  Widget _buildTabs() {
     final tabs = _tabs;
     if (_activeKey.isEmpty && tabs.isNotEmpty) _activeKey = tabs.first.key;
     _ensureCtls();
@@ -161,6 +182,47 @@ class _CommunityPageState extends State<CommunityPage> {
         if (ctrl == null) return const SizedBox.shrink();
         return ThreadGrid(controller: ctrl, visible: isActive);
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 带 fid 时使用单版块模式
+    if (widget.fid.isNotEmpty) {
+      final ctrl = _ctrlMap[widget.fid];
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text(SiteConfig.forums[widget.fid] ?? widget.fid),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0.5,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 20),
+              tooltip: '刷新',
+              onPressed: ctrl != null ? () => ctrl.refresh() : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.filter_list, size: 20),
+              tooltip: '筛选排序',
+              onPressed: _showFilterDialog,
+            ),
+          ],
+        ),
+        body: _buildSingleForum(),
+      );
+    }
+    // 不带 fid 时显示所有版块标签页
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('社区'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0.5,
+      ),
+      body: _buildTabs(),
     );
   }
 }

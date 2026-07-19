@@ -65,7 +65,7 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
 
     if (widget.quotedPost == null) return const SizedBox.shrink();
 
-    final nickname = widget.quotedPost!['nickname']?.toString() ?? '';
+    final nickname = widget.quotedPost!['username']?.toString() ?? '';
     final bbcode = widget.quotedPost!['bbcode']?.toString() ?? '';
 
     return Container(
@@ -138,7 +138,7 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
   }
 
   void _showDetailDialog(String nickname, String bbcode) {
-    final time = widget.quotedPost!['time']?.toString() ?? '';
+    final time = widget.quotedPost!['postTime']?.toString() ?? '';
 
     showDialog(
       context: context,
@@ -179,9 +179,7 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
                 disabledTags: context
                     .read<SettingsProvider>()
                     .disabledBbcodeTags,
-                autoDetectUrls: context
-                    .read<SettingsProvider>()
-                    .autoDetectUrls,
+                autoDetectUrls: context.read<SettingsProvider>().autoDetectUrls,
               ),
             ],
           ),

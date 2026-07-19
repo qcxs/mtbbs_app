@@ -7,8 +7,8 @@ import 'thread_card.dart';
 /// 通用帖子列表网格
 ///
 /// 功能：
-/// - 下拉刷新（去重插顶部）
-/// - 触底加载更多
+/// - 下拉刷新
+/// - 分页器（上一页 / 页码 / 下一页），切换时滚动到顶部
 /// - 响应式列数（手机 1 列，平板 2 列，桌面 3 列）
 /// - 加载中骨架屏
 /// - 空状态、错误状态显示
@@ -16,11 +16,7 @@ class ThreadGrid extends StatefulWidget {
   final ThreadListController controller;
   final bool visible;
 
-  const ThreadGrid({
-    super.key,
-    required this.controller,
-    this.visible = true,
-  });
+  const ThreadGrid({super.key, required this.controller, this.visible = true});
 
   @override
   State<ThreadGrid> createState() => _ThreadGridState();
@@ -29,6 +25,7 @@ class ThreadGrid extends StatefulWidget {
 class _ThreadGridState extends State<ThreadGrid>
     with AutomaticKeepAliveClientMixin {
   bool _everLoaded = false;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   bool get wantKeepAlive => true;
@@ -46,7 +43,6 @@ class _ThreadGridState extends State<ThreadGrid>
       oldWidget.controller.removeListener(_onStateChanged);
       widget.controller.addListener(_onStateChanged);
     }
-    // 页面从不可见变为可见时，触发加载
     if (!oldWidget.visible && widget.visible) {
       _checkLoad();
     }
@@ -55,7 +51,6 @@ class _ThreadGridState extends State<ThreadGrid>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 首次可见时触发初始加载（initState 中不加载，延迟到这里）
     if (widget.visible) {
       _checkLoad();
     }
@@ -64,6 +59,7 @@ class _ThreadGridState extends State<ThreadGrid>
   @override
   void dispose() {
     widget.controller.removeListener(_onStateChanged);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -79,9 +75,20 @@ class _ThreadGridState extends State<ThreadGrid>
     if (mounted) setState(() {});
   }
 
+  /// 页面切换时滚动到顶部
+  void _handlePageChange() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    super.build(context); // keep alive
+    super.build(context);
     final ctrl = widget.controller;
 
     if (ctrl.state == LoadState.error) {
@@ -105,17 +112,28 @@ class _ThreadGridState extends State<ThreadGrid>
     }
 
     if (ctrl.items.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: ctrl.refresh,
-        child: LayoutBuilder(
-          builder: (_, constraints) => SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: SizedBox(
-              height: constraints.maxHeight > 0 ? constraints.maxHeight : null,
-              child: _buildEmpty(),
+      return Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: ctrl.refresh,
+            child: LayoutBuilder(
+              builder: (_, constraints) => SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: constraints.maxHeight > 0
+                      ? constraints.maxHeight
+                      : null,
+                  child: _buildEmpty(),
+                ),
+              ),
             ),
           ),
-        ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: _buildFloatingPaginator(ctrl),
+          ),
+        ],
       );
     }
 
@@ -142,33 +160,29 @@ class _ThreadGridState extends State<ThreadGrid>
         final crossAxisCount = _crossAxisCount(constraints.maxWidth);
         final spacing = _gridSpacing(constraints.maxWidth);
 
-        return RefreshIndicator(
-          color: Theme.of(context).colorScheme.primary,
-          onRefresh: ctrl.refresh,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification is ScrollEndNotification) {
-                final metrics = notification.metrics;
-                if (metrics.maxScrollExtent > 0) {
-                  const threshold = 280.0;
-                  if (metrics.pixels >= metrics.maxScrollExtent - threshold) {
-                    ctrl.loadMore();
-                  }
-                }
-              }
-              return false;
-            },
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                if (crossAxisCount == 1)
-                  _buildListSliver(ctrl)
-                else
-                  _buildGridSliver(ctrl, crossAxisCount, spacing),
-                _buildFooter(ctrl, crossAxisCount),
-              ],
+        return Stack(
+          children: [
+            RefreshIndicator(
+              color: Theme.of(context).colorScheme.primary,
+              onRefresh: ctrl.refresh,
+              child: CustomScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  if (crossAxisCount == 1)
+                    _buildListSliver(ctrl)
+                  else
+                    _buildGridSliver(ctrl, crossAxisCount, spacing),
+                ],
+              ),
             ),
-          ),
+            // 悬浮翻页按钮
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: _buildFloatingPaginator(ctrl),
+            ),
+          ],
         );
       },
     );
@@ -222,49 +236,187 @@ class _ThreadGridState extends State<ThreadGrid>
     );
   }
 
-  // ==================== 底部加载状态 ====================
+  // ==================== 悬浮翻页按钮 ====================
 
-  Widget _buildFooter(ThreadListController ctrl, int crossAxisCount) {
-    // loadingMore 时显示骨架屏占位
-    if (ctrl.state == LoadState.loadingMore) {
-      return SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) => _buildSkeletonCard(),
-          childCount: 3,
+  Widget _buildFloatingPaginator(ThreadListController ctrl) {
+    final pageLabel = '第 ${ctrl.page} 页';
+
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(24),
+      color: Colors.white,
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.grey.shade300),
         ),
-      );
-    }
-
-    if (ctrl.state == LoadState.loading && ctrl.items.isNotEmpty) {
-      return const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 16),
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _pageBtn(
+              icon: Icons.chevron_left,
+              enabled: ctrl.hasPrev,
+              onTap: () {
+                ctrl.prevPage();
+                _handlePageChange();
+              },
             ),
+            Container(width: 1, height: 20, color: Colors.grey.shade200),
+            GestureDetector(
+              onTap: () => _showPagePicker(ctrl),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: ctrl.state == LoadState.loading
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.grey.shade500,
+                        ),
+                      )
+                    : Text(
+                        pageLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+              ),
+            ),
+            Container(width: 1, height: 20, color: Colors.grey.shade200),
+            _pageBtn(
+              icon: Icons.chevron_right,
+              enabled: ctrl.hasNext,
+              onTap: () {
+                ctrl.nextPage();
+                _handlePageChange();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pageBtn({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: IconButton(
+        icon: Icon(icon, size: 20),
+        onPressed: enabled ? onTap : null,
+        color: enabled ? Colors.grey.shade700 : Colors.grey.shade300,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      ),
+    );
+  }
+
+  void _showPagePicker(ThreadListController ctrl) {
+    final tc = TextEditingController();
+    final knownTotal = ctrl.totalPages > 0;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('跳转页'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                knownTotal
+                    ? '共 ${ctrl.totalPages} 页，当前第 ${ctrl.page} 页'
+                    : '当前第 ${ctrl.page} 页',
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: tc,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: '输入页码',
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      );
-    }
-
-    if (!ctrl.hasMore && ctrl.items.isNotEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Center(
-            child: Text(
-              '已经全部加载',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-            ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
           ),
-        ),
-      );
-    }
+          FilledButton(
+            onPressed: () {
+              final p = int.tryParse(tc.text);
+              if (p != null && p >= 1) {
+                Navigator.of(ctx).pop();
+                ctrl.goToPage(p);
+                _handlePageChange();
+              }
+            },
+            child: const Text('跳转'),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return const SliverToBoxAdapter(child: SizedBox.shrink());
+  // ==================== 骨架屏 ====================
+
+  Widget _buildSkeleton() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = _crossAxisCount(constraints.maxWidth);
+        final spacing = _gridSpacing(constraints.maxWidth);
+
+        return RefreshIndicator(
+          color: Theme.of(context).colorScheme.primary,
+          onRefresh: widget.controller.refresh,
+          child: CustomScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              if (crossAxisCount == 1)
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      child: _buildSkeletonCard(),
+                    ),
+                    childCount: 8,
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: EdgeInsets.all(spacing),
+                  sliver: SliverMasonryGrid.count(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: spacing,
+                    crossAxisSpacing: spacing,
+                    itemBuilder: (context, index) => _buildSkeletonCard(),
+                    childCount: 8,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildSkeletonCard() {
@@ -307,53 +459,6 @@ class _ThreadGridState extends State<ThreadGrid>
           ),
         ),
       ),
-    );
-  }
-
-  // ==================== 骨架屏 ====================
-
-  /// 骨架屏使用和真实数据相同的布局容器（LayoutBuilder → 响应式列数 → CustomScrollView），
-  /// 确保骨架屏→真实卡片的过渡无缝，列数变化时骨架屏也同步适配。
-  Widget _buildSkeleton() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossAxisCount = _crossAxisCount(constraints.maxWidth);
-        final spacing = _gridSpacing(constraints.maxWidth);
-
-        return RefreshIndicator(
-          color: Theme.of(context).colorScheme.primary,
-          onRefresh: widget.controller.refresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              if (crossAxisCount == 1)
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      child: _buildSkeletonCard(),
-                    ),
-                    childCount: 8,
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: EdgeInsets.all(spacing),
-                  sliver: SliverMasonryGrid.count(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: spacing,
-                    crossAxisSpacing: spacing,
-                    itemBuilder: (context, index) => _buildSkeletonCard(),
-                    childCount: 8,
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
     );
   }
 

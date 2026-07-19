@@ -666,6 +666,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       pageLoading: _pageLoading,
       tid: widget.tid,
       onScrollNotification: _handleScrollNotification,
+      onReply: (post) =>
+          context.push('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}'),
       onRecommend: _handleRecommend,
       onFavorite: _handleFavorite,
       onRate: _handleRate,

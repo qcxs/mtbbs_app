@@ -13,6 +13,7 @@ import 'config/router.dart';
 import 'core/emoji_loader.dart';
 import 'api/forum/misc/export.dart' as forum_misc;
 import 'api/home/credit/export.dart' as credit_api;
+import 'models/post_preview.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +44,9 @@ void main() async {
   editorHistory.autoSaveInterval = Duration(seconds: settings.autoSaveInterval);
   editorHistory.maxAutoSnapshots = settings.maxAutoSnapshots;
   await editorHistory.cleanup(); // 清理过期会话
+
+  // 预加载帖子预览缓存，避免重启后首次访问走网络
+  await PostPreviewManager.instance.init();
 
   // 根据设置初始化路由（默认启动 Tab）
   final router = buildRouter(

@@ -5,6 +5,7 @@ import '../widgets/app_shell.dart';
 import '../models/editor_snapshot.dart';
 import '../pages/home/home_page.dart';
 import '../pages/guide/guide_page.dart';
+import '../pages/message/message_page.dart';
 import '../pages/community/community_page.dart';
 import '../pages/user/my_profile_page.dart';
 import '../pages/settings/settings_page.dart';
@@ -39,14 +40,21 @@ GoRouter buildRouter({String initialLocation = '/'}) {
               GoRoute(path: '/', builder: (_, __) => const HomePage()),
               GoRoute(path: '/guide', builder: (_, __) => const GuidePage()),
               GoRoute(
-                path: '/community',
-                builder: (_, __) => const CommunityPage(),
+                path: '/message',
+                pageBuilder: (_, __) =>
+                    const NoTransitionPage(child: MessagePage()),
               ),
               GoRoute(
                 path: '/profile',
                 builder: (_, __) => const ProfilePage(),
               ),
             ],
+          ),
+          GoRoute(
+            path: '/forum',
+            pageBuilder: (_, state) => NoTransitionPage(
+              child: CommunityPage(fid: state.uri.queryParameters['fid'] ?? ''),
+            ),
           ),
           GoRoute(
             path: '/settings',

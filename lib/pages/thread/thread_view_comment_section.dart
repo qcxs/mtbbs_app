@@ -11,7 +11,11 @@ class CommentHeaderDelegate extends SliverPersistentHeaderDelegate {
   CommentHeaderDelegate({required this.child});
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => child;
 
   @override
   double get minExtent => 44;
@@ -40,6 +44,7 @@ class CommentSection extends StatelessWidget {
   final void Function(int page)? onNextPage;
   final VoidCallback? onShowPagePicker;
   final void Function(ScrollNotification) onScrollNotification;
+  final void Function(PostItem post)? onReply;
   final void Function(PostItem post)? onRecommend;
   final void Function(PostItem post)? onFavorite;
   final void Function(PostItem post)? onRate;
@@ -58,6 +63,7 @@ class CommentSection extends StatelessWidget {
     this.onNextPage,
     this.onShowPagePicker,
     required this.onScrollNotification,
+    this.onReply,
     this.onRecommend,
     this.onFavorite,
     this.onRate,
@@ -78,25 +84,28 @@ class CommentSection extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        ...posts.map((post) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: ThreadPostCard(
-            key: postKeys.putIfAbsent(post.pid, () => GlobalKey()),
-            post: post,
-            index: currentPage,
-            tid: tid,
-            isLiked: false,
-            isFavorited: false,
-            isLoggedIn: auth.isLoggedIn,
-            currentUid: auth.uid,
-            globalDisabledTags: settings.disabledBbcodeTags,
-            onRecommend: () => onRecommend?.call(post),
-            onFavorite: () => onFavorite?.call(post),
-            onRate: () => onRate?.call(post),
-            onKick: () => onKick?.call(post),
-            onPopupAction: (action) => onPopupAction?.call(action, post),
+        ...posts.map(
+          (post) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ThreadPostCard(
+              key: postKeys.putIfAbsent(post.pid, () => GlobalKey()),
+              post: post,
+              index: currentPage,
+              tid: tid,
+              isLiked: false,
+              isFavorited: false,
+              isLoggedIn: auth.isLoggedIn,
+              currentUid: auth.uid,
+              globalDisabledTags: settings.disabledBbcodeTags,
+              onReply: () => onReply?.call(post),
+              onRecommend: () => onRecommend?.call(post),
+              onFavorite: () => onFavorite?.call(post),
+              onRate: () => onRate?.call(post),
+              onKick: () => onKick?.call(post),
+              onPopupAction: (action) => onPopupAction?.call(action, post),
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -110,7 +119,10 @@ class CommentSection extends StatelessWidget {
           children: [
             Icon(Icons.forum_outlined, size: 40, color: Colors.grey.shade300),
             const SizedBox(height: 8),
-            Text('暂无评论', style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
+            Text(
+              '暂无评论',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            ),
           ],
         ),
       ),
@@ -135,7 +147,11 @@ class CommentSection extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             '评论区',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade800,
+            ),
           ),
           const Spacer(),
           IconButton(
@@ -156,12 +172,19 @@ class CommentSection extends StatelessWidget {
               ),
               child: pageLoading
                   ? SizedBox(
-                      width: 12, height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey.shade500),
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.grey.shade500,
+                      ),
                     )
                   : Text(
                       '$currentPage / $totalPages',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
             ),
           ),

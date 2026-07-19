@@ -8,7 +8,7 @@ import '../widgets/user_avatar.dart';
 import '../pages/settings/user_management_dialog.dart';
 import '../pages/home/home_page.dart';
 import '../pages/guide/guide_page.dart';
-import '../pages/community/community_page.dart';
+import '../pages/message/message_page.dart';
 import '../pages/user/my_profile_page.dart';
 
 /// 响应式外壳（底部导航栏 + 侧边栏）
@@ -31,9 +31,9 @@ class _AppShellState extends State<AppShell> {
       case 0:
         return const HomePage();
       case 1:
-        return const GuidePage();
+        return const MessagePage();
       case 2:
-        return const CommunityPage();
+        return const GuidePage();
       case 3:
         return const ProfilePage();
       default:

@@ -12,7 +12,7 @@ class NavItem {
 /// 导航栏 Tab 列表（同一数据源驱动底栏、侧栏和默认启动页设置）
 const navItems = [
   NavItem('首页', Icons.home_outlined, Icons.home, '/'),
+  NavItem('消息', Icons.mail_outline, Icons.mail, '/message'),
   NavItem('导读', Icons.explore_outlined, Icons.explore, '/guide'),
-  NavItem('社区', Icons.forum_outlined, Icons.forum, '/community'),
   NavItem('我的', Icons.person_outline, Icons.person, '/profile'),
 ];

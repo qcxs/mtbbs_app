@@ -3,19 +3,13 @@ import '../models/thread_item.dart';
 import '../core/logger.dart';
 
 /// 帖子列表加载状态
-enum LoadState { initial, loading, loaded, error, loadingMore }
+enum LoadState { initial, loading, loaded, error }
 
 /// 通用帖子列表控制器
 ///
-/// 管理分页、刷新、加载更多、去重逻辑。
+/// 管理分页、刷新、内存缓存逻辑。
+/// 无脑翻页：上一页/下一页始终可点击，无数据时显示空状态。
 /// 通过 [fetchFn] 注入具体 API 调用，支持导读、版块、个人发帖等场景复用。
-///
-/// 使用示例：
-/// ```dart
-/// final ctrl = ThreadListController(
-///   fetchFn: (page) => guide_api.getThreadList(dio, page: page),
-/// );
-/// ```
 class ThreadListController extends ChangeNotifier {
   final Future<Map<String, dynamic>> Function({required int page}) fetchFn;
 
@@ -23,20 +17,35 @@ class ThreadListController extends ChangeNotifier {
   LoadState state = LoadState.initial;
   String? errorMessage;
   int page = 1;
-  bool hasMore = true;
+  int totalPages = 0; // 仅供跳页弹窗显示，不影响翻页
+
+  /// 内存缓存：page → items
+  final Map<int, List<ThreadItem>> _pageCache = {};
+
+  /// 最大缓存页数
+  static const int _maxCachePages = 20;
 
   ThreadListController({required this.fetchFn});
+
+  // ==================== 分页状态 ====================
+
+  bool get hasPrev => page > 1;
+  bool get hasNext => true; // 始终允许下一页
+
+  // ==================== 加载 / 刷新 ====================
 
   /// 首次加载 / 重置加载
   Future<void> loadInitial() async {
     state = LoadState.loading;
     page = 1;
+    _pageCache.clear();
     notifyListeners();
 
     try {
       final result = await fetchFn(page: page);
       items = _parseItems(result);
-      hasMore = result['hasMore'] as bool? ?? false;
+      totalPages = result['totalPages'] as int? ?? 0;
+      _cachePage(1, items);
       state = LoadState.loaded;
       AppLogger.i('PAGE', 'loaded ${items.length} items');
     } catch (e) {
@@ -47,11 +56,10 @@ class ThreadListController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 下拉刷新：清旧数据，重新加载
+  /// 下拉刷新：清空缓存，重新加载第一页
   Future<void> refresh() async {
-    if (state == LoadState.loading || state == LoadState.loadingMore) return;
-
-    items.clear();
+    if (state == LoadState.loading) return;
+    _pageCache.clear();
     page = 1;
     notifyListeners();
 
@@ -59,44 +67,63 @@ class ThreadListController extends ChangeNotifier {
       final result = await fetchFn(page: 1);
       final newItems = _parseItems(result);
       items = newItems;
-      hasMore = result['hasMore'] as bool? ?? true;
+      totalPages = result['totalPages'] as int? ?? 0;
+      _cachePage(1, newItems);
       notifyListeners();
     } catch (e) {
       debugPrint('[ThreadList] refresh error: $e');
     }
   }
 
-  /// 触底加载下一页（自动节流：loadingMore 状态防止并发）
-  Future<void> loadMore() async {
-    if (!hasMore ||
-        state == LoadState.loading ||
-        state == LoadState.loadingMore)
-      return;
+  // ==================== 翻页 ====================
 
-    state = LoadState.loadingMore;
+  /// 跳转到指定页（缓存命中直接返回，否则请求）
+  Future<void> goToPage(int targetPage) async {
+    if (targetPage < 1 || targetPage == page) return;
+
+    // 缓存命中
+    if (_pageCache.containsKey(targetPage)) {
+      items = List.from(_pageCache[targetPage]!);
+      page = targetPage;
+      notifyListeners();
+      return;
+    }
+
+    state = LoadState.loading;
+    page = targetPage;
     notifyListeners();
 
-    page++;
-
     try {
-      final result = await fetchFn(page: page);
+      final result = await fetchFn(page: targetPage);
       final newItems = _parseItems(result);
 
-      if (newItems.isEmpty) {
-        hasMore = false;
-      } else {
-        items.addAll(newItems);
-        // 有数据就认为还有更多，不依赖服务端 hasMore
-        hasMore = true;
-      }
+      // 有无数据都停在此页，无数据时显示空状态（分页器仍在，可翻走）
+      items = newItems;
+      final tp = result['totalPages'] as int?;
+      if (tp != null && tp > 0) totalPages = tp;
+      if (newItems.isNotEmpty) _cachePage(targetPage, newItems);
       state = LoadState.loaded;
       notifyListeners();
     } catch (e) {
-      debugPrint('[ThreadList] loadMore error: $e');
-      page--; // 回滚页码
-      state = LoadState.loaded;
+      errorMessage = e.toString();
+      page = targetPage > 1 ? targetPage - 1 : 1;
+      state = LoadState.error;
       notifyListeners();
     }
+  }
+
+  Future<void> nextPage() => goToPage(page + 1);
+  Future<void> prevPage() => goToPage(page - 1);
+
+  bool get hasCachedFirst => _pageCache.containsKey(1);
+
+  // ==================== 内部 ====================
+
+  void _cachePage(int p, List<ThreadItem> pageItems) {
+    if (_pageCache.length >= _maxCachePages) {
+      _pageCache.remove(_pageCache.keys.first);
+    }
+    _pageCache[p] = List.from(pageItems);
   }
 
   List<ThreadItem> _parseItems(Map<String, dynamic> result) {

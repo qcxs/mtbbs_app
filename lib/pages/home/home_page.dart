@@ -6,18 +6,18 @@ import '../../config/site_config.dart';
 import '../../core/url_router.dart';
 import '../../models/managed_item.dart';
 import '../../providers/settings_provider.dart';
-import '../../widgets/page_actions.dart';
 import '../../widgets/ranklist_section.dart';
 import '../../widgets/rss_section.dart';
 
 /// 首页
 ///
-/// 分为三部分（均为独立组件）：
-///   1. 快捷链接（可配置的图标网格）
-///   2. 帖子排行（带 Tab 切换）
-///   3. RSS 订阅列表
+/// 分为四部分（均为独立组件，可折叠）：
+///   1. 快捷链接
+///   2. 版块列表
+///   3. 帖子排行
+///   4. RSS 订阅
 ///
-/// 排行和 RSS 各自管理自己的加载状态，通过 key 变更触发刷新。
+/// 排行和 RSS 默认展开，其余折叠。
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -27,13 +27,22 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _refreshCounter = 0;
+  final Set<String> _expandedSections = {'排行', 'RSS'};
 
   Future<void> _refreshAll() {
     setState(() => _refreshCounter++);
     return Future.value();
   }
 
-  String get _homeUrl => SiteConfig.baseUrl;
+  void _toggleSection(String name) {
+    setState(() {
+      if (_expandedSections.contains(name)) {
+        _expandedSections.remove(name);
+      } else {
+        _expandedSections.add(name);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,68 +50,114 @@ class _HomePageState extends State<HomePage> {
     final links = settings.shortcutLinks.where((e) => e.visible).toList();
     final refreshKey = ValueKey('refresh_$_refreshCounter');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(SiteConfig.current.name),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          PageActions(
-            url: _homeUrl,
-            onRefresh: _refreshAll,
-            copyLabel: '复制首页链接',
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        key: ValueKey('home_${SiteConfig.baseUrl}'),
-        onRefresh: _refreshAll,
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            // ====== 快捷链接 ======
-            if (links.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '快捷链接',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-              ),
-              Wrap(
+    return RefreshIndicator(
+      key: ValueKey('home_${SiteConfig.baseUrl}'),
+      onRefresh: _refreshAll,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          // ====== 快捷链接 ======
+          if (links.isNotEmpty) ...[
+            _CollapsibleSection(
+              title: '快捷链接',
+              expanded: _expandedSections.contains('快捷链接'),
+              onToggle: () => _toggleSection('快捷链接'),
+              child: Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: links
                     .map((link) => _ShortcutTile(link: link))
                     .toList(),
               ),
-              const SizedBox(height: 24),
-            ],
-
-            // ====== 帖子排行 ======
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '帖子排行',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
-                ),
-              ),
             ),
-            RanklistSection(key: refreshKey),
-            const SizedBox(height: 24),
-
-            // ====== RSS 订阅 ======
-            RssSection(key: refreshKey),
+            const SizedBox(height: 12),
           ],
-        ),
+
+          // ====== 版块 ======
+          _CollapsibleSection(
+            title: '版块',
+            expanded: _expandedSections.contains('版块'),
+            onToggle: () => _toggleSection('版块'),
+            child: _ForumList(),
+          ),
+          const SizedBox(height: 12),
+
+          // ====== 帖子排行 ======
+          _CollapsibleSection(
+            title: '帖子排行',
+            expanded: _expandedSections.contains('排行'),
+            onToggle: () => _toggleSection('排行'),
+            child: RanklistSection(key: refreshKey),
+          ),
+          const SizedBox(height: 12),
+
+          // ====== RSS 订阅 ======
+          _CollapsibleSection(
+            title: 'RSS 订阅',
+            expanded: _expandedSections.contains('RSS'),
+            onToggle: () => _toggleSection('RSS'),
+            child: RssSection(key: refreshKey),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+// ==================== 可折叠段落 ====================
+
+class _CollapsibleSection extends StatelessWidget {
+  final String title;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  const _CollapsibleSection({
+    required this.title,
+    required this.expanded,
+    required this.onToggle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onToggle,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(
+                  expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: Colors.grey.shade600,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: child,
+          secondChild: const SizedBox.shrink(),
+          crossFadeState: expanded
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
+          duration: const Duration(milliseconds: 200),
+        ),
+      ],
     );
   }
 }
@@ -181,6 +236,52 @@ class _ShortcutTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ==================== 版块列表 ====================
+
+class _ForumList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final forums = SiteConfig.defaultForumOrder
+        .where((fid) => SiteConfig.forums.containsKey(fid))
+        .map((fid) => MapEntry(fid, SiteConfig.forums[fid]!))
+        .toList();
+    if (forums.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: forums.map((entry) {
+        return InkWell(
+          onTap: () => context.push('/forum?fid=${entry.key}'),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.deepPurple.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.deepPurple.shade100),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.forum, size: 18, color: Colors.deepPurple.shade400),
+                const SizedBox(width: 6),
+                Text(
+                  entry.value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.deepPurple.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

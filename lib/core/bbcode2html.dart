@@ -252,37 +252,15 @@ class BBCode2Html {
           '<table style="width:100%;border:1px solid #E3EDF5;border-collapse:collapse;">${m.group(1)}</table>',
     );
 
-    // Media（仅解析 B站，其余转链接）
+    // [media] → 可点击的视频占位符（忽略参数，如 x,500,375）
     html = html.replaceAllMapped(
       RegExp(
         r'\[media(?:=[^\]]+)?\]([\s\S]+?)\[\/media\]',
         caseSensitive: false,
       ),
       (m) {
-        var url = m.group(1)!.trim();
-        // 提取 B站 BV/AV
-        final bvMatch = RegExp(
-          r'bilibili\.com/video/(BV[a-zA-Z0-9]+)',
-          caseSensitive: false,
-        ).firstMatch(url);
-        final avMatch = RegExp(
-          r'bilibili\.com/video/av(\d+)',
-          caseSensitive: false,
-        ).firstMatch(url);
-        final b23Match = RegExp(
-          r'b23\.tv/(BV[a-zA-Z0-9]+)',
-          caseSensitive: false,
-        ).firstMatch(url);
-        if (bvMatch != null) {
-          return '<iframe src="https://player.bilibili.com/player.html?bvid=${bvMatch.group(1)}&high_quality=1" width="100%" height="400" frameborder="0" allowfullscreen></iframe>';
-        }
-        if (avMatch != null) {
-          return '<iframe src="https://player.bilibili.com/player.html?bvid=${avMatch.group(1)}&high_quality=1" width="100%" height="400" frameborder="0" allowfullscreen></iframe>';
-        }
-        if (b23Match != null) {
-          return '<iframe src="https://player.bilibili.com/player.html?bvid=${b23Match.group(1)}&high_quality=1" width="100%" height="400" frameborder="0" allowfullscreen></iframe>';
-        }
-        return '<a href="$url" target="_blank">$url</a>';
+        final url = m.group(1)!.trim();
+        return '<a href="$url" target="_blank" style="display:inline-block;padding:8px 14px;background:#f5f5f5;border:1px solid #ddd;border-radius:6px;color:#333;text-decoration:none;font-size:13px;">▶ 视频 $url</a>';
       },
     );
 

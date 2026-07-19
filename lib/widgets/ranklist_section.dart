@@ -22,7 +22,6 @@ class _RanklistSectionState extends State<RanklistSection> {
   final Map<int, List<Map<String, dynamic>>> _items = {};
   final Map<int, bool> _loading = {};
   final Map<int, String?> _error = {};
-  bool _everLoaded = false;
 
   @override
   void initState() {
@@ -35,13 +34,12 @@ class _RanklistSectionState extends State<RanklistSection> {
     super.didUpdateWidget(oldWidget);
     // key 改变时（父页面主动触发刷新），重新加载
     if (widget.key != oldWidget.key) {
-      _everLoaded = false;
-      _fetch(tab: _tabIndex);
+      _fetch(tab: _tabIndex, force: true);
     }
   }
 
-  Future<void> _fetch({required int tab}) async {
-    if (_everLoaded) return;
+  Future<void> _fetch({required int tab, bool force = false}) async {
+    if (_items.containsKey(tab) && !force) return;
     setState(() {
       _loading[tab] = true;
       _error[tab] = null;
@@ -55,7 +53,6 @@ class _RanklistSectionState extends State<RanklistSection> {
       );
       if (!mounted) return;
       if (result['success'] == true) {
-        _everLoaded = true;
         setState(() {
           _items[tab] = List<Map<String, dynamic>>.from(result['items'] ?? []);
           _loading[tab] = false;
