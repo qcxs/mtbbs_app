@@ -14,18 +14,26 @@ class RanklistSection extends StatefulWidget {
   State<RanklistSection> createState() => _RanklistSectionState();
 }
 
-class _RanklistSectionState extends State<RanklistSection> {
+class _RanklistSectionState extends State<RanklistSection>
+    with AutomaticKeepAliveClientMixin {
   static const _views = ['replies', 'views', 'heats'];
   static const _labels = ['回复排行', '查看排行', '热度排行'];
 
   int _tabIndex = 0;
-  final Map<int, List<Map<String, dynamic>>> _items = {};
-  final Map<int, bool> _loading = {};
-  final Map<int, String?> _error = {};
+  static final Map<int, List<Map<String, dynamic>>> _items = {};
+  static final Map<int, bool> _loading = {};
+  static final Map<int, String?> _error = {};
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
+    updateKeepAlive();
+    debugPrint(
+      '[RanklistSection] initState called, _items isEmpty=${_items.isEmpty}',
+    );
     _fetch(tab: 0);
   }
 
@@ -34,6 +42,9 @@ class _RanklistSectionState extends State<RanklistSection> {
     super.didUpdateWidget(oldWidget);
     // key 改变时（父页面主动触发刷新），重新加载
     if (widget.key != oldWidget.key) {
+      _items.clear();
+      _loading.clear();
+      _error.clear();
       _fetch(tab: _tabIndex, force: true);
     }
   }
@@ -83,6 +94,7 @@ class _RanklistSectionState extends State<RanklistSection> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -101,8 +113,8 @@ class _RanklistSectionState extends State<RanklistSection> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade100,
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   alignment: Alignment.center,
@@ -113,7 +125,7 @@ class _RanklistSectionState extends State<RanklistSection> {
                       fontWeight: isActive
                           ? FontWeight.w600
                           : FontWeight.normal,
-                      color: isActive ? Colors.white : Colors.grey.shade700,
+                      color: isActive ? Colors.white : cs.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -128,6 +140,7 @@ class _RanklistSectionState extends State<RanklistSection> {
   }
 
   Widget _buildList() {
+    final cs = Theme.of(context).colorScheme;
     final tab = _tabIndex;
     final loading = _loading[tab] ?? false;
     final error = _error[tab];
@@ -146,15 +159,15 @@ class _RanklistSectionState extends State<RanklistSection> {
         child: Center(
           child: Column(
             children: [
-              Icon(Icons.trending_up, size: 32, color: Colors.grey.shade300),
+              Icon(Icons.trending_up, size: 32, color: cs.outlineVariant),
               const SizedBox(height: 6),
               Text(
                 '加载失败',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
               ),
               Text(
                 error,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
@@ -172,7 +185,7 @@ class _RanklistSectionState extends State<RanklistSection> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Text('暂无数据', style: TextStyle(color: Colors.grey.shade400)),
+          child: Text('暂无数据', style: TextStyle(color: cs.onSurfaceVariant)),
         ),
       );
     }

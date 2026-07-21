@@ -110,11 +110,12 @@ class _OnlinePageState extends State<OnlinePage> {
   }
 
   Widget _buildStatsBar() {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 2, 12, 2),
       child: Text(
         _stats,
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
       ),
     );
   }
@@ -146,6 +147,7 @@ class _OnlinePageState extends State<OnlinePage> {
   }
 
   Widget _buildBody() {
+    final cs = Theme.of(context).colorScheme;
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -164,12 +166,12 @@ class _OnlinePageState extends State<OnlinePage> {
             Icon(
               _searchQuery.isNotEmpty ? Icons.search_off : Icons.people_outline,
               size: 48,
-              color: Colors.grey.shade300,
+              color: cs.outlineVariant,
             ),
             const SizedBox(height: 12),
             Text(
               _searchQuery.isNotEmpty ? '未找到匹配结果' : '暂无数据',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -199,10 +201,10 @@ class _OnlinePageState extends State<OnlinePage> {
             final time = item['time'] as String? ?? '';
 
             final typeColor = switch (type) {
-              '管理员' => Colors.red,
-              '超级版主' => Colors.purple,
-              '版主' => Colors.blue,
-              _ => Colors.grey,
+              '管理员' => cs.error,
+              '超级版主' => cs.onSurfaceVariant,
+              '版主' => cs.onSurfaceVariant,
+              _ => cs.onSurfaceVariant,
             };
 
             return Card(
@@ -262,14 +264,14 @@ class _OnlinePageState extends State<OnlinePage> {
                                 Icon(
                                   Icons.access_time,
                                   size: 10,
-                                  color: Colors.grey.shade400,
+                                  color: cs.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 1),
                                 Text(
                                   time,
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color: Colors.grey.shade500,
+                                    color: cs.onSurfaceVariant,
                                   ),
                                 ),
                               ],

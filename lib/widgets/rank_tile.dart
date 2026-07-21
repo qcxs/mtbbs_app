@@ -26,12 +26,13 @@ class RankTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: cs.outlineVariant),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
@@ -52,8 +53,8 @@ class RankTile extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: rank <= 3
-                        ? Colors.deepOrange.shade400
-                        : Colors.grey.shade500,
+                        ? cs.onSurfaceVariant
+                        : cs.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -80,14 +81,14 @@ class RankTile extends StatelessWidget {
                           forumName,
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.blue.shade400,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                         Text(
                           ' · $author',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.grey.shade500,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                         if (time.isNotEmpty) ...[
@@ -95,7 +96,7 @@ class RankTile extends StatelessWidget {
                             ' · $time',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey.shade400,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -111,7 +112,7 @@ class RankTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.deepOrange.shade300,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ],

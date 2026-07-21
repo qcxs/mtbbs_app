@@ -107,7 +107,9 @@ class _SearchPageState extends State<SearchPage> {
     final fullUrl = input.contains('://')
         ? input
         : '${SiteConfig.baseUrl}/$input';
-    context.push('/browser?url=${Uri.encodeComponent(fullUrl)}');
+    context.push(
+      '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
+    );
   }
 
   Future<void> _performBingSearch(String query) async {
@@ -182,14 +184,14 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final searchHistory = context.watch<SearchHistoryProvider>();
     final allItems = searchHistory.getAll();
     final text = _controller.text.trim();
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: cs.surface,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -221,16 +223,17 @@ class _SearchPageState extends State<SearchPage> {
   // ==================== 历史记录（点击填充搜索框） ====================
 
   Widget _buildHistory(List<SearchHistoryItem> items) {
+    final cs = Theme.of(context).colorScheme;
     if (items.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search, size: 48, color: Colors.grey.shade200),
+            Icon(Icons.search, size: 48, color: cs.surfaceContainerHigh),
             const SizedBox(height: 12),
             Text(
               '暂无搜索历史',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -252,7 +255,7 @@ class _SearchPageState extends State<SearchPage> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
                 const Spacer(),
@@ -262,7 +265,7 @@ class _SearchPageState extends State<SearchPage> {
                   },
                   child: Text(
                     '清空',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -272,7 +275,7 @@ class _SearchPageState extends State<SearchPage> {
         final item = items[i - 1];
         return ListTile(
           dense: true,
-          leading: Icon(Icons.history, size: 18, color: Colors.grey.shade500),
+          leading: Icon(Icons.history, size: 18, color: cs.onSurfaceVariant),
           title: Text(
             item.text,
             maxLines: 1,
@@ -281,10 +284,10 @@ class _SearchPageState extends State<SearchPage> {
           ),
           subtitle: Text(
             '点击填充到搜索框',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
           trailing: IconButton(
-            icon: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
+            icon: Icon(Icons.close, size: 16, color: cs.onSurfaceVariant),
             onPressed: () {
               context.read<SearchHistoryProvider>().remove(item.text);
             },
@@ -298,6 +301,7 @@ class _SearchPageState extends State<SearchPage> {
   // ==================== 搜索建议 ====================
 
   Widget _buildSuggestions(String text) {
+    final cs = Theme.of(context).colorScheme;
     final domain = Uri.tryParse(SiteConfig.baseUrl)?.host ?? '';
 
     return ListView(
@@ -307,7 +311,7 @@ class _SearchPageState extends State<SearchPage> {
           if (_routeResult?.appPath != null)
             _suggestionCard(
               icon: Icons.open_in_new,
-              iconColor: Colors.blue,
+              iconColor: cs.onSurfaceVariant,
               label: '打开页面：${_routeResult!.label}',
               subtitle: _routeResult!.siteName != null
                   ? '[${_routeResult!.siteName}] ${_routeResult!.appPath}'
@@ -316,7 +320,7 @@ class _SearchPageState extends State<SearchPage> {
             ),
           _suggestionCard(
             icon: Icons.language,
-            iconColor: Colors.orange,
+            iconColor: const Color(0xFF607D8B),
             label: '在浏览器中打开',
             subtitle: text,
             onTap: () => _openInBrowser(text),
@@ -326,7 +330,7 @@ class _SearchPageState extends State<SearchPage> {
         if (_hasUserMatch(text)) ...[
           _suggestionCard(
             icon: Icons.person,
-            iconColor: Colors.indigo,
+            iconColor: cs.onSurfaceVariant,
             label: _userSearchLabel(text),
             subtitle: '查看用户主页',
             onTap: () => _lookupUser(text),
@@ -338,20 +342,20 @@ class _SearchPageState extends State<SearchPage> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade600,
+            color: cs.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 4),
         _suggestionCard(
           icon: Icons.forum,
-          iconColor: Colors.deepPurple,
+          iconColor: cs.onSurfaceVariant,
           label: '站内搜索"$text"',
           subtitle: '$domain · Discuz 搜索',
           onTap: () => _performSiteSearch(text),
         ),
         _suggestionCard(
           icon: Icons.search,
-          iconColor: Colors.green,
+          iconColor: const Color(0xFF00BCD4),
           label: 'Bing 搜索"$text"',
           subtitle: '限定站点 $domain',
           onTap: () => _performBingSearch(text),
@@ -367,6 +371,7 @@ class _SearchPageState extends State<SearchPage> {
     String? subtitle,
     required VoidCallback onTap,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
@@ -379,7 +384,7 @@ class _SearchPageState extends State<SearchPage> {
         subtitle: subtitle != null
             ? Text(
                 subtitle,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               )

@@ -112,6 +112,7 @@ class _ThreadGridState extends State<ThreadGrid>
     }
 
     if (ctrl.items.isEmpty) {
+      final cs = Theme.of(context).colorScheme;
       return Stack(
         children: [
           RefreshIndicator(
@@ -123,7 +124,7 @@ class _ThreadGridState extends State<ThreadGrid>
                   height: constraints.maxHeight > 0
                       ? constraints.maxHeight
                       : null,
-                  child: _buildEmpty(),
+                  child: _buildEmpty(cs),
                 ),
               ),
             ),
@@ -131,7 +132,7 @@ class _ThreadGridState extends State<ThreadGrid>
           Positioned(
             right: 16,
             bottom: 16,
-            child: _buildFloatingPaginator(ctrl),
+            child: _buildFloatingPaginator(ctrl, cs),
           ),
         ],
       );
@@ -159,11 +160,12 @@ class _ThreadGridState extends State<ThreadGrid>
       builder: (context, constraints) {
         final crossAxisCount = _crossAxisCount(constraints.maxWidth);
         final spacing = _gridSpacing(constraints.maxWidth);
+        final cs = Theme.of(context).colorScheme;
 
         return Stack(
           children: [
             RefreshIndicator(
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               onRefresh: ctrl.refresh,
               child: CustomScrollView(
                 controller: _scrollController,
@@ -180,7 +182,7 @@ class _ThreadGridState extends State<ThreadGrid>
             Positioned(
               right: 16,
               bottom: 16,
-              child: _buildFloatingPaginator(ctrl),
+              child: _buildFloatingPaginator(ctrl, cs),
             ),
           ],
         );
@@ -238,18 +240,18 @@ class _ThreadGridState extends State<ThreadGrid>
 
   // ==================== 悬浮翻页按钮 ====================
 
-  Widget _buildFloatingPaginator(ThreadListController ctrl) {
+  Widget _buildFloatingPaginator(ThreadListController ctrl, ColorScheme cs) {
     final pageLabel = '第 ${ctrl.page} 页';
 
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(24),
-      color: Colors.white,
+      color: cs.surface,
       child: Container(
         height: 44,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: cs.outlineVariant),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -261,8 +263,9 @@ class _ThreadGridState extends State<ThreadGrid>
                 ctrl.prevPage();
                 _handlePageChange();
               },
+              cs: cs,
             ),
-            Container(width: 1, height: 20, color: Colors.grey.shade200),
+            Container(width: 1, height: 20, color: cs.outlineVariant),
             GestureDetector(
               onTap: () => _showPagePicker(ctrl),
               child: Padding(
@@ -273,20 +276,20 @@ class _ThreadGridState extends State<ThreadGrid>
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.grey.shade500,
+                          color: cs.onSurfaceVariant,
                         ),
                       )
                     : Text(
                         pageLabel,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade700,
+                          color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
               ),
             ),
-            Container(width: 1, height: 20, color: Colors.grey.shade200),
+            Container(width: 1, height: 20, color: cs.outlineVariant),
             _pageBtn(
               icon: Icons.chevron_right,
               enabled: ctrl.hasNext,
@@ -294,6 +297,7 @@ class _ThreadGridState extends State<ThreadGrid>
                 ctrl.nextPage();
                 _handlePageChange();
               },
+              cs: cs,
             ),
           ],
         ),
@@ -305,6 +309,7 @@ class _ThreadGridState extends State<ThreadGrid>
     required IconData icon,
     required bool enabled,
     required VoidCallback onTap,
+    required ColorScheme cs,
   }) {
     return SizedBox(
       width: 44,
@@ -312,7 +317,7 @@ class _ThreadGridState extends State<ThreadGrid>
       child: IconButton(
         icon: Icon(icon, size: 20),
         onPressed: enabled ? onTap : null,
-        color: enabled ? Colors.grey.shade700 : Colors.grey.shade300,
+        color: enabled ? cs.onSurfaceVariant : cs.outlineVariant,
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       ),
@@ -380,9 +385,10 @@ class _ThreadGridState extends State<ThreadGrid>
       builder: (context, constraints) {
         final crossAxisCount = _crossAxisCount(constraints.maxWidth);
         final spacing = _gridSpacing(constraints.maxWidth);
+        final cs = Theme.of(context).colorScheme;
 
         return RefreshIndicator(
-          color: Theme.of(context).colorScheme.primary,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           onRefresh: widget.controller.refresh,
           child: CustomScrollView(
             controller: _scrollController,
@@ -396,7 +402,7 @@ class _ThreadGridState extends State<ThreadGrid>
                         horizontal: 8,
                         vertical: 4,
                       ),
-                      child: _buildSkeletonCard(),
+                      child: _buildSkeletonCard(cs),
                     ),
                     childCount: 8,
                   ),
@@ -408,7 +414,7 @@ class _ThreadGridState extends State<ThreadGrid>
                     crossAxisCount: crossAxisCount,
                     mainAxisSpacing: spacing,
                     crossAxisSpacing: spacing,
-                    itemBuilder: (context, index) => _buildSkeletonCard(),
+                    itemBuilder: (context, index) => _buildSkeletonCard(cs),
                     childCount: 8,
                   ),
                 ),
@@ -419,7 +425,7 @@ class _ThreadGridState extends State<ThreadGrid>
     );
   }
 
-  Widget _buildSkeletonCard() {
+  Widget _buildSkeletonCard(ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Card(
@@ -432,27 +438,27 @@ class _ThreadGridState extends State<ThreadGrid>
             children: [
               Row(
                 children: [
-                  _skeletonBox(28, 28, 14),
+                  _skeletonBox(cs, 28, 28, 14),
                   const SizedBox(width: 6),
-                  _skeletonBox(80, 12, 4),
+                  _skeletonBox(cs, 80, 12, 4),
                   const Spacer(),
-                  _skeletonBox(50, 10, 4),
+                  _skeletonBox(cs, 50, 10, 4),
                 ],
               ),
               const SizedBox(height: 10),
-              _skeletonBox(double.infinity, 16, 4),
+              _skeletonBox(cs, double.infinity, 16, 4),
               const SizedBox(height: 4),
-              _skeletonBox(double.infinity, 12, 4),
+              _skeletonBox(cs, double.infinity, 12, 4),
               const SizedBox(height: 8),
-              _skeletonBox(double.infinity, 100, 6),
+              _skeletonBox(cs, double.infinity, 100, 6),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _skeletonBox(40, 12, 4),
+                  _skeletonBox(cs, 40, 12, 4),
                   const SizedBox(width: 12),
-                  _skeletonBox(40, 12, 4),
+                  _skeletonBox(cs, 40, 12, 4),
                   const SizedBox(width: 12),
-                  _skeletonBox(40, 12, 4),
+                  _skeletonBox(cs, 40, 12, 4),
                 ],
               ),
             ],
@@ -462,12 +468,12 @@ class _ThreadGridState extends State<ThreadGrid>
     );
   }
 
-  Widget _skeletonBox(double w, double h, double r) {
+  Widget _skeletonBox(ColorScheme cs, double w, double h, double r) {
     return Container(
       width: w == double.infinity ? null : w,
       height: h,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(r),
       ),
     );
@@ -475,16 +481,16 @@ class _ThreadGridState extends State<ThreadGrid>
 
   // ==================== 空状态 / 错误状态 ====================
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(ColorScheme cs) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade300),
+          Icon(Icons.inbox_outlined, size: 48, color: cs.outlineVariant),
           const SizedBox(height: 8),
           Text(
             '暂无帖子',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -492,27 +498,24 @@ class _ThreadGridState extends State<ThreadGrid>
   }
 
   Widget _buildError(ThreadListController ctrl) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.wifi_off_outlined,
-              size: 48,
-              color: Colors.grey.shade300,
-            ),
+            Icon(Icons.wifi_off_outlined, size: 48, color: cs.outlineVariant),
             const SizedBox(height: 8),
             Text(
               '加载失败',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 4),
             Text(
               ctrl.errorMessage ?? '',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             ElevatedButton.icon(

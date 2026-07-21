@@ -114,12 +114,26 @@ Map<String, dynamic>? _parseItem(dom.Element dl) {
       }
     }
 
+    // 时间：<dt><span class="xg1 xw0"><span title="2026-7-20 02:46">14 小时前</span></span></dt>
+    String time = '';
+    String timeTitle = '';
+    final dtEl = dl.querySelector('dt');
+    if (dtEl != null) {
+      final timeInner = dtEl.querySelector('span.xg1.xw0 span');
+      if (timeInner != null) {
+        time = timeInner.text.trim().replaceAll('\u00A0', ' ');
+        timeTitle = timeInner.attributes['title'] ?? '';
+      }
+    }
+
     return {
       'uid': uid,
       'username': username,
       'threadTitle': threadTitle,
       'viewUrl': viewUrl,
       'bodyHtml': bodyHtml,
+      'time': time,
+      'timeTitle': timeTitle,
       // segments：结构化段落供 UI 直接渲染，无需 HTML 解析
       'segments': _extractSegments(bodyEl),
     };

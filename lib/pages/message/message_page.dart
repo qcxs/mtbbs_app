@@ -33,15 +33,16 @@ class _MessagePageState extends State<MessagePage>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
         Container(
-          color: Colors.white,
+          color: cs.surface,
           child: TabBar(
             controller: _tabCtl,
-            labelColor: Colors.deepPurple,
-            unselectedLabelColor: Colors.grey.shade600,
-            indicatorColor: Colors.deepPurple,
+            labelColor: cs.onSurfaceVariant,
+            unselectedLabelColor: cs.onSurfaceVariant,
+            indicatorColor: cs.onSurfaceVariant,
             tabs: const [
               Tab(text: '我的消息'),
               Tab(text: '我的帖子'),

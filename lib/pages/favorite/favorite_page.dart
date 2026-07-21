@@ -142,6 +142,7 @@ class _FavoritePageState extends State<FavoritePage> {
   }
 
   Widget _buildBody() {
+    final cs = Theme.of(context).colorScheme;
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -155,11 +156,11 @@ class _FavoritePageState extends State<FavoritePage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.bookmark_border, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.bookmark_border, size: 48, color: cs.outlineVariant),
             const SizedBox(height: 12),
             Text(
               '暂无收藏',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -199,8 +200,7 @@ class _FavoritePageState extends State<FavoritePage> {
               // 多列模式：按行分组
               if (crossAxisCount > 1) {
                 if (index % crossAxisCount != 0) return const SizedBox.shrink();
-                final rowEnd =
-                    (index + crossAxisCount).clamp(0, _items.length);
+                final rowEnd = (index + crossAxisCount).clamp(0, _items.length);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
@@ -208,9 +208,7 @@ class _FavoritePageState extends State<FavoritePage> {
                     children: [
                       for (int i = index; i < rowEnd; i++) ...[
                         if (i > index) const SizedBox(width: 8),
-                        Expanded(
-                          child: _FavoriteCard(item: _items[i]),
-                        ),
+                        Expanded(child: _FavoriteCard(item: _items[i])),
                       ],
                       if (rowEnd - index < crossAxisCount)
                         ...List.generate(
@@ -242,6 +240,7 @@ class _FavoriteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final title = item['title'] as String? ?? '';
     final tid = item['tid'] as String? ?? '';
     final time = item['time'] as String? ?? '';
@@ -266,7 +265,7 @@ class _FavoriteCard extends StatelessWidget {
                   Icon(
                     type == 'thread' ? Icons.article_outlined : Icons.link,
                     size: 14,
-                    color: Colors.grey.shade500,
+                    color: cs.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -291,14 +290,14 @@ class _FavoriteCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     note,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: cs.onSurfaceVariant,
                       height: 1.3,
                     ),
                     maxLines: 2,
@@ -310,7 +309,7 @@ class _FavoriteCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   time,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                 ),
               ],
             ],

@@ -14,15 +14,21 @@ class RssSection extends StatefulWidget {
   State<RssSection> createState() => _RssSectionState();
 }
 
-class _RssSectionState extends State<RssSection> {
+class _RssSectionState extends State<RssSection>
+    with AutomaticKeepAliveClientMixin {
   List<Map<String, dynamic>> _items = [];
   bool _loading = false;
   String? _error;
   bool _everLoaded = false;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
+    updateKeepAlive();
+    debugPrint('[RssSection] initState called, _everLoaded=$_everLoaded');
     _fetch();
   }
 
@@ -69,6 +75,7 @@ class _RssSectionState extends State<RssSection> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -82,14 +89,14 @@ class _RssSectionState extends State<RssSection> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
+                  color: cs.onSurface,
                 ),
               ),
               const Spacer(),
               if (_items.isNotEmpty)
                 Text(
                   '${_items.length} 条',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
             ],
           ),
@@ -106,12 +113,12 @@ class _RssSectionState extends State<RssSection> {
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.rss_feed, size: 40, color: Colors.grey.shade300),
+                  Icon(Icons.rss_feed, size: 40, color: cs.outlineVariant),
                   const SizedBox(height: 8),
-                  Text('加载失败', style: TextStyle(color: Colors.grey.shade500)),
+                  Text('加载失败', style: TextStyle(color: cs.onSurfaceVariant)),
                   Text(
                     _error!,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -124,7 +131,7 @@ class _RssSectionState extends State<RssSection> {
             child: Center(
               child: Text(
                 '暂无帖子',
-                style: TextStyle(color: Colors.grey.shade400),
+                style: TextStyle(color: cs.onSurfaceVariant),
               ),
             ),
           )

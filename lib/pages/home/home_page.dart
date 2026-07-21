@@ -54,6 +54,7 @@ class _HomePageState extends State<HomePage> {
       key: ValueKey('home_${SiteConfig.baseUrl}'),
       onRefresh: _refreshAll,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(12),
         children: [
           // ====== 快捷链接 ======
@@ -121,6 +122,7 @@ class _CollapsibleSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -134,7 +136,7 @@ class _CollapsibleSection extends StatelessWidget {
                 Icon(
                   expanded ? Icons.expand_less : Icons.expand_more,
                   size: 20,
-                  color: Colors.grey.shade600,
+                  color: cs.onSurfaceVariant,
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -142,7 +144,7 @@ class _CollapsibleSection extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
+                    color: cs.onSurface,
                   ),
                 ),
               ],
@@ -171,6 +173,7 @@ class _ShortcutTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final url = link.data?['url']?.toString() ?? '';
     final imageUrl = link.data?['imageUrl']?.toString();
 
@@ -183,7 +186,9 @@ class _ShortcutTile extends StatelessWidget {
                 if (routeResult.appPath != null && !routeResult.isOtherSite) {
                   context.push(routeResult.appPath!);
                 } else {
-                  context.push('/browser?url=${Uri.encodeComponent(url)}');
+                  context.push(
+                    '/browser?url=${Uri.encodeComponent(url)}&intercept=false',
+                  );
                 }
               } else {
                 context.push(url);
@@ -199,7 +204,7 @@ class _ShortcutTile extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: imageUrl != null && imageUrl.isNotEmpty
@@ -207,7 +212,7 @@ class _ShortcutTile extends StatelessWidget {
                       imageUrl: imageUrl,
                       fit: BoxFit.cover,
                       errorWidget: (_, __, ___) =>
-                          const Icon(Icons.link, color: Colors.grey),
+                          Icon(Icons.link, color: cs.onSurfaceVariant),
                     )
                   : Center(
                       child: Text(
@@ -217,7 +222,7 @@ class _ShortcutTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade500,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -245,6 +250,7 @@ class _ShortcutTile extends StatelessWidget {
 class _ForumList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final forums = SiteConfig.defaultForumOrder
         .where((fid) => SiteConfig.forums.containsKey(fid))
         .map((fid) => MapEntry(fid, SiteConfig.forums[fid]!))
@@ -260,21 +266,21 @@ class _ForumList extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.deepPurple.shade50,
+              color: cs.surfaceContainerLow,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.deepPurple.shade100),
+              border: Border.all(color: cs.surfaceContainerLow),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.forum, size: 18, color: Colors.deepPurple.shade400),
+                Icon(Icons.forum, size: 18, color: cs.onSurfaceVariant),
                 const SizedBox(width: 6),
                 Text(
                   entry.value,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Colors.deepPurple.shade700,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ],

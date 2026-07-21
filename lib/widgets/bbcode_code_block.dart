@@ -155,6 +155,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
         // 当前语言排在顶部
         final sorted = List.of(_languages)
           ..sort((a, b) {
@@ -170,7 +171,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                border: Border(bottom: BorderSide(color: cs.outlineVariant)),
               ),
               child: Row(
                 children: [
@@ -255,6 +256,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
   }
 
   Widget _buildTopBar() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -277,13 +279,13 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
                 children: [
                   Text(
                     _languageLabel,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(width: 3),
                   Icon(
                     Icons.arrow_drop_down,
                     size: 12,
-                    color: Colors.grey.shade500,
+                    color: cs.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -313,12 +315,12 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
                   Icon(
                     Icons.copy_rounded,
                     size: 12,
-                    color: Colors.grey.shade400,
+                    color: cs.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '复制',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -344,18 +346,19 @@ class _LanguageTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListTile(
       dense: true,
       title: Text(
         label,
         style: TextStyle(
           fontSize: 13,
-          color: selected ? Colors.deepPurple : null,
+          color: selected ? cs.onSurfaceVariant : null,
           fontWeight: selected ? FontWeight.w600 : null,
         ),
       ),
       trailing: selected
-          ? const Icon(Icons.check, size: 18, color: Colors.deepPurple)
+          ? Icon(Icons.check, size: 18, color: cs.onSurfaceVariant)
           : null,
       onTap: onTap,
     );

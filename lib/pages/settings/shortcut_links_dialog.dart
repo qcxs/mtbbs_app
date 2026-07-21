@@ -7,6 +7,7 @@ import '../../widgets/managed_list_dialog.dart';
 /// 快捷链接管理对话框 — 独立组件，可在任意页面调用
 class ShortcutLinksDialog {
   static void show(BuildContext context, SettingsProvider settings) {
+    final cs = Theme.of(context).colorScheme;
     showManagedListDialog(
       context: context,
       title: '快捷链接',
@@ -18,7 +19,7 @@ class ShortcutLinksDialog {
       allowToggleVisibility: true,
       itemBuilder: (item, isVisible) => Text(
         item.name,
-        style: TextStyle(color: isVisible ? null : Colors.grey),
+        style: TextStyle(color: isVisible ? null : cs.onSurfaceVariant),
       ),
       onAdd: () => _handleAdd(context, settings),
       onEdit: (item) => _handleEdit(context, settings, item),

@@ -14,6 +14,7 @@ class RssTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final title = item['title']?.toString() ?? '';
     final link = item['link']?.toString() ?? '';
     final description = item['description']?.toString() ?? '';
@@ -25,7 +26,7 @@ class RssTile extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: cs.outlineVariant),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -65,7 +66,7 @@ class RssTile extends StatelessWidget {
                     description.replaceAll(RegExp(r'<[^>]+>'), ''),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: cs.onSurfaceVariant,
                       height: 1.3,
                     ),
                     maxLines: 2,
@@ -82,20 +83,20 @@ class RssTile extends StatelessWidget {
                           author,
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade500,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                       if (author.isNotEmpty && pubDate.isNotEmpty)
                         Text(
                           ' · ',
-                          style: TextStyle(color: Colors.grey.shade300),
+                          style: TextStyle(color: cs.outlineVariant),
                         ),
                       if (pubDate.isNotEmpty)
                         Text(
                           pubDate,
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade500,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                     ],

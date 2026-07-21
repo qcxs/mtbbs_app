@@ -171,6 +171,7 @@ class _MypostTabState extends State<MypostTab> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     if (_loading)
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     if (_error != null) {
@@ -178,9 +179,9 @@ class _MypostTabState extends State<MypostTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.error_outline, size: 48, color: cs.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: Colors.grey.shade600)),
+            Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => _load(1),
@@ -196,9 +197,9 @@ class _MypostTabState extends State<MypostTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.forum_outlined, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.forum_outlined, size: 48, color: cs.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text('暂无提醒', style: TextStyle(color: Colors.grey.shade500)),
+            Text('暂无提醒', style: TextStyle(color: cs.onSurfaceVariant)),
           ],
         ),
       );
@@ -222,9 +223,10 @@ class _MypostTabState extends State<MypostTab> {
   }
 
   Widget _buildHeader() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      color: Colors.white,
+      color: cs.surface,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -250,12 +252,12 @@ class _MypostTabState extends State<MypostTab> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '$_page / $_totalPages',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ),
               ),
@@ -277,13 +279,14 @@ class _MypostTabState extends State<MypostTab> {
   }
 
   Widget _subTab(String label, String type) {
+    final cs = Theme.of(context).colorScheme;
     final active = _type == type;
     return GestureDetector(
       onTap: () => _switchType(type),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: active ? Colors.deepPurple.shade50 : Colors.transparent,
+          color: active ? cs.surfaceContainerLow : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -291,7 +294,7 @@ class _MypostTabState extends State<MypostTab> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-            color: active ? Colors.deepPurple : Colors.grey.shade700,
+            color: active ? cs.onSurfaceVariant : cs.onSurfaceVariant,
           ),
         ),
       ),
@@ -301,8 +304,11 @@ class _MypostTabState extends State<MypostTab> {
   // ==================== Item ====================
 
   Widget _buildItem(Map<String, dynamic> item, int index) {
+    final cs = Theme.of(context).colorScheme;
     final uid = item['uid'] as String? ?? '';
     final username = item['username'] as String? ?? '';
+    final time = item['time'] as String? ?? '';
+    final timeTitle = item['timeTitle'] as String? ?? '';
     final segments = item['segments'] as List<dynamic>? ?? [];
     final viewUrl = item['viewUrl'] as String? ?? '';
     final ids = parseViewUrl(viewUrl);
@@ -314,38 +320,42 @@ class _MypostTabState extends State<MypostTab> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: cs.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 头部：头像 + 可点击用户名
+            // 头部：头像 + 用户名 + 时间
             Row(
               children: [
                 UserAvatar(uid: uid, radius: 20),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: GestureDetector(
-                    onTap: uid.isNotEmpty
-                        ? () => context.push('/user/$uid')
-                        : null,
-                    child: Text(
-                      username,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.deepPurple.shade600,
-                        decoration: TextDecoration.underline,
-                      ),
+                  child: Text(
+                    username,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                if (time.isNotEmpty)
+                  Tooltip(
+                    message: timeTitle.isNotEmpty ? timeTitle : time,
+                    child: Text(
+                      time,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 6),
-            // 通知消息体（结构化段落，用户名/标题可点击）
+            // 通知消息体（结构化段落，标题可点击）
             if (segments.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
@@ -394,7 +404,7 @@ class _MypostTabState extends State<MypostTab> {
                         context.push(result.appPath!);
                       } else {
                         context.push(
-                          '/browser?url=${Uri.encodeComponent(fullUrl)}',
+                          '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
                         );
                       }
                     },
@@ -419,7 +429,7 @@ class _MypostTabState extends State<MypostTab> {
                     icon: Icon(
                       Icons.more_horiz,
                       size: 16,
-                      color: Colors.grey.shade500,
+                      color: cs.onSurfaceVariant,
                     ),
                     onSelected: (v) {
                       if (v == 'showBbcode') {
@@ -452,7 +462,7 @@ class _MypostTabState extends State<MypostTab> {
                                 preview.bbcode,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade800,
+                                  color: cs.onSurface,
                                   height: 1.5,
                                 ),
                               ),
@@ -481,8 +491,9 @@ class _MypostTabState extends State<MypostTab> {
   }
 
   Widget _buildSegments(List<dynamic> segments) {
+    final cs = Theme.of(context).colorScheme;
     final spans = <InlineSpan>[];
-    const style = TextStyle(fontSize: 13, color: Colors.black87, height: 1.4);
+    final style = TextStyle(fontSize: 13, color: cs.onSurface, height: 1.4);
 
     for (final seg in segments) {
       final map = seg as Map<String, dynamic>;
@@ -491,25 +502,6 @@ class _MypostTabState extends State<MypostTab> {
       if (text.isEmpty) continue;
 
       switch (type) {
-        case 'user':
-          final uid = map['uid'] as String? ?? '';
-          spans.add(
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: GestureDetector(
-                onTap: uid.isNotEmpty ? () => context.push('/user/$uid') : null,
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.deepPurple.shade600,
-                    decoration: TextDecoration.underline,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ),
-          );
         case 'thread':
           final url = map['url'] as String? ?? '';
           spans.add(
@@ -526,7 +518,7 @@ class _MypostTabState extends State<MypostTab> {
                           context.push(result.appPath!);
                         } else {
                           context.push(
-                            '/browser?url=${Uri.encodeComponent(fullUrl)}',
+                            '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
                           );
                         }
                       }
@@ -535,7 +527,7 @@ class _MypostTabState extends State<MypostTab> {
                   text,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.blue.shade700,
+                    color: cs.onSurfaceVariant,
                     decoration: TextDecoration.underline,
                     height: 1.4,
                   ),
@@ -551,17 +543,18 @@ class _MypostTabState extends State<MypostTab> {
   }
 
   Widget _actionBtn({required String label, required VoidCallback onTap}) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.deepPurple.shade50,
+          color: cs.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           label,
-          style: TextStyle(fontSize: 11, color: Colors.deepPurple.shade600),
+          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
         ),
       ),
     );

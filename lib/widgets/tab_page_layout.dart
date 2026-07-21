@@ -156,7 +156,7 @@ class _TabPageLayoutState extends State<TabPageLayout> {
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
           color: selected
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+              ? Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.1)
               : null,
           borderRadius: BorderRadius.circular(20),
         ),
@@ -166,7 +166,7 @@ class _TabPageLayoutState extends State<TabPageLayout> {
             fontSize: 14,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             color: selected
-                ? Theme.of(context).colorScheme.primary
+                ? Theme.of(context).colorScheme.onSurfaceVariant
                 : Colors.grey.shade600,
           ),
         ),

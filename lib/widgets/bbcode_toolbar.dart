@@ -24,25 +24,26 @@ class BBCodeToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final visibleItems = items.where((e) => e.visible).toList();
     if (visibleItems.isEmpty) return const SizedBox.shrink();
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+        color: cs.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: cs.outlineVariant)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Wrap(
         spacing: 2,
         runSpacing: 2,
         alignment: WrapAlignment.start,
-        children: _buildButtons(visibleItems),
+        children: _buildButtons(visibleItems, cs),
       ),
     );
   }
 
-  List<Widget> _buildButtons(List<ManagedItem> visibleItems) {
+  List<Widget> _buildButtons(List<ManagedItem> visibleItems, ColorScheme cs) {
     final widgets = <Widget>[];
     for (int i = 0; i < visibleItems.length; i++) {
       final item = visibleItems[i];
@@ -52,11 +53,11 @@ class BBCodeToolbar extends StatelessWidget {
       if (i > 0) {
         final prevAction = resolveToolbarAction(visibleItems[i - 1].id);
         if (prevAction != null && _shouldAddSeparator(action, prevAction)) {
-          widgets.add(_separator());
+          widgets.add(_separator(cs));
         }
       }
 
-      widgets.add(_buildButton(action, item));
+      widgets.add(_buildButton(action, item, cs));
     }
     return widgets;
   }
@@ -95,7 +96,7 @@ class BBCodeToolbar extends StatelessWidget {
     return true;
   }
 
-  Widget _buildButton(ToolbarAction action, ManagedItem item) {
+  Widget _buildButton(ToolbarAction action, ManagedItem item, ColorScheme cs) {
     final shortcut = shortcuts[item.id] ?? '';
     final tooltip = shortcut.isNotEmpty
         ? '${item.name} ($shortcut)'
@@ -110,6 +111,7 @@ class BBCodeToolbar extends StatelessWidget {
           action: action,
           enabled: enabled && canUndo,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.redo:
         return _toolBtn(
@@ -118,6 +120,7 @@ class BBCodeToolbar extends StatelessWidget {
           action: action,
           enabled: enabled && canRedo,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.bold:
         return _toolBtn(
@@ -126,6 +129,7 @@ class BBCodeToolbar extends StatelessWidget {
           action: action,
           bold: true,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.italic:
         return _toolBtn(
@@ -134,6 +138,7 @@ class BBCodeToolbar extends StatelessWidget {
           action: action,
           italic: true,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.underline:
         return _toolBtn(
@@ -142,6 +147,7 @@ class BBCodeToolbar extends StatelessWidget {
           action: action,
           underline: true,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.strikethrough:
         return _toolBtn(
@@ -150,6 +156,7 @@ class BBCodeToolbar extends StatelessWidget {
           action: action,
           strike: true,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.color:
         return _toolBtn(
@@ -157,6 +164,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.backcolor:
         return _toolBtn(
@@ -164,6 +172,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.quote:
         return _toolBtn(
@@ -171,6 +180,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.hide:
         return _toolBtn(
@@ -178,6 +188,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.free:
         return _toolBtn(
@@ -185,6 +196,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.code:
         return _toolBtn(
@@ -192,6 +204,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.alignLeft:
         return _toolBtn(
@@ -199,6 +212,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.alignCenter:
         return _toolBtn(
@@ -206,6 +220,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.alignRight:
         return _toolBtn(
@@ -213,6 +228,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.listUl:
         return _toolBtn(
@@ -220,6 +236,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.listOl:
         return _toolBtn(
@@ -227,6 +244,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.link:
         return _toolBtn(
@@ -234,6 +252,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.image:
         return _toolBtn(
@@ -242,6 +261,7 @@ class BBCodeToolbar extends StatelessWidget {
           action: action,
           name: item.name,
           onLongPress: () => controller.onAction(ToolbarAction.imageLongPress),
+          cs: cs,
         );
       case ToolbarAction.hr:
         return _toolBtn(
@@ -249,6 +269,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.emoji:
         return _toolBtn(
@@ -256,6 +277,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.select:
         return _toolBtn(
@@ -263,6 +285,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.fontSize:
         return _toolBtn(
@@ -270,6 +293,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.history:
         return _toolBtn(
@@ -277,6 +301,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.mtImage:
         return _toolBtn(
@@ -284,6 +309,7 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
       case ToolbarAction.imageLongPress:
         return const SizedBox.shrink(); // 仅用作长按触发，不渲染按钮
@@ -293,16 +319,17 @@ class BBCodeToolbar extends StatelessWidget {
           tooltip: tooltip,
           action: action,
           name: item.name,
+          cs: cs,
         );
     }
   }
 
   bool _isEnabled(ToolbarAction action) => true;
 
-  Widget _separator() {
+  Widget _separator(ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-      child: Container(width: 1, color: Colors.grey.shade300),
+      child: Container(width: 1, color: cs.outlineVariant),
     );
   }
 
@@ -318,6 +345,7 @@ class BBCodeToolbar extends StatelessWidget {
     bool strike = false,
     String name = '',
     VoidCallback? onLongPress,
+    required ColorScheme cs,
   }) {
     final Widget child;
     if (icon != null) {
@@ -329,14 +357,16 @@ class BBCodeToolbar extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: enabled ? Colors.grey.shade700 : Colors.grey.shade400,
+              color: enabled
+                  ? cs.onSurfaceVariant
+                  : cs.onSurfaceVariant.withValues(alpha: 0.4),
             ),
             if (name.isNotEmpty)
               Text(
                 name,
                 style: TextStyle(
                   fontSize: 8,
-                  color: Colors.grey.shade500,
+                  color: cs.onSurfaceVariant,
                   height: 1.1,
                 ),
                 maxLines: 1,
@@ -361,7 +391,7 @@ class BBCodeToolbar extends StatelessWidget {
                     : strike
                     ? TextDecoration.lineThrough
                     : TextDecoration.none,
-                color: Colors.grey.shade700,
+                color: cs.onSurfaceVariant,
               ),
             ),
             if (name.isNotEmpty)
@@ -369,7 +399,7 @@ class BBCodeToolbar extends StatelessWidget {
                 name,
                 style: TextStyle(
                   fontSize: 8,
-                  color: Colors.grey.shade500,
+                  color: cs.onSurfaceVariant,
                   height: 1.1,
                 ),
                 maxLines: 1,
@@ -391,7 +421,7 @@ class BBCodeToolbar extends StatelessWidget {
             onLongPress: onLongPress,
             child: Container(
               decoration: BoxDecoration(
-                color: enabled ? null : Colors.grey.shade100,
+                color: enabled ? null : cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: child,
@@ -447,6 +477,7 @@ class ColorPickerPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,7 +501,7 @@ class ColorPickerPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: c,
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: cs.outlineVariant),
                 ),
               ),
             );

@@ -11,6 +11,7 @@ class ThreadItem {
   final int? threadId;
   final String? boardName;
   final String? boardUrl;
+  final int? boardId;
   final int? likes;
   final int? comments;
   final int? views;
@@ -28,6 +29,7 @@ class ThreadItem {
     this.threadId,
     this.boardName,
     this.boardUrl,
+    this.boardId,
     this.likes,
     this.comments,
     this.views,
@@ -46,6 +48,7 @@ class ThreadItem {
     threadId: json['threadId'] as int?,
     boardName: json['boardName']?.toString(),
     boardUrl: json['boardUrl']?.toString(),
+    boardId: json['boardId'] as int?,
     likes: json['likes'] as int?,
     comments: json['comments'] as int?,
     views: json['views'] as int?,
@@ -66,6 +69,7 @@ class ThreadItem {
     'threadId': threadId,
     'boardName': boardName,
     'boardUrl': boardUrl,
+    'boardId': boardId,
     'likes': likes,
     'comments': comments,
     'views': views,

@@ -25,6 +25,7 @@ class UserProfilePage extends StatefulWidget {
 }
 
 class _UserProfilePageState extends State<UserProfilePage> {
+  ColorScheme get _cs => Theme.of(context).colorScheme;
   Map<String, dynamic>? _profile;
   bool _loading = true;
   String? _error;
@@ -43,7 +44,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     try {
       final raw = await space_api.getUserProfile(
         ApiService().dio,
-        uid: widget.uid,
+        uid: widget.uid == 'self' ? '' : widget.uid,
       );
       final profile = raw['success'] == true && raw['profile'] != null
           ? UserProfile.fromMap(raw['profile'] as Map<String, dynamic>)
@@ -90,14 +91,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = _cs;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
         title: Text(
           _profile != null ? '${_profile!['nickname'] ?? '用户'}的主页' : '用户主页',
         ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: _cs.surface,
         elevation: 0.5,
         actions: [
           if (_profile != null)
@@ -132,13 +133,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
               Icon(
                 Icons.person_off_outlined,
                 size: 48,
-                color: Colors.grey.shade300,
+                color: _cs.onSurfaceVariant,
               ),
               const SizedBox(height: 8),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600),
+                style: TextStyle(color: _cs.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
@@ -195,14 +196,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      color: Colors.white,
+      color: _cs.surface,
       child: Row(
         children: [
           UserAvatar(
             uid: uid,
             nickname: nickname,
             radius: 32,
-            disableTap: true,
+            tapAction: AvatarTapAction.viewAvatar,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -226,14 +227,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50,
+                          color: const Color(0xFF4CAF50).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           '在线',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.green.shade700,
+                            color: const Color(0xFF4CAF50),
                           ),
                         ),
                       ),
@@ -242,7 +243,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 const SizedBox(height: 4),
                 Text(
                   'UID: $uid',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 13, color: _cs.onSurfaceVariant),
                 ),
                 if (group != null && group.isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -252,18 +253,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: adminGroup != null
-                          ? Colors.orange.shade50
-                          : Colors.blue.shade50,
+                      color: const Color(0xFFFF9900).withOpacity(0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       group,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: adminGroup != null
-                            ? Colors.orange.shade700
-                            : Colors.blue.shade700,
+                        color: Color(0xFFFF9900),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -285,63 +282,58 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      color: Colors.white,
+      color: _cs.surface,
       child: Row(
         children: [
           _statBox(
             '积分',
             points['credits']?.toString() ?? '0',
             Icons.monetization_on_outlined,
-            Colors.orange,
+            const Color(0xFFFF9800),
           ),
           _divider(),
           _statBox(
             '好评',
             points['reputation']?.toString() ?? '0',
             Icons.thumb_up_outlined,
-            Colors.green,
+            const Color(0xFF4CAF50),
           ),
           _divider(),
           _statBox(
             '金币',
             points['goldCoins']?.toString() ?? '0',
             Icons.workspace_premium_outlined,
-            Colors.amber,
+            const Color(0xFFFFC107),
           ),
           _divider(),
           _statBox(
             '信誉',
             points['credit']?.toString() ?? '0',
             Icons.verified_outlined,
-            Colors.blue,
+            const Color(0xFF2196F3),
           ),
         ],
       ),
     );
   }
 
-  Widget _statBox(
-    String label,
-    String value,
-    IconData icon,
-    MaterialColor color,
-  ) {
+  Widget _statBox(String label, String value, IconData icon, Color color) {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, size: 22, color: color.shade400),
+          Icon(icon, size: 22, color: color),
           const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
+          ),
           Text(
             value,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: color.shade700,
+              color: color,
             ),
-          ),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
           ),
         ],
       ),
@@ -349,7 +341,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _divider() {
-    return Container(width: 1, height: 36, color: Colors.grey.shade200);
+    return Container(width: 1, height: 36, color: _cs.outlineVariant);
   }
 
   // ==================== 活跃统计 ====================
@@ -361,37 +353,63 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final uid = widget.uid;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      color: Colors.white,
+      color: _cs.surface,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _activityStatItem('好友', stats['friends']?.toString() ?? '0'),
           _activityStatItem(
+            Icons.people_outline,
+            '好友',
+            stats['friends']?.toString() ?? '0',
+            const Color(0xFFE91E63),
+          ),
+          _activityStatItem(
+            Icons.reply_outlined,
             '回帖',
             stats['replies']?.toString() ?? '0',
+            const Color(0xFF00BCD4),
             onTap: () => context.push('/my-threads?type=reply&uid=$uid'),
           ),
           _activityStatItem(
+            Icons.article_outlined,
             '主题',
             stats['threads']?.toString() ?? '0',
+            const Color(0xFF9C27B0),
             onTap: () => context.push('/my-threads?uid=$uid'),
           ),
-          _activityStatItem('分享', stats['shares']?.toString() ?? '0'),
+          _activityStatItem(
+            Icons.share_outlined,
+            '分享',
+            stats['shares']?.toString() ?? '0',
+            const Color(0xFFFF5722),
+          ),
         ],
       ),
     );
   }
 
-  Widget _activityStatItem(String label, String value, {VoidCallback? onTap}) {
+  Widget _activityStatItem(
+    IconData icon,
+    String label,
+    String value,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     final content = Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        Icon(icon, size: 20, color: color),
+        const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          style: TextStyle(fontSize: 12, color: _cs.onSurfaceVariant),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
       ],
     );
@@ -444,10 +462,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.pie_chart_outline,
                       size: 18,
-                      color: Colors.grey,
+                      color: _cs.onSurfaceVariant,
                     ),
                     const SizedBox(width: 6),
                     const Text(
@@ -471,7 +489,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   '公式: $formulaStr',
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey.shade400,
+                    color: _cs.onSurfaceVariant,
                     height: 1.4,
                   ),
                   maxLines: 3,
@@ -485,7 +503,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         '估算精华帖: ',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: _cs.onSurfaceVariant,
                         ),
                       ),
                       Text(
@@ -500,7 +518,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         '(可能不准确)',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.orange.shade400,
+                          color: _cs.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -537,7 +555,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     s.label,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey.shade600,
+                                      color: _cs.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
@@ -615,14 +633,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
       }
     }
 
-    addSeg('金币', termGold, Colors.amber.shade400);
-    addSeg('主题', termThreads, Colors.blue.shade400);
-    addSeg('发帖', termPosts, Colors.green.shade400);
-    if (elitePosts > 0) addSeg('精华', termElite, Colors.purple.shade400);
-    addSeg('好评', termReputation, Colors.pink.shade400);
-    addSeg('信誉', termCredit < 0 ? 0 : termCredit, Colors.teal.shade400);
-    addSeg('好友', termFriends, Colors.orange.shade400);
-    addSeg('在线', termOnline, Colors.indigo.shade400);
+    addSeg('金币', termGold, const Color(0xFFFFC107));
+    addSeg('主题', termThreads, const Color(0xFF3F51B5));
+    addSeg('发帖', termPosts, const Color(0xFF00BCD4));
+    if (elitePosts > 0) addSeg('精华', termElite, const Color(0xFFFF9800));
+    addSeg('好评', termReputation, const Color(0xFF4CAF50));
+    addSeg('信誉', termCredit < 0 ? 0 : termCredit, const Color(0xFF2196F3));
+    addSeg('好友', termFriends, const Color(0xFFE91E63));
+    addSeg('在线', termOnline, const Color(0xFF9C27B0));
 
     return (segments, totalCalc, elitePosts, formulaStr, diff);
   }
@@ -649,20 +667,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      color: _cs.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.format_quote, size: 16, color: Colors.grey.shade400),
+              Icon(Icons.format_quote, size: 16, color: _cs.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 '个性签名',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+                  color: _cs.onSurfaceVariant,
                 ),
               ),
             ],
@@ -672,7 +690,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             sig.replaceAll(RegExp(r'\[/?\w+(=[^\]]*)?\]'), ''),
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade700,
+              color: _cs.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -686,14 +704,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Widget _buildCustomTitle() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      color: _cs.surface,
       child: Row(
         children: [
-          Icon(Icons.badge_outlined, size: 16, color: Colors.grey.shade400),
+          Icon(Icons.badge_outlined, size: 16, color: _cs.onSurfaceVariant),
           const SizedBox(width: 4),
           Text(
             '头衔: ',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 13, color: _cs.onSurfaceVariant),
           ),
           Text(
             _profile!['customTitle'] as String? ?? '',
@@ -727,7 +745,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      color: Colors.white,
+      color: _cs.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -736,7 +754,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               Icon(
                 Icons.bar_chart_outlined,
                 size: 16,
-                color: Colors.grey.shade400,
+                color: _cs.onSurfaceVariant,
               ),
               const SizedBox(width: 4),
               Text(
@@ -744,7 +762,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+                  color: _cs.onSurfaceVariant,
                 ),
               ),
             ],
@@ -761,7 +779,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       item.key,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey.shade500,
+                        color: _cs.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -783,7 +801,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      color: _cs.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -792,7 +810,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               Icon(
                 Icons.emoji_events_outlined,
                 size: 16,
-                color: Colors.grey.shade400,
+                color: _cs.onSurfaceVariant,
               ),
               const SizedBox(width: 4),
               Text(
@@ -800,7 +818,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+                  color: _cs.onSurfaceVariant,
                 ),
               ),
             ],
@@ -822,13 +840,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ? CachedNetworkImage(imageUrl: icon, fit: BoxFit.contain)
                       : Container(
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: _cs.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Icon(
                             Icons.emoji_events_outlined,
                             size: 18,
-                            color: Colors.grey.shade400,
+                            color: _cs.onSurfaceVariant,
                           ),
                         ),
                 ),
@@ -845,7 +863,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 final name = medal['name'] as String? ?? '';
                 return Text(
                   name,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
                 );
               }).toList(),
             ),

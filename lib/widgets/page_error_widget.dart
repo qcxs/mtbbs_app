@@ -24,6 +24,7 @@ class PageErrorWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -33,7 +34,7 @@ class PageErrorWidget extends StatelessWidget {
             Icon(
               Icons.error_outline_rounded,
               size: 48,
-              color: Colors.grey.shade400,
+              color: cs.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             Text(
@@ -41,7 +42,7 @@ class PageErrorWidget extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
-                color: Colors.grey.shade600,
+                color: cs.onSurfaceVariant,
                 height: 1.5,
               ),
             ),

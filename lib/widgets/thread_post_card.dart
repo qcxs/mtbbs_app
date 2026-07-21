@@ -70,6 +70,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
   bool get _isMainPost => widget.index == 0;
 
   Widget _buildRating(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final rating = widget.post.rating!;
     final totalScore = rating['totalScore'] as String? ?? '';
     final columns = rating['columns'] as List<dynamic>? ?? [];
@@ -85,7 +86,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -99,7 +100,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                 totalScore,
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.orange.shade700,
+                  color: cs.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -107,25 +108,22 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Table(
-              border: TableBorder.all(
-                color: Colors.orange.shade200,
-                width: 0.5,
-              ),
+              border: TableBorder.all(color: cs.outline, width: 0.5),
               defaultColumnWidth: const IntrinsicColumnWidth(),
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [
                 // 表头行
                 TableRow(
-                  decoration: BoxDecoration(color: Colors.orange.shade100),
+                  decoration: BoxDecoration(color: cs.surfaceContainerHigh),
                   children: [
-                    _rateCell(Text('用户', style: _rateHeaderStyle)),
+                    _rateCell(Text('用户', style: _rateHeaderStyle(cs))),
                     ...columns.map(
                       (c) => _rateCell(
-                        Text(c.toString(), style: _rateHeaderStyle),
+                        Text(c.toString(), style: _rateHeaderStyle(cs)),
                       ),
                     ),
                     if (hasReason)
-                      _rateCell(Text('理由', style: _rateHeaderStyle)),
+                      _rateCell(Text('理由', style: _rateHeaderStyle(cs))),
                   ],
                 ),
                 // 数据行
@@ -151,7 +149,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                               username,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade700,
+                                color: cs.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -163,7 +161,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                             s.toString(),
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.orange.shade700,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -174,7 +172,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                             reason,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade500,
+                              color: cs.onSurfaceVariant,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -191,10 +189,10 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     );
   }
 
-  TextStyle get _rateHeaderStyle => TextStyle(
+  TextStyle _rateHeaderStyle(ColorScheme cs) => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: Colors.orange.shade800,
+    color: cs.onSurfaceVariant,
   );
 
   /// 评分表格单元格
@@ -207,9 +205,10 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
-      color: Colors.white,
+      color: cs.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -228,7 +227,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           else
             Text(
               widget.post.bbcode,
-              style: TextStyle(color: Colors.grey.shade500),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
           if (widget.post.rating != null) _buildRating(context),
           if (_isMainPost) _buildActionButtons(context),
@@ -245,14 +244,14 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.deepPurple.shade50,
+                      color: cs.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '回复',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.deepPurple.shade600,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -265,6 +264,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         UserAvatar(
@@ -288,23 +288,31 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                   ),
                   if (widget.post.usergroup.isNotEmpty) ...[
                     const SizedBox(width: 4),
-                    _badge(widget.post.usergroup, Colors.orange),
+                    _badge(
+                      widget.post.usergroup,
+                      const Color(0xFFFF9900),
+                      const Color(0xFFFF9900).withOpacity(0.12),
+                    ),
                   ],
                   if (_isMainPost && widget.post.floorLabel.isNotEmpty) ...[
                     const SizedBox(width: 4),
-                    _badge(widget.post.floorLabel, Colors.deepPurple),
+                    _badge(
+                      widget.post.floorLabel,
+                      cs.onSurfaceVariant,
+                      cs.surfaceContainerLow,
+                    ),
                   ],
                 ],
               ),
               if (widget.post.postTime.isNotEmpty)
                 Text(
                   widget.post.postTime,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                 ),
               if (widget.post.ipLocation.isNotEmpty)
                 Text(
                   widget.post.ipLocation,
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                  style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
                 ),
             ],
           ),
@@ -327,12 +335,12 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(2),
               ),
               child: Text(
                 '#${widget.post.floor}',
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
               ),
             ),
           ),
@@ -343,7 +351,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: _disableStyle ? Colors.red.shade600 : Colors.grey.shade600,
+              color: _disableStyle ? cs.error : cs.onSurfaceVariant,
             ),
           ),
           padding: EdgeInsets.zero,
@@ -362,7 +370,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
               icon: Icon(
                 Icons.edit_outlined,
                 size: 16,
-                color: Colors.grey.shade500,
+                color: cs.onSurfaceVariant,
               ),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -375,7 +383,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
         PopupMenuButton<PostCardAction>(
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-          icon: Icon(Icons.more_horiz, size: 16, color: Colors.grey.shade500),
+          icon: Icon(Icons.more_horiz, size: 16, color: cs.onSurfaceVariant),
           onSelected: (action) {
             if (action == PostCardAction.showBbcode ||
                 action == PostCardAction.editPost ||
@@ -400,33 +408,32 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     );
   }
 
-  Widget _badge(String text, MaterialColor color) {
+  Widget _badge(String text, Color textColor, Color bgColor) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
         decoration: BoxDecoration(
-          color: color.shade50,
+          color: bgColor,
           borderRadius: BorderRadius.circular(2),
         ),
-        child: Text(
-          text,
-          style: TextStyle(fontSize: 10, color: color.shade700),
-        ),
+        child: Text(text, style: TextStyle(fontSize: 10, color: textColor)),
       ),
     );
   }
 
   Widget _buildActionButtons(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final buttons = <Widget>[];
 
     if (widget.onRecommend != null) {
       buttons.add(
         _actionBtn(
           icon: widget.isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
-          color: widget.isLiked ? Colors.blue.shade500 : null,
+          color: widget.isLiked ? cs.onSurfaceVariant : null,
           tooltip: '点赞',
           onTap: widget.onRecommend,
+          cs: cs,
         ),
       );
     }
@@ -435,9 +442,10 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
       buttons.add(
         _actionBtn(
           icon: widget.isFavorited ? Icons.bookmark : Icons.bookmark_border,
-          color: widget.isFavorited ? Colors.amber.shade600 : null,
+          color: widget.isFavorited ? cs.onSurfaceVariant : null,
           tooltip: '收藏',
           onTap: widget.onFavorite,
+          cs: cs,
         ),
       );
     }
@@ -448,13 +456,19 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           icon: Icons.card_giftcard,
           tooltip: '评分',
           onTap: widget.onRate,
+          cs: cs,
         ),
       );
     }
 
     if (widget.onKick != null) {
       buttons.add(
-        _actionBtn(icon: Icons.report, tooltip: '踢帖', onTap: widget.onKick),
+        _actionBtn(
+          icon: Icons.report,
+          tooltip: '踢帖',
+          onTap: widget.onKick,
+          cs: cs,
+        ),
       );
     }
 
@@ -471,6 +485,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     Color? color,
     required String tooltip,
     required VoidCallback? onTap,
+    required ColorScheme cs,
   }) {
     return Padding(
       padding: const EdgeInsets.only(right: 4),
@@ -481,7 +496,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(6),
-            child: Icon(icon, size: 18, color: color ?? Colors.grey.shade600),
+            child: Icon(icon, size: 18, color: color ?? cs.onSurfaceVariant),
           ),
         ),
       ),

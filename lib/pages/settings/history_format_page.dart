@@ -45,29 +45,24 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('插入格式'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        actions: [
-          TextButton(
-            onPressed: _save,
-            child: const Text('保存'),
-          ),
-        ],
+        surfaceTintColor: cs.surface,
+        actions: [TextButton(onPressed: _save, child: const Text('保存'))],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
             '在编辑器中选择历史记录时，使用此格式生成插入文本。',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 4),
           Text(
             '可用占位符会自动替换为对应的内容，找不到的占位符保留原样。',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
 
@@ -116,29 +111,32 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
           // ---- 示例预览 ----
           Text(
             '预览',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: cs.surfaceContainerLow,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _previewLine(
-                  '帖子',
-                  _threadCtl.text,
-                  {'title': '求助帖', 'author': '小明', 'time': '2024-01-01'},
-                ),
+                _previewLine('帖子', _threadCtl.text, {
+                  'title': '求助帖',
+                  'author': '小明',
+                  'time': '2024-01-01',
+                }),
                 const SizedBox(height: 8),
-                _previewLine(
-                  '用户',
-                  _userCtl.text,
-                  {'nickname': '张三', 'uid': '123'},
-                ),
+                _previewLine('用户', _userCtl.text, {
+                  'nickname': '张三',
+                  'uid': '123',
+                }),
               ],
             ),
           ),
@@ -148,6 +146,7 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
   }
 
   Widget _buildPlaceholderHint(String type) {
+    final cs = Theme.of(context).colorScheme;
     final placeholders = type == 'thread'
         ? ['{title}', '{author}', '{authorUid}', '{time}', '{tid}']
         : ['{nickname}', '{uid}'];
@@ -158,12 +157,12 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.blue.shade50,
+            color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
             p,
-            style: TextStyle(fontSize: 11, color: Colors.blue.shade700),
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
         );
       }).toList(),
@@ -171,6 +170,7 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
   }
 
   Widget _previewLine(String label, String format, Map<String, String> sample) {
+    final cs = Theme.of(context).colorScheme;
     final result = _formatPlaceholders(format, sample);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +181,7 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
         ),
         Text(
           '最终: [url=https://...]$result[/url]',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
         ),
       ],
     );

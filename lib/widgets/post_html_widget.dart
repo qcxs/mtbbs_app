@@ -382,7 +382,7 @@ class PostHtmlWidget extends StatelessWidget {
         if (routeResult.appPath != null) {
           context.push(routeResult.appPath!);
         } else {
-          context.push('/browser?url=${Uri.encodeComponent(url)}');
+          context.push('/browser?url=${Uri.encodeComponent(url)}&intercept=false');
         }
       case '__external__':
         await launchUrl(uri, mode: LaunchMode.externalApplication);

@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/site_config.dart';
 import '../config/toolbar_config.dart';
@@ -61,6 +61,22 @@ class SettingsProvider extends ChangeNotifier {
   /// 最大记录数
   int _historyMaxCount = 200;
 
+  /// 主题模式
+  ThemeMode _themeMode = ThemeMode.system;
+
+  /// 主题种子色
+  Color _seedColor = const Color(0xFF9E9E9E);
+
+  /// 预设主题色
+  static const Map<String, Color> presetColors = {
+    '纯白': Color(0xFF9E9E9E),
+    '深紫': Colors.deepPurple,
+    '亮蓝': Colors.blue,
+    '青色': Colors.teal,
+    '翠绿': Colors.green,
+    '珊瑚': Color(0xFFFF6B6B),
+  };
+
   static const String defaultFormula = '';
 
   static const _defaultTabOrder = ['newthread', 'hot', 'new', 'digest', 'sofa'];
@@ -84,6 +100,12 @@ class SettingsProvider extends ChangeNotifier {
   /// 自动识别纯文本 URL
   bool get autoDetectUrls => _autoDetectUrls;
 
+  /// 主题模式
+  ThemeMode get themeMode => _themeMode;
+
+  /// 主题种子色
+  Color get seedColor => _seedColor;
+
   /// 设置快捷键
   Future<void> setShortcut(String action, String keyString) async {
     _shortcuts[action] = keyString;
@@ -105,6 +127,22 @@ class SettingsProvider extends ChangeNotifier {
     _autoDetectUrls = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('autoDetectUrls', enabled);
+    notifyListeners();
+  }
+
+  /// 设置主题模式
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('themeMode', mode.name);
+    notifyListeners();
+  }
+
+  /// 设置主题种子色
+  Future<void> setSeedColor(Color color) async {
+    _seedColor = color;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('seedColor', color.toARGB32());
     notifyListeners();
   }
 
@@ -278,6 +316,21 @@ class SettingsProvider extends ChangeNotifier {
     _historyFormatThread = prefs.getString('historyFormat_thread') ?? '{title}';
     _historyFormatUser = prefs.getString('historyFormat_user') ?? '{nickname}';
     _historyMaxCount = prefs.getInt('historyMaxCount') ?? 200;
+
+    // 恢复主题模式
+    final themeModeStr = prefs.getString('themeMode');
+    if (themeModeStr != null) {
+      _themeMode = ThemeMode.values.firstWhere(
+        (m) => m.name == themeModeStr,
+        orElse: () => ThemeMode.system,
+      );
+    }
+
+    // 恢复主题种子色
+    final seedColorInt = prefs.getInt('seedColor');
+    if (seedColorInt != null) {
+      _seedColor = Color(seedColorInt);
+    }
 
     notifyListeners();
   }

@@ -146,6 +146,7 @@ class _KickDialogContentState extends State<_KickDialogContent> {
   }
 
   Widget _buildContent() {
+    final cs = Theme.of(context).colorScheme;
     if (_loading) {
       return const SizedBox(
         width: 60,
@@ -155,7 +156,7 @@ class _KickDialogContentState extends State<_KickDialogContent> {
     }
 
     if (_error != null) {
-      return Text('加载失败: $_error', style: const TextStyle(color: Colors.red));
+      return Text('加载失败: $_error', style: TextStyle(color: cs.error));
     }
 
     if (_formData == null) {
@@ -170,12 +171,12 @@ class _KickDialogContentState extends State<_KickDialogContent> {
         children: [
           Text(
             '当前踢帖数: ${_formData!.currentKicks} / ${_formData!.maxKicks}',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 4),
           Text(
             '注意: 踢帖将把帖子从列表中移除，请合理使用。',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
           const Text('踢帖理由:', style: TextStyle(fontSize: 13)),

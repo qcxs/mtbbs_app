@@ -33,6 +33,7 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final tabs = _tabs;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -45,7 +46,7 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
               width: 32,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: cs.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -75,9 +76,8 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
                           margin: const EdgeInsets.only(right: 4),
                           decoration: BoxDecoration(
                             color: selected
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -89,8 +89,10 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
                                   ? FontWeight.w600
                                   : FontWeight.normal,
                               color: selected
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.grey.shade600,
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant
+                                  : cs.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -126,12 +128,13 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
   }
 
   Widget _buildEmojiGrid(List<_TabItem> tabs) {
+    final cs = Theme.of(context).colorScheme;
     final currentEmojis = tabs[_selectedIndex].emojis;
     if (currentEmojis.isEmpty) {
       return Center(
         child: Text(
           _selectedIndex == 0 ? '暂无常用表情' : '暂无表情',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+          style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
         ),
       );
     }
@@ -152,9 +155,9 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
           child: Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: cs.surfaceContainerLow,
               borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: cs.outlineVariant),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(2),
@@ -166,7 +169,7 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
                 errorWidget: (_, __, ___) => Icon(
                   Icons.emoji_emotions_outlined,
                   size: 22,
-                  color: Colors.grey.shade400,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),

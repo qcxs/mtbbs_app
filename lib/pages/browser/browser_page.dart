@@ -13,9 +13,18 @@ import '../../core/url_router.dart';
 ///
 /// 自动携带当前用户的 Cookie，支持多站点多账号切换。
 /// 与 WebLoginPage 职责分离：本页不做登录检测、不清除 Cookie。
+///
+/// [enableUrlIntercept] 为 true 时，URL 发生变化会尝试匹配 App 路由，
+/// 匹配成功则拦截并在 App 内打开。从 App 内打开浏览器时应传入 false 避免循环。
 class BrowserPage extends StatefulWidget {
   final String initialUrl;
-  const BrowserPage({super.key, this.initialUrl = ''});
+  final bool enableUrlIntercept;
+
+  const BrowserPage({
+    super.key,
+    this.initialUrl = '',
+    this.enableUrlIntercept = true,
+  });
 
   @override
   State<BrowserPage> createState() => _BrowserPageState();
@@ -28,14 +37,14 @@ class _BrowserPageState extends State<BrowserPage> {
   bool _canGoBack = false;
   bool _canGoForward = false;
   double _progress = 0;
-  bool _hasError = false;
-  String? _errorMessage;
   bool _cookiesSynced = false;
   bool _cookiesReady = false;
+  bool _urlInterceptEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    _urlInterceptEnabled = widget.enableUrlIntercept;
     _currentUrl = widget.initialUrl.isNotEmpty
         ? widget.initialUrl
         : SiteConfig.baseUrl;
@@ -198,16 +207,6 @@ class _BrowserPageState extends State<BrowserPage> {
     }
   }
 
-  void _toggleDesktopMode() {
-    setState(() => _desktopMode = !_desktopMode);
-    _controller?.setSettings(
-      settings: InAppWebViewSettings(
-        userAgent: _desktopMode ? SiteConfig.uaPc : SiteConfig.uaAndroid,
-      ),
-    );
-    _controller?.reload();
-  }
-
   /// 用 App 本地页面打开当前 URL（如果支持）
   void _openInApp() {
     final result = UrlRouter.parse(_currentUrl);
@@ -237,13 +236,7 @@ class _BrowserPageState extends State<BrowserPage> {
 
   // ==================== WebView 回调 ====================
 
-  void _onLoadStart(InAppWebViewController controller, WebUri? url) {
-    if (!mounted) return;
-    setState(() {
-      _hasError = false;
-      _errorMessage = null;
-    });
-  }
+  void _onLoadStart(InAppWebViewController controller, WebUri? url) {}
 
   void _onLoadStop(InAppWebViewController controller, WebUri? url) {
     if (!mounted) return;
@@ -263,24 +256,11 @@ class _BrowserPageState extends State<BrowserPage> {
     if (mounted) setState(() => _progress = progress / 100);
   }
 
-  void _onReceivedError(
-    InAppWebViewController controller,
-    WebResourceRequest request,
-    WebResourceError error,
-  ) {
-    if (!mounted) return;
-    setState(() {
-      _hasError = true;
-      _errorMessage = error.description;
-    });
-  }
-
   // ==================== UI ====================
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final isLoggedIn = auth.isLoggedIn;
+    final cs = Theme.of(context).colorScheme;
 
     return PopScope(
       canPop: !_canGoBack,
@@ -290,8 +270,7 @@ class _BrowserPageState extends State<BrowserPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
+          surfaceTintColor: cs.surface,
           leading: IconButton(
             icon: Icon(_canGoBack ? Icons.arrow_back : Icons.close),
             tooltip: _canGoBack ? '后退' : '关闭',
@@ -310,14 +289,14 @@ class _BrowserPageState extends State<BrowserPage> {
               children: [
                 Text(
                   _host.isNotEmpty ? _host : '浏览器',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
           actions: [
-            // 始终关闭按钮
+            // 关闭
             IconButton(
               icon: const Icon(Icons.close, size: 20),
               tooltip: '关闭',
@@ -329,14 +308,15 @@ class _BrowserPageState extends State<BrowserPage> {
               tooltip: '刷新',
               onPressed: () => _controller?.reload(),
             ),
-            // 账号切换
+            // URL 拦截 — 可点击切换，通过图标状态了解当前是否启用
             IconButton(
               icon: Icon(
-                isLoggedIn ? Icons.person_pin : Icons.person_outline,
+                _urlInterceptEnabled ? Icons.shield : Icons.shield_outlined,
                 size: 20,
               ),
-              tooltip: '切换账号',
-              onPressed: _showAccountSwitch,
+              tooltip: _urlInterceptEnabled ? 'URL 拦截已启用' : 'URL 拦截已禁用',
+              onPressed: () =>
+                  setState(() => _urlInterceptEnabled = !_urlInterceptEnabled),
             ),
             // 更多菜单
             PopupMenuButton<String>(
@@ -344,34 +324,54 @@ class _BrowserPageState extends State<BrowserPage> {
               padding: EdgeInsets.zero,
               onSelected: (v) {
                 switch (v) {
+                  case 'desktopMode':
+                    setState(() => _desktopMode = !_desktopMode);
+                    _controller?.setSettings(
+                      settings: InAppWebViewSettings(
+                        userAgent: _desktopMode
+                            ? SiteConfig.uaPc
+                            : SiteConfig.uaAndroid,
+                      ),
+                    );
+                    _controller?.reload();
                   case 'copyUrl':
                     _copyUrl();
                   case 'openExternal':
                     _openInExternalBrowser();
-                  case 'openInApp':
-                    _openInApp();
-                  case 'desktopMode':
-                    _toggleDesktopMode();
                 }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'openInApp',
-                  child: Text('在 App 中打开'),
-                ),
-                const PopupMenuItem(value: 'copyUrl', child: Text('复制链接')),
-                const PopupMenuItem(
-                  value: 'openExternal',
-                  child: Text('浏览器打开'),
-                ),
                 PopupMenuItem(
                   value: 'desktopMode',
                   child: Row(
                     children: [
-                      Text(_desktopMode ? '手机模式' : '桌面模式'),
+                      const Icon(Icons.desktop_windows, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('桌面模式'),
                       const Spacer(),
                       if (_desktopMode)
-                        const Icon(Icons.check, size: 16, color: Colors.green),
+                        Icon(Icons.check, size: 16, color: cs.onSurfaceVariant),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'copyUrl',
+                  child: Row(
+                    children: [
+                      Icon(Icons.copy, size: 18),
+                      SizedBox(width: 8),
+                      Text('复制链接'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'openExternal',
+                  child: Row(
+                    children: [
+                      Icon(Icons.open_in_new, size: 18),
+                      SizedBox(width: 8),
+                      Text('外部浏览器打开'),
                     ],
                   ),
                 ),
@@ -381,53 +381,20 @@ class _BrowserPageState extends State<BrowserPage> {
           bottom: _progress > 0 && _progress < 1
               ? PreferredSize(
                   preferredSize: const Size.fromHeight(2),
-                  child: LinearProgressIndicator(value: _progress),
+                  child: LinearProgressIndicator(
+                    value: _progress,
+                    color: cs.onSurfaceVariant,
+                  ),
                 )
               : null,
         ),
-        body: _hasError ? _buildError() : _buildWebView(),
+        body: _buildWebView(),
         bottomNavigationBar: _buildBottomBar(),
       ),
     );
   }
 
-  Widget _buildError() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade300),
-            const SizedBox(height: 12),
-            Text(
-              '页面加载失败',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 4),
-            if (_errorMessage != null)
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-              ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _hasError = false;
-                  _errorMessage = null;
-                });
-                _controller?.reload();
-              },
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('重试'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ==================== WebView ====================
 
   Widget _buildWebView() {
     if (!_cookiesReady) {
@@ -447,18 +414,53 @@ class _BrowserPageState extends State<BrowserPage> {
       onLoadStart: _onLoadStart,
       onLoadStop: _onLoadStop,
       onProgressChanged: _onProgressChanged,
-      onReceivedError: _onReceivedError,
       shouldOverrideUrlLoading: (controller, navigationAction) async {
+        if (!_urlInterceptEnabled) return NavigationActionPolicy.ALLOW;
+
+        final url = navigationAction.request.url?.toString() ?? '';
+        if (url.isEmpty) return NavigationActionPolicy.ALLOW;
+
+        final uri = Uri.tryParse(url);
+        if (uri == null) return NavigationActionPolicy.ALLOW;
+
+        // 如果要加载的域名不是 baseUrl，立即放行
+        final baseHost = Uri.tryParse(SiteConfig.baseUrl)?.host;
+        if (baseHost != null && uri.host != baseHost) {
+          return NavigationActionPolicy.ALLOW;
+        }
+
+        // 匹配 App 路由成功则拦截并在 App 中打开
+        final result = UrlRouter.parse(url);
+        if (result.appPath != null && mounted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('拦截：已在 App 中打开'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          }
+          context.push(result.appPath!);
+          return NavigationActionPolicy.CANCEL;
+        }
+
         return NavigationActionPolicy.ALLOW;
       },
     );
   }
 
   Widget _buildBottomBar() {
+    final cs = Theme.of(context).colorScheme;
+    final auth = context.watch<AuthProvider>();
+    final isLoggedIn = auth.isLoggedIn;
+    final routeResult = UrlRouter.parse(_currentUrl);
+    final canOpenInApp =
+        routeResult.appPath != null && !routeResult.isOtherSite;
+
     return Container(
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        color: Colors.white,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
+        color: cs.surface,
       ),
       child: SafeArea(
         top: false,
@@ -466,13 +468,30 @@ class _BrowserPageState extends State<BrowserPage> {
           children: [
             IconButton(
               icon: const Icon(Icons.chevron_left, size: 22),
+              tooltip: '后退',
               onPressed: _canGoBack ? () => _controller?.goBack() : null,
-              color: _canGoBack ? null : Colors.grey.shade300,
+              color: _canGoBack ? null : cs.outlineVariant,
             ),
             IconButton(
               icon: const Icon(Icons.chevron_right, size: 22),
+              tooltip: '前进',
               onPressed: _canGoForward ? () => _controller?.goForward() : null,
-              color: _canGoForward ? null : Colors.grey.shade300,
+              color: _canGoForward ? null : cs.outlineVariant,
+            ),
+            const Spacer(),
+            if (canOpenInApp)
+              IconButton(
+                icon: const Icon(Icons.open_in_new, size: 20),
+                tooltip: '在 App 中打开',
+                onPressed: _openInApp,
+              ),
+            IconButton(
+              icon: Icon(
+                isLoggedIn ? Icons.person_pin : Icons.person_outline,
+                size: 20,
+              ),
+              tooltip: '切换账号',
+              onPressed: _showAccountSwitch,
             ),
           ],
         ),

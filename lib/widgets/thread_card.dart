@@ -28,7 +28,7 @@ class ThreadCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildUserRow(context),
@@ -36,7 +36,7 @@ class ThreadCard extends StatelessWidget {
               _buildTitle(),
               if (item.summary != null && item.summary!.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                _buildSummary(),
+                _buildSummary(context),
               ],
               if (item.images != null && item.images!.isNotEmpty) ...[
                 const SizedBox(height: 6),
@@ -54,6 +54,7 @@ class ThreadCard extends StatelessWidget {
   // ==================== 用户信息行 ====================
 
   Widget _buildUserRow(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final hasTime = item.time != null && item.time!.isNotEmpty;
     return Row(
       children: [
@@ -90,14 +91,14 @@ class ThreadCard extends StatelessWidget {
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: const Color(0xFFFF9900).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(3),
                   ),
                   child: Text(
                     item.level!,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: Colors.orange.shade700,
+                      color: Color(0xFFFF9900),
                     ),
                   ),
                 ),
@@ -109,7 +110,7 @@ class ThreadCard extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             item.time!,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -135,10 +136,11 @@ class ThreadCard extends StatelessWidget {
 
   // ==================== 摘要 ====================
 
-  Widget _buildSummary() {
+  Widget _buildSummary(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Text(
       item.summary!,
-      style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
+      style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant, height: 1.4),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
     );
@@ -167,8 +169,8 @@ class ThreadCard extends StatelessWidget {
             memCacheWidth: 280,
             memCacheHeight: 280,
             fit: BoxFit.cover,
-            placeholder: (_, __) => _buildPlaceholder(140),
-            errorWidget: (_, __, ___) => _buildPlaceholder(140),
+            placeholder: (_, __) => _buildPlaceholder(140, context),
+            errorWidget: (_, __, ___) => _buildPlaceholder(140, context),
           ),
         ),
       );
@@ -199,8 +201,9 @@ class ThreadCard extends StatelessWidget {
                         memCacheWidth: 180,
                         memCacheHeight: 180,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => _buildPlaceholder(90),
-                        errorWidget: (_, __, ___) => _buildPlaceholder(90),
+                        placeholder: (_, __) => _buildPlaceholder(90, context),
+                        errorWidget: (_, __, ___) =>
+                            _buildPlaceholder(90, context),
                       ),
                     ),
                   ),
@@ -212,16 +215,13 @@ class ThreadCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholder(double height) {
+  Widget _buildPlaceholder(double height, BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       height: height,
-      color: Colors.grey.shade100,
+      color: cs.surfaceContainerLow,
       child: Center(
-        child: Icon(
-          Icons.image_outlined,
-          color: Colors.grey.shade300,
-          size: 28,
-        ),
+        child: Icon(Icons.image_outlined, color: cs.outlineVariant, size: 28),
       ),
     );
   }
@@ -229,22 +229,31 @@ class ThreadCard extends StatelessWidget {
   // ==================== 底部：左板块 + 右统计 ====================
 
   Widget _buildBottomBar(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         // 板块标签 — 可点击，过长时截断
         if (item.boardName != null && item.boardName!.isNotEmpty)
           Flexible(
             child: GestureDetector(
-              onTap: () => _toast(context, '查看板块: ${item.boardName}'),
+              onTap: () {
+                final fid = item.boardId;
+                if (fid != null) {
+                  context.push('/forum?fid=$fid');
+                }
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: const Color(0xFF53BCF5).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   item.boardName!,
-                  style: TextStyle(fontSize: 11, color: Colors.blue.shade600),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF53BCF5),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -252,31 +261,29 @@ class ThreadCard extends StatelessWidget {
             ),
           ),
         const Spacer(),
-        Flexible(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _statItem(Icons.favorite_border, item.likes),
-              const SizedBox(width: 10),
-              _statItem(Icons.chat_bubble_outline, item.comments),
-              const SizedBox(width: 10),
-              _statItem(Icons.visibility_outlined, item.views),
-            ],
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _statItem(Icons.favorite_border, item.likes, cs),
+            const SizedBox(width: 10),
+            _statItem(Icons.chat_bubble_outline, item.comments, cs),
+            const SizedBox(width: 10),
+            _statItem(Icons.visibility_outlined, item.views, cs),
+          ],
         ),
       ],
     );
   }
 
-  Widget _statItem(IconData icon, int? count) {
+  Widget _statItem(IconData icon, int? count, ColorScheme cs) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.grey.shade400),
+        Icon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 3),
         Text(
           _formatCount(count ?? 0),
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
       ],
     );
@@ -286,11 +293,5 @@ class ThreadCard extends StatelessWidget {
     if (count >= 10000) return '${(count / 10000).toStringAsFixed(1)}w';
     if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}k';
     return count.toString();
-  }
-
-  void _toast(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 1)),
-    );
   }
 }

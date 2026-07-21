@@ -115,6 +115,7 @@ class _SystemTabState extends State<SystemTab> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     if (_loading)
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     if (_error != null) {
@@ -122,9 +123,9 @@ class _SystemTabState extends State<SystemTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.error_outline, size: 48, color: cs.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: Colors.grey.shade600)),
+            Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => _load(1),
@@ -143,10 +144,10 @@ class _SystemTabState extends State<SystemTab> {
             Icon(
               Icons.notifications_none,
               size: 48,
-              color: Colors.grey.shade300,
+              color: cs.onSurfaceVariant,
             ),
             const SizedBox(height: 8),
-            Text('暂无系统提醒', style: TextStyle(color: Colors.grey.shade500)),
+            Text('暂无系统提醒', style: TextStyle(color: cs.onSurfaceVariant)),
           ],
         ),
       );
@@ -170,9 +171,10 @@ class _SystemTabState extends State<SystemTab> {
   }
 
   Widget _buildPagination() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: Colors.white,
+      color: cs.surface,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -189,12 +191,12 @@ class _SystemTabState extends State<SystemTab> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '$_page / $_totalPages',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ),
           ),
@@ -212,6 +214,7 @@ class _SystemTabState extends State<SystemTab> {
   }
 
   Widget _buildItem(Map<String, dynamic> item) {
+    final cs = Theme.of(context).colorScheme;
     final time = item['time'] as String? ?? '';
     final segments = item['segments'] as List<dynamic>? ?? [];
 
@@ -220,7 +223,7 @@ class _SystemTabState extends State<SystemTab> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: cs.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -233,13 +236,13 @@ class _SystemTabState extends State<SystemTab> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Icon(
                     Icons.notifications_active,
                     size: 20,
-                    color: Colors.orange.shade600,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -247,7 +250,7 @@ class _SystemTabState extends State<SystemTab> {
                 if (time.isNotEmpty)
                   Text(
                     time,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                   ),
               ],
             ),
@@ -259,7 +262,7 @@ class _SystemTabState extends State<SystemTab> {
                 item['message'] as String? ?? '',
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.grey.shade800,
+                  color: cs.onSurface,
                   height: 1.4,
                 ),
               ),
@@ -270,11 +273,12 @@ class _SystemTabState extends State<SystemTab> {
   }
 
   Widget _buildSegments(List<dynamic> segments) {
+    final cs = Theme.of(context).colorScheme;
     final spans = <InlineSpan>[];
-    const style = TextStyle(fontSize: 13, color: Colors.black87, height: 1.4);
-    const quoteStyle = TextStyle(
+    final style = TextStyle(fontSize: 13, color: cs.onSurface, height: 1.4);
+    final quoteStyle = TextStyle(
       fontSize: 12,
-      color: Colors.black54,
+      color: cs.onSurfaceVariant,
       height: 1.4,
       fontStyle: FontStyle.italic,
     );
@@ -300,7 +304,7 @@ class _SystemTabState extends State<SystemTab> {
                   text,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.deepPurple.shade600,
+                    color: cs.onSurfaceVariant,
                     decoration: TextDecoration.underline,
                     height: 1.4,
                   ),
@@ -324,7 +328,7 @@ class _SystemTabState extends State<SystemTab> {
                           context.push(result.appPath!);
                         } else {
                           context.push(
-                            '/browser?url=${Uri.encodeComponent(fullUrl)}',
+                            '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
                           );
                         }
                       }
@@ -333,7 +337,7 @@ class _SystemTabState extends State<SystemTab> {
                   text,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.blue.shade700,
+                    color: cs.onSurfaceVariant,
                     decoration: TextDecoration.underline,
                     height: 1.4,
                   ),

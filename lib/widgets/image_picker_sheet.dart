@@ -90,6 +90,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final effectiveDisabled = _uploading;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -102,7 +103,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
               width: 32,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: cs.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -184,6 +185,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
     bool disabled,
     VoidCallback onTap,
   ) {
+    final cs = Theme.of(context).colorScheme;
     final effectiveDisabled = disabled || _uploading;
     return Padding(
       padding: const EdgeInsets.only(left: 4),
@@ -201,14 +203,14 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
                 Icon(
                   icon,
                   size: 20,
-                  color: effectiveDisabled ? Colors.grey : null,
+                  color: effectiveDisabled ? cs.onSurfaceVariant : null,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   label,
                   style: TextStyle(
                     fontSize: 10,
-                    color: effectiveDisabled ? Colors.grey : null,
+                    color: effectiveDisabled ? cs.onSurfaceVariant : null,
                   ),
                 ),
               ],
@@ -220,6 +222,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
   }
 
   Widget _buildImageGrid() {
+    final cs = Theme.of(context).colorScheme;
     if (widget.loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
@@ -227,7 +230,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
       return Center(
         child: Text(
           '暂无已上传的图片',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+          style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
         ),
       );
     }
@@ -257,11 +260,8 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
                   imageUrl: fullSrc,
                   fit: BoxFit.cover,
                   errorWidget: (_, __, ___) => Container(
-                    color: Colors.grey.shade100,
-                    child: Icon(
-                      Icons.broken_image,
-                      color: Colors.grey.shade400,
-                    ),
+                    color: cs.surfaceContainerLow,
+                    child: Icon(Icons.broken_image, color: cs.onSurfaceVariant),
                   ),
                 ),
               ),
@@ -271,7 +271,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: Theme.of(context).primaryColor,
+                        color: cs.onSurfaceVariant,
                         width: 2.5,
                       ),
                     ),

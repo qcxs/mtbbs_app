@@ -85,6 +85,10 @@ ThreadItem _parseItem(dom.Element li) {
       : null;
   final boardUrl = boardEl?.attributes['href'];
 
+  // 版块 ID
+  int? boardId;
+  if (boardUrl != null) boardId = _extractBoardId(boardUrl);
+
   // 统计
   int? likes, comments, views;
   final bottomUl = li.querySelector('.comiis_xznalist_bottom');
@@ -128,6 +132,7 @@ ThreadItem _parseItem(dom.Element li) {
     threadId: threadId,
     boardName: boardName,
     boardUrl: boardUrl,
+    boardId: boardId,
     likes: likes,
     comments: comments,
     views: views,
@@ -156,6 +161,12 @@ int? _extractThreadId(String url) {
 int? _extractInt(String text) {
   final cleaned = text.replaceAll(RegExp(r'[^\d]'), '');
   return cleaned.isEmpty ? null : int.parse(cleaned);
+}
+
+/// 从版块 URL（如 forum-40-1.html）中提取 fid。
+int? _extractBoardId(String url) {
+  final m = RegExp(r'forum[_-](\d+)').firstMatch(url);
+  return m != null ? int.tryParse(m.group(1)!) : null;
 }
 
 /// 获取元素文本，排除指定标签的子元素（如 span 的 title、i 的字体图标等）

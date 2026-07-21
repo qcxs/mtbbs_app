@@ -259,6 +259,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
   /// 显示 Cookie 输入对话框
   void _showCookieInputDialog() {
+    final cs = Theme.of(context).colorScheme;
     final cookieController = TextEditingController();
     showDialog(
       context: context,
@@ -273,9 +274,9 @@ class _WebLoginPageState extends State<WebLoginPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '从浏览器开发者工具复制完整的 Cookie 字符串后粘贴到下方：',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -365,10 +366,10 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: cs.surface,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(null),
@@ -382,7 +383,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
               icon: const Icon(Icons.person_add, size: 16),
               label: const Text('填充账号', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: cs.onSurfaceVariant,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
             ),
@@ -394,7 +395,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
               icon: const Icon(Icons.cookie, size: 16),
               label: const Text('Cookie', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: cs.onSurfaceVariant,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
             ),
@@ -412,6 +413,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
   }
 
   Widget _buildBody() {
+    final cs = Theme.of(context).colorScheme;
     if (_hasError) {
       return Center(
         child: Padding(
@@ -419,17 +421,17 @@ class _WebLoginPageState extends State<WebLoginPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.grey.shade300),
+              Icon(Icons.error_outline, size: 48, color: cs.outlineVariant),
               const SizedBox(height: 12),
               Text(
                 '页面加载失败',
-                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 4),
               Text(
                 _errorMessage ?? '',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(

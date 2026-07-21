@@ -137,6 +137,7 @@ class _KeyRecorderDialogState extends State<KeyRecorderDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return AlertDialog(
       title: const Text('设置快捷键'),
       constraints: const BoxConstraints(maxWidth: 360),
@@ -150,7 +151,7 @@ class _KeyRecorderDialogState extends State<KeyRecorderDialog> {
             children: [
               Text(
                 _recorded ? '已录制' : '按下新的快捷键...',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 16),
               Container(
@@ -160,8 +161,8 @@ class _KeyRecorderDialogState extends State<KeyRecorderDialog> {
                   color: _recorded
                       ? Theme.of(
                           context,
-                        ).colorScheme.primary.withValues(alpha: 0.08)
-                      : Colors.grey.shade100,
+                        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.08)
+                      : cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -171,8 +172,8 @@ class _KeyRecorderDialogState extends State<KeyRecorderDialog> {
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: _recorded
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade400,
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : cs.onSurfaceVariant,
                   ),
                 ),
               ),

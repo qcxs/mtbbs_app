@@ -15,6 +15,7 @@ class UserManagementDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.read<AuthProvider>();
+    final cs = Theme.of(context).colorScheme;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
@@ -40,8 +41,12 @@ class UserManagementDialog extends StatelessWidget {
                     ),
                   ),
                   // 添加账号（直接打开 WebView 登录页，Cookie 功能已集成在内）
-                  GestureDetector(
-                    onTap: () async {
+                  IconButton(
+                    icon: const Icon(Icons.add, size: 18),
+                    tooltip: '添加账号',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () async {
                       Navigator.of(context).pop();
                       final ok = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(builder: (_) => const WebLoginPage()),
@@ -51,18 +56,6 @@ class UserManagementDialog extends StatelessWidget {
                         context,
                       ).showSnackBar(const SnackBar(content: Text('登录成功')));
                     },
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(
-                        Icons.add,
-                        size: 18,
-                        color: Colors.blue.shade600,
-                      ),
-                    ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
@@ -95,6 +88,7 @@ class UserManagementDialog extends StatelessWidget {
                         nickname: displayName,
                         radius: 22,
                         showBorder: true,
+                        tapAction: AvatarTapAction.none,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -112,7 +106,7 @@ class UserManagementDialog extends StatelessWidget {
                               displayUid,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade500,
+                                color: cs.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -122,8 +116,12 @@ class UserManagementDialog extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            GestureDetector(
-                              onTap: () async {
+                            IconButton(
+                              icon: const Icon(Icons.refresh, size: 16),
+                              tooltip: '刷新用户信息',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () async {
                                 await auth.refreshCurrentUserInfo();
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -131,25 +129,13 @@ class UserManagementDialog extends StatelessWidget {
                                   );
                                 }
                               },
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Icon(
-                                  Icons.refresh,
-                                  size: 16,
-                                  color: Colors.blue.shade600,
-                                ),
-                              ),
                             ),
                             const SizedBox(width: 4),
                             TextButton(
                               onPressed: () => _confirmLogout(context, auth),
-                              child: const Text(
+                              child: Text(
                                 '退出',
-                                style: TextStyle(color: Colors.red),
+                                style: TextStyle(color: cs.error),
                               ),
                             ),
                           ],
@@ -202,6 +188,7 @@ class UserManagementDialog extends StatelessWidget {
                                     uid: auth.accounts[i].uid,
                                     nickname: auth.accounts[i].username,
                                     radius: 18,
+                                    tapAction: AvatarTapAction.none,
                                   ),
                                   title: Text(
                                     auth.accounts[i].uid == '0'
@@ -210,7 +197,7 @@ class UserManagementDialog extends StatelessWidget {
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: auth.accounts[i].uid == '0'
-                                          ? Colors.grey
+                                          ? cs.onSurfaceVariant
                                           : null,
                                     ),
                                   ),
@@ -294,6 +281,7 @@ class UserManagementDialog extends StatelessWidget {
     AuthProvider auth,
     String initialText,
   ) {
+    final cs = Theme.of(context).colorScheme;
     final ctl = TextEditingController(text: initialText);
     showDialog(
       context: context,
@@ -306,7 +294,7 @@ class UserManagementDialog extends StatelessWidget {
           children: [
             Text(
               '请确认或编辑账号 JSON 数据：',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             TextField(

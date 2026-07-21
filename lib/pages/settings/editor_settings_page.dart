@@ -18,13 +18,10 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final editorHistory = context.watch<EditorHistoryProvider>();
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('编辑器设置'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text('编辑器设置'), surfaceTintColor: cs.surface),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -60,11 +57,11 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
               onChanged: (v) => settings.setMaxAutoSnapshots(v.round()),
             ),
             ListTile(
-              leading: _iconBox(Icons.delete_sweep, Colors.red),
+              leading: _iconBox(Icons.delete_sweep, cs.error),
               title: const Text('清空编辑历史'),
               subtitle: Text(
                 '删除所有保存的编辑历史记录',
-                style: TextStyle(color: Colors.grey.shade600),
+                style: TextStyle(color: cs.onSurfaceVariant),
               ),
               onTap: () => _confirmClearHistory(context, editorHistory),
             ),
@@ -72,7 +69,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
           const SizedBox(height: 8),
           _section('工具栏', [
             ListTile(
-              leading: _iconBox(Icons.reorder, Colors.blueGrey),
+              leading: _iconBox(Icons.reorder, cs.onSurfaceVariant),
               title: const Text('工具栏排序'),
               subtitle: Text(
                 '${settings.toolbarItems.length} 项（${settings.toolbarItems.where((e) => e.visible).length} 项显示）',
@@ -87,6 +84,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
   }
 
   Widget _section(String title, List<Widget> children) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -97,7 +95,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Colors.grey.shade600,
+              color: cs.onSurfaceVariant,
             ),
           ),
         ),
@@ -119,16 +117,17 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
     required int divisions,
     required ValueChanged<double> onChanged,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return StatefulBuilder(
       builder: (ctx, setD) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
-            leading: _iconBox(icon, Colors.teal),
+            leading: _iconBox(icon, cs.onSurfaceVariant),
             title: Text(title),
             subtitle: Text(
               subtitle,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
           ),
           Padding(
@@ -199,6 +198,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
     BuildContext context,
     EditorHistoryProvider editorHistory,
   ) async {
+    final cs = Theme.of(context).colorScheme;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -212,7 +212,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: cs.error),
             child: const Text('清空'),
           ),
         ],

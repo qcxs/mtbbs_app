@@ -84,13 +84,13 @@ class _HistoryPageState extends State<HistoryPage>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final history = context.watch<HistoryProvider>();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('浏览记录'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: cs.surface,
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -98,9 +98,9 @@ class _HistoryPageState extends State<HistoryPage>
             Tab(text: '帖子 (${history.getByType('thread').length})'),
             Tab(text: '用户 (${history.getByType('user').length})'),
           ],
-          labelColor: Theme.of(context).colorScheme.primary,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Theme.of(context).colorScheme.primary,
+          labelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          unselectedLabelColor: cs.onSurfaceVariant,
+          indicatorColor: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         actions: [
           PopupMenuButton<String>(
@@ -140,6 +140,7 @@ class _RecordDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final info = record.info;
 
     return Padding(
@@ -174,11 +175,11 @@ class _RecordDetailSheet extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               children: [
-                _infoRow('标题', record.title),
-                _infoRow('类型', record.type == 'thread' ? '帖子' : '用户'),
-                _infoRow('路由', record.routePath),
-                _infoRow('ID', record.id),
-                _infoRow('时间', _formatTime(record.timestamp)),
+                _infoRow(context, '标题', record.title),
+                _infoRow(context, '类型', record.type == 'thread' ? '帖子' : '用户'),
+                _infoRow(context, '路由', record.routePath),
+                _infoRow(context, 'ID', record.id),
+                _infoRow(context, '时间', _formatTime(record.timestamp)),
                 if (info.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(height: 1),
@@ -188,12 +189,12 @@ class _RecordDetailSheet extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 4),
                   for (final entry in info.entries)
-                    _infoRow(entry.key, entry.value?.toString() ?? ''),
+                    _infoRow(context, entry.key, entry.value?.toString() ?? ''),
                 ],
               ],
             ),
@@ -213,8 +214,8 @@ class _RecordDetailSheet extends StatelessWidget {
                     icon: const Icon(Icons.delete_outline, size: 18),
                     label: const Text('删除'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
+                      foregroundColor: cs.error,
+                      side: BorderSide(color: cs.error),
                     ),
                   ),
                 ),
@@ -237,7 +238,8 @@ class _RecordDetailSheet extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _infoRow(BuildContext context, String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -247,7 +249,7 @@ class _RecordDetailSheet extends StatelessWidget {
             width: 56,
             child: Text(
               label,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
             ),
           ),
           Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
@@ -282,13 +284,14 @@ class _RecordList extends StatelessWidget {
   IconData _typeIcon(String t) =>
       t == 'thread' ? Icons.article_outlined : Icons.person_outline;
 
-  Color _typeColor(String t) =>
-      t == 'thread' ? Colors.blue.shade400 : Colors.green.shade400;
+  Color _typeColor(String t, ColorScheme cs) =>
+      t == 'thread' ? cs.onSurfaceVariant : cs.onSurfaceVariant;
 
   String _typeLabel(String t) => t == 'thread' ? '帖子' : '用户';
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final history = context.watch<HistoryProvider>();
     final records = type.isEmpty ? history.getAll() : history.getByType(type);
 
@@ -297,11 +300,11 @@ class _RecordList extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.history, size: 48, color: cs.outlineVariant),
             const SizedBox(height: 8),
             Text(
               '暂无浏览记录',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -312,7 +315,7 @@ class _RecordList extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: records.length,
       separatorBuilder: (_, __) =>
-          Divider(height: 1, indent: 56, color: Colors.grey.shade200),
+          Divider(height: 1, indent: 56, color: cs.outlineVariant),
       itemBuilder: (context, index) {
         final record = records[index];
         return Dismissible(
@@ -321,18 +324,21 @@ class _RecordList extends StatelessWidget {
           background: Container(
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 20),
-            color: Colors.red.shade50,
-            child: Icon(Icons.delete_outline, color: Colors.red.shade400),
+            color: cs.errorContainer,
+            child: Icon(Icons.delete_outline, color: cs.error),
           ),
           onDismissed: (_) {
             context.read<HistoryProvider>().remove(record.id);
           },
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: _typeColor(record.type).withValues(alpha: 0.1),
+              backgroundColor: _typeColor(
+                record.type,
+                cs,
+              ).withValues(alpha: 0.1),
               child: Icon(
                 _typeIcon(record.type),
-                color: _typeColor(record.type),
+                color: _typeColor(record.type, cs),
                 size: 20,
               ),
             ),
@@ -350,28 +356,28 @@ class _RecordList extends StatelessWidget {
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: _typeColor(record.type).withValues(alpha: 0.1),
+                    color: _typeColor(record.type, cs).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(3),
                   ),
                   child: Text(
                     _typeLabel(record.type),
                     style: TextStyle(
                       fontSize: 10,
-                      color: _typeColor(record.type),
+                      color: _typeColor(record.type, cs),
                     ),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   _formatTime(record.timestamp),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
               ],
             ),
             trailing: Icon(
               Icons.chevron_right,
               size: 18,
-              color: Colors.grey.shade400,
+              color: cs.onSurfaceVariant,
             ),
             onTap: () => onShowDetail(record),
           ),

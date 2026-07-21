@@ -94,11 +94,11 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('表情管理'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: cs.surface,
         actions: [
           if (!_loading)
             IconButton(
@@ -113,6 +113,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
   }
 
   Widget _buildBody() {
+    final cs = Theme.of(context).colorScheme;
     if (_loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
@@ -127,10 +128,10 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
               Icon(
                 Icons.emoji_emotions_outlined,
                 size: 48,
-                color: Colors.grey.shade300,
+                color: cs.onSurfaceVariant,
               ),
               const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: Colors.grey.shade600)),
+              Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _refresh,
@@ -145,7 +146,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
 
     if (_groups.isEmpty) {
       return Center(
-        child: Text('暂无表情数据', style: TextStyle(color: Colors.grey.shade500)),
+        child: Text('暂无表情数据', style: TextStyle(color: cs.onSurfaceVariant)),
       );
     }
 
@@ -158,6 +159,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
   }
 
   Widget _buildGroupCard(Map<String, dynamic> group) {
+    final cs = Theme.of(context).colorScheme;
     final id = group['id'] as int;
     final name = group['name'] as String;
     final folder = group['folder'] as String;
@@ -195,7 +197,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
                           '$folder · ${emojis.length} 个表情',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade500,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -203,7 +205,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
                   ),
                   Icon(
                     expanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.grey.shade600,
+                    color: cs.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -230,6 +232,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
   }
 
   Widget _buildEmojiItem(Map<String, dynamic> emoji) {
+    final cs = Theme.of(context).colorScheme;
     final smilieId = emoji['smilieId'] as String;
     final insertText = emoji['insertText'] as String;
     final imageUrl = emoji['imageUrl'] as String;
@@ -241,9 +244,9 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
         child: Container(
           width: 60,
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: cs.outlineVariant),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -260,7 +263,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
                     errorWidget: (_, __, ___) => Icon(
                       Icons.emoji_emotions_outlined,
                       size: 24,
-                      color: Colors.grey.shade400,
+                      color: cs.onSurfaceVariant,
                     ),
                     placeholder: (_, __) => SizedBox(
                       width: 32,
@@ -279,13 +282,13 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-                color: Colors.grey.shade100,
+                color: cs.surfaceContainerLow,
                 child: Text(
                   insertText,
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant),
                 ),
               ),
             ],
@@ -296,6 +299,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
   }
 
   void _showEmojiDetail(Map<String, dynamic> emoji) {
+    final cs = Theme.of(context).colorScheme;
     final smilieId = emoji['smilieId'] as String;
     final insertText = emoji['insertText'] as String;
     final imageUrl = emoji['imageUrl'] as String;
@@ -336,7 +340,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
                 errorWidget: (_, __, ___) => Icon(
                   Icons.emoji_emotions_outlined,
                   size: 48,
-                  color: Colors.grey.shade400,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
@@ -358,6 +362,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
   }
 
   Widget _infoRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -369,7 +374,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: cs.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
               ),
             ),

@@ -35,6 +35,8 @@ class UrlRouteResult {
 /// - 帖子详情：      `forum.php?mod=viewthread&tid=123` / `thread-123-1-1.html`
 /// - 帖子定位回复：  `forum.php?mod=redirect&goto=findpost&pid=X&ptid=Y`
 /// - 用户主页：      `home.php?mod=space&uid=456` / `space-uid-456.html`
+/// - 用户资料：      `home.php?mod=space&do=profile` / `home.php?mod=space&do=profile&uid=123`
+/// - 板块列表：      `forum.php?mod=forumdisplay&fid=42` / `forum-42-1.html` / `forum-42.html`
 /// - 发新帖：        `forum.php?mod=post&action=newthread&fid=41`
 /// - 回复帖子：      `forum.php?mod=post&action=reply&tid=123`（评论）
 /// - 引用回复：      `forum.php?mod=post&action=reply&tid=123&pid=456`
@@ -138,6 +140,26 @@ class UrlRouter {
         );
       }
 
+      if (mod == 'forumdisplay') {
+        final fid = query['fid'];
+        if (fid != null && fid.isNotEmpty) {
+          final page = _resolvePage(query['page']);
+          final pageSuffix = page > 1 ? '&page=$page' : '';
+          return UrlRouteResult(
+            label: '板块',
+            appPath: '/forum?fid=$fid$pageSuffix',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
+        return UrlRouteResult(
+          label: '板块（缺少 fid）',
+          appPath: null,
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
+
       if (mod == 'post') {
         final postResult = _parsePostUrl(query);
         return UrlRouteResult(
@@ -159,6 +181,15 @@ class UrlRouter {
           return UrlRouteResult(
             label: '用户主页',
             appPath: '/user/$uid',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
+        // home.php?mod=space&do=profile — 当前用户个人资料页（无 uid）
+        if (query['do'] == 'profile') {
+          return UrlRouteResult(
+            label: '我的主页',
+            appPath: '/user/self',
             siteHost: otherSiteHost,
             siteName: otherSiteName,
           );
@@ -211,6 +242,34 @@ class UrlRouter {
       return UrlRouteResult(
         label: '用户主页',
         appPath: '/user/$uid',
+        siteHost: otherSiteHost,
+        siteName: otherSiteName,
+      );
+    }
+
+    // ==================== 板块（伪静态） ====================
+
+    // forum-{fid}-{page}.html
+    // 示例：forum-42-1.html → fid=42, page=1
+    final forumFull = RegExp(r'forum-(\d+)-(\d+)').firstMatch(url);
+    if (forumFull != null) {
+      final fid = forumFull.group(1)!;
+      final page = int.tryParse(forumFull.group(2)!) ?? 1;
+      final pageSuffix = page > 1 ? '&page=$page' : '';
+      return UrlRouteResult(
+        label: '板块',
+        appPath: '/forum?fid=$fid$pageSuffix',
+        siteHost: otherSiteHost,
+        siteName: otherSiteName,
+      );
+    }
+    // forum-{fid}.html（无 page 的简写格式）
+    final forumSimple = RegExp(r'forum-(\d+)').firstMatch(url);
+    if (forumSimple != null) {
+      final fid = forumSimple.group(1)!;
+      return UrlRouteResult(
+        label: '板块',
+        appPath: '/forum?fid=$fid',
         siteHost: otherSiteHost,
         siteName: otherSiteName,
       );

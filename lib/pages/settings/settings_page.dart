@@ -6,8 +6,8 @@ import '../../config/nav_config.dart';
 import '../../core/shortcut_helper.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/history_provider.dart';
-import 'user_management_dialog.dart';
 import 'site_management.dart';
+import 'user_management_dialog.dart';
 import 'forum_management.dart';
 import 'formula_dialog.dart';
 import 'bbcode_dialog.dart';
@@ -21,22 +21,23 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置'), centerTitle: true),
       body: ListView(
         children: [
           // ==================== 站点 ====================
-          _section('站点', [
+          _section(cs, '站点', [
             ListTile(
-              leading: _iconBox(Icons.dns, Colors.green),
+              leading: _iconBox(Icons.dns, const Color(0xFF2196F3)),
               title: const Text('当前站点'),
               subtitle: Text(SiteConfig.sites[settings.currentSiteIndex].name),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => SiteManagement.showPicker(context, settings),
             ),
             ListTile(
-              leading: _iconBox(Icons.person, Colors.deepPurple),
+              leading: _iconBox(Icons.person, const Color(0xFF4CAF50)),
               title: const Text('用户管理'),
               subtitle: const Text('账号切换、导入导出、清除登录信息'),
               trailing: const Icon(Icons.chevron_right),
@@ -48,16 +49,16 @@ class SettingsPage extends StatelessWidget {
           ]),
 
           // ==================== 版块管理 ====================
-          _section('版块管理', [
+          _section(cs, '版块管理', [
             ListTile(
-              leading: _iconBox(Icons.forum, Colors.blue),
+              leading: _iconBox(Icons.forum, const Color(0xFFFF9800)),
               title: const Text('版块管理'),
               subtitle: Text('${settings.forumEntries.length} 个板块'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => ForumManagement.showPicker(context, settings),
             ),
             ListTile(
-              leading: _iconBox(Icons.emoji_emotions, Colors.amber),
+              leading: _iconBox(Icons.emoji_emotions, const Color(0xFFFFC107)),
               title: const Text('表情管理'),
               subtitle: const Text('查看和刷新当前站点表情'),
               trailing: const Icon(Icons.chevron_right),
@@ -66,9 +67,9 @@ class SettingsPage extends StatelessWidget {
           ]),
 
           // ==================== 快捷链接 ====================
-          _section('快捷链接', [
+          _section(cs, '快捷链接', [
             ListTile(
-              leading: _iconBox(Icons.link, Colors.lightBlue),
+              leading: _iconBox(Icons.link, const Color(0xFF9C27B0)),
               title: const Text('管理快捷链接'),
               subtitle: Text('${settings.shortcutLinks.length} 个链接'),
               trailing: const Icon(Icons.chevron_right),
@@ -77,16 +78,16 @@ class SettingsPage extends StatelessWidget {
           ]),
 
           // ==================== 浏览历史 ====================
-          _section('浏览历史', [
+          _section(cs, '浏览历史', [
             ListTile(
-              leading: _iconBox(Icons.history, Colors.brown),
+              leading: _iconBox(Icons.history, const Color(0xFF607D8B)),
               title: const Text('插入格式'),
               subtitle: const Text('编辑器引用时格式化文本'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/settings/history-format'),
             ),
             ListTile(
-              leading: _iconBox(Icons.storage, Colors.brown),
+              leading: _iconBox(Icons.storage, const Color(0xFF795548)),
               title: const Text('最大记录数'),
               subtitle: Text('${settings.historyMaxCount} 条'),
               trailing: const Icon(Icons.chevron_right),
@@ -95,9 +96,9 @@ class SettingsPage extends StatelessWidget {
           ]),
 
           // ==================== 积分公式 ====================
-          _section('积分公式', [
+          _section(cs, '积分公式', [
             ListTile(
-              leading: _iconBox(Icons.calculate, Colors.orange),
+              leading: _iconBox(Icons.calculate, const Color(0xFFE91E63)),
               title: const Text('积分计算公式'),
               subtitle: const Text('点击查看和刷新'),
               trailing: const Icon(Icons.chevron_right),
@@ -106,9 +107,12 @@ class SettingsPage extends StatelessWidget {
           ]),
 
           // ==================== BBCode 渲染 ====================
-          _section('BBCode 渲染', [
+          _section(cs, 'BBCode 渲染', [
             ListTile(
-              leading: _iconBox(Icons.palette_outlined, Colors.teal),
+              leading: _iconBox(
+                Icons.palette_outlined,
+                const Color(0xFFFF5722),
+              ),
               title: const Text('禁用样式标签'),
               subtitle: Text(
                 settings.disabledBbcodeTags.isEmpty
@@ -119,7 +123,7 @@ class SettingsPage extends StatelessWidget {
               onTap: () => BbcodeDialog.show(context, settings),
             ),
             SwitchListTile(
-              secondary: _iconBox(Icons.link, Colors.indigo),
+              secondary: _iconBox(Icons.link, const Color(0xFF9C27B0)),
               title: const Text('自动识别链接'),
               subtitle: const Text('纯文本 http(s) URL 自动转为可点击链接'),
               value: settings.autoDetectUrls,
@@ -128,16 +132,23 @@ class SettingsPage extends StatelessWidget {
           ]),
 
           // ==================== 界面管理 ====================
-          _section('界面管理', [
+          _section(cs, '界面管理', [
             ListTile(
-              leading: _iconBox(Icons.tab, Colors.deepOrange),
+              leading: _iconBox(Icons.tab, const Color(0xFF3F51B5)),
               title: const Text('默认启动页'),
               subtitle: Text(_tabNameFor(settings.defaultTabIndex)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => DefaultTabDialog.show(context, settings),
             ),
             ListTile(
-              leading: _iconBox(Icons.settings, Colors.blueGrey),
+              leading: _iconBox(Icons.palette, const Color(0xFFFF9800)),
+              title: const Text('主题色'),
+              subtitle: Text(_colorNameFor(settings.seedColor)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showColorPicker(context, settings),
+            ),
+            ListTile(
+              leading: _iconBox(Icons.settings, const Color(0xFF607D8B)),
               title: const Text('编辑器设置'),
               subtitle: const Text('快照、工具栏排序等'),
               trailing: const Icon(Icons.chevron_right),
@@ -146,15 +157,29 @@ class SettingsPage extends StatelessWidget {
           ]),
 
           // ==================== 快捷键 ====================
-          _section('快捷键', [
+          _section(cs, '快捷键', [
             ListTile(
-              leading: _iconBox(Icons.keyboard, Colors.indigo),
+              leading: _iconBox(Icons.keyboard, const Color(0xFF00BCD4)),
               title: const Text('自定义快捷键'),
               subtitle: Text('${ShortcutHelper.labels.length} 个可配置项'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/settings/shortcuts'),
             ),
           ]),
+
+          const SizedBox(height: 12),
+
+          // ==================== 关于 ====================
+          Material(
+            color: cs.surface,
+            child: ListTile(
+              leading: Icon(Icons.info_outline, color: cs.onSurfaceVariant),
+              title: const Text('关于'),
+              subtitle: const Text('MTBBS v1.0.0'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {},
+            ),
+          ),
         ],
       ),
     );
@@ -209,19 +234,80 @@ class SettingsPage extends StatelessWidget {
     return navItems[index].label;
   }
 
+  String _colorNameFor(Color color) {
+    for (final entry in SettingsProvider.presetColors.entries) {
+      if (entry.value.toARGB32() == color.toARGB32()) return entry.key;
+    }
+    return '自定义';
+  }
+
+  void _showColorPicker(BuildContext context, SettingsProvider settings) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final mCs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          title: const Text('主题色'),
+          content: Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            alignment: WrapAlignment.center,
+            children: SettingsProvider.presetColors.entries.map((e) {
+              final isActive =
+                  e.value.toARGB32() == settings.seedColor.toARGB32();
+              return GestureDetector(
+                onTap: () {
+                  settings.setSeedColor(e.value);
+                  Navigator.of(ctx).pop();
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: e.value,
+                        shape: BoxShape.circle,
+                        border: isActive
+                            ? Border.all(color: mCs.onSurfaceVariant, width: 3)
+                            : null,
+                      ),
+                      child: isActive
+                          ? Icon(Icons.check, color: Colors.white, size: 22)
+                          : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(e.key, style: const TextStyle(fontSize: 11)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _iconBox(IconData icon, Color color) {
     return Container(
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, color: color),
     );
   }
 
-  Widget _section(String title, List<Widget> children) {
+  Widget _section(ColorScheme cs, String title, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -232,7 +318,7 @@ class SettingsPage extends StatelessWidget {
               title,
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey.shade600,
+                color: cs.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
               ),
             ),

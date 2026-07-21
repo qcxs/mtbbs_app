@@ -53,12 +53,13 @@ class ThreadCommentList extends StatelessWidget {
   });
 
   List<Widget> _buildPostCards(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return [
       for (int i = 0; i < posts.length; i++) ...[
         if (i > 0) const Divider(height: 1),
         _buildPostCard(context, posts[i], i + 1),
       ],
-      _buildFooter(),
+      _buildFooter(cs),
     ];
   }
 
@@ -85,7 +86,12 @@ class ThreadCommentList extends StatelessWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text('暂无回复', style: TextStyle(color: Colors.grey.shade500)),
+          child: Text(
+            '暂无回复',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       );
     }
@@ -133,14 +139,14 @@ class ThreadCommentList extends StatelessWidget {
             if (i < posts.length) {
               return _buildPostCard(context, posts[i], i + 1);
             }
-            return _buildFooter();
+            return _buildFooter(Theme.of(context).colorScheme);
           },
         ),
       ),
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(ColorScheme cs) {
     if (isLoadingMore) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
@@ -159,7 +165,7 @@ class ThreadCommentList extends StatelessWidget {
         child: Center(
           child: Text(
             '没有更多了',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
         ),
       );

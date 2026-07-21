@@ -40,11 +40,12 @@ class MainPostSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!isLoaded) return _buildPlaceholder();
+    if (!isLoaded) return _buildPlaceholder(context);
     return _buildPostCard(context);
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildPlaceholder(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.all(8),
       child: InkWell(
@@ -54,16 +55,16 @@ class MainPostSection extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              Icon(Icons.article_outlined, size: 40, color: Colors.grey.shade300),
+              Icon(Icons.article_outlined, size: 40, color: cs.outlineVariant),
               const SizedBox(height: 8),
               Text(
                 post.username.isNotEmpty ? '${post.username} 的帖子' : '主帖内容',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 4),
               Text(
                 '点击加载帖子内容',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],
           ),

@@ -166,7 +166,9 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('删除'),
           ),
         ],
@@ -207,6 +209,7 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return AlertDialog(
       title: Row(
         children: [
@@ -228,7 +231,7 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
                   padding: const EdgeInsets.all(32),
                   child: Text(
                     widget.emptyHint,
-                    style: TextStyle(color: Colors.grey.shade400),
+                    style: TextStyle(color: cs.onSurfaceVariant),
                   ),
                 ),
               )
@@ -258,7 +261,7 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
                         : Text(
                             item.name,
                             style: TextStyle(
-                              color: isVisible ? null : Colors.grey,
+                              color: isVisible ? null : cs.onSurfaceVariant,
                             ),
                           ),
                     trailing: Row(
@@ -271,7 +274,9 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
                                   ? Icons.visibility
                                   : Icons.visibility_off,
                               size: 18,
-                              color: isVisible ? Colors.blue : Colors.grey,
+                              color: isVisible
+                                  ? cs.onSurfaceVariant
+                                  : cs.onSurfaceVariant,
                             ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
@@ -303,7 +308,7 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
                               minHeight: 28,
                             ),
                             tooltip: '删除',
-                            color: Colors.red.shade300,
+                            color: cs.error,
                             onPressed: _loading ? null : () => _handleDelete(i),
                           ),
                       ],

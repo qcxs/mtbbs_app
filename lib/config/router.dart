@@ -129,6 +129,8 @@ GoRouter buildRouter({String initialLocation = '/'}) {
             pageBuilder: (_, state) => NoTransitionPage(
               child: BrowserPage(
                 initialUrl: state.uri.queryParameters['url'] ?? '',
+                enableUrlIntercept:
+                    state.uri.queryParameters['intercept'] != 'false',
               ),
             ),
           ),

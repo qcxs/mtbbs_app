@@ -97,6 +97,7 @@ class _GuidePageState extends State<GuidePage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final auth = context.watch<AuthProvider>();
     final settings = context.watch<SettingsProvider>();
     final views = _views(auth.isLoggedIn);
@@ -184,7 +185,7 @@ class _GuidePageState extends State<GuidePage> {
                         icon: Icon(
                           Icons.tune,
                           size: 20,
-                          color: Colors.grey.shade600,
+                          color: cs.onSurfaceVariant,
                         ),
                         tooltip: 'Tab 排序',
                         onPressed: _showOrderDialog,
@@ -223,15 +224,14 @@ class _GuidePageState extends State<GuidePage> {
   }
 
   Widget _chip(String label, bool selected, VoidCallback onTap) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-              : null,
+          color: selected ? cs.onSurfaceVariant.withOpacity(0.1) : null,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -239,9 +239,7 @@ class _GuidePageState extends State<GuidePage> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            color: selected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.grey.shade600,
+            color: selected ? cs.onSurfaceVariant : cs.onSurfaceVariant,
           ),
         ),
       ),
@@ -249,17 +247,18 @@ class _GuidePageState extends State<GuidePage> {
   }
 
   Widget _buildLoginPrompt() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.lock_outline, size: 48, color: cs.outlineVariant),
             const SizedBox(height: 12),
             Text(
               '登录后可查看自己的帖子',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(

@@ -45,9 +45,9 @@ class _HistoryPickerState extends State<HistoryPicker>
             Tab(text: '帖子 (${history.getByType('thread').length})'),
             Tab(text: '用户 (${history.getByType('user').length})'),
           ],
-          labelColor: Theme.of(context).colorScheme.primary,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Theme.of(context).colorScheme.primary,
+          labelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          indicatorColor: Theme.of(context).colorScheme.onSurfaceVariant,
           tabAlignment: TabAlignment.fill,
           labelStyle: const TextStyle(fontSize: 12),
         ),
@@ -91,13 +91,14 @@ class _PickerList extends StatelessWidget {
   IconData _typeIcon(String t) =>
       t == 'thread' ? Icons.article_outlined : Icons.person_outline;
 
-  Color _typeColor(String t) =>
-      t == 'thread' ? Colors.blue.shade400 : Colors.green.shade400;
+  Color _typeColor(String t, ColorScheme cs) =>
+      t == 'thread' ? cs.onSurfaceVariant : cs.onSurfaceVariant;
 
   String _typeLabel(String t) => t == 'thread' ? '帖子' : '用户';
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final history = context.watch<HistoryProvider>();
     final records = type.isEmpty ? history.getAll() : history.getByType(type);
 
@@ -105,7 +106,7 @@ class _PickerList extends StatelessWidget {
       return Center(
         child: Text(
           '暂无浏览记录',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
         ),
       );
     }
@@ -113,20 +114,16 @@ class _PickerList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 2),
       itemCount: records.length,
-      separatorBuilder: (_, __) =>
-          Divider(height: 1, indent: 56, color: Colors.grey.shade100),
+      separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
       itemBuilder: (_, index) {
         final record = records[index];
+        final typeColor = _typeColor(record.type, cs);
         return ListTile(
           dense: true,
           leading: CircleAvatar(
             radius: 16,
-            backgroundColor: _typeColor(record.type).withValues(alpha: 0.1),
-            child: Icon(
-              _typeIcon(record.type),
-              color: _typeColor(record.type),
-              size: 16,
-            ),
+            backgroundColor: typeColor.withValues(alpha: 0.1),
+            child: Icon(_typeIcon(record.type), color: typeColor, size: 16),
           ),
           title: Text(
             record.title,
@@ -139,18 +136,18 @@ class _PickerList extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0),
                 decoration: BoxDecoration(
-                  color: _typeColor(record.type).withValues(alpha: 0.1),
+                  color: typeColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 child: Text(
                   _typeLabel(record.type),
-                  style: TextStyle(fontSize: 9, color: _typeColor(record.type)),
+                  style: TextStyle(fontSize: 9, color: typeColor),
                 ),
               ),
               const SizedBox(width: 4),
               Text(
                 _formatTime(record.timestamp),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
           ),

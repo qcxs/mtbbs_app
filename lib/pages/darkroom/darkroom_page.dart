@@ -194,6 +194,7 @@ class _DarkroomPageState extends State<DarkroomPage> {
   }
 
   Widget _buildBody() {
+    final cs = Theme.of(context).colorScheme;
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -214,12 +215,12 @@ class _DarkroomPageState extends State<DarkroomPage> {
                   ? Icons.search_off
                   : Icons.shield_outlined,
               size: 48,
-              color: Colors.grey.shade300,
+              color: cs.outlineVariant,
             ),
             const SizedBox(height: 12),
             Text(
               _searchQuery.isNotEmpty ? '未找到匹配结果' : '暂无数据',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -315,6 +316,7 @@ class _DarkroomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final username = item['username'] as String? ?? '';
     final uid = item['uid'] as String? ?? '';
     final action = item['action'] as String? ?? '';
@@ -325,10 +327,10 @@ class _DarkroomCard extends StatelessWidget {
     final groupExpiry = item['groupexpiry'] as String? ?? '';
 
     final actionColor = action.contains('访问')
-        ? Colors.red
+        ? cs.error
         : action.contains('发言')
-        ? Colors.orange
-        : Colors.grey;
+        ? const Color(0xFFE65100)
+        : cs.onSurfaceVariant;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
@@ -369,14 +371,14 @@ class _DarkroomCard extends StatelessWidget {
                           Icon(
                             Icons.access_time,
                             size: 12,
-                            color: Colors.grey.shade400,
+                            color: cs.onSurfaceVariant,
                           ),
                           const SizedBox(width: 3),
                           Text(
                             dateline,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade500,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -409,7 +411,7 @@ class _DarkroomCard extends StatelessWidget {
                               groupExpiry,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade500,
+                                color: cs.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -418,7 +420,7 @@ class _DarkroomCard extends StatelessWidget {
                             'UID:$uid',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey.shade400,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -442,7 +444,7 @@ class _DarkroomCard extends StatelessWidget {
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: cs.surfaceContainerLow,
                       borderRadius: const BorderRadius.only(
                         topRight: Radius.circular(10),
                         bottomLeft: Radius.circular(10),
@@ -469,7 +471,7 @@ class _DarkroomCard extends StatelessWidget {
                                 operator,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey.shade500,
+                                  color: cs.onSurfaceVariant,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),

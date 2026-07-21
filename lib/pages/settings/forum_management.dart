@@ -11,6 +11,7 @@ import '../../../providers/settings_provider.dart';
 class ForumManagement {
   /// 弹出版块管理对话框
   static void showPicker(BuildContext context, SettingsProvider settings) {
+    final cs = Theme.of(context).colorScheme;
     final items = settings.forumEntries
         .map((e) => ManagedItem(id: e.key, name: e.value, visible: true))
         .toList();
@@ -30,7 +31,7 @@ class ForumManagement {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: cs.surfaceContainerLow,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
@@ -39,7 +40,7 @@ class ForumManagement {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Colors.blue.shade700,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
@@ -51,7 +52,7 @@ class ForumManagement {
               Text(item.name, style: const TextStyle(fontSize: 14)),
               Text(
                 'fid=${item.id}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -60,7 +61,7 @@ class ForumManagement {
       onReorder: (from, to) => settings.moveForum(from, to),
       titleActions: [
         IconButton(
-          icon: Icon(Icons.refresh, size: 18, color: Colors.blue.shade600),
+          icon: Icon(Icons.refresh, size: 18, color: cs.onSurfaceVariant),
           tooltip: '从 API 刷新',
           onPressed: () async {
             final ctx = context;

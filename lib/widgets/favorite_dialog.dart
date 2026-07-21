@@ -173,7 +173,7 @@ class _FavoriteDialogContentState extends State<_FavoriteDialogContent> {
         children: [
           Text(
             '收藏帖子',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
           const Text('备注（可选）:', style: TextStyle(fontSize: 13)),

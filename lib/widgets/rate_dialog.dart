@@ -168,6 +168,7 @@ class _RateDialogContentState extends State<_RateDialogContent> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     if (_loading) {
       return const AlertDialog(
         constraints: BoxConstraints(maxWidth: 420),
@@ -201,16 +202,16 @@ class _RateDialogContentState extends State<_RateDialogContent> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: cs.errorContainer,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   _submitError!,
-                  style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                  style: TextStyle(fontSize: 12, color: cs.onErrorContainer),
                 ),
               ),
             // 评分项列表
-            ..._formData!.items.map((item) => _buildRateItem(item)),
+            ..._formData!.items.map((item) => _buildRateItem(item, cs)),
             const SizedBox(height: 12),
             // 理由下拉
             if (_formData!.reasonOptions.isNotEmpty) ...[
@@ -268,7 +269,7 @@ class _RateDialogContentState extends State<_RateDialogContent> {
     );
   }
 
-  Widget _buildRateItem(action_parse.RateItem item) {
+  Widget _buildRateItem(action_parse.RateItem item, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -323,7 +324,7 @@ class _RateDialogContentState extends State<_RateDialogContent> {
               padding: const EdgeInsets.only(left: 6),
               child: Text(
                 '剩余${item.todayRemaining}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ),
         ],

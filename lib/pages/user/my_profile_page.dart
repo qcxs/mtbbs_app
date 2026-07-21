@@ -2,40 +2,70 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../auth/widgets/login_sheet.dart';
+import '../../providers/settings_provider.dart';
 import '../../widgets/user_avatar.dart';
+import '../settings/user_management_dialog.dart';
 
 /// 我的页面
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
-  /// 显示退出确认弹窗
-  static void _confirmLogout(BuildContext context, AuthProvider auth) {
+  /// 显示夜间模式选择弹窗
+  static void _showThemeModePicker(BuildContext context) {
+    final settings = context.read<SettingsProvider>();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('退出登录'),
-        content: Text('确定退出 ${auth.username} 吗？\n将清除该账号的登录状态。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              auth.logout();
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('退出'),
-          ),
-        ],
+        title: const Text('夜间模式'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _modeOption(ctx, settings, ThemeMode.light, '浅色', Icons.light_mode),
+            _modeOption(ctx, settings, ThemeMode.dark, '深色', Icons.dark_mode),
+            _modeOption(
+              ctx,
+              settings,
+              ThemeMode.system,
+              '跟随系统',
+              Icons.settings_brightness,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  static Widget _modeOption(
+    BuildContext ctx,
+    SettingsProvider settings,
+    ThemeMode mode,
+    String label,
+    IconData icon,
+  ) {
+    final mCs = Theme.of(ctx).colorScheme;
+    final active = settings.themeMode == mode;
+    return ListTile(
+      leading: Icon(icon, color: active ? mCs.onSurfaceVariant : null),
+      title: Text(label),
+      trailing: active ? Icon(Icons.check, color: mCs.onSurfaceVariant) : null,
+      onTap: () {
+        settings.setThemeMode(mode);
+        Navigator.of(ctx).pop();
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final auth = context.watch<AuthProvider>();
+    final settings = context.watch<SettingsProvider>();
+
+    final themeIcon = switch (settings.themeMode) {
+      ThemeMode.light => Icons.light_mode,
+      ThemeMode.dark => Icons.dark_mode,
+      ThemeMode.system => Icons.settings_brightness,
+    };
 
     return Material(
       type: MaterialType.transparency,
@@ -44,7 +74,7 @@ class ProfilePage extends StatelessWidget {
           // 用户卡片
           Container(
             padding: const EdgeInsets.all(20),
-            color: Colors.white,
+            color: cs.surface,
             child: Row(
               children: [
                 UserAvatar(uid: auth.uid, nickname: auth.username, radius: 30),
@@ -65,17 +95,25 @@ class ProfilePage extends StatelessWidget {
                         auth.isLoggedIn ? 'UID: ${auth.uid}' : '登录后可浏览论坛',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
-                if (!auth.isLoggedIn)
-                  ElevatedButton(
-                    onPressed: () => showLoginSheet(context),
-                    child: const Text('登录'),
+                IconButton(
+                  icon: Icon(themeIcon),
+                  tooltip: '夜间模式',
+                  onPressed: () => _showThemeModePicker(context),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.swap_horiz, size: 20),
+                  tooltip: '切换账号',
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => const UserManagementDialog(),
                   ),
+                ),
               ],
             ),
           ),
@@ -84,7 +122,7 @@ class ProfilePage extends StatelessWidget {
 
           // 功能列表
           Material(
-            color: Colors.white,
+            color: cs.surface,
             child: Column(
               children: [
                 ListTile(
@@ -135,29 +173,9 @@ class ProfilePage extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/settings'),
                 ),
-                const Divider(height: 1, indent: 56),
-                ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: const Text('关于'),
-                  subtitle: const Text('MTBBS v1.0.0'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
               ],
             ),
           ),
-
-          if (auth.isLoggedIn) ...[
-            const SizedBox(height: 12),
-            Material(
-              color: Colors.white,
-              child: ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('退出登录', style: TextStyle(color: Colors.red)),
-                onTap: () => _confirmLogout(context, auth),
-              ),
-            ),
-          ],
         ],
       ),
     );

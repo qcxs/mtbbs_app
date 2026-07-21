@@ -44,7 +44,7 @@ class PageActions extends StatelessWidget {
   });
 
   void _openInBrowser(BuildContext context) {
-    context.push('/browser?url=${Uri.encodeComponent(url)}');
+    context.push('/browser?url=${Uri.encodeComponent(url)}&intercept=false');
   }
 
   void _copyLink(BuildContext context) {

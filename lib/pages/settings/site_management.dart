@@ -7,6 +7,7 @@ import '../../../auth/providers/auth_provider.dart';
 /// 站点管理 — 切换、添加、删除站点
 class SiteManagement {
   static void showPicker(BuildContext context, SettingsProvider settings) {
+    final cs = Theme.of(context).colorScheme;
     final current = settings.currentSiteIndex;
     showDialog(
       context: context,
@@ -23,11 +24,7 @@ class SiteManagement {
                 },
                 child: Container(
                   padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(Icons.add, size: 18, color: Colors.blue.shade600),
+                  child: Icon(Icons.add, size: 18, color: cs.onSurfaceVariant),
                 ),
               ),
             ],
@@ -46,7 +43,7 @@ class SiteManagement {
                   title: Text(site.name),
                   subtitle: Text(
                     subtitle.toString(),
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                   ),
                   value: i,
                   groupValue: current,
@@ -74,7 +71,7 @@ class SiteManagement {
                         icon: Icon(
                           Icons.edit_outlined,
                           size: 18,
-                          color: Colors.grey.shade500,
+                          color: cs.onSurfaceVariant,
                         ),
                         onPressed: () {
                           Navigator.of(ctx).pop();
@@ -85,7 +82,7 @@ class SiteManagement {
                         icon: Icon(
                           Icons.delete_outline,
                           size: 18,
-                          color: Colors.red.shade300,
+                          color: cs.error,
                         ),
                         onPressed: () =>
                             _deleteSite(context, settings, site.name, i),
@@ -113,6 +110,7 @@ class SiteManagement {
     String name,
     int index,
   ) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -124,7 +122,7 @@ class SiteManagement {
             child: const Text('取消'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: cs.error),
             onPressed: () async {
               final wasCurrent = index == settings.currentSiteIndex;
               await settings.deleteSite(index);

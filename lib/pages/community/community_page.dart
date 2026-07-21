@@ -187,15 +187,14 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     // 带 fid 时使用单版块模式
     if (widget.fid.isNotEmpty) {
       final ctrl = _ctrlMap[widget.fid];
       return Scaffold(
-        backgroundColor: Colors.white,
         appBar: AppBar(
           title: Text(SiteConfig.forums[widget.fid] ?? widget.fid),
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
+          surfaceTintColor: cs.surface,
           elevation: 0.5,
           actions: [
             IconButton(
@@ -215,11 +214,9 @@ class _CommunityPageState extends State<CommunityPage> {
     }
     // 不带 fid 时显示所有版块标签页
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('社区'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: cs.surface,
         elevation: 0.5,
       ),
       body: _buildTabs(),

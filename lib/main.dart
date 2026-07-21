@@ -142,19 +142,32 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: searchHistory),
         ChangeNotifierProvider.value(value: editorHistory),
       ],
-      child: MaterialApp.router(
-        title: 'MTBBS',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          fontFamily: 'sans-serif',
-          scaffoldBackgroundColor: Colors.white,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-        ),
-        routerConfig: router,
+      child: Builder(
+        builder: (context) {
+          final s = context.watch<SettingsProvider>();
+          return MaterialApp.router(
+            title: 'MTBBS',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              fontFamily: 'sans-serif',
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: s.seedColor,
+                brightness: Brightness.light,
+              ),
+              useMaterial3: true,
+            ),
+            darkTheme: ThemeData(
+              fontFamily: 'sans-serif',
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: s.seedColor,
+                brightness: Brightness.dark,
+              ),
+              useMaterial3: true,
+            ),
+            themeMode: s.themeMode,
+            routerConfig: router,
+          );
+        },
       ),
     );
   }

@@ -457,56 +457,67 @@ class _EditorPageState extends State<EditorPage> {
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
-      allowMultiple: false,
+      allowMultiple: true,
       withData: false,
       withReadStream: false,
     );
     if (result == null || result.files.isEmpty) return;
-    final filePath = result.files.single.path;
-    if (filePath == null) return;
 
-    final file = File(filePath);
-    try {
-      final uploadResult = await upload_api.uploadImage(
-        ApiService().dio,
-        file: file,
-        uid: auth.uid,
-        uploadHash: _pageData.uploadHash,
-      );
-      if (!mounted) return;
-      if (uploadResult['success'] == true) {
-        final aid = uploadResult['aid']?.toString() ?? '';
-        final src = uploadResult['src']?.toString() ?? '';
-        final title = uploadResult['title']?.toString() ?? '';
-        if (aid.isNotEmpty && src.isNotEmpty) {
-          setState(() {
-            _imageList.add({
-              'aid': aid,
-              'src': src,
-              'title': title,
-              'type': 'uploaded',
+    int successCount = 0;
+    int failCount = 0;
+    for (final f in result.files) {
+      final filePath = f.path;
+      if (filePath == null) continue;
+
+      final file = File(filePath);
+      try {
+        final uploadResult = await upload_api.uploadImage(
+          ApiService().dio,
+          file: file,
+          uid: auth.uid,
+          uploadHash: _pageData.uploadHash,
+        );
+        if (!mounted) return;
+        if (uploadResult['success'] == true) {
+          final aid = uploadResult['aid']?.toString() ?? '';
+          final src = uploadResult['src']?.toString() ?? '';
+          final title = uploadResult['title']?.toString() ?? '';
+          if (aid.isNotEmpty && src.isNotEmpty) {
+            setState(() {
+              _imageList.add({
+                'aid': aid,
+                'src': src,
+                'title': title,
+                'type': 'uploaded',
+              });
+              _aidToSrc[aid] = src;
             });
-            _aidToSrc[aid] = src;
-          });
-          _syncImagesNotifier();
+            successCount++;
+          }
+        } else {
+          failCount++;
         }
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('上传成功')));
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('上传失败: ${uploadResult['error'] ?? '未知错误'}')),
-          );
+      } finally {
+        if (file.existsSync()) {
+          file.deleteSync();
         }
       }
-    } finally {
-      // 清理 file_picker 产生的临时文件，避免残留
-      if (file.existsSync()) {
-        file.deleteSync();
-      }
+    }
+    _syncImagesNotifier();
+
+    if (!mounted) return;
+    if (successCount > 0 && failCount == 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('上传成功 $successCount 张图片')));
+    } else if (successCount > 0 && failCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('上传完成：成功 $successCount 张，失败 $failCount 张')),
+      );
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('上传失败')));
     }
   }
 
@@ -1168,6 +1179,7 @@ class _EditorPageState extends State<EditorPage> {
 
   /// 构建顶栏提示条
   Widget _buildHintBar() {
+    final cs = Theme.of(context).colorScheme;
     final hints = <Widget>[];
 
     // Emoji 警告
@@ -1176,7 +1188,7 @@ class _EditorPageState extends State<EditorPage> {
         _hintItem(
           id: 'emoji',
           icon: Icons.warning_amber_rounded,
-          color: Colors.orange,
+          color: cs.onSurfaceVariant,
           message: '输入内容包含不兼容的 Emoji，提交后可能被截断',
         ),
       );
@@ -1190,7 +1202,7 @@ class _EditorPageState extends State<EditorPage> {
           _hintItem(
             id: 'unexpected_close',
             icon: Icons.info_outline,
-            color: Colors.blue,
+            color: cs.onSurfaceVariant,
             message: '上次编辑器意外关闭，可在编辑历史中恢复',
           ),
         );
@@ -1199,7 +1211,7 @@ class _EditorPageState extends State<EditorPage> {
 
     if (hints.isEmpty) return const SizedBox.shrink();
     return Container(
-      color: Colors.amber.shade50,
+      color: cs.surfaceContainerLow,
       child: Column(mainAxisSize: MainAxisSize.min, children: hints),
     );
   }
@@ -1210,10 +1222,11 @@ class _EditorPageState extends State<EditorPage> {
     required Color color,
     required String message,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.amber.shade100)),
+        border: Border(bottom: BorderSide(color: cs.surfaceContainerLow)),
       ),
       child: Row(
         children: [
@@ -1222,14 +1235,14 @@ class _EditorPageState extends State<EditorPage> {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+              style: TextStyle(fontSize: 12, color: cs.onSurface),
             ),
           ),
           GestureDetector(
             onTap: () => _dismissHint(id),
             child: Container(
               padding: const EdgeInsets.all(4),
-              child: Icon(Icons.close, size: 14, color: Colors.grey.shade400),
+              child: Icon(Icons.close, size: 14, color: cs.onSurfaceVariant),
             ),
           ),
         ],
@@ -1260,6 +1273,7 @@ class _EditorPageState extends State<EditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isWide = MediaQuery.of(context).size.width > 600;
     final settings = context.watch<SettingsProvider>();
 
@@ -1318,8 +1332,7 @@ class _EditorPageState extends State<EditorPage> {
           child: Scaffold(
             appBar: AppBar(
               title: Text(_pageTitle),
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.white,
+              surfaceTintColor: cs.surface,
               actions: [
                 if (!isWide)
                   IconButton(
@@ -1447,14 +1460,17 @@ class _EditorPageState extends State<EditorPage> {
     children: [_buildEditor(), _buildPreview()],
   );
 
-  Widget _buildWideLayout() => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(child: _buildEditor()),
-      Container(width: 1, color: Colors.grey.shade300),
-      Expanded(child: _buildPreview()),
-    ],
-  );
+  Widget _buildWideLayout() {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _buildEditor()),
+        Container(width: 1, color: cs.outlineVariant),
+        Expanded(child: _buildPreview()),
+      ],
+    );
+  }
 
   Widget _buildEditor() {
     return Column(
@@ -1542,6 +1558,7 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildPreview() {
+    final cs = Theme.of(context).colorScheme;
     return ValueListenableBuilder<_PreviewData>(
       valueListenable: _previewData,
       builder: (context, data, _) {
@@ -1550,7 +1567,7 @@ class _EditorPageState extends State<EditorPage> {
           return Center(
             child: Text(
               '输入内容后即可预览',
-              style: TextStyle(color: Colors.grey.shade400),
+              style: TextStyle(color: cs.onSurfaceVariant),
             ),
           );
         }
@@ -1583,7 +1600,7 @@ class _EditorPageState extends State<EditorPage> {
                         autoDetectUrls: settings.autoDetectUrls,
                       ),
                     )
-                  : Text('暂无内容', style: TextStyle(color: Colors.grey.shade400)),
+                  : Text('暂无内容', style: TextStyle(color: cs.onSurfaceVariant)),
             ],
           ),
         );

@@ -76,7 +76,7 @@ class CommentSection extends StatelessWidget {
     if (posts.isEmpty && pageLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-    if (posts.isEmpty) return _buildEmpty();
+    if (posts.isEmpty) return _buildEmpty(context);
 
     final auth = context.watch<AuthProvider>();
     final settings = context.watch<SettingsProvider>();
@@ -110,18 +110,19 @@ class CommentSection extends StatelessWidget {
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.forum_outlined, size: 40, color: Colors.grey.shade300),
+            Icon(Icons.forum_outlined, size: 40, color: cs.outlineVariant),
             const SizedBox(height: 8),
             Text(
               '暂无评论',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -131,6 +132,7 @@ class CommentSection extends StatelessWidget {
 
   /// 评论区头部（标题 + 分页控件）
   static Widget buildHeader({
+    required BuildContext context,
     required int currentPage,
     required int totalPages,
     required bool pageLoading,
@@ -138,19 +140,20 @@ class CommentSection extends StatelessWidget {
     required VoidCallback? onNext,
     required VoidCallback? onPageTap,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: Colors.white,
+      color: cs.surface,
       child: Row(
         children: [
-          Icon(Icons.forum_outlined, size: 18, color: Colors.grey.shade600),
+          Icon(Icons.forum_outlined, size: 18, color: cs.onSurfaceVariant),
           const SizedBox(width: 6),
           Text(
             '评论区',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade800,
+              color: cs.onSurface,
             ),
           ),
           const Spacer(),
@@ -167,7 +170,7 @@ class CommentSection extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: pageLoading
@@ -176,15 +179,12 @@ class CommentSection extends StatelessWidget {
                       height: 12,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.grey.shade500,
+                        color: cs.onSurfaceVariant,
                       ),
                     )
                   : Text(
                       '$currentPage / $totalPages',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
-                      ),
+                      style: TextStyle(fontSize: 12, color: cs.onSurface),
                     ),
             ),
           ),

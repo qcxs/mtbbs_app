@@ -16,6 +16,7 @@ class ShortcutSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('快捷键设置')),
@@ -53,8 +54,7 @@ class ShortcutSettingsPage extends StatelessWidget {
           const Divider(height: 32),
 
           // ==================== 编辑器工具栏快捷键 ====================
-          _sectionHeader(context, '编辑器工具栏快捷键',
-              subtitle: '隐藏的工具栏项其快捷键自动失效'),
+          _sectionHeader(context, '编辑器工具栏快捷键', subtitle: '隐藏的工具栏项其快捷键自动失效'),
           for (final config in allToolbarItemConfigs)
             _shortcutTile(
               context,
@@ -76,9 +76,7 @@ class ShortcutSettingsPage extends StatelessWidget {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                          '${config.name} 已设置为 $result',
-                        ),
+                        content: Text('${config.name} 已设置为 $result'),
                         duration: const Duration(seconds: 1),
                       ),
                     );
@@ -93,7 +91,7 @@ class ShortcutSettingsPage extends StatelessWidget {
             child: Text(
               '提示：修改后立即生效，无需重启',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 32),
@@ -102,7 +100,12 @@ class ShortcutSettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _sectionHeader(BuildContext context, String title, {String? subtitle}) {
+  Widget _sectionHeader(
+    BuildContext context,
+    String title, {
+    String? subtitle,
+  }) {
+    final sCs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
@@ -113,13 +116,13 @@ class ShortcutSettingsPage extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Colors.grey.shade600,
+              color: sCs.onSurfaceVariant,
             ),
           ),
           if (subtitle != null)
             Text(
               subtitle,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+              style: TextStyle(fontSize: 11, color: sCs.onSurfaceVariant),
             ),
         ],
       ),
@@ -133,31 +136,33 @@ class ShortcutSettingsPage extends StatelessWidget {
     bool? visible,
     required VoidCallback onTap,
   }) {
+    final tCs = Theme.of(context).colorScheme;
     return ListTile(
       leading: Container(
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.indigo.shade50,
+          color: const Color(0xFF00BCD4).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(Icons.keyboard, color: Colors.indigo.shade600, size: 22),
+        child: const Icon(Icons.keyboard, color: Color(0xFF00BCD4), size: 22),
       ),
       title: Text(
         label,
-        style: visible == false
-            ? TextStyle(color: Colors.grey.shade400)
-            : null,
+        style: visible == false ? TextStyle(color: tCs.onSurfaceVariant) : null,
       ),
       subtitle: visible == false
-          ? Text('已隐藏', style: TextStyle(fontSize: 11, color: Colors.grey.shade400))
+          ? Text(
+              '已隐藏',
+              style: TextStyle(fontSize: 11, color: tCs.onSurfaceVariant),
+            )
           : null,
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: tCs.surfaceContainerLow,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: tCs.outlineVariant),
         ),
         child: Text(
           currentKey.isEmpty ? '未设置' : currentKey,
@@ -165,7 +170,9 @@ class ShortcutSettingsPage extends StatelessWidget {
             fontSize: 12,
             fontFamily: 'monospace',
             fontWeight: FontWeight.w600,
-            color: currentKey.isEmpty ? Colors.grey.shade400 : Colors.grey.shade700,
+            color: currentKey.isEmpty
+                ? tCs.onSurfaceVariant
+                : tCs.onSurfaceVariant,
           ),
         ),
       ),

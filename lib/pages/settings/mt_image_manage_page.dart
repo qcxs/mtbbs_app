@@ -59,6 +59,7 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('MT 图床管理'), centerTitle: true),
       body: _loading
@@ -67,7 +68,7 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
           ? Center(
               child: Text(
                 '暂无历史记录',
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
               ),
             )
           : ListView.builder(
@@ -87,11 +88,11 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
                       errorBuilder: (_, __, ___) => Container(
                         width: 48,
                         height: 48,
-                        color: Colors.grey.shade200,
-                        child: const Icon(
+                        color: cs.surfaceContainerHigh,
+                        child: Icon(
                           Icons.image,
                           size: 24,
-                          color: Colors.grey,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -102,7 +103,7 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14,
-                      color: item.hidden ? Colors.grey : null,
+                      color: item.hidden ? cs.onSurfaceVariant : null,
                     ),
                   ),
                   subtitle: Text(
@@ -129,7 +130,7 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
                         value: 'delete',
                         child: Text(
                           '删除',
-                          style: TextStyle(color: Colors.red.shade400),
+                          style: TextStyle(color: cs.error),
                         ),
                       ),
                     ],

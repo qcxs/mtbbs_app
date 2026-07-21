@@ -102,6 +102,7 @@ class _AppShellState extends State<AppShell> {
     AuthProvider auth,
     NavItem item,
   ) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -113,7 +114,7 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(
               Icons.edit_outlined,
               size: 20,
-              color: Colors.grey.shade600,
+              color: cs.onSurfaceVariant,
             ),
             tooltip: '发帖',
             onPressed: () {
@@ -162,7 +163,7 @@ class _AppShellState extends State<AppShell> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.search, size: 22, color: Colors.grey.shade600),
+            icon: Icon(Icons.search, size: 22, color: cs.onSurfaceVariant),
             tooltip: '搜索',
             onPressed: () => context.push('/search'),
           ),
@@ -172,6 +173,7 @@ class _AppShellState extends State<AppShell> {
               uid: auth.uid,
               nickname: auth.username,
               radius: 16,
+              tapAction: AvatarTapAction.custom,
               onTap: () => showDialog(
                 context: context,
                 builder: (_) => const UserManagementDialog(),
@@ -179,7 +181,6 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
         ],
-        backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0.5,
       ),
@@ -203,6 +204,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildSideRail(BuildContext context, AuthProvider auth, NavItem item) {
+    final cs = Theme.of(context).colorScheme;
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Row(
@@ -231,7 +233,7 @@ class _AppShellState extends State<AppShell> {
               ),
             ),
           ),
-          Container(width: 1, color: Colors.grey.shade300),
+          Container(width: 1, color: cs.outlineVariant),
           Expanded(
             child: _isTabRoute
                 ? IndexedStack(index: _currentIndex, children: _buildTabPages())
@@ -243,6 +245,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildSideRailLeading(BuildContext context, AuthProvider auth) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -251,6 +254,7 @@ class _AppShellState extends State<AppShell> {
           uid: auth.uid,
           nickname: auth.username,
           radius: 18,
+          tapAction: AvatarTapAction.custom,
           onTap: () => showDialog(
             context: context,
             builder: (_) => const UserManagementDialog(),
@@ -258,11 +262,7 @@ class _AppShellState extends State<AppShell> {
         ),
         const SizedBox(height: 4),
         IconButton(
-          icon: Icon(
-            Icons.edit_outlined,
-            size: 20,
-            color: Colors.grey.shade600,
-          ),
+          icon: Icon(Icons.edit_outlined, size: 20, color: cs.onSurfaceVariant),
           tooltip: '发帖',
           onPressed: () {
             final forums = SiteConfig.forums;
@@ -310,7 +310,7 @@ class _AppShellState extends State<AppShell> {
           },
         ),
         IconButton(
-          icon: Icon(Icons.search, color: Colors.grey.shade600),
+          icon: Icon(Icons.search, color: cs.onSurfaceVariant),
           tooltip: '搜索',
           onPressed: () => context.push('/search'),
         ),
@@ -319,6 +319,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildSideRailDestination(int index, NavItem item) {
+    final cs = Theme.of(context).colorScheme;
     final selected = index == _currentIndex;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -334,7 +335,7 @@ class _AppShellState extends State<AppShell> {
               Icon(
                 selected ? item.iconFilled : item.icon,
                 size: 24,
-                color: selected ? Colors.deepPurple : Colors.grey.shade600,
+                color: selected ? cs.onSurfaceVariant : cs.onSurfaceVariant,
               ),
               const SizedBox(height: 4),
               Text(
@@ -342,7 +343,7 @@ class _AppShellState extends State<AppShell> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                  color: selected ? Colors.deepPurple : Colors.grey.shade600,
+                  color: selected ? cs.onSurfaceVariant : cs.onSurfaceVariant,
                 ),
               ),
             ],

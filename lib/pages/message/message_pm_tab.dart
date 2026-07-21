@@ -113,6 +113,7 @@ class _PmTabState extends State<PmTab> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     if (_loading)
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     if (_error != null) {
@@ -120,9 +121,9 @@ class _PmTabState extends State<PmTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.error_outline, size: 48, color: cs.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: Colors.grey.shade600)),
+            Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => _load(1),
@@ -138,9 +139,9 @@ class _PmTabState extends State<PmTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.forum_outlined, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.forum_outlined, size: 48, color: cs.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text('暂无消息', style: TextStyle(color: Colors.grey.shade500)),
+            Text('暂无消息', style: TextStyle(color: cs.onSurfaceVariant)),
           ],
         ),
       );
@@ -164,9 +165,10 @@ class _PmTabState extends State<PmTab> {
   }
 
   Widget _buildPagination() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: Colors.white,
+      color: cs.surface,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -183,12 +185,12 @@ class _PmTabState extends State<PmTab> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '$_page / $_totalPages',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ),
           ),
@@ -206,6 +208,7 @@ class _PmTabState extends State<PmTab> {
   }
 
   Widget _buildItem(Map<String, dynamic> item) {
+    final cs = Theme.of(context).colorScheme;
     final uid = item['uid'] as String? ?? '';
     final username = item['username'] as String? ?? '';
     final isNew = item['isNew'] as bool? ?? false;
@@ -219,7 +222,7 @@ class _PmTabState extends State<PmTab> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: cs.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -258,7 +261,7 @@ class _PmTabState extends State<PmTab> {
                               ? FontWeight.w600
                               : FontWeight.normal,
                           fontSize: 14,
-                          color: Colors.grey.shade900,
+                          color: cs.onSurface,
                         ),
                       ),
                       if (messageCount.isNotEmpty) ...[
@@ -267,7 +270,7 @@ class _PmTabState extends State<PmTab> {
                           '$messageCount 条',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade500,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -276,7 +279,7 @@ class _PmTabState extends State<PmTab> {
                         time,
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade500,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -288,7 +291,7 @@ class _PmTabState extends State<PmTab> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color: cs.onSurfaceVariant,
                       height: 1.3,
                     ),
                   ),
@@ -302,7 +305,7 @@ class _PmTabState extends State<PmTab> {
                               ? replyUrl
                               : '${SiteConfig.baseUrl}/$replyUrl';
                           context.push(
-                            '/browser?url=${Uri.encodeComponent(fullUrl)}',
+                            '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
                           );
                         },
                         child: Container(
@@ -311,14 +314,14 @@ class _PmTabState extends State<PmTab> {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.deepPurple.shade50,
+                            color: cs.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '回复',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.deepPurple.shade600,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ),

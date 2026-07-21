@@ -32,44 +32,47 @@ void showImageInfoDialog(
 
   showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('图片信息'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (nameStr != null) _infoRow('文件名', nameStr),
-          if (sizeStr != null) _infoRow('尺寸', sizeStr),
-          if (downloadsStr != null) _infoRow('下载次数', downloadsStr),
-          if (uploadTimeStr != null) _infoRow('上传时间', uploadTimeStr),
-          if (sourceInfo != null) _infoRow('来源', sourceInfo),
-          const SizedBox(height: 8),
-          Text('URL:', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-          const SizedBox(height: 4),
-          SelectableText(url, style: const TextStyle(fontSize: 12)),
+    builder: (ctx) {
+      final cs = Theme.of(ctx).colorScheme;
+      return AlertDialog(
+        title: const Text('图片信息'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (nameStr != null) _infoRow('文件名', nameStr, cs),
+            if (sizeStr != null) _infoRow('尺寸', sizeStr, cs),
+            if (downloadsStr != null) _infoRow('下载次数', downloadsStr, cs),
+            if (uploadTimeStr != null) _infoRow('上传时间', uploadTimeStr, cs),
+            if (sourceInfo != null) _infoRow('来源', sourceInfo, cs),
+            const SizedBox(height: 8),
+            Text('URL:', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            SelectableText(url, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: url));
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已复制链接'), duration: Duration(seconds: 1)),
+              );
+            },
+            child: const Text('复制链接'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
         ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: url));
-            Navigator.of(ctx).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('已复制链接'), duration: Duration(seconds: 1)),
-            );
-          },
-          child: const Text('复制链接'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('关闭'),
-        ),
-      ],
-    ),
+      );
+    },
   );
 }
 
-Widget _infoRow(String label, String value) {
+Widget _infoRow(String label, String value, ColorScheme cs) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Row(
@@ -77,7 +80,7 @@ Widget _infoRow(String label, String value) {
       children: [
         SizedBox(
           width: 64,
-          child: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          child: Text(label, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
         ),
         Expanded(
           child: Text(value, style: const TextStyle(fontSize: 13)),

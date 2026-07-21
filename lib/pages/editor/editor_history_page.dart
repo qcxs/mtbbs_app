@@ -76,11 +76,11 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('编辑历史'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: cs.surface,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, size: 20),
@@ -94,6 +94,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Widget _buildBody() {
+    final cs = Theme.of(context).colorScheme;
     if (_loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
@@ -103,9 +104,9 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.error_outline, size: 48, color: cs.outlineVariant),
             const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: Colors.grey.shade600)),
+            Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _load,
@@ -122,11 +123,11 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history, size: 48, color: Colors.grey.shade300),
+            Icon(Icons.history, size: 48, color: cs.outlineVariant),
             const SizedBox(height: 12),
             Text(
               '暂无编辑历史',
-              style: TextStyle(fontSize: 15, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -143,6 +144,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   // ==================== Session 卡片 ====================
 
   Widget _buildSessionCard(EditorSessionSummary session) {
+    final cs = Theme.of(context).colorScheme;
     final expanded = _expandedSessions.contains(session.key);
     final typeLabel = _typeLabel(session.key);
     final typeIcon = _typeIcon(session.key);
@@ -178,14 +180,14 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
                                 vertical: 1,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
+                                color: cs.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(3),
                               ),
                               child: Text(
                                 typeLabel,
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey.shade600,
+                                  color: cs.onSurfaceVariant,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -209,7 +211,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
                           '${session.totalCount} 条记录',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade500,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -217,7 +219,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
                   ),
                   Icon(
                     expanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.grey.shade600,
+                    color: cs.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -237,23 +239,24 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Widget _typeIcon(String key) {
+    final cs = Theme.of(context).colorScheme;
     IconData icon;
     Color color;
     if (key.startsWith('post')) {
       icon = Icons.post_add;
-      color = Colors.blue;
+      color = cs.onSurfaceVariant;
     } else if (key.startsWith('comment')) {
       icon = Icons.comment;
-      color = Colors.green;
+      color = cs.onSurfaceVariant;
     } else if (key.startsWith('reply')) {
       icon = Icons.reply;
-      color = Colors.orange;
+      color = cs.onSurfaceVariant;
     } else if (key.startsWith('editPost') || key.startsWith('editReply')) {
       icon = Icons.edit;
-      color = Colors.purple;
+      color = cs.onSurfaceVariant;
     } else {
       icon = Icons.description;
-      color = Colors.grey;
+      color = cs.onSurfaceVariant;
     }
     return Container(
       padding: const EdgeInsets.all(8),
@@ -282,6 +285,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Widget _buildSnapshotTile(EditorSnapshot snapshot) {
+    final cs = Theme.of(context).colorScheme;
     final timeStr = _formatTime(snapshot.createdAt);
 
     return Padding(
@@ -294,7 +298,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
             children: [
               Text(
                 timeStr,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
               if (snapshot.isManual)
                 Container(
@@ -304,14 +308,14 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
                     vertical: 0,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: Text(
                     '手动',
                     style: TextStyle(
                       fontSize: 9,
-                      color: Colors.blue.shade600,
+                      color: cs.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -342,7 +346,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
                       '${snapshot.wordCount} 字',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade500,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                     if (snapshot.pendingAids.isNotEmpty) ...[
@@ -351,7 +355,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
                         '${snapshot.pendingAids.length} 张图片',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade500,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -376,7 +380,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
           _actionChip(
             label: '删除',
             icon: Icons.delete_outline,
-            color: Colors.red.shade400,
+            color: cs.error,
             onTap: () => _delete(snapshot),
           ),
         ],
@@ -390,7 +394,8 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
     required VoidCallback onTap,
     Color? color,
   }) {
-    final c = color ?? Colors.grey.shade600;
+    final cs = Theme.of(context).colorScheme;
+    final c = color ?? cs.onSurfaceVariant;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -425,6 +430,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Future<void> _delete(EditorSnapshot snapshot) async {
+    final cs = Theme.of(context).colorScheme;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -449,7 +455,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: cs.error),
             child: const Text('删除'),
           ),
         ],
@@ -468,6 +474,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   void _showDetail(EditorSnapshot snapshot) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -512,7 +519,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
                   style: const TextStyle(fontSize: 12, height: 1.4),
                 )
               else
-                Text('(空内容)', style: TextStyle(color: Colors.grey.shade400)),
+                Text('(空内容)', style: TextStyle(color: cs.onSurfaceVariant)),
             ],
           ),
         ),
@@ -541,6 +548,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Widget _detailRow(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 3),
       child: Row(
@@ -553,7 +561,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),

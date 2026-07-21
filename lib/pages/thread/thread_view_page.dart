@@ -397,6 +397,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   }
 
   void _showBbcodeDialog(PostItem post) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -420,11 +421,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         ),
         content: SelectableText(
           post.bbcode,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade800,
-            height: 1.5,
-          ),
+          style: TextStyle(fontSize: 12, color: cs.onSurface, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -539,14 +536,14 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _data?.title.isNotEmpty == true ? _data!.title : '帖子详情',
           style: const TextStyle(fontSize: 15),
         ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        surfaceTintColor: cs.surface,
         actions: [
           PageActions(
             url: _threadUrl,
@@ -580,6 +577,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   // ==================== 布局 ====================
 
   Widget _buildWideLayout() {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -593,7 +591,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
             ],
           ),
         ),
-        Container(width: 1, color: Colors.grey.shade300),
+        Container(width: 1, color: cs.outlineVariant),
         Expanded(flex: 2, child: _buildCommentColumn()),
       ],
     );
@@ -623,6 +621,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
               pinned: true,
               delegate: CommentHeaderDelegate(
                 child: CommentSection.buildHeader(
+                  context: context,
                   currentPage: _currentPage,
                   totalPages: _totalPages,
                   pageLoading: _pageLoading,
@@ -689,6 +688,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     return Column(
       children: [
         CommentSection.buildHeader(
+          context: context,
           currentPage: _currentPage,
           totalPages: _totalPages,
           pageLoading: _pageLoading,
@@ -740,6 +740,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   // ==================== 杂项组件 ====================
 
   Widget _buildReplyBar() {
+    final cs = Theme.of(context).colorScheme;
     if (_data == null) return const SizedBox.shrink();
     return Container(
       padding: EdgeInsets.only(
@@ -749,12 +750,12 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         bottom: MediaQuery.of(context).padding.bottom + 6,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
       ),
       child: Row(
         children: [
-          Icon(Icons.reply_rounded, size: 16, color: Colors.grey.shade400),
+          Icon(Icons.reply_rounded, size: 16, color: cs.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
             child: GestureDetector(
@@ -765,19 +766,19 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '说点什么...',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 6),
           IconButton(
-            icon: Icon(Icons.send_rounded, color: Colors.deepPurple.shade400),
+            icon: Icon(Icons.send_rounded, color: cs.onSurfaceVariant),
             onPressed: _navigateComment,
           ),
         ],

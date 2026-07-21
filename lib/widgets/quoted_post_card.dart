@@ -29,7 +29,7 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
     if (widget.loading) {
       return Container(
         padding: const EdgeInsets.all(12),
-        color: Colors.amber.shade50,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: const Row(
           children: [
             SizedBox(
@@ -47,15 +47,22 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
     if (widget.error != null) {
       return Container(
         padding: const EdgeInsets.all(12),
-        color: Colors.red.shade50,
+        color: Theme.of(context).colorScheme.errorContainer,
         child: Row(
           children: [
-            Icon(Icons.error_outline, size: 14, color: Colors.red.shade400),
+            Icon(
+              Icons.error_outline,
+              size: 14,
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 '加载失败: ${widget.error}',
-                style: TextStyle(fontSize: 12, color: Colors.red.shade600),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
               ),
             ),
           ],
@@ -68,14 +75,14 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
     final nickname = widget.quotedPost!['username']?.toString() ?? '';
     final bbcode = widget.quotedPost!['bbcode']?.toString() ?? '';
 
+    final cs = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
-        border: Border(
-          left: BorderSide(color: Colors.amber.shade300, width: 3),
-        ),
+        color: cs.surfaceContainerLow,
+        border: Border(left: BorderSide(color: cs.outline, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,18 +91,14 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Row(
               children: [
-                Icon(
-                  Icons.format_quote,
-                  size: 14,
-                  color: Colors.orange.shade700,
-                ),
+                Icon(Icons.format_quote, size: 14, color: cs.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Text(
                   '回复 @$nickname',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.orange.shade700,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
                 const Spacer(),
@@ -107,14 +110,14 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
+                      color: cs.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       '查看',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.orange.shade700,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -129,7 +132,7 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
                 bbcode.replaceAll(RegExp(r'\[/?[a-z0-9=,#]+\]'), ''),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ),
         ],
@@ -138,6 +141,7 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
   }
 
   void _showDetailDialog(String nickname, String bbcode) {
+    final cs = Theme.of(context).colorScheme;
     final time = widget.quotedPost!['postTime']?.toString() ?? '';
 
     showDialog(
@@ -169,7 +173,7 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     time,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ),
               PostHtmlWidget(
