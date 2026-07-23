@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../config/site_config.dart';
+import '../../core/site_store.dart';
 import '../../core/clipboard_helper.dart';
 import '../../core/cookie_sync.dart';
 import '../../core/url_router.dart';
@@ -47,7 +48,7 @@ class _BrowserPageState extends State<BrowserPage> {
     _urlInterceptEnabled = widget.enableUrlIntercept;
     _currentUrl = widget.initialUrl.isNotEmpty
         ? widget.initialUrl
-        : SiteConfig.baseUrl;
+        : SiteStore.instance.baseUrl;
   }
 
   @override
@@ -75,7 +76,7 @@ class _BrowserPageState extends State<BrowserPage> {
       // 再设置当前账号的 Cookie
       await syncCookieStringToWebView(
         auth.currentCookieString,
-        SiteConfig.baseUrl,
+        SiteStore.instance.baseUrl,
       );
     } catch (_) {
       // Cookie 同步失败不应阻塞页面加载
@@ -328,9 +329,7 @@ class _BrowserPageState extends State<BrowserPage> {
                     setState(() => _desktopMode = !_desktopMode);
                     _controller?.setSettings(
                       settings: InAppWebViewSettings(
-                        userAgent: _desktopMode
-                            ? SiteConfig.uaPc
-                            : SiteConfig.uaAndroid,
+                        userAgent: _desktopMode ? Site.uaPc : Site.uaAndroid,
                       ),
                     );
                     _controller?.reload();
@@ -404,7 +403,7 @@ class _BrowserPageState extends State<BrowserPage> {
     return InAppWebView(
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,
-        userAgent: SiteConfig.uaAndroid,
+        userAgent: Site.uaAndroid,
         supportZoom: true,
       ),
       initialUrlRequest: URLRequest(url: WebUri(_currentUrl)),
@@ -424,7 +423,7 @@ class _BrowserPageState extends State<BrowserPage> {
         if (uri == null) return NavigationActionPolicy.ALLOW;
 
         // 如果要加载的域名不是 baseUrl，立即放行
-        final baseHost = Uri.tryParse(SiteConfig.baseUrl)?.host;
+        final baseHost = Uri.tryParse(SiteStore.instance.baseUrl)?.host;
         if (baseHost != null && uri.host != baseHost) {
           return NavigationActionPolicy.ALLOW;
         }

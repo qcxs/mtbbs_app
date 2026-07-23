@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/home/smiley/export.dart' as smiley_api;
 import 'package:mtbbs/core/smilie_map.dart';
@@ -22,7 +22,7 @@ class EmojiService {
   /// 按站点 host 隔离的表情数据
   final Map<String, _SiteEmojiData> _siteData = {};
 
-  String get _host => SiteConfig.current.host;
+  String get _host => SiteStore.instance.host;
   _SiteEmojiData get _current =>
       _siteData.putIfAbsent(_host, () => _SiteEmojiData());
 
@@ -125,7 +125,7 @@ class EmojiService {
       if (json == null || json.isEmpty) return false;
       final data = jsonDecode(json) as Map<String, dynamic>;
       // CDN 配置变更时丢弃旧缓存
-      if (data['cdnUrl']?.toString() != SiteConfig.cdnUrl) return false;
+      if (data['cdnUrl']?.toString() != SiteStore.instance.cdnUrl) return false;
       _current.map = Map<String, String>.from(data['map'] as Map? ?? {});
       _current.smilieIdMap = Map<String, String>.from(
         data['smilieIdMap'] as Map? ?? {},
@@ -149,12 +149,26 @@ class EmojiService {
       await prefs.setString(
         _cacheKey,
         jsonEncode({
-          'cdnUrl': SiteConfig.cdnUrl,
+          'cdnUrl': SiteStore.instance.cdnUrl,
           'map': _current.map,
           'smilieIdMap': _current.smilieIdMap,
           'groups': _current.groups,
         }),
       );
+    } catch (_) {}
+  }
+
+  // ==================== 清空缓存 ====================
+
+  /// 清空当前站点的表情元数据缓存（SharedPreferences + 内存）
+  /// 下次调用 [load] 时会重新从 API 获取。
+  Future<void> clearCache() async {
+    _current.reset();
+    SmilieMap.update({});
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+      await prefs.remove('emoji_usage_$_host');
     } catch (_) {}
   }
 

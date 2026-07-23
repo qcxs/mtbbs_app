@@ -143,15 +143,8 @@ class PostAstWidget extends StatelessWidget {
   // ==================== 黄底容器 ====================
 
   Widget _buildYellowContainer(BuildContext context, AstNode node) {
-    final label =
-        {'quote': '引用', 'free': '免费信息', 'hide': '隐藏内容'}[node.type] ?? '';
-    final labelColor =
-        {
-          'quote': Colors.orange.shade700,
-          'free': Colors.green.shade700,
-          'hide': Colors.red.shade700,
-        }[node.type] ??
-        Colors.grey;
+    final label = node.type == 'hide' ? '隐藏内容' : '';
+    final labelColor = node.type == 'hide' ? Colors.red.shade700 : Colors.grey;
 
     return SizedBox(
       width: double.infinity,
@@ -797,7 +790,16 @@ class PostAstWidget extends StatelessWidget {
     if (url != null) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 2),
-        child: CachedNetworkImage(imageUrl: url, width: 22, height: 22),
+        child: CachedNetworkImage(
+          imageUrl: url,
+          width: 22,
+          height: 22,
+          errorWidget: (_, __, ___) => Icon(
+            Icons.emoji_emotions_outlined,
+            size: 18,
+            color: Colors.grey.shade400,
+          ),
+        ),
       );
     }
     return Text('[$name]', style: TextStyle(fontSize: fontSize));
@@ -1053,7 +1055,22 @@ class PostAstWidget extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: src,
                   width: maxImageWidth * 0.2,
-                  errorWidget: (_, __, ___) => Text('[图片]', style: style),
+                  placeholder: (_, __) => const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Center(
+                      child: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Icon(
+                    Icons.broken_image_outlined,
+                    size: 20,
+                    color: Colors.grey.shade400,
+                  ),
                 ),
               ),
             );
@@ -1072,6 +1089,11 @@ class PostAstWidget extends StatelessWidget {
                 imageUrl: imgUrl,
                 width: 22,
                 height: 22,
+                errorWidget: (_, __, ___) => Icon(
+                  Icons.emoji_emotions_outlined,
+                  size: 18,
+                  color: Colors.grey.shade400,
+                ),
               ),
             );
           }

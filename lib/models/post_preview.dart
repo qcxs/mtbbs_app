@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/stagger_queue.dart';
 
 /// 帖子预览数据
 class PostPreviewData {
@@ -86,6 +87,13 @@ class PostPreviewCache {
     }
     await _persist();
   }
+
+  /// 清空所有帖子预览缓存
+  Future<void> clear() async {
+    _cache.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+  }
 }
 
 /// 帖子预览管理器（单例）
@@ -118,6 +126,9 @@ class PostPreviewManager {
     _pending.add(key);
 
     try {
+      // 错峰等待放行后再发起 HTTP 请求
+      await enqueueStagger().ready;
+
       final result = await viewpid_api.getPostByPid(
         ApiService().dio,
         tid: tid,
@@ -142,6 +153,9 @@ class PostPreviewManager {
       _pending.remove(key);
     }
   }
+
+  /// 清空所有帖子预览缓存
+  Future<void> clear() => _cache.clear();
 }
 
 /// 从 viewUrl 中提取 tid/ptid 和 pid

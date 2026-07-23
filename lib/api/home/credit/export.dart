@@ -7,5 +7,5 @@ import 'parse.dart' as parse;
 
 Future<Map<String, dynamic>> fetch(Dio dio) async {
   final resp = await http.getCreditFormula(dio);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

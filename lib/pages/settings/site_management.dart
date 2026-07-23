@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../config/site_config.dart';
+import '../../../core/site_store.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
+import '../../../core/app_orchestrator.dart';
 
 /// 站点管理 — 切换、添加、删除站点
 class SiteManagement {
@@ -33,8 +35,8 @@ class SiteManagement {
             width: double.maxFinite,
             child: ListView(
               shrinkWrap: true,
-              children: List.generate(SiteConfig.sites.length, (i) {
-                final site = SiteConfig.sites[i];
+              children: List.generate(SiteStore.instance.sites.length, (i) {
+                final site = SiteStore.instance.sites[i];
                 final subtitle = StringBuffer(site.baseUrl);
                 if (site.cdn != null && site.cdn!.isNotEmpty) {
                   subtitle.write('\nCDN: ${site.cdn}');
@@ -49,13 +51,13 @@ class SiteManagement {
                   groupValue: current,
                   onChanged: (v) async {
                     if (v == null) return;
-                    context.read<AuthProvider>().saveCurrentSiteState();
-                    await settings.switchSite(v);
-                    SiteConfig.switchTo(v);
-                    await settings.reloadSiteConfig();
+                    final orchestrator = AppOrchestrator(
+                      settings: settings,
+                      auth: context.read<AuthProvider>(),
+                    );
+                    await orchestrator.switchSite(v);
                     if (ctx.mounted) Navigator.of(ctx).pop();
                     if (context.mounted) {
-                      await context.read<AuthProvider>().onSiteChanged();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('已切换到 ${site.name}'),
@@ -150,7 +152,7 @@ class SiteManagement {
     SettingsProvider settings,
     int index,
   ) {
-    final site = SiteConfig.sites[index];
+    final site = SiteStore.instance.sites[index];
     final nameCtl = TextEditingController(text: site.name);
     final urlCtl = TextEditingController(text: site.baseUrl);
     final cdnCtl = TextEditingController(text: site.cdn ?? '');

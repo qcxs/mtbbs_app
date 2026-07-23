@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:mtbbs/config/site_config.dart';
 
 /// 导读 HTTP 请求 — 基于 Dio
 ///
@@ -10,5 +11,8 @@ Future<Response<String>> getThreadList(
   String view = 'newthread',
   int page = 1,
 }) {
-  return dio.get<String>('/forum.php?mod=guide&index=1&view=$view&page=$page&mobile=2');
+  return dio.get<String>(
+    '/forum.php?mod=guide&index=1&view=$view&page=$page&mobile=2',
+    options: Options(headers: {'User-Agent': Site.uaAndroid}),
+  );
 }

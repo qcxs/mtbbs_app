@@ -1,12 +1,12 @@
+import 'dart:io';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:mtbbs/core/logger.dart';
 
+// ==================== 文件服务（忽略服务器 Cache-Control） ====================
+
 /// 忽略服务器 [Cache-Control] 头的文件服务响应。
-///
-/// flutter_cache_manager 默认会使用服务器的 `max-age` 计算缓存过期时间，
-/// 但 CDN 通常返回极短的 max-age 导致缓存频繁失效。
-/// 本实现强制使用自定义 [stalePeriod] 计算 [validTill]。
 class IgnoreCacheResponse implements FileServiceResponse {
   final http.Response response;
   final Duration stalePeriod;
@@ -40,9 +40,6 @@ class IgnoreCacheResponse implements FileServiceResponse {
 }
 
 /// 忽略服务器 [Cache-Control] 头的文件服务。
-///
-/// 使用 [http] 包（非 Dio）直接下载，避免论坛 Dio 实例的拦截器、
-/// Cookie 和请求头干扰 CDN 请求。
 class IgnoreCacheFileService extends FileService {
   final Duration stalePeriod;
   IgnoreCacheFileService({required this.stalePeriod});
@@ -61,24 +58,75 @@ class IgnoreCacheFileService extends FileService {
   }
 }
 
-/// 表情图片缓存管理器。
-/// 表情几乎不会变化，使用 30 天有效期。
-final emojiCacheManager = CacheManager(
+// ==================== 管理器工厂 ====================
+
+CacheManager? _emojiCacheManager;
+CacheManager? _avatarCacheManager;
+
+Duration _stalePeriod(int days) =>
+    days > 0 ? Duration(days: days) : const Duration(days: 36500);
+
+CacheManager _createEmoji(int days) => CacheManager(
   Config(
     'emoji_cache',
-    stalePeriod: Duration(days: 30),
+    stalePeriod: _stalePeriod(days),
     maxNrOfCacheObjects: 1500,
-    fileService: IgnoreCacheFileService(stalePeriod: Duration(days: 30)),
+    fileService: IgnoreCacheFileService(stalePeriod: _stalePeriod(days)),
   ),
 );
 
-/// 头像缓存管理器。
-/// 头像变更不频繁，使用 7 天有效期。
-final avatarCacheManager = CacheManager(
+CacheManager _createAvatar(int days) => CacheManager(
   Config(
     'avatar_cache',
-    stalePeriod: Duration(days: 7),
+    stalePeriod: _stalePeriod(days),
     maxNrOfCacheObjects: 500,
-    fileService: IgnoreCacheFileService(stalePeriod: Duration(days: 7)),
+    fileService: IgnoreCacheFileService(stalePeriod: _stalePeriod(days)),
   ),
 );
+
+/// 应用启动时调用，用用户的配置初始化缓存管理器。
+void initCacheManagers({required int emojiDays, required int avatarDays}) {
+  _emojiCacheManager?.dispose();
+  _avatarCacheManager?.dispose();
+  _emojiCacheManager = _createEmoji(emojiDays);
+  _avatarCacheManager = _createAvatar(avatarDays);
+}
+
+/// 表情图片缓存管理器
+CacheManager get emojiCacheManager => _emojiCacheManager ??= _createEmoji(30);
+
+/// 头像图片缓存管理器
+CacheManager get avatarCacheManager => _avatarCacheManager ??= _createAvatar(7);
+
+// ==================== 缓存统计与清空 ====================
+
+/// 获取指定缓存 key 对应目录的磁盘占用（字节）和文件数。
+///
+/// [cacheKey] 是创建 CacheManager 时传入的 Config key（如 'emoji_cache'）。
+Future<({int bytes, int files})> getCacheInfo(String cacheKey) async {
+  final baseDir = await getTemporaryDirectory();
+  final cacheDir = Directory('${baseDir.path}/$cacheKey');
+  if (!cacheDir.existsSync()) return (bytes: 0, files: 0);
+  int bytes = 0, files = 0;
+  await for (final entity in cacheDir.list(recursive: true)) {
+    if (entity is File) {
+      bytes += await entity.length();
+      files++;
+    }
+  }
+  return (bytes: bytes, files: files);
+}
+
+/// 清空指定缓存 key 对应目录的所有文件。
+///
+/// 直接删除磁盘目录，比 [CacheManager.emptyCache] 更可靠。
+Future<void> clearCacheByKey(String cacheKey) async {
+  final baseDir = await getTemporaryDirectory();
+  final cacheDir = Directory('${baseDir.path}/$cacheKey');
+  if (cacheDir.existsSync()) {
+    await cacheDir.delete(recursive: true);
+  }
+}
+
+/// 清空指定缓存管理器的所有缓存文件。
+Future<void> clearCache(CacheManager manager) => manager.emptyCache();

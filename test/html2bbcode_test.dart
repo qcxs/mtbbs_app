@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 import 'package:mtbbs/core/html2bbcode.dart';
 
 void main() {
   setUpAll(() {
-    SiteConfig.init();
+    SiteStore.instance.init();
   });
 
   group('Html2BBCode - 表格转换', () {

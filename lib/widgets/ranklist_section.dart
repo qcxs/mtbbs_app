@@ -16,8 +16,8 @@ class RanklistSection extends StatefulWidget {
 
 class _RanklistSectionState extends State<RanklistSection>
     with AutomaticKeepAliveClientMixin {
-  static const _views = ['replies', 'views', 'heats'];
-  static const _labels = ['回复排行', '查看排行', '热度排行'];
+  static const _views = ['heats', 'replies', 'views'];
+  static const _labels = ['热度排行', '回复排行', '查看排行'];
 
   int _tabIndex = 0;
   static final Map<int, List<Map<String, dynamic>>> _items = {};

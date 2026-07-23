@@ -20,7 +20,7 @@ Future<Response<String>> getUserProfile(
   final path = _buildPath(uid, username);
   return dio.get<String>(
     path,
-    options: Options(headers: {'User-Agent': SiteConfig.uaPc}),
+    options: Options(headers: {'User-Agent': Site.uaPc}),
   );
 }
 

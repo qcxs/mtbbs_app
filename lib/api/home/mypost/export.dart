@@ -13,5 +13,5 @@ Future<Map<String, dynamic>> getMypostList(
   String type = 'post',
 }) async {
   final resp = await http.getMypostList(dio, page: page, type: type);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

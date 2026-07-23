@@ -7,6 +7,7 @@ import '../core/shortcut_helper.dart';
 import '../api/home/credit/export.dart' as credit_api;
 import '../services/api_service.dart';
 import '../models/managed_item.dart';
+import '../core/site_store.dart';
 
 /// 设置管理
 class SettingsProvider extends ChangeNotifier {
@@ -26,6 +27,15 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 自动识别并链接 URL
   bool _autoDetectUrls = true;
+
+  /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
+  int _staggerInterval = 40;
+
+  /// 头像缓存天数（-1 表示永不过期）
+  int _avatarCacheDays = 7;
+
+  /// 表情缓存天数（-1 表示永不过期）
+  int _emojiCacheDays = -1;
 
   /// 用户自定义站点列表（持久化）
   List<Site> _sites = [];
@@ -100,6 +110,15 @@ class SettingsProvider extends ChangeNotifier {
   /// 自动识别纯文本 URL
   bool get autoDetectUrls => _autoDetectUrls;
 
+  /// 通用错峰间隔（毫秒）
+  int get staggerInterval => _staggerInterval;
+
+  /// 头像缓存天数（-1 = 永不过期）
+  int get avatarCacheDays => _avatarCacheDays;
+
+  /// 表情缓存天数（-1 = 永不过期）
+  int get emojiCacheDays => _emojiCacheDays;
+
   /// 主题模式
   ThemeMode get themeMode => _themeMode;
 
@@ -127,6 +146,30 @@ class SettingsProvider extends ChangeNotifier {
     _autoDetectUrls = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('autoDetectUrls', enabled);
+    notifyListeners();
+  }
+
+  /// 设置通用错峰间隔（毫秒）
+  Future<void> setStaggerInterval(int ms) async {
+    _staggerInterval = ms.clamp(20, 300);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('staggerInterval', _staggerInterval);
+    notifyListeners();
+  }
+
+  /// 设置头像缓存天数（-1 = 永不过期）
+  Future<void> setAvatarCacheDays(int days) async {
+    _avatarCacheDays = days.clamp(-1, 365);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('avatarCacheDays', _avatarCacheDays);
+    notifyListeners();
+  }
+
+  /// 设置表情缓存天数（-1 = 永不过期）
+  Future<void> setEmojiCacheDays(int days) async {
+    _emojiCacheDays = days.clamp(-1, 365);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('emojiCacheDays', _emojiCacheDays);
     notifyListeners();
   }
 
@@ -163,7 +206,7 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 当前站点的快捷链接
   List<ManagedItem> get shortcutLinks =>
-      List.unmodifiable(_shortcutLinks[SiteConfig.current.host] ?? []);
+      List.unmodifiable(_shortcutLinks[SiteStore.instance.host] ?? []);
 
   /// 工具栏项配置
   List<ManagedItem> get toolbarItems => List.unmodifiable(_toolbarItems);
@@ -212,7 +255,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setCreditFormula(String formula) async {
     _creditFormula = formula;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('creditFormula_${SiteConfig.current.host}', formula);
+    await prefs.setString('creditFormula_${SiteStore.instance.host}', formula);
     notifyListeners();
   }
 
@@ -221,7 +264,7 @@ class SettingsProvider extends ChangeNotifier {
     _fontSize = prefs.getDouble('fontSize') ?? 16;
     // 按站点加载积分公式
     _creditFormula =
-        prefs.getString('creditFormula_${SiteConfig.current.host}') ??
+        prefs.getString('creditFormula_${SiteStore.instance.host}') ??
         defaultFormula;
     _currentSiteIndex = prefs.getInt('currentSiteIndex') ?? 0;
     _defaultTabIndex = (prefs.getInt('defaultTabIndex') ?? 0).clamp(0, 3);
@@ -240,10 +283,10 @@ class SettingsProvider extends ChangeNotifier {
     }
     // 确保索引不越界（可能上次有更多站点）
     _currentSiteIndex = _currentSiteIndex.clamp(0, _sites.length - 1);
-    // 同步到 SiteConfig
-    SiteConfig.sites = _sites;
+    // 同步到站点
+    SiteStore.instance.replaceSites(_sites);
     _currentSiteIndex = _currentSiteIndex.clamp(0, _sites.length - 1);
-    SiteConfig.switchTo(_currentSiteIndex);
+    SiteStore.instance.switchTo(_currentSiteIndex);
 
     final saved = prefs.getString('tabOrder');
     if (saved != null && saved.isNotEmpty) {
@@ -274,6 +317,13 @@ class SettingsProvider extends ChangeNotifier {
 
     // 恢复自动识别 URL
     _autoDetectUrls = prefs.getBool('autoDetectUrls') ?? true;
+
+    // 恢复通用错峰间隔
+    _staggerInterval = prefs.getInt('staggerInterval') ?? 40;
+
+    // 恢复缓存配置
+    _avatarCacheDays = prefs.getInt('avatarCacheDays') ?? 7;
+    _emojiCacheDays = prefs.getInt('emojiCacheDays') ?? -1;
 
     // 恢复快捷链接（每个域名独立存储）
     for (final site in _sites) {
@@ -420,13 +470,13 @@ class SettingsProvider extends ChangeNotifier {
     _currentSiteIndex = index;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('currentSiteIndex', index);
-    // 在 SiteConfig 切换后调用 reloadSiteConfig 加载 per-site 配置
+    // 站点切换后调用 reloadSiteConfig 加载 per-site 配置
     notifyListeners();
   }
 
-  /// 在 SiteConfig 切换后调用，加载当前站点的所有独立配置
+  /// 站点切换后调用，加载当前站点的所有独立配置
   Future<void> reloadSiteConfig() async {
-    _creditFormula = await _loadFormulaForHost(SiteConfig.current.host);
+    _creditFormula = await _loadFormulaForHost(SiteStore.instance.host);
     notifyListeners();
   }
 
@@ -439,12 +489,12 @@ class SettingsProvider extends ChangeNotifier {
   // ==================== 快捷链接 CRUD ====================
 
   List<ManagedItem> _linksForCurrent() =>
-      _shortcutLinks.putIfAbsent(SiteConfig.current.host, () => []);
+      _shortcutLinks.putIfAbsent(SiteStore.instance.host, () => []);
 
   Future<void> _persistLinks() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      'shortcutLinks_${SiteConfig.current.host}',
+      'shortcutLinks_${SiteStore.instance.host}',
       ManagedItem.encodeList(_linksForCurrent()),
     );
     notifyListeners();
@@ -470,8 +520,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> moveShortcutLink(int from, int to) async {
     final list = _linksForCurrent();
     final item = list.removeAt(from);
-    final idx = to > from ? to - 1 : to;
-    list.insert(idx.clamp(0, list.length), item);
+    list.insert(to.clamp(0, list.length), item);
     await _persistLinks();
   }
 
@@ -579,7 +628,10 @@ class SettingsProvider extends ChangeNotifier {
     if (index < 0 || index >= _sites.length) return;
     _sites[index] = site;
     if (index == _currentSiteIndex) {
-      SiteConfig.current = site;
+      final idx = SiteStore.instance.sites.indexWhere(
+        (s) => s.host == site.host,
+      );
+      if (idx >= 0) SiteStore.instance.switchTo(idx);
     }
     await _persistSites();
     notifyListeners();
@@ -593,8 +645,8 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 获取当前站点的论坛列表
   List<MapEntry<String, String>> get forumEntries {
-    final f = SiteConfig.forums;
-    return SiteConfig.defaultForumOrder
+    final f = SiteStore.instance.forums;
+    return SiteStore.instance.defaultForumOrder
         .where((fid) => f.containsKey(fid))
         .map((fid) => MapEntry(fid, f[fid]!))
         .toList();
@@ -677,17 +729,16 @@ class SettingsProvider extends ChangeNotifier {
     final idx = _currentSiteIndex;
     if (idx < 0 || idx >= _sites.length) return;
     final old = _sites[idx];
-    // 只保留 newForums 中存在的 fid，不存在的从列表中移除
     final newOrder = old.defaultForumOrder
         .where((fid) => newForums.containsKey(fid))
         .toList();
-    // 补充新 fid 到末尾
     for (final fid in newForums.keys) {
       if (!newOrder.contains(fid)) newOrder.add(fid);
     }
     _sites[idx] = Site(
       name: old.name,
       baseUrl: old.baseUrl,
+      cdn: old.cdn,
       loginPagePath: old.loginPagePath,
       forums: Map.from(newForums),
       defaultForumOrder: newOrder,
@@ -696,9 +747,9 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> _persistSites() async {
-    // 同步到 SiteConfig
-    SiteConfig.sites = _sites;
-    SiteConfig.switchTo(_currentSiteIndex.clamp(0, _sites.length - 1));
+    // 同步到站点
+    SiteStore.instance.replaceSites(_sites);
+    SiteStore.instance.switchTo(_currentSiteIndex.clamp(0, _sites.length - 1));
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -715,7 +766,7 @@ class SettingsProvider extends ChangeNotifier {
         _creditFormula = result['formula'] as String;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(
-          'creditFormula_${SiteConfig.current.host}',
+          'creditFormula_${SiteStore.instance.host}',
           _creditFormula,
         );
         notifyListeners();

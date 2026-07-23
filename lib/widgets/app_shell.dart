@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../config/site_config.dart';
 import '../config/nav_config.dart';
+import '../core/site_store.dart';
 import '../auth/providers/auth_provider.dart';
 import '../widgets/user_avatar.dart';
 import '../pages/settings/user_management_dialog.dart';
@@ -118,7 +118,7 @@ class _AppShellState extends State<AppShell> {
             ),
             tooltip: '发帖',
             onPressed: () {
-              final forums = SiteConfig.forums;
+              final forums = SiteStore.instance.forums;
               if (forums.isEmpty) {
                 ScaffoldMessenger.of(
                   context,
@@ -137,7 +137,7 @@ class _AppShellState extends State<AppShell> {
                     width: double.maxFinite,
                     child: ListView(
                       shrinkWrap: true,
-                      children: SiteConfig.defaultForumOrder
+                      children: SiteStore.instance.defaultForumOrder
                           .where((fid) => forums.containsKey(fid))
                           .map(
                             (fid) => ListTile(
@@ -265,7 +265,7 @@ class _AppShellState extends State<AppShell> {
           icon: Icon(Icons.edit_outlined, size: 20, color: cs.onSurfaceVariant),
           tooltip: '发帖',
           onPressed: () {
-            final forums = SiteConfig.forums;
+            final forums = SiteStore.instance.forums;
             if (forums.isEmpty) {
               ScaffoldMessenger.of(
                 context,
@@ -284,7 +284,7 @@ class _AppShellState extends State<AppShell> {
                   width: double.maxFinite,
                   child: ListView(
                     shrinkWrap: true,
-                    children: SiteConfig.defaultForumOrder
+                    children: SiteStore.instance.defaultForumOrder
                         .where((fid) => forums.containsKey(fid))
                         .map(
                           (fid) => ListTile(

@@ -1,4 +1,4 @@
-import '../config/site_config.dart';
+import '../core/site_store.dart';
 
 /// URL 路由解析结果
 class UrlRouteResult {
@@ -59,10 +59,10 @@ class UrlRouter {
     String? otherSiteName;
 
     if (host != null) {
-      final currentHost = Uri.tryParse(SiteConfig.baseUrl)?.host;
+      final currentHost = Uri.tryParse(SiteStore.instance.baseUrl)?.host;
       if (currentHost != null && host != currentHost) {
         // 查找匹配的站点名称
-        for (final site in SiteConfig.sites) {
+        for (final site in SiteStore.instance.sites) {
           final siteHost = Uri.tryParse(site.baseUrl)?.host;
           if (siteHost == host) {
             otherSiteHost = host;

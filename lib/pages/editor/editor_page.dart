@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 
 import 'package:mtbbs/core/emoji_loader.dart';
 import 'package:mtbbs/core/page_fetcher.dart';
@@ -25,6 +25,8 @@ import 'package:mtbbs/widgets/bbcode_toolbar.dart';
 import 'package:mtbbs/widgets/history_picker.dart';
 import 'package:mtbbs/widgets/emoji_picker_sheet.dart';
 import 'package:mtbbs/widgets/image_picker_sheet.dart';
+import 'package:mtbbs/widgets/attachment_picker_sheet.dart';
+import 'package:mtbbs/widgets/toast_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:mtbbs/widgets/page_error_widget.dart';
 import 'package:mtbbs/widgets/quoted_post_card.dart';
@@ -67,6 +69,13 @@ class _ImageSheetData {
   const _ImageSheetData(this.images, this.loading);
 }
 
+/// 附件管理面板的响应式数据
+class _AttachmentSheetData {
+  final List<Map<String, dynamic>> attachments;
+  final bool loading;
+  const _AttachmentSheetData(this.attachments, this.loading);
+}
+
 /// 预览数据（防抖后更新）
 class _PreviewData {
   final String title;
@@ -99,6 +108,9 @@ class _EditorPageState extends State<EditorPage> {
   /// AID → 图片URL 映射（用于预览时替换 [attachimg]）
   Map<String, String> _aidToSrc = {};
 
+  /// AID → 附件信息映射（用于预览时替换 [attach]）
+  Map<String, Map<String, String>> _aidToAttachment = {};
+
   /// 图片列表（编辑器生命周期内持久，供图片管理面板使用）
   List<Map<String, dynamic>> _imageList = [];
   final Set<String> _ignoredAids = <String>{};
@@ -108,6 +120,14 @@ class _EditorPageState extends State<EditorPage> {
   final ValueNotifier<_ImageSheetData> _imageSheetDataNotifier = ValueNotifier(
     const _ImageSheetData([], false),
   );
+
+  /// 附件列表（编辑器生命周期内持久，供附件管理面板使用）
+  List<Map<String, dynamic>> _attachmentList = [];
+  bool _loadingAttachments = false;
+
+  /// 响应式数据（附件管理面板）
+  final ValueNotifier<_AttachmentSheetData> _attachmentSheetDataNotifier =
+      ValueNotifier(const _AttachmentSheetData([], false));
 
   late final BBCodeToolbarController _toolbarCtl;
   final MtImageHosting _mtImageHosting = MtImageHosting();
@@ -140,7 +160,7 @@ class _EditorPageState extends State<EditorPage> {
     switch (widget.type) {
       case EditorType.post:
         final name =
-            SiteConfig.current.forums[widget.fid] ?? '版块 ${widget.fid}';
+            SiteStore.instance.forums[widget.fid] ?? '版块 ${widget.fid}';
         return '发帖 - $name';
       case EditorType.editPost:
         return '编辑帖子';
@@ -210,6 +230,23 @@ class _EditorPageState extends State<EditorPage> {
     );
     if (!mounted) return;
 
+    AppLogger.i(
+      'EDITOR',
+      jsonEncode({
+        'type': 'page_loaded',
+        'success': result.success,
+        'formhash': result.formhash.isNotEmpty,
+        'titleLen': result.title.length,
+        'contentLen': result.content.length,
+        'images': result.images.length,
+        'boundAttachments': result.boundAttachments.length,
+        'uploadHash': result.uploadHash.isNotEmpty,
+        'fid': result.fid,
+        'tid': result.tid,
+        'pid': result.pid,
+      }),
+    );
+
     if (!result.success) {
       setState(() {
         _loadingPage = false;
@@ -237,6 +274,15 @@ class _EditorPageState extends State<EditorPage> {
           'type': 'existing',
         };
       }).toList();
+      // 同步填充已绑定附件映射
+      _aidToAttachment = {
+        for (final att in result.boundAttachments)
+          att['aid'] as String: {
+            'name': att['filename'] ?? '',
+            'size': att['size'] ?? '',
+            'url': 'forum.php?mod=attachment&aid=${att['aid'] ?? ''}',
+          },
+      };
       if (_isEdit && !preserveContent) {
         if (result.title.isNotEmpty) _titleCtl.text = result.title;
         if (result.content.isNotEmpty) _contentCtl.text = result.content;
@@ -262,8 +308,9 @@ class _EditorPageState extends State<EditorPage> {
       });
     }
 
-    // 异步加载已上传但未绑定的图片
+    // 异步加载已上传但未绑定的图片和附件
     _refreshImageList();
+    _refreshAttachmentList();
   }
 
   Future<void> _doFetchQuotedPost() async {
@@ -410,7 +457,10 @@ class _EditorPageState extends State<EditorPage> {
       final fid = _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid;
       final tid = _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid;
 
-      AppLogger.i('IMAGE', '刷新图片列表 fid=$fid tid=$tid');
+      AppLogger.i(
+        'EDITOR',
+        jsonEncode({'action': 'refreshImageList', 'fid': fid, 'tid': tid}),
+      );
       setState(() => _loadingImages = true);
       _syncImagesNotifier();
       final images = await upload_api.fetchUnusedImages(
@@ -419,6 +469,7 @@ class _EditorPageState extends State<EditorPage> {
         tid: tid.isNotEmpty ? tid : null,
       );
       if (!mounted) return;
+      int newCount = 0;
       setState(() {
         for (final img in images) {
           final aid = img['aid']?.toString() ?? '';
@@ -432,6 +483,7 @@ class _EditorPageState extends State<EditorPage> {
               'title': img['title']?.toString() ?? '',
               'type': 'uploaded',
             });
+            newCount++;
           }
           // 同时更新 _aidToSrc（供预览用）
           if (!_aidToSrc.containsKey(aid)) {
@@ -441,7 +493,16 @@ class _EditorPageState extends State<EditorPage> {
         _loadingImages = false;
       });
       _syncImagesNotifier();
+      AppLogger.i(
+        'EDITOR',
+        jsonEncode({
+          'action': 'refreshImageList_done',
+          'total': _imageList.length,
+          'new': newCount,
+        }),
+      );
     } catch (_) {
+      AppLogger.w('EDITOR', 'refreshImageList failed');
       if (mounted) {
         setState(() => _loadingImages = false);
         _syncImagesNotifier();
@@ -455,8 +516,10 @@ class _EditorPageState extends State<EditorPage> {
     if (!auth.isLoggedIn) return;
     if (_pageData.uploadHash.isEmpty) return;
 
+    final imgExts = _pageData.imageExtensions;
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+      type: imgExts.isNotEmpty ? FileType.custom : FileType.image,
+      allowedExtensions: imgExts.isNotEmpty ? imgExts : null,
       allowMultiple: true,
       withData: false,
       withReadStream: false,
@@ -467,7 +530,10 @@ class _EditorPageState extends State<EditorPage> {
     int failCount = 0;
     for (final f in result.files) {
       final filePath = f.path;
-      if (filePath == null) continue;
+      if (filePath == null) {
+        failCount++;
+        continue;
+      }
 
       final file = File(filePath);
       try {
@@ -497,27 +563,28 @@ class _EditorPageState extends State<EditorPage> {
         } else {
           failCount++;
         }
-      } finally {
-        if (file.existsSync()) {
-          file.deleteSync();
-        }
-      }
+      } finally {}
     }
     _syncImagesNotifier();
 
+    AppLogger.i(
+      'EDITOR',
+      jsonEncode({
+        'action': 'handleImageUpload',
+        'success': successCount,
+        'fail': failCount,
+        'totalFiles': result.files.length,
+        'imageListSize': _imageList.length,
+      }),
+    );
+
     if (!mounted) return;
     if (successCount > 0 && failCount == 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('上传成功 $successCount 张图片')));
+      showToast(context, '上传成功 $successCount 张图片');
     } else if (successCount > 0 && failCount > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('上传完成：成功 $successCount 张，失败 $failCount 张')),
-      );
+      showToast(context, '上传完成：成功 $successCount 张，失败 $failCount 张');
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('上传失败')));
+      showToast(context, '上传失败');
     }
   }
 
@@ -537,13 +604,17 @@ class _EditorPageState extends State<EditorPage> {
         _aidToSrc.remove(aid);
       });
       _syncImagesNotifier();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已删除')));
+      AppLogger.i(
+        'EDITOR',
+        jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': true}),
+      );
+      showToast(context, '已删除');
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('删除失败')));
+      AppLogger.w(
+        'EDITOR',
+        jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': false}),
+      );
+      showToast(context, '删除失败');
     }
   }
 
@@ -572,9 +643,10 @@ class _EditorPageState extends State<EditorPage> {
       ..addAll(_activeAids);
   }
 
-  /// 预览前处理：将 [attachimg] 替换为 [img]
+  /// 预览前处理：将 [attachimg] 替换为 [img]，将 [attach] 替换为卡片
   String _preparePreviewBbcode(String bbcode) {
-    return bbcode.replaceAllMapped(
+    // 处理图片附件 [attachimg]
+    bbcode = bbcode.replaceAllMapped(
       RegExp(r'\[attachimg\](\d+)\[/attachimg\]'),
       (m) {
         final aid = m.group(1) ?? '';
@@ -590,6 +662,221 @@ class _EditorPageState extends State<EditorPage> {
         return m.group(0)!;
       },
     );
+    // 处理文件附件 [attach]
+    bbcode = bbcode.replaceAllMapped(RegExp(r'\[attach\](\d+)\[/attach\]'), (
+      m,
+    ) {
+      final aid = m.group(1) ?? '';
+      final att = _aidToAttachment[aid];
+      if (att != null) {
+        final data = jsonEncode({
+          'type': 'attach',
+          'name': att['name'],
+          'size': att['size'],
+          'url': att['url'],
+        });
+        return '[appdata]$data[/appdata]';
+      }
+      return m.group(0)!;
+    });
+    return bbcode;
+  }
+
+  // ==================== 附件管理 ====================
+
+  /// 同步附件数据到 notifier
+  void _syncAttachmentsNotifier() {
+    _attachmentSheetDataNotifier.value = _AttachmentSheetData(
+      List.from(_attachmentList),
+      _loadingAttachments,
+    );
+  }
+
+  /// 从附件条目构建预览信息
+  Map<String, String> _buildAttachInfo(Map<String, dynamic> att) {
+    final aid = att['aid'] as String? ?? '';
+    final title = att['title'] as String? ?? '';
+    final sizeMatch = RegExp(r'文件大小:\s*([^ ]+)').firstMatch(title);
+    return {
+      'name': att['filename'] as String? ?? '附件 #$aid',
+      'size': sizeMatch?.group(1) ?? '',
+      'url': 'forum.php?mod=attachment&aid=$aid',
+    };
+  }
+
+  /// 刷新附件列表
+  Future<void> _refreshAttachmentList() async {
+    try {
+      final fid = _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid;
+      final tid = _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid;
+
+      AppLogger.i(
+        'EDITOR',
+        jsonEncode({'action': 'refreshAttachmentList', 'fid': fid, 'tid': tid}),
+      );
+      setState(() => _loadingAttachments = true);
+      _syncAttachmentsNotifier();
+      final attachments = await upload_api.fetchUnusedAttachments(
+        ApiService().dio,
+        fid: fid,
+        tid: tid.isNotEmpty ? tid : null,
+      );
+      if (!mounted) return;
+      int mergeCount = 0;
+      setState(() {
+        // 合并已绑定附件 + 未使用附件
+        final merged = <Map<String, dynamic>>[];
+        // 先添加已绑定的（从 _aidToAttachment 重建条目）
+        for (final entry in _aidToAttachment.entries) {
+          merged.add({
+            'aid': entry.key,
+            'filename': entry.value['name'] ?? '',
+            'title': '',
+            'isimage': '0',
+            'icon': '',
+            'bound': true,
+          });
+        }
+        // 再添加未使用的（去重）
+        for (final att in attachments) {
+          final aid = att['aid'] as String? ?? '';
+          if (aid.isNotEmpty && !merged.any((m) => m['aid'] == aid)) {
+            merged.add(att);
+          }
+          // 补充 _aidToAttachment 映射
+          if (aid.isNotEmpty && !_aidToAttachment.containsKey(aid)) {
+            _aidToAttachment[aid] = _buildAttachInfo(att);
+            mergeCount++;
+          }
+        }
+        _attachmentList = merged;
+        _loadingAttachments = false;
+      });
+      _syncAttachmentsNotifier();
+      AppLogger.i(
+        'EDITOR',
+        jsonEncode({
+          'action': 'refreshAttachmentList_done',
+          'count': _attachmentList.length,
+          'merged': mergeCount,
+          'boundTotal': _aidToAttachment.length,
+        }),
+      );
+    } catch (_) {
+      AppLogger.w('EDITOR', 'refreshAttachmentList failed');
+      if (mounted) {
+        setState(() => _loadingAttachments = false);
+        _syncAttachmentsNotifier();
+      }
+    }
+  }
+
+  /// 处理附件上传
+  Future<void> _handleAttachmentUpload() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) return;
+    if (_pageData.uploadHash.isEmpty) return;
+
+    final attExts = _pageData.attachmentExtensions;
+    final result = await FilePicker.platform.pickFiles(
+      type: attExts.isNotEmpty ? FileType.custom : FileType.any,
+      allowedExtensions: attExts.isNotEmpty ? attExts : null,
+      allowMultiple: true,
+      withData: false,
+      withReadStream: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    int successCount = 0;
+    int failCount = 0;
+    for (final f in result.files) {
+      final filePath = f.path;
+      if (filePath == null) {
+        failCount++;
+        continue;
+      }
+
+      final file = File(filePath);
+      try {
+        final uploadResult = await upload_api.uploadAttachment(
+          ApiService().dio,
+          file: file,
+          uid: auth.uid,
+          uploadHash: _pageData.uploadHash,
+          fid: _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid,
+        );
+        if (!mounted) return;
+        if (uploadResult['success'] == true) {
+          final aid = uploadResult['aid']?.toString() ?? '';
+          if (aid.isNotEmpty) {
+            final name = uploadResult['filename']?.toString() ?? '';
+            _aidToAttachment[aid] = {
+              'name': name,
+              'size': '',
+              'url': 'forum.php?mod=attachment&aid=$aid',
+            };
+          }
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } finally {}
+    }
+    _syncAttachmentsNotifier();
+
+    AppLogger.i(
+      'EDITOR',
+      jsonEncode({
+        'action': 'handleAttachmentUpload',
+        'success': successCount,
+        'fail': failCount,
+        'totalFiles': result.files.length,
+        'boundTotal': _aidToAttachment.length,
+      }),
+    );
+
+    if (!mounted) return;
+    if (successCount > 0 && failCount == 0) {
+      showToast(context, '上传成功 $successCount 个附件');
+    } else if (successCount > 0 && failCount > 0) {
+      showToast(context, '上传完成：成功 $successCount 个，失败 $failCount 个');
+    } else {
+      showToast(context, '上传失败');
+    }
+  }
+
+  /// 删除附件
+  Future<void> _handleAttachmentDelete(String aid) async {
+    final ok = await upload_api.deleteUnusedImage(
+      ApiService().dio,
+      formhash: _pageData.formhash,
+      tid: _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid,
+      pid: _pageData.pid.isNotEmpty ? _pageData.pid : widget.pid,
+      aid: aid,
+    );
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        _attachmentList.removeWhere((i) => i['aid'] == aid);
+        _aidToAttachment.remove(aid);
+      });
+      _syncAttachmentsNotifier();
+      AppLogger.i(
+        'EDITOR',
+        jsonEncode({'action': 'deleteAttachment', 'aid': aid, 'success': true}),
+      );
+      showToast(context, '已删除');
+    } else {
+      AppLogger.w(
+        'EDITOR',
+        jsonEncode({
+          'action': 'deleteAttachment',
+          'aid': aid,
+          'success': false,
+        }),
+      );
+      showToast(context, '删除失败');
+    }
   }
 
   // ==================== 工具栏操作 ====================
@@ -710,6 +997,8 @@ class _EditorPageState extends State<EditorPage> {
         }
       case ToolbarAction.image:
         _showImagePickerSheet();
+      case ToolbarAction.attach:
+        _showAttachmentPickerSheet();
       case ToolbarAction.imageLongPress:
         showTextInputDialog(
           context,
@@ -998,7 +1287,7 @@ class _EditorPageState extends State<EditorPage> {
     showModalBottomSheet(
       context: context,
       constraints: const BoxConstraints(maxWidth: 500, maxHeight: 450),
-      builder: (ctx) => ValueListenableBuilder<_ImageSheetData>(
+      builder: (_) => ValueListenableBuilder<_ImageSheetData>(
         valueListenable: _imageSheetDataNotifier,
         builder: (_, data, __) => ImagePickerSheet(
           images: data.images,
@@ -1014,12 +1303,51 @@ class _EditorPageState extends State<EditorPage> {
             _contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
             _syncPendingAids();
           },
+          allowedExtensions: _pageData.imageExtensions.isNotEmpty
+              ? _pageData.imageExtensions
+              : null,
         ),
       ),
-    ).then((_) {
-      _syncPendingAids();
-      if (mounted) _refreshImageList();
-    });
+    );
+  }
+
+  void _showAttachmentPickerSheet() {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先登录')));
+      return;
+    }
+    if (_pageData.uploadHash.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('页面数据未加载，无法上传')));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      constraints: const BoxConstraints(maxWidth: 500, maxHeight: 450),
+      builder: (ctx) => ValueListenableBuilder<_AttachmentSheetData>(
+        valueListenable: _attachmentSheetDataNotifier,
+        builder: (_, data, __) => AttachmentPickerSheet(
+          attachments: data.attachments,
+          loading: data.loading,
+          contentText: _contentCtl.text,
+          controller: _contentCtl,
+          onUpload: _handleAttachmentUpload,
+          onDelete: _handleAttachmentDelete,
+          onRefresh: _refreshAttachmentList,
+          onInsert: (aid) {
+            _contentCtl.wrapInline('', '', '[attach]$aid[/attach]');
+          },
+          allowedExtensions: _pageData.attachmentExtensions.isNotEmpty
+              ? _pageData.attachmentExtensions
+              : null,
+        ),
+      ),
+    );
   }
 
   // ==================== 提交 ====================
@@ -1063,11 +1391,33 @@ class _EditorPageState extends State<EditorPage> {
     }
 
     setState(() => _isSubmitting = true);
+
+    AppLogger.i(
+      'EDITOR',
+      jsonEncode({
+        'action': 'submit',
+        'type': widget.type.name,
+        'titleLen': title.length,
+        'contentLen': content.length,
+        'formhash': _pageData.formhash.isNotEmpty,
+        'posttime': _pageData.posttime.isNotEmpty,
+      }),
+    );
+
     try {
       final result = await _submitHelper.submit(_pageData, title, content);
       if (!mounted) return;
       if (result.success) {
         final msg = result.needsApproval ? '需要审核' : '操作成功';
+        AppLogger.i(
+          'EDITOR',
+          jsonEncode({
+            'action': 'submit_done',
+            'success': true,
+            'needsApproval': result.needsApproval,
+            'type': widget.type.name,
+          }),
+        );
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(msg)));
@@ -1077,6 +1427,14 @@ class _EditorPageState extends State<EditorPage> {
         Navigator.of(context).pop({'success': true, 'result': result});
       } else {
         setState(() => _isSubmitting = false);
+        AppLogger.w(
+          'EDITOR',
+          jsonEncode({
+            'action': 'submit_done',
+            'success': false,
+            'error': result.message,
+          }),
+        );
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('操作失败: ${result.message}')));
@@ -1084,6 +1442,10 @@ class _EditorPageState extends State<EditorPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
+        AppLogger.e(
+          'EDITOR',
+          jsonEncode({'action': 'submit_error', 'error': e.toString()}),
+        );
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('网络错误: $e')));

@@ -37,10 +37,16 @@ List<({bool isTable, String content})> splitByTable(String bbcode) {
   for (final match in regex.allMatches(bbcode)) {
     // 表格前的普通 BBCode
     if (match.start > lastEnd) {
-      segments.add((isTable: false, content: bbcode.substring(lastEnd, match.start)));
+      segments.add((
+        isTable: false,
+        content: bbcode.substring(lastEnd, match.start),
+      ));
     }
     // 表格 BBCode（含 [table] 标签本身）
-    segments.add((isTable: true, content: bbcode.substring(match.start, match.end)));
+    segments.add((
+      isTable: true,
+      content: bbcode.substring(match.start, match.end),
+    ));
     lastEnd = match.end;
   }
   // 剩余普通 BBCode
@@ -89,17 +95,14 @@ class BbcodeTableWidget extends StatelessWidget {
     if (data.rows.isEmpty) return const SizedBox.shrink();
 
     // 计算最大列数
-    final maxCols = data.rows.map((r) => r.length).reduce(
-      (a, b) => a > b ? a : b,
-    );
+    final maxCols = data.rows
+        .map((r) => r.length)
+        .reduce((a, b) => a > b ? a : b);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Table(
-        border: TableBorder.all(
-          color: const Color(0xFFD0D7DE),
-          width: 1,
-        ),
+        border: TableBorder.all(color: const Color(0xFFD0D7DE), width: 1),
         defaultColumnWidth: const IntrinsicColumnWidth(),
         defaultVerticalAlignment: TableCellVerticalAlignment.top,
         children: data.rows.map((row) {
@@ -111,6 +114,7 @@ class BbcodeTableWidget extends StatelessWidget {
                   : '';
               return Container(
                 padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(maxWidth: 350),
                 child: cellHtml.isNotEmpty
                     ? Html(
                         data: cellHtml,

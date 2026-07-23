@@ -11,5 +11,5 @@ Future<Map<String, dynamic>> getThreadList(
   int page = 1,
 }) async {
   final resp = await http.getThreadList(dio, view: view, page: page);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

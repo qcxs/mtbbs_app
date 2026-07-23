@@ -4,6 +4,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import '../../config/site_config.dart';
+import '../../core/site_store.dart';
 import '../../api/misc/userstatus/export.dart' as userstatus_api;
 import '../../core/cookie_sync.dart';
 import '../providers/auth_provider.dart';
@@ -31,7 +32,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
   final _passwordController = TextEditingController();
 
   WebUri get _loginUrl => WebUri(
-    '${SiteConfig.current.baseUrl}/member.php?mod=logging&action=login&mobile=2',
+    '${SiteStore.instance.baseUrl}/member.php?mod=logging&action=login&mobile=2',
   );
 
   @override
@@ -58,7 +59,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
     if (_loginDone || url == null) return;
 
     final cookies = await CookieManager.instance().getCookies(
-      url: WebUri(SiteConfig.baseUrl),
+      url: WebUri(SiteStore.instance.baseUrl),
     );
 
     // Discuz 登录成功后会写入 {tablepre}_auth cookie
@@ -88,8 +89,8 @@ class _WebLoginPageState extends State<WebLoginPage> {
       // 用临时 Dio 调用 userstatus API 验证登录
       final tempDio = Dio(
         BaseOptions(
-          baseUrl: SiteConfig.baseUrl,
-          headers: {'User-Agent': SiteConfig.uaAndroid, 'Cookie': allCookies},
+          baseUrl: SiteStore.instance.baseUrl,
+          headers: {'User-Agent': Site.uaAndroid, 'Cookie': allCookies},
         ),
       );
       final result = await userstatus_api.fetch(tempDio);
@@ -333,11 +334,11 @@ class _WebLoginPageState extends State<WebLoginPage> {
 
     // 3. 清除旧 Cookie → 注入新 Cookie（与内置浏览器相同模式）
     await CookieManager.instance().deleteAllCookies();
-    await syncCookieStringToWebView(cookieStr, SiteConfig.baseUrl);
+    await syncCookieStringToWebView(cookieStr, SiteStore.instance.baseUrl);
 
     // 4. 跳转到站点首页，原 _checkLoginOnLoadStop 会自动检测 _auth 并完成登录
     _controller?.loadUrl(
-      urlRequest: URLRequest(url: WebUri(SiteConfig.baseUrl)),
+      urlRequest: URLRequest(url: WebUri(SiteStore.instance.baseUrl)),
     );
   }
 
@@ -452,7 +453,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
     return InAppWebView(
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,
-        userAgent: SiteConfig.uaAndroid,
+        userAgent: Site.uaAndroid,
         // 禁用下拉刷新等干扰
         supportZoom: false,
       ),
@@ -477,7 +478,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
         debugPrint('[WebLogin] error: $error');
         if (!mounted) return;
         final errorHost = Uri.tryParse(request.url.toString())?.host;
-        if (errorHost == Uri.parse(SiteConfig.baseUrl).host) {
+        if (errorHost == Uri.parse(SiteStore.instance.baseUrl).host) {
           setState(() {
             _hasError = true;
             _errorMessage = error.description;

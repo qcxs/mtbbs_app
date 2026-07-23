@@ -7,25 +7,43 @@ import 'providers/settings_provider.dart';
 import 'providers/history_provider.dart';
 import 'providers/search_history_provider.dart';
 import 'providers/editor_history_provider.dart';
-import 'config/site_config.dart';
 import 'config/nav_config.dart';
 import 'config/router.dart';
 import 'core/emoji_loader.dart';
+import 'core/site_store.dart';
+import 'core/event_bus.dart';
 import 'api/forum/misc/export.dart' as forum_misc;
 import 'api/home/credit/export.dart' as credit_api;
 import 'models/post_preview.dart';
+import 'core/stagger_queue.dart';
+import 'core/cache_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 初始化站点配置默认值
-  SiteConfig.init();
+  SiteStore.instance.init();
 
   final settings = SettingsProvider();
   await settings.load(); // 加载持久化站点列表覆盖默认值
 
+  // 同步通用错峰间隔到全局队列
+  setStaggerInterval(Duration(milliseconds: settings.staggerInterval));
+
+  // 用用户配置初始化缓存管理器
+  initCacheManagers(
+    emojiDays: settings.emojiCacheDays,
+    avatarDays: settings.avatarCacheDays,
+  );
+
   // 用 settings 中的站点配置初始化 ApiService
-  await ApiService().init(baseUrl: SiteConfig.baseUrl);
+  await ApiService().init(baseUrl: SiteStore.instance.baseUrl);
+
+  // 订阅站点切换事件 — ApiService 已就绪，可安全调用 switchSite
+  EventBus.stream.where((e) => e is SiteChangedEvent).listen((_) {
+    ApiService().switchSite();
+    EmojiService().load();
+  });
 
   final auth = AuthProvider();
   await auth.tryRestore();
@@ -80,7 +98,7 @@ Future<void> _runSettingsGuard(SettingsProvider settings) async {
           refresh: () => EmojiService().load(),
         ),
         (
-          needsRefresh: () => SiteConfig.forums.isEmpty,
+          needsRefresh: () => SiteStore.instance.forums.isEmpty,
           refresh: () async {
             final result = await forum_misc.fetchForumNav(dio);
             if (result['success'] == true) {
@@ -136,6 +154,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: SiteStore.instance),
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: history),

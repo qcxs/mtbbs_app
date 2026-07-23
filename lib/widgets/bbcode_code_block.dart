@@ -119,6 +119,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
   ];
 
   String _language = '';
+  bool _wordWrap = true;
 
   @override
   void initState() {
@@ -235,20 +236,34 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
               bottomLeft: Radius.circular(6),
               bottomRight: Radius.circular(6),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: HighlightView(
-                widget.code,
-                language: _renderLanguage,
-                theme: monokaiSublimeTheme,
-                padding: const EdgeInsets.all(12),
-                textStyle: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: widget.fontSize,
-                  height: 1.5,
-                ),
-              ),
-            ),
+            child: _wordWrap
+                ? SingleChildScrollView(
+                    child: HighlightView(
+                      widget.code,
+                      language: _renderLanguage,
+                      theme: monokaiSublimeTheme,
+                      padding: const EdgeInsets.all(12),
+                      textStyle: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: widget.fontSize,
+                        height: 1.5,
+                      ),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: HighlightView(
+                      widget.code,
+                      language: _renderLanguage,
+                      theme: monokaiSublimeTheme,
+                      padding: const EdgeInsets.all(12),
+                      textStyle: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: widget.fontSize,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -256,7 +271,8 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
   }
 
   Widget _buildTopBar() {
-    final cs = Theme.of(context).colorScheme;
+    // 代码块背景始终是深色，顶栏文字使用固定亮色（不跟随主题）
+    const barTextColor = Color(0xFFB0B0B0);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -279,19 +295,34 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
                 children: [
                   Text(
                     _languageLabel,
-                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 11, color: barTextColor),
                   ),
                   const SizedBox(width: 3),
-                  Icon(
-                    Icons.arrow_drop_down,
-                    size: 12,
-                    color: cs.onSurfaceVariant,
-                  ),
+                  Icon(Icons.arrow_drop_down, size: 12, color: barTextColor),
                 ],
               ),
             ),
           ),
           const Spacer(),
+          // 自动换行切换
+          GestureDetector(
+            onTap: () => setState(() => _wordWrap = !_wordWrap),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _wordWrap
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Icon(
+                Icons.wrap_text,
+                size: 14,
+                color: _wordWrap ? Colors.white : const Color(0xFF888888),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
           // 复制按钮
           GestureDetector(
             onTap: () {
@@ -312,15 +343,11 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.copy_rounded,
-                    size: 12,
-                    color: cs.onSurfaceVariant,
-                  ),
+                  Icon(Icons.copy_rounded, size: 12, color: barTextColor),
                   const SizedBox(width: 4),
                   Text(
                     '复制',
-                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 11, color: barTextColor),
                   ),
                 ],
               ),

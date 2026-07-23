@@ -15,7 +15,7 @@ Future<Response<String>> getRanklist(
     '/misc.php?mod=ranklist&type=thread&view=$view&orderby=$orderby&inajax=1',
     options: Options(
       headers: {
-        'User-Agent': SiteConfig.uaPc,
+        'User-Agent': Site.uaPc,
         'X-Requested-With': 'XMLHttpRequest',
       },
     ),

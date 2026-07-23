@@ -5,5 +5,5 @@ import 'parse.dart' as parse;
 
 Future<Map<String, dynamic>> getPostByPid(Dio dio, {required String tid, required String viewpid}) async {
   final resp = await http.getPostByPid(dio, tid: tid, viewpid: viewpid);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

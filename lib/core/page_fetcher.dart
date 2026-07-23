@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
+import 'package:mtbbs/core/logger.dart';
 import 'page_helper.dart';
 
 /// 从编辑页/发帖页/回复页提取的会话数据
@@ -23,8 +25,17 @@ class PageFormData {
   /// 编辑模式下已绑定的图片
   final List<Map<String, String>> images;
 
+  /// 编辑模式下已绑定的附件（仅 PC 版，从 a[id^=attachname] 提取）
+  final List<Map<String, String>> boundAttachments;
+
   /// 图片上传所需的 hash（从页面 JavaScript 中提取）
   final String uploadHash;
+
+  /// 论坛允许的图片扩展名列表（如 ['jpg','jpeg','gif','png']）
+  final List<String> imageExtensions;
+
+  /// 论坛允许的附件扩展名列表（如图片+文档等）
+  final List<String> attachmentExtensions;
 
   /// 请求对应的 URL
   final String fetchedUrl;
@@ -47,7 +58,10 @@ class PageFormData {
     this.title = '',
     this.content = '',
     this.images = const [],
+    this.boundAttachments = const [],
     this.uploadHash = '',
+    this.imageExtensions = const [],
+    this.attachmentExtensions = const [],
     this.fetchedUrl = '',
     this.success = false,
     this.loginRequired = false,
@@ -74,15 +88,15 @@ class PageFetcher {
   }) {
     switch (type) {
       case 'post':
-        return '/forum.php?mod=post&action=newthread&fid=$fid&mobile=2';
+        return '/forum.php?mod=post&action=newthread&fid=$fid';
       case 'comment':
-        return '/forum.php?mod=post&action=reply&fid=2&tid=$tid&mobile=2';
+        return '/forum.php?mod=post&action=reply&fid=2&tid=$tid';
       case 'reply':
         final q = repquote != null ? '&repquote=$repquote' : '';
-        return '/forum.php?mod=post&action=reply&fid=2&tid=$tid$q&mobile=2';
+        return '/forum.php?mod=post&action=reply&fid=2&tid=$tid$q';
       case 'editPost':
       case 'editReply':
-        return '/forum.php?mod=post&action=edit&fid=$fid&tid=$tid&pid=$pid&page=1&mobile=2';
+        return '/forum.php?mod=post&action=edit&fid=$fid&tid=$tid&pid=$pid&page=1';
       default:
         return '';
     }
@@ -114,45 +128,93 @@ class PageFetcher {
 
     // 编辑模式：提取标题
     final titleInput = doc.querySelector(
-      'input#needsubject, input[id="needsubject"]',
+      'input#subject, input[name="subject"]',
     );
     final title = titleInput?.attributes['value']?.trim() ?? '';
 
     // 编辑模式：提取内容
     String content = '';
     final textarea = doc.querySelector(
-      'textarea#needmessage, textarea[id="needmessage"]',
+      'textarea#e_textarea, textarea[id="e_textarea"]',
     );
-    if (textarea != null) {
-      content = textarea.text.trim();
-    } else {
-      final textarea2 = doc.querySelector(
-        'textarea#e_textarea, textarea[id="e_textarea"]',
-      );
-      if (textarea2 != null) content = textarea2.text.trim();
-    }
+    if (textarea != null) content = textarea.text.trim();
 
-    // 编辑模式：提取已绑定的图片
+    // 编辑模式：提取已绑定的图片和附件
+    // PC 版格式：
+    //   图片：<a id="imageattach{aid}"><img id="image_{aid}" src="forum.php?mod=image&aid={aid}...">
+    //   附件：<a id="attachname{aid}" title="filename 文件大小: ...">filename</a>
     final images = <Map<String, String>>[];
-    final imgList = doc.querySelector('ul#imglist');
-    if (imgList != null) {
-      for (final li in imgList.querySelectorAll('li')) {
-        final span = li.querySelector('span[aid]');
-        final img = li.querySelector('img');
-        final aid = span?.attributes['aid'] ?? '';
-        final src = img?.attributes['src'] ?? '';
-        if (aid.isNotEmpty && src.isNotEmpty) {
-          images.add({'aid': aid, 'src': src, 'type': 'existing'});
-        }
+    final boundAttachments = <Map<String, String>>[];
+
+    for (final a in doc.querySelectorAll('a[id^="imageattach"]')) {
+      final aId = a.attributes['id'] ?? '';
+      final aid = aId.replaceFirst('imageattach', '');
+      if (aid.isEmpty || !RegExp(r'^\d+$').hasMatch(aid)) continue;
+      final img = a.querySelector('img');
+      final src = img?.attributes['src'] ?? '';
+      if (src.isNotEmpty) {
+        images.add({'aid': aid, 'src': src, 'type': 'existing'});
       }
     }
 
-    // 从页面 JavaScript 中提取图片上传所需的 hash
-    // 格式: uploadformdata:{uid:"...", hash:"32位hex"}
-    final hashMatch = RegExp(
-      r'''uploadformdata[^}]*?hash:"([a-f0-9]+)"''',
+    for (final a in doc.querySelectorAll('a[id^="attachname"]')) {
+      final aId = a.attributes['id'] ?? '';
+      final aid = aId.replaceFirst('attachname', '');
+      if (aid.isEmpty || !RegExp(r'^\d+$').hasMatch(aid)) continue;
+      final title = a.attributes['title'] ?? '';
+      final sizeMatch = RegExp(r'文件大小:\s*([^ ]+)').firstMatch(title);
+      boundAttachments.add({
+        'aid': aid,
+        'filename': a.text.trim(),
+        'title': title,
+        'size': sizeMatch?.group(1) ?? '',
+      });
+    }
+
+    // 从页面表单中提取图片/附件上传所需的 hash
+    final hashInput = doc.querySelector(
+      'form#imgattachform input[name="hash"], '
+      'form#attachform input[name="hash"]',
+    );
+    final uploadHash = hashInput?.attributes['value'] ?? '';
+
+    // 从页面 JavaScript 中提取允许的文件扩展名
+    List<String> parseExtList(String raw) => raw
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final extMatch = RegExp(
+      r"""var\s+extensions\s*=\s*'([^']+)'""",
     ).firstMatch(html);
-    final uploadHash = hashMatch?.group(1) ?? '';
+    final imgExtMatch = RegExp(
+      r"""var\s+imgexts\s*=\s*'([^']+)'""",
+    ).firstMatch(html);
+    final attachmentExtensions = extMatch != null
+        ? parseExtList(extMatch.group(1)!)
+        : <String>[];
+    final imageExtensions = imgExtMatch != null
+        ? parseExtList(imgExtMatch.group(1)!)
+        : <String>[];
+
+    AppLogger.i(
+      'PAGE',
+      jsonEncode({
+        'type': 'editor_page',
+        'url': url,
+        'formhash': formhash.isNotEmpty,
+        'fid': fid,
+        'tid': tid,
+        'pid': pid,
+        'titleLen': title.length,
+        'contentLen': content.length,
+        'images': images.length,
+        'boundAttachments': boundAttachments.length,
+        'uploadHash': uploadHash.isNotEmpty,
+        'imageExts': imageExtensions.join(','),
+        'attachExts': attachmentExtensions.join(','),
+      }),
+    );
 
     return PageFormData(
       formhash: formhash,
@@ -167,7 +229,10 @@ class PageFetcher {
       title: title,
       content: content,
       images: images,
+      boundAttachments: boundAttachments,
       uploadHash: uploadHash,
+      imageExtensions: imageExtensions,
+      attachmentExtensions: attachmentExtensions,
       fetchedUrl: url,
       success: formhash.isNotEmpty,
     );

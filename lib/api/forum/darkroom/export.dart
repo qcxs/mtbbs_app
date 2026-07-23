@@ -7,5 +7,5 @@ import 'parse.dart' as parse;
 
 Future<Map<String, dynamic>> getList(Dio dio, {String cid = ''}) async {
   final resp = await http.getList(dio, cid: cid);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

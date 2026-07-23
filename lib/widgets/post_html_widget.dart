@@ -7,8 +7,8 @@ import 'package:flutter_html/flutter_html.dart';
 import '../core/bbcode2html.dart';
 import '../core/emoji_loader.dart';
 import '../core/url_router.dart';
-import '../config/site_config.dart';
 import '../providers/settings_provider.dart';
+import '../core/site_store.dart';
 import 'bbcode_table.dart';
 import 'bbcode_code_block.dart';
 import 'image_preview/image_preview.dart';
@@ -163,7 +163,7 @@ class PostHtmlWidget extends StatelessWidget {
       emojiMap: emojiMap,
       smilieIdMap: smilieIdMap,
       disabledTags: disabledTags,
-      baseUrl: SiteConfig.baseUrl,
+      baseUrl: SiteStore.instance.baseUrl,
       autoDetectUrls: autoDetectUrls,
     );
     final html = converter.convert(bbcodeContent);
@@ -175,6 +175,7 @@ class PostHtmlWidget extends StatelessWidget {
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
         ),
+        'a': Style(textDecoration: TextDecoration.none),
         'blockquote': Style(
           backgroundColor: const Color(0xFFFFF8E1),
           margin: Margins.zero,
@@ -199,6 +200,19 @@ class PostHtmlWidget extends StatelessWidget {
           backgroundColor: const Color(0xFFE3F2FD),
           margin: Margins.zero,
           padding: HtmlPaddings.all(8),
+        ),
+        '.bbcode-locked': Style(
+          backgroundColor: const Color(0xFFFFF3E0),
+          margin: Margins.zero,
+          padding: HtmlPaddings.all(10),
+          fontSize: FontSize(14),
+        ),
+        '.bbcode-pstatus': Style(
+          backgroundColor: const Color(0xFFF5F5F5),
+          color: const Color(0xFF999999),
+          margin: Margins.zero,
+          padding: HtmlPaddings.symmetric(vertical: 4, horizontal: 8),
+          fontSize: FontSize(12),
         ),
         'ul': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
         'ol': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
@@ -247,7 +261,24 @@ class PostHtmlWidget extends StatelessWidget {
                 width: width,
                 height: height,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                loadingBuilder: (_, child, progress) => progress != null
+                    ? SizedBox(
+                        width: width,
+                        height: height ?? 100,
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    : child,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.broken_image_outlined,
+                  size: 48,
+                  color: Colors.grey.shade400,
+                ),
               ),
             );
           },
@@ -382,7 +413,9 @@ class PostHtmlWidget extends StatelessWidget {
         if (routeResult.appPath != null) {
           context.push(routeResult.appPath!);
         } else {
-          context.push('/browser?url=${Uri.encodeComponent(url)}&intercept=false');
+          context.push(
+            '/browser?url=${Uri.encodeComponent(url)}&intercept=false',
+          );
         }
       case '__external__':
         await launchUrl(uri, mode: LaunchMode.externalApplication);

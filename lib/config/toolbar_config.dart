@@ -39,6 +39,7 @@ enum ToolbarAction {
   history,
   clearStyles,
   mtImage,
+  attach,
 }
 
 /// 工具栏项的默认配置
@@ -96,6 +97,12 @@ const allToolbarItemConfigs = [
     action: ToolbarAction.mtImage,
     id: 'mtImage',
     name: 'MT图床',
+    defaultVisible: true,
+  ),
+  ToolbarItemConfig(
+    action: ToolbarAction.attach,
+    id: 'attach',
+    name: '附件',
     defaultVisible: true,
   ),
 

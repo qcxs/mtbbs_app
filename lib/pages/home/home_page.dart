@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../config/site_config.dart';
 import '../../core/url_router.dart';
+import '../../core/site_store.dart';
 import '../../models/managed_item.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/ranklist_section.dart';
@@ -47,11 +47,12 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final siteStore = context.watch<SiteStore>();
     final links = settings.shortcutLinks.where((e) => e.visible).toList();
     final refreshKey = ValueKey('refresh_$_refreshCounter');
 
     return RefreshIndicator(
-      key: ValueKey('home_${SiteConfig.baseUrl}'),
+      key: ValueKey('home_${siteStore.baseUrl}'),
       onRefresh: _refreshAll,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -251,9 +252,9 @@ class _ForumList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final forums = SiteConfig.defaultForumOrder
-        .where((fid) => SiteConfig.forums.containsKey(fid))
-        .map((fid) => MapEntry(fid, SiteConfig.forums[fid]!))
+    final forums = SiteStore.instance.defaultForumOrder
+        .where((fid) => SiteStore.instance.forums.containsKey(fid))
+        .map((fid) => MapEntry(fid, SiteStore.instance.forums[fid]!))
         .toList();
     if (forums.isEmpty) return const SizedBox.shrink();
     return Wrap(

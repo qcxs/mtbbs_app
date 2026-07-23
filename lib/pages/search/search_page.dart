@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../config/site_config.dart';
+import '../../core/site_store.dart';
 import '../../core/url_router.dart';
 import '../../core/username_validator.dart';
 import '../../providers/search_history_provider.dart';
@@ -81,7 +81,7 @@ class _SearchPageState extends State<SearchPage> {
 
     final fullUrl = input.contains('://')
         ? input
-        : '${SiteConfig.baseUrl}/$input';
+        : '${SiteStore.instance.baseUrl}/$input';
     final result = UrlRouter.parse(fullUrl);
 
     if (result.isOtherSite) {
@@ -106,7 +106,7 @@ class _SearchPageState extends State<SearchPage> {
 
     final fullUrl = input.contains('://')
         ? input
-        : '${SiteConfig.baseUrl}/$input';
+        : '${SiteStore.instance.baseUrl}/$input';
     context.push(
       '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
     );
@@ -115,7 +115,7 @@ class _SearchPageState extends State<SearchPage> {
   Future<void> _performBingSearch(String query) async {
     await _addHistory(query);
     if (!mounted) return;
-    final domain = Uri.tryParse(SiteConfig.baseUrl)?.host ?? '';
+    final domain = Uri.tryParse(SiteStore.instance.baseUrl)?.host ?? '';
     final url =
         'https://www.bing.com/search?q=${Uri.encodeComponent('$query site:$domain')}';
     context.push('/browser?url=${Uri.encodeComponent(url)}');
@@ -125,7 +125,7 @@ class _SearchPageState extends State<SearchPage> {
     await _addHistory(query);
     if (!mounted) return;
     final url =
-        '${SiteConfig.baseUrl}/search.php?mod=forum&srchtxt=${Uri.encodeComponent(query)}&searchsubmit=yes';
+        '${SiteStore.instance.baseUrl}/search.php?mod=forum&srchtxt=${Uri.encodeComponent(query)}&searchsubmit=yes';
     context.push('/browser?url=${Uri.encodeComponent(url)}');
   }
 
@@ -302,7 +302,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Widget _buildSuggestions(String text) {
     final cs = Theme.of(context).colorScheme;
-    final domain = Uri.tryParse(SiteConfig.baseUrl)?.host ?? '';
+    final domain = Uri.tryParse(SiteStore.instance.baseUrl)?.host ?? '';
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),

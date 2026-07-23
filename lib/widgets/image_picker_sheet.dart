@@ -19,6 +19,7 @@ class ImagePickerSheet extends StatefulWidget {
   final void Function(String aid) onIgnore;
   final VoidCallback onRefresh;
   final void Function(String aid) onInsert;
+  final List<String>? allowedExtensions;
 
   const ImagePickerSheet({
     super.key,
@@ -32,6 +33,7 @@ class ImagePickerSheet extends StatefulWidget {
     required this.onIgnore,
     required this.onRefresh,
     required this.onInsert,
+    this.allowedExtensions,
   });
 
   @override
@@ -115,10 +117,28 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
           child: Row(
             children: [
               const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  '图片管理',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '图片管理',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (widget.allowedExtensions != null &&
+                        widget.allowedExtensions!.isNotEmpty)
+                      Text(
+                        '支持 ${widget.allowedExtensions!.join(', ')}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               IconButton(

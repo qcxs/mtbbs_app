@@ -8,5 +8,5 @@ import 'parse.dart' as parse;
 /// 获取私人消息列表
 Future<Map<String, dynamic>> getPmList(Dio dio, {int page = 1}) async {
   final resp = await http.getPmList(dio, page: page);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

@@ -1,4 +1,4 @@
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 
 /// 解析 common_smilies_var.js → 结构化表情数据
 ///
@@ -36,7 +36,7 @@ Map<String, dynamic> parseResponse(String body, {String? baseUrl}) {
   }
 
   // baseUrl 未传入时从 SiteConfig 获取（Flutter 环境）
-  final imgBase = baseUrl ?? SiteConfig.baseUrl;
+  final imgBase = baseUrl ?? SiteStore.instance.baseUrl;
 
   // 1. 解析分组信息 smilies_type['_N'] = ['name', 'folder'];
   final typeRegex = RegExp(
@@ -92,7 +92,8 @@ Map<String, dynamic> parseResponse(String body, {String? baseUrl}) {
     final raws = groupEmojis[gid] ?? [];
 
     final emojis = raws.map((e) {
-      final imageUrl = '$imgBase/static/image/smiley/${info.folder}/${e.filename}';
+      final imageUrl =
+          '$imgBase/static/image/smiley/${info.folder}/${e.filename}';
       smilieIdMap[e.smilieId] = e.insertText;
       insertTextMap[e.insertText] = imageUrl;
       return <String, String>{

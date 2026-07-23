@@ -321,6 +321,14 @@ class BBCodeToolbar extends StatelessWidget {
           name: item.name,
           cs: cs,
         );
+      case ToolbarAction.attach:
+        return _toolBtn(
+          icon: Icons.attach_file_outlined,
+          tooltip: tooltip,
+          action: action,
+          name: item.name,
+          cs: cs,
+        );
     }
   }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:mtbbs/core/cache_utils.dart';
 import 'package:mtbbs/core/emoji_loader.dart';
+import 'package:mtbbs/widgets/staggered_emoji_image.dart';
 
 /// 表情管理页 — 查看当前站点的所有表情分组和列表
 class EmojiManagementPage extends StatefulWidget {
@@ -255,28 +254,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
                 padding: const EdgeInsets.all(4),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    cacheManager: emojiCacheManager,
-                    width: 32,
-                    height: 32,
-                    errorWidget: (_, __, ___) => Icon(
-                      Icons.emoji_emotions_outlined,
-                      size: 24,
-                      color: cs.onSurfaceVariant,
-                    ),
-                    placeholder: (_, __) => SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: Center(
-                        child: SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 1.5),
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: StaggeredEmojiImage(imageUrl: imageUrl, size: 32),
                 ),
               ),
               Container(
@@ -299,7 +277,6 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
   }
 
   void _showEmojiDetail(Map<String, dynamic> emoji) {
-    final cs = Theme.of(context).colorScheme;
     final smilieId = emoji['smilieId'] as String;
     final insertText = emoji['insertText'] as String;
     final imageUrl = emoji['imageUrl'] as String;
@@ -332,17 +309,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                cacheManager: emojiCacheManager,
-                width: 64,
-                height: 64,
-                errorWidget: (_, __, ___) => Icon(
-                  Icons.emoji_emotions_outlined,
-                  size: 48,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
+              child: StaggeredEmojiImage(imageUrl: imageUrl, size: 64),
             ),
             const SizedBox(height: 16),
             _infoRow('insertText', insertText),

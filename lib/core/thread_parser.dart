@@ -1,7 +1,7 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
 import '../models/thread_item.dart';
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 import 'package:mtbbs/core/url_util.dart';
 import 'page_helper.dart';
 
@@ -52,7 +52,7 @@ ThreadItem _parseItem(dom.Element li) {
       threadId = _extractThreadId(threadUrl ?? '');
     }
     if (threadUrl != null && !threadUrl.startsWith('http')) {
-      threadUrl = '${SiteConfig.baseUrl}/$threadUrl';
+      threadUrl = '${SiteStore.instance.baseUrl}/$threadUrl';
     }
     // 摘要（独立于标题）
     final summaryEl = li.querySelector('.list_body');
@@ -65,7 +65,7 @@ ThreadItem _parseItem(dom.Element li) {
       threadUrl = bodyLink.attributes['href'];
       threadId = _extractThreadId(threadUrl ?? '');
       if (threadUrl != null && !threadUrl.startsWith('http')) {
-        threadUrl = '${SiteConfig.baseUrl}/$threadUrl';
+        threadUrl = '${SiteStore.instance.baseUrl}/$threadUrl';
       }
     }
   }

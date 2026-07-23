@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:mtbbs/api/forum/forumdisplay/export.dart' as forum_api;
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import '../../controllers/thread_list_controller.dart';
 import '../../widgets/thread_grid.dart';
@@ -26,9 +27,9 @@ class _CommunityPageState extends State<CommunityPage> {
   final Map<String, String> _filterMap = {};
   String _activeKey = '';
 
-  List<TabInfo> get _tabs => SiteConfig.defaultForumOrder
-      .where((fid) => SiteConfig.forums.containsKey(fid))
-      .map((fid) => TabInfo(SiteConfig.forums[fid]!, fid))
+  List<TabInfo> get _tabs => SiteStore.instance.defaultForumOrder
+      .where((fid) => SiteStore.instance.forums.containsKey(fid))
+      .map((fid) => TabInfo(SiteStore.instance.forums[fid]!, fid))
       .toList();
 
   void _ensureCtls() {
@@ -187,13 +188,15 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听 SiteStore 变化（如论坛列表加载完成后重建标签页）
+    context.watch<SiteStore>();
     final cs = Theme.of(context).colorScheme;
     // 带 fid 时使用单版块模式
     if (widget.fid.isNotEmpty) {
       final ctrl = _ctrlMap[widget.fid];
       return Scaffold(
         appBar: AppBar(
-          title: Text(SiteConfig.forums[widget.fid] ?? widget.fid),
+          title: Text(SiteStore.instance.forums[widget.fid] ?? widget.fid),
           surfaceTintColor: cs.surface,
           elevation: 0.5,
           actions: [

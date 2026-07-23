@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:html/parser.dart' as htmlParser;
 import 'package:dio/dio.dart';
 import '../../widgets/page_actions.dart';
-import '../../config/site_config.dart';
+import '../../core/site_store.dart';
 import '../../widgets/rate_dialog.dart';
 import '../../widgets/kick_dialog.dart';
 import '../../widgets/favorite_dialog.dart';
@@ -30,16 +30,19 @@ import 'thread_view_main_post.dart';
 /// - 只有 [tid]：显示帖子标题 + 主帖占位 + 第 1 页评论。
 /// - [tid] + [initialPage]：加载指定页评论。
 /// - [tid] + [pid]：通过 redirect 解析实际 page，自动跳到对应页。
+/// - [authorid]：过滤只显示指定用户的评论。
 class ThreadViewPage extends StatefulWidget {
   final String tid;
   final int initialPage;
   final String? pid;
+  final String? authorid;
 
   const ThreadViewPage({
     super.key,
     required this.tid,
     this.initialPage = 1,
     this.pid,
+    this.authorid,
   });
 
   @override
@@ -130,6 +133,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         ApiService().dio,
         tid: widget.tid,
         page: 1,
+        authorid: widget.authorid,
       );
       if (page1Result['success'] != true) {
         throw Exception(page1Result['message']?.toString() ?? '加载失败');
@@ -142,24 +146,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       _liked = d.mainPost?.isLiked ?? false;
 
       final title = d.title.isNotEmpty ? d.title : '帖子${widget.tid}';
-      context.read<HistoryProvider>().addRecord(
-        BrowseRecord(
-          id: 'thread_${widget.tid}',
-          type: 'thread',
-          title: title,
-          routePath: '/thread/${widget.tid}',
-          timestamp: DateTime.now(),
-          info: {
-            'tid': widget.tid,
-            'title': d.title,
-            'author': d.mainPost?.username ?? '',
-            'authorUid': d.mainPost?.uid ?? '',
-            'time': d.mainPost?.postTime ?? '',
-            'url':
-                '${SiteConfig.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}',
-          },
-        ),
-      );
+      _recordThreadHistory(title);
 
       _commentPages[1] = List<PostItem>.from(d.posts);
       _currentPage = targetPage.clamp(1, _totalPages);
@@ -201,6 +188,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         ApiService().dio,
         tid: widget.tid,
         page: page,
+        authorid: widget.authorid,
       );
       if (raw['success'] != true) {
         throw Exception(raw['message']?.toString() ?? '加载失败');
@@ -237,7 +225,12 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   void _doPreload(int page) {
     _preloading = true;
     detail_api
-        .getThreadDetail(ApiService().dio, tid: widget.tid, page: page)
+        .getThreadDetail(
+          ApiService().dio,
+          tid: widget.tid,
+          page: page,
+          authorid: widget.authorid,
+        )
         .then((raw) {
           if (raw['success'] == true && mounted) {
             final data = ThreadViewData.fromMap(raw, widget.tid);
@@ -257,6 +250,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     setState(() {
       _currentPage = page;
     });
+    _recordThreadHistory(null);
     if (!_commentPages.containsKey(page)) _loadCommentPage(page);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final posts = _commentPages[_currentPage];
@@ -302,6 +296,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         ApiService().dio,
         tid: widget.tid,
         page: 1,
+        authorid: widget.authorid,
       );
       if (raw['success'] == true && mounted) {
         final d = ThreadViewData.fromMap(raw, widget.tid);
@@ -394,6 +389,31 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     }
     final result = await showKickDialog(context, '', post.kickUrl);
     if (result == true && mounted) _loadInitial();
+  }
+
+  /// 记录帖子浏览历史（含当前页码）
+  void _recordThreadHistory(String? title) {
+    if (_data == null) return;
+    final t = title ?? _data!.title;
+    context.read<HistoryProvider>().addRecord(
+      BrowseRecord(
+        id: 'thread_${widget.tid}',
+        type: 'thread',
+        title: t.isNotEmpty ? t : '帖子${widget.tid}',
+        routePath: '/thread/${widget.tid}',
+        timestamp: DateTime.now(),
+        info: {
+          'tid': widget.tid,
+          'title': _data!.title,
+          'author': _data!.mainPost?.username ?? '',
+          'authorUid': _data!.mainPost?.uid ?? '',
+          'time': _data!.mainPost?.postTime ?? '',
+          'page': _currentPage,
+          'url':
+              '${SiteStore.instance.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}',
+        },
+      ),
+    );
   }
 
   void _showBbcodeDialog(PostItem post) {
@@ -532,7 +552,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   // ==================== Build ====================
 
   String get _threadUrl =>
-      '${SiteConfig.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}';
+      '${SiteStore.instance.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}';
 
   @override
   Widget build(BuildContext context) {

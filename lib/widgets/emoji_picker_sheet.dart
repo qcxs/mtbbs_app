@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../core/cache_utils.dart';
+import 'staggered_emoji_image.dart';
 
 /// 表情面板 — 底部弹出，支持分组浏览/锁定连续插入/常用表情
 class EmojiPickerSheet extends StatefulWidget {
@@ -161,17 +160,7 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(2),
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                cacheManager: emojiCacheManager,
-                width: 30,
-                height: 30,
-                errorWidget: (_, __, ___) => Icon(
-                  Icons.emoji_emotions_outlined,
-                  size: 22,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
+              child: StaggeredEmojiImage(imageUrl: imageUrl, size: 30),
             ),
           ),
         );

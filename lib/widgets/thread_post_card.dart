@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../models/thread_detail.dart';
-import '../../config/site_config.dart';
 import '../../core/emoji_loader.dart';
+import '../../core/site_store.dart';
 import '../../providers/settings_provider.dart';
 import 'post_html_widget.dart';
 import 'user_avatar.dart';
@@ -321,7 +321,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           GestureDetector(
             onTap: () {
               final url =
-                  '${SiteConfig.baseUrl}/forum.php?mod=redirect&goto=findpost&ptid=${widget.tid}&pid=${widget.post.pid}';
+                  '${SiteStore.instance.baseUrl}/forum.php?mod=redirect&goto=findpost&ptid=${widget.tid}&pid=${widget.post.pid}';
               Clipboard.setData(ClipboardData(text: url));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

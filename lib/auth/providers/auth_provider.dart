@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import '../../services/api_service.dart';
 import '../../config/site_config.dart';
+import '../../core/site_store.dart';
 import '../../api/misc/userstatus/export.dart' as userstatus_api;
 
 /// 账号模型
@@ -94,7 +95,7 @@ class AuthProvider extends ChangeNotifier {
 
   // ==================== 当前站点快捷访问 ====================
 
-  String get _host => SiteConfig.current.host;
+  String get _host => SiteStore.instance.host;
 
   List<Account> get _currentAccounts =>
       _siteAccounts.putIfAbsent(_host, () => []);
@@ -170,8 +171,8 @@ class AuthProvider extends ChangeNotifier {
     try {
       final tempDio = Dio(
         BaseOptions(
-          baseUrl: SiteConfig.baseUrl,
-          headers: {'User-Agent': SiteConfig.uaAndroid, 'Cookie': cookieStr},
+          baseUrl: SiteStore.instance.baseUrl,
+          headers: {'User-Agent': Site.uaAndroid, 'Cookie': cookieStr},
         ),
       );
       final result = await userstatus_api.fetch(tempDio);
@@ -320,7 +321,10 @@ class AuthProvider extends ChangeNotifier {
     final cm =
         ApiService().dio.interceptors.firstWhere((i) => i is CookieManager)
             as CookieManager;
-    await cm.cookieJar.saveFromResponse(Uri.parse(SiteConfig.baseUrl), cookies);
+    await cm.cookieJar.saveFromResponse(
+      Uri.parse(SiteStore.instance.baseUrl),
+      cookies,
+    );
 
     final idx = uid.isNotEmpty
         ? _currentAccounts.indexWhere((a) => a.uid == uid)
@@ -359,7 +363,7 @@ class AuthProvider extends ChangeNotifier {
           ApiService().dio.interceptors.firstWhere((i) => i is CookieManager)
               as CookieManager;
       await cm.cookieJar.saveFromResponse(
-        Uri.parse(SiteConfig.baseUrl),
+        Uri.parse(SiteStore.instance.baseUrl),
         cookies,
       );
     } catch (e) {
@@ -373,7 +377,7 @@ class AuthProvider extends ChangeNotifier {
       final eq = pair.indexOf('=');
       if (eq <= 0) continue;
       final c = Cookie(pair.substring(0, eq), pair.substring(eq + 1));
-      c.domain = '.${Uri.parse(SiteConfig.baseUrl).host}';
+      c.domain = '.${Uri.parse(SiteStore.instance.baseUrl).host}';
       c.path = '/';
       c.maxAge = 86400 * 30;
       cookies.add(c);
@@ -417,12 +421,12 @@ class AuthProvider extends ChangeNotifier {
 
   // ==================== 站点切换 ====================
 
-  /// 在切换 SiteConfig 之前调用，保存当前站点的账号状态
+  /// 在切换站点之前调用，保存当前站点的账号状态
   void saveCurrentSiteState() {
     _saveState();
   }
 
-  /// 在外部切换 SiteConfig 后调用，恢复新站点的账号上下文
+  /// 在外部切换站点后调用，恢复新站点的账号上下文
   Future<void> onSiteChanged() async {
     // 切换到新站点的 guest jar
     await ApiService().switchSite();

@@ -9,6 +9,7 @@ import '../pages/message/message_page.dart';
 import '../pages/community/community_page.dart';
 import '../pages/user/my_profile_page.dart';
 import '../pages/settings/settings_page.dart';
+import '../pages/settings/cache_settings_page.dart';
 import '../pages/settings/emoji_management.dart';
 import '../pages/settings/editor_settings_page.dart';
 import '../pages/settings/history_format_page.dart';
@@ -62,6 +63,11 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                 const NoTransitionPage(child: SettingsPage()),
           ),
           GoRoute(
+            path: '/settings/cache',
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: CacheSettingsPage()),
+          ),
+          GoRoute(
             path: '/settings/emoji',
             pageBuilder: (_, __) =>
                 const NoTransitionPage(child: EmojiManagementPage()),
@@ -76,6 +82,7 @@ GoRouter buildRouter({String initialLocation = '/'}) {
             pageBuilder: (_, state) {
               final pageStr = state.uri.queryParameters['page'];
               final pid = state.uri.queryParameters['pid'];
+              final authorid = state.uri.queryParameters['authorid'];
               // pid 优先级高于 page，两者不共存
               final initialPage = pid != null && pid.isNotEmpty
                   ? 1
@@ -85,6 +92,7 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                   tid: state.pathParameters['tid'] ?? '',
                   initialPage: initialPage,
                   pid: pid,
+                  authorid: authorid,
                 ),
               );
             },

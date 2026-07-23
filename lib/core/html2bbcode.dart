@@ -80,13 +80,12 @@ class Html2BBCode {
     final cls = el.className;
     // 忽略区域
     if (cls.contains('f_a')) return '';
-    // 编辑记录：pstatus
+    // 编辑记录：pstatus → [appdata]
     if (cls.contains('pstatus')) {
-      final match = RegExp(
-        r'本帖最后由\s*(.+?)\s*于\s*([\d\-:\s]+)\s*编辑',
-      ).firstMatch(el.text.trim());
-      if (match != null)
-        return '\n作者: ${match.group(1)!.trim()}，修改时间：${match.group(2)!.trim()}\n';
+      final msg = sanitizeText(el.text).trim();
+      if (msg.isNotEmpty) {
+        return '\n[appdata]${jsonEncode({"type": "pstatus", "message": msg})}[/appdata]\n';
+      }
       return '';
     }
 
@@ -96,8 +95,31 @@ class Html2BBCode {
       if (bq != null) return '\n[quote]${_parseChildren(bq)}[/quote]\n';
       return '\n[quote]${_parseChildren(el)}[/quote]\n';
     }
+    // PC 模板隐藏内容：.showhide → [hide]（去除标题）
+    if (cls == 'showhide') {
+      final content = el.nodes
+          .where((n) => !(n is dom.Element && n.localName == 'h4'))
+          .map((n) => _parseNode(n))
+          .join();
+      return '\n[hide]$content[/hide]\n';
+    }
+    // PC 模板隐藏内容（未回复）：.locked → [appdata]
+    if (cls == 'locked') {
+      final msg = sanitizeText(el.text).trim();
+      if (msg.isNotEmpty) {
+        return '[appdata]${jsonEncode({"type": "locked", "message": msg})}[/appdata]\n';
+      }
+      return '';
+    }
     // PC 模板代码块：.blockcode → [code]
     if (cls == 'blockcode') {
+      // 从 <ol><li> 逐行提取，保留换行
+      final ol = el.querySelector('ol');
+      if (ol != null) {
+        final lines = ol.querySelectorAll('li').map((li) => li.text).join('\n');
+        return '\n[code]$lines[/code]\n';
+      }
+      // 无 ol/li 时回退到 el.text
       final codeText = el.text.trim();
       final clean = codeText.replaceAll(RegExp(r'复制代码\s*$'), '').trim();
       return '\n[code]$clean[/code]\n';
@@ -267,14 +289,11 @@ class Html2BBCode {
         ).firstMatch(sc);
         if (audioMatch != null) return '[audio]${audioMatch.group(1)}[/audio]';
       }
-      // Flash 嵌入（AC_FL_RunContent）
+      // Flash 嵌入（AC_FL_RunContent）→ [flash]reload值[/flash]
       if (sc.contains('AC_FL_RunContent')) {
-        final urlMatch = RegExp(r"encodeURI\('([^']*)'\)").firstMatch(sc);
-        if (urlMatch != null) {
-          final url = urlMatch.group(1)!;
-          if (url.isNotEmpty) {
-            return '[media]$url[/media]';
-          }
+        final reload = el.attributes['reload'] ?? '';
+        if (reload.isNotEmpty) {
+          return '\n[flash]$reload[/flash]\n';
         }
         return '';
       }
@@ -304,8 +323,6 @@ class Html2BBCode {
     if (tag == 'a') {
       final href = el.attributes['href'] ?? '';
       final content = _parseChildren(el);
-      final text = el.text.trim();
-      if (text.startsWith('@')) return '$text ';
       if (href.startsWith('mailto:'))
         return '[email=${href.replaceFirst('mailto:', '')}]$content[/email]';
       if (href.contains('wpa.qq.com')) {
@@ -354,6 +371,11 @@ class Html2BBCode {
       var li = '';
       for (final child in el.children) {
         if (child.localName == 'li') li += '[*]${_parseChildren(child)}\n';
+      }
+      // 无 <li> 时的保底：直接输出子节点内容
+      if (li.trim().isEmpty) {
+        li = _parseChildren(el).trim();
+        if (li.isEmpty) return '';
       }
       return listType.isNotEmpty
           ? '[list=$listType]\n$li[/list]'

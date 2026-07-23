@@ -18,12 +18,12 @@ class _HistoryPageState extends State<HistoryPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  static const _tabs = ['全部', '帖子', '用户'];
+  static const _tabs = ['全部', '帖子', '用户', '我的帖子', '回复'];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -38,6 +38,10 @@ class _HistoryPageState extends State<HistoryPage>
         return 'thread';
       case 2:
         return 'user';
+      case 3:
+        return 'mythread';
+      case 4:
+        return 'reply';
       default:
         return '';
     }
@@ -93,10 +97,13 @@ class _HistoryPageState extends State<HistoryPage>
         surfaceTintColor: cs.surface,
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: [
             Tab(text: '全部 (${history.totalCount})'),
             Tab(text: '帖子 (${history.getByType('thread').length})'),
             Tab(text: '用户 (${history.getByType('user').length})'),
+            Tab(text: '我的帖子 (${history.getByType('mythread').length})'),
+            Tab(text: '回复 (${history.getByType('reply').length})'),
           ],
           labelColor: Theme.of(context).colorScheme.onSurfaceVariant,
           unselectedLabelColor: cs.onSurfaceVariant,
@@ -121,6 +128,8 @@ class _HistoryPageState extends State<HistoryPage>
           _RecordList(type: '', onShowDetail: _showDetail),
           _RecordList(type: 'thread', onShowDetail: _showDetail),
           _RecordList(type: 'user', onShowDetail: _showDetail),
+          _RecordList(type: 'mythread', onShowDetail: _showDetail),
+          _RecordList(type: 'reply', onShowDetail: _showDetail),
         ],
       ),
     );
@@ -176,7 +185,7 @@ class _RecordDetailSheet extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               children: [
                 _infoRow(context, '标题', record.title),
-                _infoRow(context, '类型', record.type == 'thread' ? '帖子' : '用户'),
+                _infoRow(context, '类型', _RecordList._typeLabel(record.type)),
                 _infoRow(context, '路由', record.routePath),
                 _infoRow(context, 'ID', record.id),
                 _infoRow(context, '时间', _formatTime(record.timestamp)),
@@ -261,7 +270,7 @@ class _RecordDetailSheet extends StatelessWidget {
 
 // ==================== 记录列表 ====================
 
-/// 记录列表（支持滑动删除 + 点击查看详情）
+/// 记录列表（点击查看详情）
 class _RecordList extends StatelessWidget {
   final String type;
   final void Function(BrowseRecord) onShowDetail;
@@ -281,13 +290,21 @@ class _RecordList extends StatelessWidget {
     return '$m-$d $h:$min';
   }
 
-  IconData _typeIcon(String t) =>
-      t == 'thread' ? Icons.article_outlined : Icons.person_outline;
+  static IconData _typeIcon(String t) => switch (t) {
+    'thread' => Icons.article_outlined,
+    'user' => Icons.person_outline,
+    'mythread' => Icons.list_alt,
+    'reply' => Icons.reply,
+    _ => Icons.history,
+  };
 
-  Color _typeColor(String t, ColorScheme cs) =>
-      t == 'thread' ? cs.onSurfaceVariant : cs.onSurfaceVariant;
-
-  String _typeLabel(String t) => t == 'thread' ? '帖子' : '用户';
+  static String _typeLabel(String t) => switch (t) {
+    'thread' => '帖子',
+    'user' => '用户',
+    'mythread' => '我的帖子',
+    'reply' => '回复',
+    _ => t,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -318,69 +335,47 @@ class _RecordList extends StatelessWidget {
           Divider(height: 1, indent: 56, color: cs.outlineVariant),
       itemBuilder: (context, index) {
         final record = records[index];
-        return Dismissible(
-          key: ValueKey(record.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            color: cs.errorContainer,
-            child: Icon(Icons.delete_outline, color: cs.error),
-          ),
-          onDismissed: (_) {
-            context.read<HistoryProvider>().remove(record.id);
-          },
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: _typeColor(
-                record.type,
-                cs,
-              ).withValues(alpha: 0.1),
-              child: Icon(
-                _typeIcon(record.type),
-                color: _typeColor(record.type, cs),
-                size: 20,
-              ),
-            ),
-            title: Text(
-              record.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14),
-            ),
-            subtitle: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _typeColor(record.type, cs).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    _typeLabel(record.type),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: _typeColor(record.type, cs),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _formatTime(record.timestamp),
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                ),
-              ],
-            ),
-            trailing: Icon(
-              Icons.chevron_right,
-              size: 18,
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: cs.onSurfaceVariant.withValues(alpha: 0.1),
+            child: Icon(
+              _typeIcon(record.type),
               color: cs.onSurfaceVariant,
+              size: 20,
             ),
-            onTap: () => onShowDetail(record),
           ),
+          title: Text(
+            record.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14),
+          ),
+          subtitle: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  _typeLabel(record.type),
+                  style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _formatTime(record.timestamp),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+          trailing: Icon(
+            Icons.chevron_right,
+            size: 18,
+            color: cs.onSurfaceVariant,
+          ),
+          onTap: () => onShowDetail(record),
         );
       },
     );

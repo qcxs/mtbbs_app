@@ -2,22 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../models/thread_item.dart';
+import '../models/thread_detail.dart';
 import 'user_avatar.dart';
 import 'image_preview/image_preview.dart';
+import 'post_html_widget.dart';
 
 /// 帖子卡片 Widget
 ///
 /// 布局（从上到下）：
 ///   用户行 | 标题 | 摘要 | 图片(固定高度/裁剪) | 底部栏(版块+统计)
+///   查看回复(可选) | 展开的回复列表(可选)
 /// 图片区总是固定高度 + BoxFit.cover 裁剪，卡片高度可预期。
 class ThreadCard extends StatelessWidget {
   final ThreadItem item;
   final VoidCallback? onTap;
+  final VoidCallback? onViewReplies;
+  final List<PostItem>? replies;
+  final bool repliesLoading;
+  final String? replyError;
 
-  const ThreadCard({super.key, required this.item, this.onTap});
+  const ThreadCard({
+    super.key,
+    required this.item,
+    this.onTap,
+    this.onViewReplies,
+    this.replies,
+    this.repliesLoading = false,
+    this.replyError,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0.5,
@@ -44,6 +60,168 @@ class ThreadCard extends StatelessWidget {
               ],
               const SizedBox(height: 6),
               _buildBottomBar(context),
+              if (onViewReplies != null) ...[
+                const SizedBox(height: 6),
+                if (repliesLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Center(
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  )
+                else if (replyError != null) ...[
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cs.errorContainer.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 14, color: cs.error),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            replyError!,
+                            style: TextStyle(fontSize: 11, color: cs.error),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: onViewReplies,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '收起',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (replies != null && replies!.isNotEmpty) ...[
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerLow.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 顶部：标题 + 收起按钮
+                        Row(
+                          children: [
+                            Text(
+                              '回复 (${replies!.length})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: onViewReplies,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '收起',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        for (final reply in replies!)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                UserAvatar(
+                                  uid: reply.uid,
+                                  nickname: reply.username,
+                                  radius: 12,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        reply.username,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      PostHtmlWidget(
+                                        bbcode: reply.bbcode,
+                                        fontSize: 11,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: onViewReplies,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '查看回复',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ],
           ),
         ),

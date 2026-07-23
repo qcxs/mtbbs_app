@@ -167,13 +167,13 @@ class BBCode2Html {
     // 引用 [quote]...[/quote]
     html = html.replaceAllMapped(
       RegExp(r'\[quote\]([\s\S]*?)\[/quote\]', caseSensitive: false),
-      (m) => '<blockquote>${_labelBlock('引用', m.group(1)!)}</blockquote>',
+      (m) => '<blockquote>${m.group(1)}</blockquote>',
     );
 
     // 免费信息 [free]...[/free]
     html = html.replaceAllMapped(
       RegExp(r'\[free\]([\s\S]*?)\[/free\]', caseSensitive: false),
-      (m) => '<blockquote>${_labelBlock('免费内容', m.group(1)!)}</blockquote>',
+      (m) => '<blockquote>${m.group(1)}</blockquote>',
     );
 
     // 隐藏内容 [hide]...[/hide]（支持 [hide=参数]）
@@ -252,28 +252,26 @@ class BBCode2Html {
           '<table style="width:100%;border:1px solid #E3EDF5;border-collapse:collapse;">${m.group(1)}</table>',
     );
 
-    // [media] → 可点击的视频占位符（忽略参数，如 x,500,375）
+    // [media] / [audio] / [flash] → 统一占位符 [标签] 内容
+    String _placeholder(String label, String content) =>
+        '<a href="$content" target="_blank">[$label] $content</a>';
+
     html = html.replaceAllMapped(
       RegExp(
         r'\[media(?:=[^\]]+)?\]([\s\S]+?)\[\/media\]',
         caseSensitive: false,
       ),
-      (m) {
-        final url = m.group(1)!.trim();
-        return '<a href="$url" target="_blank" style="display:inline-block;padding:8px 14px;background:#f5f5f5;border:1px solid #ddd;border-radius:6px;color:#333;text-decoration:none;font-size:13px;">▶ 视频 $url</a>';
-      },
+      (m) => _placeholder('视频', m.group(1)!.trim()),
     );
 
-    // [audio] → 音频占位
     html = html.replaceAllMapped(
       RegExp(r'\[audio\]([\s\S]*?)\[\/audio\]', caseSensitive: false),
-      (m) => '<a href="${m.group(1)}" target="_blank">[音频] ${m.group(1)}</a>',
+      (m) => _placeholder('音频', m.group(1)!.trim()),
     );
 
-    // 附件 [attach]...[/attach]
     html = html.replaceAllMapped(
-      RegExp(r'\[attach\]([\s\S]+?)\[\/attach\]', caseSensitive: false),
-      (m) => '<div class="bbcode-attach">附件: ${m.group(1)}</div>',
+      RegExp(r'\[flash\]([\s\S]*?)\[\/flash\]', caseSensitive: false),
+      (m) => _placeholder('Flash', m.group(1)?.trim() ?? ''),
     );
 
     // [img=W,H]...[/img] 和 [img]...[/img]
@@ -348,6 +346,12 @@ class BBCode2Html {
           return _renderAttach(data);
         case 'image_attach':
           return _renderImageAttach(data);
+        case 'locked':
+          final msg = _escapeHtml(data['message'] as String? ?? '');
+          return '<div class="bbcode-locked">$msg</div>';
+        case 'pstatus':
+          final msg = _escapeHtml(data['message'] as String? ?? '');
+          return '<div class="bbcode-pstatus">$msg</div>';
         default:
           return '';
       }
@@ -466,18 +470,39 @@ class BBCode2Html {
 
   /// 移除被禁用的 BBCode 标签（保留标签内的内容）
   /// 例如禁用 "color" 时，[color=red]text[/color] → text
+  /// 不涉及嵌套问题，只需删除所有匹配的 [tag]、[tag=xxx]、[/tag] 标记
   String _stripDisabledTags(String html) {
+    // 标签名 → BBCode 实际标签名的映射
+    const tagMapping = {
+      'bold': 'b',
+      'italic': 'i',
+      'underline': 'u',
+      'strikethrough': 's',
+    };
+    // 次标签：禁用一个主标签时连带屏蔽的同义词
+    const secondaryMapping = {
+      'backcolor': ['background'],
+    };
     for (final tag in _disabledTags!) {
-      // 匹配 [tag=任意值]...[/tag] 和 [tag]...[/tag]
-      html = html.replaceAllMapped(
-        RegExp(
-          '\\[$tag(?:=[^\\]]+)?\\]([\\s\\S]*?)\\[/$tag\\]',
-          caseSensitive: false,
-        ),
-        (m) => m.group(1) ?? '',
-      );
+      final bbcodeTag = tagMapping[tag] ?? tag;
+      html = _stripTag(html, bbcodeTag);
+      // 连带屏蔽同义词
+      final secondaries = secondaryMapping[tag];
+      if (secondaries != null) {
+        for (final sec in secondaries) {
+          html = _stripTag(html, sec);
+        }
+      }
     }
     return html;
+  }
+
+  /// 删除全部 [tag]、[tag=xxx]、[/tag]
+  String _stripTag(String html, String tag) {
+    return html.replaceAllMapped(
+      RegExp('\\[$tag(?:=[^\\]]*)?\\]|\\[/$tag\\]', caseSensitive: false),
+      (_) => '',
+    );
   }
 
   /// 替换带值标签 [tag=value]...[/tag]

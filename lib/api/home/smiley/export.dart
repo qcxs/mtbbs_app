@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 import '../../helpers.dart';
 import 'http.dart' as http;
 import 'parse.dart' as parse;
@@ -16,5 +16,8 @@ import 'parse.dart' as parse;
 /// - insertTextMap: insertText → imageUrl（用于 BBCode 预览渲染）
 Future<Map<String, dynamic>> fetchSmilies(Dio dio) async {
   final resp = await http.getSmiliesJs(dio);
-  return parse.parseResponse(safeDecode(resp), baseUrl: SiteConfig.cdnUrl);
+  return parseWithLog(
+    resp,
+    (b, s) => parse.parseResponse(b, baseUrl: SiteStore.instance.cdnUrl),
+  );
 }

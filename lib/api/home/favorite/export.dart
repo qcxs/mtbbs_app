@@ -7,5 +7,5 @@ import 'parse.dart' as parse;
 
 Future<Map<String, dynamic>> fetchFavorites(Dio dio, {int page = 1}) async {
   final resp = await http.getFavorites(dio, page: page);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

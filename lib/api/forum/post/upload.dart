@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:html/dom.dart' as dom;
+import 'package:mtbbs/core/logger.dart';
 import 'package:mtbbs/core/xml_helper.dart';
 
 /// 上传图片到论坛
@@ -40,9 +42,28 @@ Future<Map<String, dynamic>> uploadImage(
     final filepath = parts.length > 5 ? parts[5] : '';
     final title = parts.length > 6 ? parts[6] : '';
     final src = filepath.isNotEmpty ? 'data/attachment/forum/$filepath' : '';
+    AppLogger.i(
+      'UPLOAD',
+      jsonEncode({
+        'action': 'uploadImage',
+        'success': true,
+        'aid': aid,
+        'filepath': filepath,
+        'title': title,
+      }),
+    );
     return {'aid': aid, 'src': src, 'title': title, 'success': true};
   }
   final errorMsg = parts.length > 2 ? _statusMsg(parts[2]) : '上传失败';
+  AppLogger.w(
+    'UPLOAD',
+    jsonEncode({
+      'action': 'uploadImage',
+      'success': false,
+      'error': errorMsg,
+      'code': parts.length > 2 ? parts[2] : '?',
+    }),
+  );
   return {'success': false, 'error': errorMsg};
 }
 
@@ -64,12 +85,6 @@ Future<List<Map<String, dynamic>>> fetchUnusedImages(
   final resp = await dio.get(
     '/forum.php?mod=ajax&action=imagelist',
     queryParameters: params,
-    options: Options(
-      headers: {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    ),
   );
 
   final body = resp.data is String ? resp.data as String : '';
@@ -99,6 +114,34 @@ Future<List<Map<String, dynamic>>> fetchUnusedImages(
     // DOM 解析失败时返回空列表
   }
 
+  AppLogger.i(
+    'UPLOAD',
+    jsonEncode({
+      'action': 'fetchUnusedImages',
+      'success': true,
+      'count': images.length,
+      'fid': fid,
+      'tid': tid,
+    }),
+  );
+  if (images.isNotEmpty) {
+    AppLogger.d(
+      'UPLOAD',
+      jsonEncode({
+        'action': 'fetchUnusedImages',
+        'preview': images
+            .take(3)
+            .map(
+              (i) => {
+                'aid': i['aid'],
+                'src': i['src'],
+                'title': (i['title'] as String?)?.length ?? 0,
+              },
+            )
+            .toList(),
+      }),
+    );
+  }
   return images;
 }
 
@@ -124,7 +167,161 @@ Future<bool> deleteUnusedImage(
     '/forum.php?mod=ajax&action=deleteattach&inajax=yes',
     queryParameters: params,
   );
-  return resp.statusCode == 200;
+  final ok = resp.statusCode == 200;
+  AppLogger.i(
+    'UPLOAD',
+    jsonEncode({
+      'action': 'deleteUnusedImage',
+      'success': ok,
+      'aid': aid,
+      'tid': tid,
+      'pid': pid,
+    }),
+  );
+  return ok;
+}
+
+/// 上传附件到论坛
+///
+/// 使用 swfupload 端点（无 type=image），返回 `{aid, filename, success}`。
+/// 响应格式与图片上传相同: DISCUZUPLOAD|{?}|{errorCode}|{aid}|{?}|{filepath}|{title}|{?}
+Future<Map<String, dynamic>> uploadAttachment(
+  Dio dio, {
+  required File file,
+  required String uid,
+  required String uploadHash,
+  String fid = '',
+}) async {
+  final formData = FormData.fromMap({
+    'Filedata': await MultipartFile.fromFile(
+      file.path,
+      filename: file.path.split('/').last,
+    ),
+    'uid': uid,
+    'hash': uploadHash,
+  });
+
+  var url = '/misc.php?mod=swfupload&action=swfupload&operation=upload';
+  if (fid.isNotEmpty) url += '&fid=$fid';
+
+  final resp = await dio.post<String>(
+    url,
+    data: formData,
+    options: Options(
+      contentType: 'multipart/form-data',
+      sendTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
+    ),
+  );
+
+  final body = resp.data ?? '';
+  final parts = body.split('|');
+  if (parts.length >= 4 && parts[2] == '0') {
+    final aid = parts[3];
+    final filepath = parts.length > 5 ? parts[5] : '';
+    final title = parts.length > 6 ? parts[6] : '';
+    AppLogger.i(
+      'UPLOAD',
+      jsonEncode({
+        'action': 'uploadAttachment',
+        'success': true,
+        'aid': aid,
+        'filepath': filepath,
+        'filename': title,
+      }),
+    );
+    return {
+      'aid': aid,
+      'filepath': filepath,
+      'filename': title,
+      'success': true,
+    };
+  }
+  final errorMsg = parts.length > 2 ? _statusMsg(parts[2]) : '上传失败';
+  AppLogger.w(
+    'UPLOAD',
+    jsonEncode({
+      'action': 'uploadAttachment',
+      'success': false,
+      'error': errorMsg,
+      'code': parts.length > 2 ? parts[2] : '?',
+    }),
+  );
+  return {'success': false, 'error': errorMsg};
+}
+
+/// 获取未使用的附件列表
+///
+/// 使用 DOM 解析 `attachlist` 端点响应（XML/CDATA）。
+/// 每个附件由 `<tbody id="attach_{aid}">` 表示，通过 `a#attachname{aid}` 提取文件名。
+Future<List<Map<String, dynamic>>> fetchUnusedAttachments(
+  Dio dio, {
+  String fid = '',
+  String? tid,
+}) async {
+  final params = <String, dynamic>{};
+  if (fid.isNotEmpty) params['fid'] = fid;
+  if (tid != null && tid.isNotEmpty) params['tid'] = tid;
+  final resp = await dio.get(
+    '/forum.php?mod=ajax&action=attachlist',
+    queryParameters: params,
+  );
+
+  final body = resp.data is String ? resp.data as String : '';
+  final list = <Map<String, dynamic>>[];
+
+  try {
+    final xml = parseInajaxXml(body);
+    final doc = xml?.htmlDoc;
+    if (doc == null) return list;
+
+    for (final tbody in doc.querySelectorAll('tbody[id^="attach_"]')) {
+      final tbodyId = tbody.attributes['id'] ?? '';
+      final aid = tbodyId.replaceFirst('attach_', '');
+      if (aid.isEmpty || !RegExp(r'^\d+$').hasMatch(aid)) continue;
+
+      final link = tbody.querySelector('a[id^="attachname"]');
+      if (link == null) continue;
+
+      final filename = link.text.trim();
+      final title = link.attributes['title'] ?? '';
+      final isImage = link.attributes['isimage'] ?? '0';
+      final iconImg = link.querySelector('img');
+      final iconSrc = iconImg?.attributes['src'] ?? '';
+
+      list.add({
+        'aid': aid,
+        'filename': filename,
+        'title': title,
+        'isimage': isImage,
+        'icon': iconSrc,
+      });
+    }
+  } catch (_) {}
+
+  AppLogger.i(
+    'UPLOAD',
+    jsonEncode({
+      'action': 'fetchUnusedAttachments',
+      'success': true,
+      'count': list.length,
+      'fid': fid,
+      'tid': tid,
+    }),
+  );
+  if (list.isNotEmpty) {
+    AppLogger.d(
+      'UPLOAD',
+      jsonEncode({
+        'action': 'fetchUnusedAttachments',
+        'preview': list
+            .take(3)
+            .map((a) => {'aid': a['aid'], 'filename': a['filename']})
+            .toList(),
+      }),
+    );
+  }
+  return list;
 }
 
 /// 上传状态码映射

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../config/site_config.dart';
+import '../../core/site_store.dart';
 import '../../api/home/space/export.dart' as space_api;
 import '../../services/api_service.dart';
 import '../../models/user_profile.dart';
@@ -76,7 +76,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               'nickname': profile.nickname,
               'avatar': profile.avatar,
               'url':
-                  '${SiteConfig.baseUrl}/home.php?mod=space&uid=${widget.uid}',
+                  '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}',
             },
           ),
         );
@@ -108,7 +108,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
               onPressed: _showCreditDialog,
             ),
           PageActions(
-            url: '${SiteConfig.baseUrl}/home.php?mod=space&uid=${widget.uid}',
+            url:
+                '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}',
             onRefresh: _load,
             loading: _loading,
             copyLabel: '复制个人主页链接',

@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:html/dom.dart' as dom;
-import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/html2bbcode.dart';
 import 'package:mtbbs/core/page_helper.dart';
+import 'package:mtbbs/core/site_store.dart';
 
 /// 从 table#pidXX.plhin（PC 模板）提取单帖完整数据
 ///
@@ -103,6 +104,22 @@ Map<String, dynamic> parsePostFromTable(
       bbcode = converter.convertElementContent(msgEl);
     }
 
+    // 锁定帖（仅作者可见等）：使用 appdata 专属标签
+    // 保底策略：html2bbcode 已处理则跳过，否则补充识别
+    final lockedEl = plc.querySelector('.locked');
+    if (lockedEl != null) {
+      final hasLockedAppdata = RegExp(
+        r'\[appdata\]\{"type":"locked".*?\}\[/appdata\]',
+      ).hasMatch(bbcode);
+      if (!hasLockedAppdata) {
+        final lockedMsg = sanitizeText(lockedEl.text).trim();
+        if (lockedMsg.isNotEmpty) {
+          bbcode =
+              '[appdata]${jsonEncode({"type": "locked", "message": lockedMsg})}[/appdata]\n$bbcode';
+        }
+      }
+    }
+
     // 附件区 div.pattl — 未插入正文的附件，追加到正文末尾
     final pattl = plc.querySelector('div.pattl');
     if (pattl != null) {
@@ -144,8 +161,7 @@ Map<String, dynamic> parsePostFromTable(
 
       // 解析表头确定列结构：th[0]=用户, th[1..n-2]=评分列, th[n-1]=理由
       final headerThs = rateDl.querySelectorAll('table.ratl tr th');
-      final reasonColIndex =
-          headerThs.length > 1 ? headerThs.length - 1 : null;
+      final reasonColIndex = headerThs.length > 1 ? headerThs.length - 1 : null;
       final scoreColIndices = <int>[
         for (int i = 1; i < headerThs.length - 1; i++) i,
       ];
@@ -166,10 +182,9 @@ Map<String, dynamic> parsePostFromTable(
             .map((i) => i < allTds.length ? allTds[i].text.trim() : '')
             .toList();
         // 理由列：最后一列
-        final reason =
-            reasonColIndex != null && reasonColIndex < allTds.length
-                ? allTds[reasonColIndex].text.trim()
-                : '';
+        final reason = reasonColIndex != null && reasonColIndex < allTds.length
+            ? allTds[reasonColIndex].text.trim()
+            : '';
         if (nameLink != null) {
           final href = nameLink.attributes['href'] ?? '';
           final uidMatch = RegExp(r'space-uid-(\d+)').firstMatch(href);
@@ -223,6 +238,6 @@ String resolveUrl(String href) {
   final uri = Uri.tryParse(href);
   if (uri == null) return href;
   if (uri.hasScheme) return href;
-  final base = Uri.parse(SiteConfig.baseUrl);
+  final base = Uri.parse(SiteStore.instance.baseUrl);
   return base.resolve(href).toString();
 }

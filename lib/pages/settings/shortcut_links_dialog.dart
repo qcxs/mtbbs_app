@@ -23,6 +23,7 @@ class ShortcutLinksDialog {
       ),
       onAdd: () => _handleAdd(context, settings),
       onEdit: (item) => _handleEdit(context, settings, item),
+      onReorder: (from, to) => settings.moveShortcutLink(from, to),
       onDelete: (id) async {
         await settings.removeShortcutLink(id);
         return true;

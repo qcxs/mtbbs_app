@@ -8,7 +8,7 @@ Future<Response<String>> getOnlineUsers(Dio dio) {
   return dio.get<String>(
     '/forum.php?showoldetails=yes',
     options: Options(headers: {
-      'User-Agent': SiteConfig.uaPc,
+      'User-Agent': Site.uaPc,
     }),
   );
 }

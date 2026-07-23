@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../config/site_config.dart';
+import '../../core/site_store.dart';
 import '../../config/nav_config.dart';
 import '../../core/shortcut_helper.dart';
+import '../../core/stagger_queue.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/history_provider.dart';
 import 'site_management.dart';
@@ -32,7 +33,9 @@ class SettingsPage extends StatelessWidget {
             ListTile(
               leading: _iconBox(Icons.dns, const Color(0xFF2196F3)),
               title: const Text('当前站点'),
-              subtitle: Text(SiteConfig.sites[settings.currentSiteIndex].name),
+              subtitle: Text(
+                SiteStore.instance.sites[settings.currentSiteIndex].name,
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => SiteManagement.showPicker(context, settings),
             ),
@@ -63,6 +66,13 @@ class SettingsPage extends StatelessWidget {
               subtitle: const Text('查看和刷新当前站点表情'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/settings/emoji'),
+            ),
+            ListTile(
+              leading: _iconBox(Icons.storage, const Color(0xFF607D8B)),
+              title: const Text('缓存管理'),
+              subtitle: const Text('头像/表情/预览缓存，设置过期时间'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/settings/cache'),
             ),
           ]),
 
@@ -167,6 +177,20 @@ class SettingsPage extends StatelessWidget {
             ),
           ]),
 
+          // ==================== 通用错峰 ====================
+          _section(cs, '通用错峰', [
+            ListTile(
+              leading: _iconBox(
+                Icons.motion_photos_on,
+                const Color(0xFF009688),
+              ),
+              title: const Text('请求间隔'),
+              subtitle: Text('${settings.staggerInterval}ms，头像/预览等批量请求逐个放行'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showStaggerDialog(context, settings),
+            ),
+          ]),
+
           const SizedBox(height: 12),
 
           // ==================== 关于 ====================
@@ -239,6 +263,51 @@ class SettingsPage extends StatelessWidget {
       if (entry.value.toARGB32() == color.toARGB32()) return entry.key;
     }
     return '自定义';
+  }
+
+  void _showStaggerDialog(BuildContext context, SettingsProvider settings) {
+    final ctl = TextEditingController(
+      text: settings.staggerInterval.toString(),
+    );
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        constraints: const BoxConstraints(maxWidth: 360),
+        title: const Text('通用错峰间隔'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('短时间大量请求时，可能封ip，设置请求间隔，主动放慢请求。取值范围：（20-300ms），自行测试。'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '间隔（毫秒）',
+                border: OutlineInputBorder(),
+                isDense: true,
+                helperText: '默认 40ms',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final v = int.tryParse(ctl.text.trim()) ?? 40;
+              await settings.setStaggerInterval(v);
+              setStaggerInterval(Duration(milliseconds: v));
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showColorPicker(BuildContext context, SettingsProvider settings) {

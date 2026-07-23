@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -104,11 +105,17 @@ class EditorSubmitHelper {
     }
   }
 
-  /// 从内容中提取 [attachimg]{aid}[/attachimg] + 面板活跃 AID
+  /// 从内容中提取 [attachimg]{aid}[/attachimg] + [attach]{aid}[/attach] + 面板活跃 AID
   Map<String, String> parseAttachNew(String content) {
     final aids = RegExp(
       r'\[attachimg\](\d+)\[/attachimg\]',
     ).allMatches(content).map((m) => m.group(1)!).toSet();
+    // 也提取 [attach]{aid}[/attach]
+    aids.addAll(
+      RegExp(
+        r'\[attach\](\d+)\[/attach\]',
+      ).allMatches(content).map((m) => m.group(1)!),
+    );
     aids.addAll(contentCtl.pendingAids);
     if (aids.isEmpty) return const {};
     return {for (final aid in aids) 'attachnew[$aid][description]': ''};
@@ -121,9 +128,21 @@ class EditorSubmitHelper {
     String content, {
     Map<String, String> attachNew = const {},
   }) async {
+    AppLogger.i(
+      'EDITOR',
+      jsonEncode({
+        'action': 'submitEdit',
+        'titleLen': title.length,
+        'contentLen': content.length,
+        'attachNew': attachNew.length,
+        'fid': pageData.fid.isNotEmpty ? pageData.fid : widgetFid,
+        'tid': pageData.tid.isNotEmpty ? pageData.tid : widgetTid,
+        'pid': pageData.pid.isNotEmpty ? pageData.pid : widgetPid,
+      }),
+    );
     try {
       final editResp = await ApiService().dio.post(
-        '/forum.php?mod=post&action=edit&fid=${pageData.fid.isNotEmpty ? pageData.fid : widgetFid}&tid=${pageData.tid.isNotEmpty ? pageData.tid : widgetTid}&pid=${pageData.pid.isNotEmpty ? pageData.pid : widgetPid}&editsubmit=yes&mobile=2&inajax=1&formhash=${pageData.formhash}',
+        '/forum.php?mod=post&action=edit&fid=${pageData.fid.isNotEmpty ? pageData.fid : widgetFid}&tid=${pageData.tid.isNotEmpty ? pageData.tid : widgetTid}&pid=${pageData.pid.isNotEmpty ? pageData.pid : widgetPid}&editsubmit=yes&inajax=1&formhash=${pageData.formhash}',
         data: {
           'formhash': pageData.formhash,
           'posttime': pageData.posttime,
@@ -134,7 +153,6 @@ class EditorSubmitHelper {
           'pid': pageData.pid.isNotEmpty ? pageData.pid : widgetPid,
           'page': '1',
           'editsubmit': 'yes',
-          'mobile': '2',
           ...attachNew,
         },
         options: Options(
@@ -153,7 +171,17 @@ class EditorSubmitHelper {
       final body = editResp.data is String ? (editResp.data as String) : '';
 
       if (code == 301 || code == 302) {
-        if (location.contains('viewthread')) {
+        final ok = location.contains('viewthread');
+        AppLogger.i(
+          'EDITOR',
+          jsonEncode({
+            'action': 'submitEdit_redirect',
+            'success': ok,
+            'code': code,
+            'location': location,
+          }),
+        );
+        if (ok) {
           return const SubmitResult(success: true, message: '编辑成功');
         }
         return SubmitResult(success: false, message: '编辑后重定向异常: $location');
@@ -165,21 +193,35 @@ class EditorSubmitHelper {
       if (errorMatch != null) {
         final start = body.indexOf(errorMatch.group(0)!);
         final snippet = body.substring(start, start + 60);
-        return SubmitResult(
-          success: false,
-          message: snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim(),
+        final cleanMsg = snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+        AppLogger.w(
+          'EDITOR',
+          jsonEncode({'action': 'submitEdit_error', 'error': cleanMsg}),
         );
+        return SubmitResult(success: false, message: cleanMsg);
       }
 
       if (body.contains('审核') || body.contains('审核中')) {
+        AppLogger.i(
+          'EDITOR',
+          jsonEncode({'action': 'submitEdit_approval', 'needsApproval': true}),
+        );
         return const SubmitResult(
           success: true,
           message: '编辑成功，等待审核',
           needsApproval: true,
         );
       }
+      AppLogger.i(
+        'EDITOR',
+        jsonEncode({'action': 'submitEdit_done', 'success': true}),
+      );
       return const SubmitResult(success: true, message: '编辑成功');
     } catch (e) {
+      AppLogger.e(
+        'EDITOR',
+        jsonEncode({'action': 'submitEdit_exception', 'error': e.toString()}),
+      );
       return SubmitResult(success: false, message: '网络错误: $e');
     }
   }
@@ -191,6 +233,19 @@ class EditorSubmitHelper {
     String content,
   ) async {
     final attachNew = parseAttachNew(content);
+
+    AppLogger.i(
+      'EDITOR',
+      jsonEncode({
+        'action': 'submit',
+        'type': editorType.name,
+        'titleLen': title.length,
+        'contentLen': content.length,
+        'attachNew': attachNew.length,
+        'formhash': pageData.formhash.isNotEmpty,
+      }),
+    );
+
     switch (editorType) {
       case EditorType.post:
         return post_api.submitNewPost(

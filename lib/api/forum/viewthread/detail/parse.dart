@@ -19,6 +19,7 @@ Map<String, dynamic> parseResponse(
   String body,
   int statusCode, {
   int page = 1,
+  String? authorid,
 }) {
   if (statusCode != 200) {
     return {'success': false, 'message': 'HTTP $statusCode'};
@@ -59,12 +60,18 @@ Map<String, dynamic> parseResponse(
   // 提取所有帖子 table
   // 标准 Discuz：直接 table
   // 克米模板：   .comiis_vrx > table
+  // div[id^="post_"] 包装：标准 Discuz 变体
   var postTables = doc
       .querySelectorAll('#postlist > table[id^="pid"]')
       .toList();
   if (postTables.isEmpty) {
     postTables = doc
         .querySelectorAll('#postlist .comiis_vrx > table[id^="pid"]')
+        .toList();
+  }
+  if (postTables.isEmpty) {
+    postTables = doc
+        .querySelectorAll('#postlist div[id^="post_"] > table[id^="pid"]')
         .toList();
   }
 
@@ -97,8 +104,8 @@ Map<String, dynamic> parseResponse(
   }
 
   // 判断第一个帖子是否为楼主帖
-  if (page > 1) {
-    // page>1：全部作为评论
+  if (page > 1 || (authorid != null && authorid.isNotEmpty)) {
+    // page>1 或 authorid 筛选时：全部作为评论
     for (int i = 0; i < postTables.length; i++) {
       comments.add(
         parsePostFromTable(postTables[i], floor: i + 1, isOp: false),

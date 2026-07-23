@@ -12,5 +12,5 @@ Future<Map<String, dynamic>> getUserProfile(
   String username = '',
 }) async {
   final resp = await http.getUserProfile(dio, uid: uid, username: username);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

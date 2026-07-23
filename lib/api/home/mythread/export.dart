@@ -12,5 +12,5 @@ Future<Map<String, dynamic>> getMyThreads(
   String? type,
 }) async {
   final resp = await http.getMyThreads(dio, page: page, uid: uid, type: type);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

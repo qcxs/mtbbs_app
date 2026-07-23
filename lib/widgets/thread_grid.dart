@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 import '../controllers/thread_list_controller.dart';
+import '../models/thread_item.dart';
+import '../models/thread_detail.dart';
 import 'thread_card.dart';
 
 /// 通用帖子列表网格
@@ -15,8 +17,20 @@ import 'thread_card.dart';
 class ThreadGrid extends StatefulWidget {
   final ThreadListController controller;
   final bool visible;
+  final void Function(ThreadItem item)? onViewReplies;
+  final Map<int, List<PostItem>> expandedReplies;
+  final Set<int> loadingReplies;
+  final Map<int, String> errorReplies;
 
-  const ThreadGrid({super.key, required this.controller, this.visible = true});
+  const ThreadGrid({
+    super.key,
+    required this.controller,
+    this.visible = true,
+    this.onViewReplies,
+    this.expandedReplies = const {},
+    this.loadingReplies = const {},
+    this.errorReplies = const {},
+  });
 
   @override
   State<ThreadGrid> createState() => _ThreadGridState();
@@ -204,6 +218,12 @@ class _ThreadGridState extends State<ThreadGrid>
               final tid = item.threadId;
               if (tid != null && tid > 0) context.push('/thread/$tid');
             },
+            onViewReplies: widget.onViewReplies != null
+                ? () => widget.onViewReplies!(item)
+                : null,
+            replies: widget.expandedReplies[item.threadId],
+            repliesLoading: widget.loadingReplies.contains(item.threadId),
+            replyError: widget.errorReplies[item.threadId],
           ),
         );
       }, childCount: ctrl.items.length),
@@ -231,6 +251,12 @@ class _ThreadGridState extends State<ThreadGrid>
               final tid = item.threadId;
               if (tid != null && tid > 0) context.push('/thread/$tid');
             },
+            onViewReplies: widget.onViewReplies != null
+                ? () => widget.onViewReplies!(item)
+                : null,
+            replies: widget.expandedReplies[item.threadId],
+            repliesLoading: widget.loadingReplies.contains(item.threadId),
+            replyError: widget.errorReplies[item.threadId],
           );
         },
         childCount: ctrl.items.length,

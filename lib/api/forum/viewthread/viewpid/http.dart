@@ -13,7 +13,7 @@ Future<Response<String>> getPostByPid(
     options: Options(
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
-        'User-Agent': SiteConfig.uaPc,
+        'User-Agent': Site.uaPc,
       },
     ),
   );

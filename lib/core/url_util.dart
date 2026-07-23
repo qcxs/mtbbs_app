@@ -1,4 +1,4 @@
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 
 /// URL 统一工具
 ///
@@ -26,5 +26,5 @@ String normalizeUrl(String url) {
   // 协议相对 //host/path → https://host/path
   if (url.startsWith('//')) return 'https:$url';
   // 相对路径 → 基于站点 baseUrl 解析
-  return Uri.parse(SiteConfig.baseUrl).resolve(url).toString();
+  return Uri.parse(SiteStore.instance.baseUrl).resolve(url).toString();
 }

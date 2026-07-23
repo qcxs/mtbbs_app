@@ -12,6 +12,7 @@ class BbcodeDialog {
     'size': '字号 [size]',
     'font': '字体 [font]',
     'backcolor': '背景色 [backcolor]',
+    'align': '对齐 [align]',
     'imgDimension': '忽略图片宽高设置',
   };
 
@@ -25,6 +26,7 @@ class BbcodeDialog {
     'size',
     'font',
     'backcolor',
+    'align',
     'imgDimension',
   ];
 

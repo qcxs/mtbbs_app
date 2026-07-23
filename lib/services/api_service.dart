@@ -4,6 +4,7 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:path_provider/path_provider.dart';
 import '../config/site_config.dart';
+import '../core/site_store.dart';
 import '../core/logger.dart';
 
 /// API 服务 — 基于 Dio + CookieManager 的统一 HTTP 客户端
@@ -30,19 +31,19 @@ class ApiService {
   Future<void> init({String? baseUrl}) async {
     if (_initialized) return;
 
-    _currentHost = SiteConfig.current.host;
+    _currentHost = SiteStore.instance.host;
     final dir = await getApplicationDocumentsDirectory();
     _guestJar = PersistCookieJar(
       storage: FileStorage('${dir.path}/${SiteConfig.cookieDir}/$_currentHost'),
       ignoreExpires: true,
     );
 
-    final url = baseUrl ?? SiteConfig.baseUrl;
+    final url = baseUrl ?? SiteStore.instance.baseUrl;
     dio = Dio(
       BaseOptions(
         baseUrl: url,
         headers: {
-          'User-Agent': SiteConfig.uaAndroid,
+          'User-Agent': Site.uaPc,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -56,6 +57,7 @@ class ApiService {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
+          options.extra['_start'] = DateTime.now().millisecondsSinceEpoch;
           final path = options.path;
           final method = options.method;
           final qp = options.queryParameters;
@@ -72,7 +74,14 @@ class ApiService {
           final path = response.requestOptions.path;
           final status = response.statusCode ?? 0;
           final size = (response.data as String?)?.length ?? 0;
-          AppLogger.i('DIO', '$path → $status (${AppLogger.bytes(size)})');
+          final start = response.requestOptions.extra['_start'] as int?;
+          final elapsed = start != null
+              ? DateTime.now().millisecondsSinceEpoch - start
+              : 0;
+          AppLogger.i(
+            'DIO',
+            '$path → $status (${AppLogger.bytes(size)}, ${elapsed}ms)',
+          );
           handler.next(response);
         },
         onError: (error, handler) {
@@ -102,8 +111,8 @@ class ApiService {
 
   /// 切换站点 — 更新 baseUrl + 重建 guest jar
   Future<void> switchSite() async {
-    _currentHost = SiteConfig.current.host;
-    dio.options.baseUrl = SiteConfig.baseUrl;
+    _currentHost = SiteStore.instance.host;
+    dio.options.baseUrl = SiteStore.instance.baseUrl;
 
     final dir = await getApplicationDocumentsDirectory();
     _guestJar = PersistCookieJar(

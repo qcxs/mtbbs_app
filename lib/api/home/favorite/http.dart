@@ -5,6 +5,6 @@ import '../../../config/site_config.dart';
 Future<Response<String>> getFavorites(Dio dio, {int page = 1}) {
   return dio.get<String>(
     '/home.php?mod=space&do=favorite&view=me&page=$page',
-    options: Options(headers: {'User-Agent': SiteConfig.uaPc}),
+    options: Options(headers: {'User-Agent': Site.uaPc}),
   );
 }

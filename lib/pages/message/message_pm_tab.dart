@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/site_store.dart';
 import 'package:mtbbs/widgets/user_avatar.dart';
 
 /// 私人消息 Tab
@@ -303,7 +303,7 @@ class _PmTabState extends State<PmTab> {
                         onTap: () {
                           final fullUrl = replyUrl.startsWith('http')
                               ? replyUrl
-                              : '${SiteConfig.baseUrl}/$replyUrl';
+                              : '${SiteStore.instance.baseUrl}/$replyUrl';
                           context.push(
                             '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
                           );

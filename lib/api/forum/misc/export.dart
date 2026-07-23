@@ -6,5 +6,5 @@ import 'parse.dart' as parse;
 /// 获取论坛导航（版块列表）
 Future<Map<String, dynamic>> fetchForumNav(Dio dio) async {
   final resp = await http.getForumNav(dio);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

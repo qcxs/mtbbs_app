@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:mtbbs/config/site_config.dart';
 
 /// 版块帖子列表 HTTP 请求（forumdisplay）— 基于 Dio
 /// 只负责发请求，不做 print 或解析。
@@ -39,5 +40,8 @@ Future<Response<String>> getForumThreads(
   if (orderby.isNotEmpty) buf.write('&orderby=$orderby');
   if (filter.isNotEmpty) buf.write('&filter=$filter');
 
-  return dio.get<String>(buf.toString());
+  return dio.get<String>(
+    buf.toString(),
+    options: Options(headers: {'User-Agent': Site.uaAndroid}),
+  );
 }

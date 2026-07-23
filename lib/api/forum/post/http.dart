@@ -4,9 +4,7 @@ import 'package:dio/dio.dart';
 
 /// 获取发帖/回复页面的 HTML（用于提取 formhash/posttime 等会话字段）
 Future<Response<String>> getNewThreadPage(Dio dio, {required String fid}) {
-  return dio.get<String>(
-    '/forum.php?mod=post&action=newthread&fid=$fid&mobile=2',
-  );
+  return dio.get<String>('/forum.php?mod=post&action=newthread&fid=$fid');
 }
 
 /// 获取回复页面的 HTML
@@ -16,8 +14,8 @@ Future<Response<String>> getReplyPage(
   String? repquote,
 }) {
   final url = repquote != null
-      ? '/forum.php?mod=post&action=reply&fid=2&tid=$tid&repquote=$repquote&mobile=2'
-      : '/forum.php?mod=post&action=reply&fid=2&tid=$tid&mobile=2';
+      ? '/forum.php?mod=post&action=reply&fid=2&tid=$tid&repquote=$repquote'
+      : '/forum.php?mod=post&action=reply&fid=2&tid=$tid';
   return dio.get<String>(url);
 }
 
@@ -32,7 +30,7 @@ Future<Response<String>> submitNewThread(
   Map<String, String> attachNew = const {},
 }) {
   return dio.post<String>(
-    '/forum.php?mod=post&action=newthread&fid=$fid&topicsubmit=yes&mobile=2&inajax=1',
+    '/forum.php?mod=post&action=newthread&fid=$fid&topicsubmit=yes&inajax=1',
     options: Options(
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -86,7 +84,7 @@ Future<Response<String>> submitReply(
   data.addAll(attachNew);
 
   return dio.post<String>(
-    '/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&replysubmit=yes&mobile=2&inajax=1',
+    '/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&replysubmit=yes&inajax=1',
     options: Options(
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

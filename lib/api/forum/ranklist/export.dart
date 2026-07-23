@@ -12,5 +12,5 @@ Future<Map<String, dynamic>> getRanklist(Dio dio, {
   String orderby = 'thisweek',
 }) async {
   final resp = await http.getRanklist(dio, view: view, orderby: orderby);
-  return parse.parseResponse(safeDecode(resp), resp.statusCode ?? 0);
+  return parseWithLog(resp, parse.parseResponse);
 }

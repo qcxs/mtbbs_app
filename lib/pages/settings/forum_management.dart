@@ -64,7 +64,11 @@ class ForumManagement {
           icon: Icon(Icons.refresh, size: 18, color: cs.onSurfaceVariant),
           tooltip: '从 API 刷新',
           onPressed: () async {
-            final ctx = context;
+            // 先关弹窗（弹窗在根 Navigator 上）
+            if (context.mounted) {
+              Navigator.of(context, rootNavigator: true).pop();
+            }
+            // 后台刷新
             final result = await forum_misc.fetchForumNav(ApiService().dio);
             if (result['success'] == true) {
               final refreshed =
@@ -76,9 +80,9 @@ class ForumManagement {
                 await settings.replaceForums(refreshed);
               }
             }
-            if (ctx.mounted) {
-              Navigator.of(ctx).pop(); // 关闭当前对话框
-              ScaffoldMessenger.of(ctx).showSnackBar(
+            // 弹窗已关，用设置页 context 显示 SnackBar
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
                     result['success'] == true
