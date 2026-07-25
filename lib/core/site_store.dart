@@ -41,6 +41,12 @@ class SiteStore extends ChangeNotifier {
   /// 当前站点登录页路径
   String get loginPagePath => current.loginPagePath;
 
+  /// 当前站点有效 UA
+  String get userAgent => current.effectiveUserAgent;
+
+  /// 当前站点是否使用移动端 UA
+  bool get isMobileUA => current.isMobileUA;
+
   /// 当前站点板块列表 (fid → 名称)
   Map<String, String> get forums => current.forums;
 

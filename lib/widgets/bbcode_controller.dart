@@ -170,7 +170,7 @@ class BBCodeController extends TextEditingController {
     final txt = text;
     final cursor = sel.start;
 
-    const selfClosing = {'hr', 'img', 'br'};
+    const selfClosing = {'hr', 'br'};
 
     int openPos = -1;
     String tagName = '';

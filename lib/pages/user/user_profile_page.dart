@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/site_store.dart';
+import '../../core/cache_utils.dart';
 import '../../api/home/space/export.dart' as space_api;
 import '../../services/api_service.dart';
 import '../../models/user_profile.dart';
@@ -291,6 +292,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             points['credits']?.toString() ?? '0',
             Icons.monetization_on_outlined,
             const Color(0xFFFF9800),
+            onTap: _showCreditDialog,
           ),
           _divider(),
           _statBox(
@@ -318,27 +320,56 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  Widget _statBox(String label, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, size: 22, color: color),
-          const SizedBox(height: 4),
-          Text(
+  Widget _statBox(
+    String label,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    final clickable = onTap != null;
+    final content = Column(
+      children: [
+        Icon(icon, size: 22, color: color),
+        const SizedBox(height: 4),
+        Container(
+          decoration: clickable
+              ? BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: _cs.onSurfaceVariant.withValues(alpha: 0.35),
+                      width: 1,
+                    ),
+                  ),
+                )
+              : null,
+          padding: clickable ? const EdgeInsets.only(bottom: 1) : null,
+          child: Text(
             label,
             style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
           ),
-        ],
-      ),
+        ),
+      ],
     );
+    if (clickable) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: content,
+        ),
+      );
+    }
+    return Expanded(child: content);
   }
 
   Widget _divider() {
@@ -396,13 +427,27 @@ class _UserProfilePageState extends State<UserProfilePage> {
     Color color, {
     VoidCallback? onTap,
   }) {
+    final clickable = onTap != null;
     final content = Column(
       children: [
         Icon(icon, size: 20, color: color),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, color: _cs.onSurfaceVariant),
+        Container(
+          decoration: clickable
+              ? BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: _cs.onSurfaceVariant.withValues(alpha: 0.35),
+                      width: 1,
+                    ),
+                  ),
+                )
+              : null,
+          padding: clickable ? const EdgeInsets.only(bottom: 1) : null,
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: _cs.onSurfaceVariant),
+          ),
         ),
         Text(
           value,
@@ -414,7 +459,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         ),
       ],
     );
-    if (onTap != null) {
+    if (clickable) {
       return InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
@@ -825,50 +870,62 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: medals.map((m) {
-              final medal = m as Map<String, dynamic>;
-              final name = medal['name'] as String? ?? '';
-              final icon = medal['icon'] as String? ?? '';
-              return Tooltip(
-                message: name,
-                child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: icon.isNotEmpty
-                      ? CachedNetworkImage(imageUrl: icon, fit: BoxFit.contain)
-                      : Container(
-                          decoration: BoxDecoration(
-                            color: _cs.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Icon(
-                            Icons.emoji_events_outlined,
-                            size: 18,
+          SizedBox(
+            height: 88,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.zero,
+              itemCount: medals.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, i) {
+                final medal = medals[i] as Map<String, dynamic>;
+                final name = medal['name'] as String? ?? '';
+                final icon = medal['icon'] as String? ?? '';
+                return SizedBox(
+                  width: 64,
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: icon.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: icon,
+                                  cacheManager: imageCacheManager,
+                                  fit: BoxFit.contain,
+                                )
+                              : Container(
+                                  color: _cs.surfaceContainerLow,
+                                  child: Icon(
+                                    Icons.emoji_events_outlined,
+                                    size: 18,
+                                    color: _cs.onSurfaceVariant,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Flexible(
+                        child: Text(
+                          name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
                             color: _cs.onSurfaceVariant,
+                            height: 1.2,
                           ),
                         ),
-                ),
-              );
-            }).toList(),
-          ),
-          if (medals.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              children: medals.map((m) {
-                final medal = m as Map<String, dynamic>;
-                final name = medal['name'] as String? ?? '';
-                return Text(
-                  name,
-                  style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
                 );
-              }).toList(),
+              },
             ),
-          ],
+          ),
         ],
       ),
     );

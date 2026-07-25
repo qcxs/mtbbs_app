@@ -261,11 +261,22 @@ class _EditorPageState extends State<EditorPage> {
       _loadingPage = false;
       _pageError = null;
       // 同步填充 AID→URL 映射和图片列表
-      _aidToSrc = {
-        for (final img in result.images)
-          if (img['aid'] != null && img['src'] != null)
-            img['aid']!: img['src']!,
-      };
+      if (preserveContent) {
+        // 保留模式：合并新数据，已有的快照数据不被覆盖
+        for (final img in result.images) {
+          final aid = img['aid'];
+          final src = img['src'];
+          if (aid != null && src != null && aid.isNotEmpty && src.isNotEmpty) {
+            _aidToSrc[aid] = src;
+          }
+        }
+      } else {
+        _aidToSrc = {
+          for (final img in result.images)
+            if (img['aid'] != null && img['src'] != null)
+              img['aid']!: img['src']!,
+        };
+      }
       _imageList = result.images.map((img) {
         return <String, dynamic>{
           'aid': img['aid'] ?? '',
@@ -521,8 +532,8 @@ class _EditorPageState extends State<EditorPage> {
       type: imgExts.isNotEmpty ? FileType.custom : FileType.image,
       allowedExtensions: imgExts.isNotEmpty ? imgExts : null,
       allowMultiple: true,
-      withData: false,
-      withReadStream: false,
+      withReadStream: true,
+      allowCompression: false,
     );
     if (result == null || result.files.isEmpty) return;
 
@@ -782,8 +793,8 @@ class _EditorPageState extends State<EditorPage> {
       type: attExts.isNotEmpty ? FileType.custom : FileType.any,
       allowedExtensions: attExts.isNotEmpty ? attExts : null,
       allowMultiple: true,
-      withData: false,
-      withReadStream: false,
+      withReadStream: true,
+      allowCompression: false,
     );
     if (result == null || result.files.isEmpty) return;
 
@@ -1476,11 +1487,37 @@ class _EditorPageState extends State<EditorPage> {
       ).showSnackBar(const SnackBar(content: Text('快照不存在')));
       return;
     }
+
+    // 校验编辑器类型一致性，防止跨类型恢复导致 fid/tid/pid 错乱
+    if (snapshot.editorType != widget.type.name) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '无法恢复：快照类型为"${_typeLabel(snapshot.editorType)}"，'
+            '当前为"${_pageTitle}"',
+          ),
+        ),
+      );
+      return;
+    }
+
     _saveManualSnapshot();
     _titleCtl.text = snapshot.title;
     _contentCtl.text = snapshot.content;
     _contentCtl.pendingAids = snapshot.pendingAids.toSet();
     _pageData = snapshot.pageData.toPageFormData();
+
+    // 从快照预填充图片/附件映射（供恢复后预览使用，
+    // _doFetchPage 后若新页面无这些图片，再兜底合并）
+    for (final img in snapshot.pageData.images) {
+      final aid = img['aid'];
+      final src = img['src'];
+      if (aid != null && src != null && aid.isNotEmpty && src.isNotEmpty) {
+        _aidToSrc[aid] = src;
+      }
+    }
+
     if (snapshot.quotedPost != null) {
       _quotedPost = snapshot.quotedPost!.map(
         (k, v) => MapEntry(k, v as dynamic),
@@ -1501,6 +1538,23 @@ class _EditorPageState extends State<EditorPage> {
       ),
     );
     AppLogger.i('EDITOR', 'restored snapshot: $snapshotId');
+  }
+
+  static String _typeLabel(String type) {
+    switch (type) {
+      case 'post':
+        return '发帖';
+      case 'comment':
+        return '评论';
+      case 'reply':
+        return '回复';
+      case 'editPost':
+        return '编辑帖子';
+      case 'editReply':
+        return '编辑评论';
+      default:
+        return type;
+    }
   }
 
   // ==================== 提示系统 ====================
@@ -1712,32 +1766,35 @@ class _EditorPageState extends State<EditorPage> {
                         await _saveManualSnapshot();
                       case 'history':
                         _openHistoryPage();
+                      case 'toolbar':
+                        if (!context.mounted) return;
+                        await context.push('/settings/editor');
                       case 'info':
                         if (!context.mounted) return;
+                        final curTitle = _titleCtl.text.trim();
+                        final curContent = _contentCtl.text.trim();
                         final fields = <String, dynamic>{
+                          '类型': _pageTitle,
                           'URL': _pageData.fetchedUrl,
                           'formhash': _pageData.formhash,
                           'posttime': _pageData.posttime,
                           if (_pageData.fid.isNotEmpty) 'fid': _pageData.fid,
                           if (_pageData.tid.isNotEmpty) 'tid': _pageData.tid,
                           if (_pageData.pid.isNotEmpty) 'pid': _pageData.pid,
-                          if (_pageData.noticeauthor.isNotEmpty)
-                            'noticeauthor': _pageData.noticeauthor,
-                          if (_pageData.reppid.isNotEmpty)
-                            'reppid': _pageData.reppid,
-                          if (_pageData.title.isNotEmpty) '标题': _pageData.title,
-                          if (_pageData.content.isNotEmpty)
-                            '内容(前80字)': _pageData.content.length > 80
-                                ? '${_pageData.content.substring(0, 80)}...'
-                                : _pageData.content,
-                          if (_pageData.images.isNotEmpty)
-                            '图片数': '${_pageData.images.length} 张',
+                          if (curTitle.isNotEmpty)
+                            '标题': curTitle.length > 50
+                                ? '${curTitle.substring(0, 50)}...'
+                                : curTitle,
+                          if (curContent.isNotEmpty)
+                            '内容(前80字)': curContent.length > 80
+                                ? '${curContent.substring(0, 80)}...'
+                                : curContent,
                           if (_pageData.uploadHash.isNotEmpty)
                             'uploadHash': _pageData.uploadHash,
                           if (_imageList.isNotEmpty)
-                            '图片列表(JSON)': const JsonEncoder.withIndent(
-                              '  ',
-                            ).convert(_imageList),
+                            '图片': '${_imageList.length} 张',
+                          if (_attachmentList.isNotEmpty)
+                            '附件': '${_attachmentList.length} 个',
                         };
                         showPageInfoDialog(context, fields);
                       case 'refresh':
@@ -1761,6 +1818,15 @@ class _EditorPageState extends State<EditorPage> {
                       child: ListTile(
                         leading: Icon(Icons.history, size: 20),
                         title: Text('编辑历史'),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'toolbar',
+                      child: ListTile(
+                        leading: Icon(Icons.tune, size: 20),
+                        title: Text('工具栏设置'),
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                       ),

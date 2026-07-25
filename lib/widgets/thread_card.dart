@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../models/thread_item.dart';
 import '../models/thread_detail.dart';
+import '../core/cache_utils.dart';
 import 'user_avatar.dart';
 import 'image_preview/image_preview.dart';
 import 'post_html_widget.dart';
@@ -233,7 +234,24 @@ class ThreadCard extends StatelessWidget {
 
   Widget _buildUserRow(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final hasUid = item.uid != null && '${item.uid}'.isNotEmpty;
+    final hasNick = item.nickname != null && item.nickname!.isNotEmpty;
     final hasTime = item.time != null && item.time!.isNotEmpty;
+
+    // 无发帖人信息时，仅在有时间时显示时间文本
+    if (!hasUid && !hasNick) {
+      if (!hasTime) return const SizedBox.shrink();
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            item.time!,
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         UserAvatar(
@@ -342,6 +360,7 @@ class ThreadCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           child: CachedNetworkImage(
             imageUrl: images.first,
+            cacheManager: imageCacheManager,
             width: double.infinity,
             height: 140,
             memCacheWidth: 280,
@@ -374,6 +393,7 @@ class ThreadCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                       child: CachedNetworkImage(
                         imageUrl: url,
+                        cacheManager: imageCacheManager,
                         width: double.infinity,
                         height: 90,
                         memCacheWidth: 180,
@@ -408,14 +428,16 @@ class ThreadCard extends StatelessWidget {
 
   Widget _buildBottomBar(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final fid = item.boardId;
+    final name = item.boardName;
+    final showBoard = (name != null && name.isNotEmpty) || fid != null;
     return Row(
       children: [
         // 板块标签 — 可点击，过长时截断
-        if (item.boardName != null && item.boardName!.isNotEmpty)
+        if (showBoard)
           Flexible(
             child: GestureDetector(
               onTap: () {
-                final fid = item.boardId;
                 if (fid != null) {
                   context.push('/forum?fid=$fid');
                 }
@@ -427,7 +449,7 @@ class ThreadCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  item.boardName!,
+                  name ?? '未知板块（$fid）',
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFF53BCF5),

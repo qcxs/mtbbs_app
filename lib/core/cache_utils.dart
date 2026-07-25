@@ -3,6 +3,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/site_store.dart';
 
 // ==================== 文件服务（忽略服务器 Cache-Control） ====================
 
@@ -53,7 +54,12 @@ class IgnoreCacheFileService extends FileService {
         ? '...${url.substring(url.length - 60)}'
         : url;
     AppLogger.i('CACHE', 'download: $short');
-    final response = await http.get(Uri.parse(url));
+    // 模拟浏览器行为：携带当前站点的 Referer
+    final reqHeaders = <String, String>{
+      'Referer': SiteStore.instance.baseUrl,
+      ...?headers,
+    };
+    final response = await http.get(Uri.parse(url), headers: reqHeaders);
     return IgnoreCacheResponse(response, stalePeriod, url);
   }
 }
@@ -62,6 +68,7 @@ class IgnoreCacheFileService extends FileService {
 
 CacheManager? _emojiCacheManager;
 CacheManager? _avatarCacheManager;
+CacheManager? _imageCacheManager;
 
 Duration _stalePeriod(int days) =>
     days > 0 ? Duration(days: days) : const Duration(days: 36500);
@@ -84,12 +91,27 @@ CacheManager _createAvatar(int days) => CacheManager(
   ),
 );
 
+CacheManager _createImage(int days) => CacheManager(
+  Config(
+    'image_cache',
+    stalePeriod: _stalePeriod(days),
+    maxNrOfCacheObjects: 500,
+    fileService: IgnoreCacheFileService(stalePeriod: _stalePeriod(days)),
+  ),
+);
+
 /// 应用启动时调用，用用户的配置初始化缓存管理器。
-void initCacheManagers({required int emojiDays, required int avatarDays}) {
+void initCacheManagers({
+  required int emojiDays,
+  required int avatarDays,
+  required int imageDays,
+}) {
   _emojiCacheManager?.dispose();
   _avatarCacheManager?.dispose();
+  _imageCacheManager?.dispose();
   _emojiCacheManager = _createEmoji(emojiDays);
   _avatarCacheManager = _createAvatar(avatarDays);
+  _imageCacheManager = _createImage(imageDays);
 }
 
 /// 表情图片缓存管理器
@@ -97,6 +119,9 @@ CacheManager get emojiCacheManager => _emojiCacheManager ??= _createEmoji(30);
 
 /// 头像图片缓存管理器
 CacheManager get avatarCacheManager => _avatarCacheManager ??= _createAvatar(7);
+
+/// 通用图片缓存管理器（帖子图片、封面图等），默认携带 Referer
+CacheManager get imageCacheManager => _imageCacheManager ??= _createImage(30);
 
 // ==================== 缓存统计与清空 ====================
 

@@ -87,6 +87,11 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
             tooltip: '刷新',
             onPressed: _load,
           ),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined, size: 20),
+            tooltip: '清空所有',
+            onPressed: _confirmClearAll,
+          ),
         ],
       ),
       body: _buildBody(),
@@ -469,6 +474,48 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('已删除')));
+      }
+    }
+  }
+
+  Future<void> _confirmClearAll() async {
+    final cs = Theme.of(context).colorScheme;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        constraints: const BoxConstraints(maxWidth: 360),
+        title: const Row(
+          children: [
+            Expanded(
+              child: Text(
+                '清空所有历史',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        content: const Text('确定要删除所有编辑历史吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: cs.error),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && context.mounted) {
+      await context.read<EditorHistoryProvider>().clearAll();
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已清空所有历史')));
       }
     }
   }

@@ -317,7 +317,9 @@ class MtUploadResult {
   );
 
   String get sizeText {
-    if (size < 1) return '${(size * 1024).toStringAsFixed(0)} KB';
-    return '${size.toStringAsFixed(1)} MB';
+    final bytes = size.toInt();
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }

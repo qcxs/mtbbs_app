@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/page_fetcher.dart';
 import 'package:mtbbs/core/xml_helper.dart';
 import 'package:mtbbs/core/logger.dart';
@@ -64,7 +65,10 @@ class EditorSubmitHelper {
     if (url.isEmpty) return const PageFormData(success: false, error: 'URL 为空');
 
     try {
-      final resp = await ApiService().dio.get(url);
+      final resp = await ApiService().dio.get(
+        url,
+        options: Options(headers: {'User-Agent': Site.uaPc}),
+      );
       final html = resp.data is String ? (resp.data as String) : '';
       final result = PageFetcher.parsePage(html, url: url);
       if (result.success) {

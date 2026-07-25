@@ -28,25 +28,90 @@ class _WebLoginPageState extends State<WebLoginPage> {
   String? _errorMessage;
   bool _loginDone = false;
   double _progress = 0;
+  late final TextEditingController _urlController;
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  WebUri get _loginUrl => WebUri(
-    '${SiteStore.instance.baseUrl}/member.php?mod=logging&action=login&mobile=2',
-  );
+  WebUri get _loginUrl {
+    final path = SiteStore.instance.loginPagePath;
+    if (path.isNotEmpty) {
+      if (path.startsWith('http://') || path.startsWith('https://')) {
+        return WebUri(path);
+      }
+      return WebUri('${SiteStore.instance.baseUrl}$path');
+    }
+    return WebUri(
+      '${SiteStore.instance.baseUrl}/member.php?mod=logging&action=login&mobile=2',
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    _urlController = TextEditingController(text: _loginUrl.toString());
     // 清除 WebView Cookie，避免已登录状态跳过登录页
     CookieManager.instance().deleteAllCookies();
   }
 
   @override
   void dispose() {
+    _urlController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  /// 显示 URL 输入对话框，点击标题触发
+  void _showUrlDialog() {
+    final cs = Theme.of(context).colorScheme;
+    final ctl = TextEditingController(text: _urlController.text);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('输入网址'),
+        content: TextField(
+          controller: ctl,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          textInputAction: TextInputAction.go,
+          decoration: InputDecoration(
+            hintText: 'https://...',
+            border: const OutlineInputBorder(),
+            isDense: true,
+            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+            filled: true,
+          ),
+          onSubmitted: (value) {
+            Navigator.of(ctx).pop();
+            _navigateFromController(ctl);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _navigateFromController(ctl);
+            },
+            child: const Text('前往'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 从对话框控制器提取 URL 并导航
+  void _navigateFromController(TextEditingController ctl) {
+    var url = ctl.text.trim();
+    if (url.isEmpty) return;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+    _urlController.text = url;
+    _controller?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
   }
 
   // ==================== 登录检测 ====================
@@ -375,7 +440,14 @@ class _WebLoginPageState extends State<WebLoginPage> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(null),
         ),
-        title: const Text('网页登录', style: TextStyle(fontSize: 16)),
+        title: GestureDetector(
+          onTap: _showUrlDialog,
+          child: Text(
+            _loginUrl.host,
+            style: const TextStyle(fontSize: 14),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         actions: [
           SizedBox(
             height: 32,

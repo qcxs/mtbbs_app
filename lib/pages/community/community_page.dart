@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/forum/forumdisplay/export.dart' as forum_api;
 import 'package:mtbbs/core/site_store.dart';
@@ -155,6 +156,13 @@ class _CommunityPageState extends State<CommunityPage> {
   Widget _buildSingleForum() {
     final fid = widget.fid;
     _activeKey = fid;
+    // fid 不在本地板块列表时也创建 controller，确保可以加载
+    if (!_ctrlMap.containsKey(fid) && fid.isNotEmpty) {
+      _ctrlMap[fid] = ThreadListController(
+        fetchFn: ({required int page}) =>
+            forum_api.getForumThreads(ApiService().dio, fid: fid, page: page),
+      );
+    }
     _ensureCtls();
     final ctrl = _ctrlMap[fid];
     if (ctrl != null && ctrl.state == LoadState.initial) {
@@ -196,7 +204,9 @@ class _CommunityPageState extends State<CommunityPage> {
       final ctrl = _ctrlMap[widget.fid];
       return Scaffold(
         appBar: AppBar(
-          title: Text(SiteStore.instance.forums[widget.fid] ?? widget.fid),
+          title: Text(
+            SiteStore.instance.forums[widget.fid] ?? '未知板块（${widget.fid}）',
+          ),
           surfaceTintColor: cs.surface,
           elevation: 0.5,
           actions: [
@@ -209,6 +219,12 @@ class _CommunityPageState extends State<CommunityPage> {
               icon: const Icon(Icons.filter_list, size: 20),
               tooltip: '筛选排序',
               onPressed: _showFilterDialog,
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              tooltip: '发帖',
+              onPressed: () =>
+                  context.push('/editor?type=post&fid=${widget.fid}'),
             ),
           ],
         ),

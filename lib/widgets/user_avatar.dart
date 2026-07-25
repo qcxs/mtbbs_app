@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../core/cache_utils.dart';
 import '../core/site_store.dart';
 import '../core/stagger_queue.dart';
+import '../providers/settings_provider.dart';
 import 'image_preview/image_preview.dart';
 
 /// 头像点击行为
@@ -109,10 +111,21 @@ class _UserAvatarState extends State<UserAvatar> {
     }
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 设置变更（如头像开关）时重新检查
+    if (!_ready) _schedule();
+  }
+
   /// 解析 301 重定向 → 检查缓存 → 排队加载
   Future<void> _schedule() async {
-    final originalUrl = _originalUrl;
     if (!mounted) return;
+
+    // 头像已禁用 → 跳过所有网络请求
+    if (!context.read<SettingsProvider>().showAvatars) return;
+
+    final originalUrl = _originalUrl;
 
     // 1. 解析 301 重定向，获取 CDN 直链
     _resolvedUrl = await _resolveRedirect(originalUrl);
@@ -214,6 +227,16 @@ class _UserAvatarState extends State<UserAvatar> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     if (widget.uid.isEmpty) return _fallback(cs);
+
+    // 头像已禁用 → 不发起任何网络请求，仅显示文字，但仍可点击
+    final showAvatars = context.select<SettingsProvider, bool>(
+      (s) => s.showAvatars,
+    );
+    if (!showAvatars) {
+      final fb = _fallback(cs);
+      if (widget.tapAction == AvatarTapAction.none) return fb;
+      return GestureDetector(onTap: () => _handleTap(context), child: fb);
+    }
 
     Widget avatarContent;
     if (_ready) {

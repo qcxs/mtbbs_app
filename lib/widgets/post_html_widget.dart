@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_html/flutter_html.dart';
 import '../core/bbcode2html.dart';
+import '../core/cache_utils.dart';
 import '../core/emoji_loader.dart';
-import '../core/url_router.dart';
-import '../providers/settings_provider.dart';
 import '../core/site_store.dart';
+import '../core/url_router.dart';
+import '../config/brand_colors.dart';
+import '../providers/settings_provider.dart';
 import 'bbcode_table.dart';
 import 'bbcode_code_block.dart';
 import 'image_preview/image_preview.dart';
@@ -83,50 +86,47 @@ class PostHtmlWidget extends StatelessWidget {
 
     // 1. 先按 [code] 分割，再对非 code 段按 [table] 分割
     final segments = _buildSegments(bbcode);
-    if (segments.length == 1 && segments.first is _HtmlSegment) {
-      // 无 code 也无 table：保持原有路径（单个 Html widget）
-      return _buildHtmlSegment(
-        context,
-        bbcode,
-        fontSize,
-        emojiMap,
-        smilieIdMap,
-        effectiveDisabled,
-        autoDetectUrls,
-      );
-    }
-
-    // 有 code/table 时分段渲染
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final segment in segments)
-          switch (segment) {
-            _HtmlSegment(:final content) => _buildHtmlSegment(
-              context,
-              content,
-              fontSize,
-              emojiMap,
-              smilieIdMap,
-              effectiveDisabled,
-              autoDetectUrls,
-            ),
-            _TableSegment(:final content) => BbcodeTableWidget(
-              bbcode: content,
-              fontSize: fontSize,
-              emojiMap: emojiMap,
-              smilieIdMap: smilieIdMap ?? EmojiService().smilieIdMap,
-              disabledTags: effectiveDisabled,
-              autoDetectUrls: autoDetectUrls,
-            ),
-            _CodeSegment(:final content) => BbcodeCodeBlock(
-              code: content,
-              fontSize: fontSize.clamp(11, 16).toDouble(),
-            ),
-          },
-      ],
-    );
+    final content = segments.length == 1 && segments.first is _HtmlSegment
+        ? _buildHtmlSegment(
+          context,
+          bbcode,
+          fontSize,
+          emojiMap,
+          smilieIdMap,
+          effectiveDisabled,
+          autoDetectUrls,
+        )
+        : Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final segment in segments)
+              switch (segment) {
+                _HtmlSegment(:final content) => _buildHtmlSegment(
+                  context,
+                  content,
+                  fontSize,
+                  emojiMap,
+                  smilieIdMap,
+                  effectiveDisabled,
+                  autoDetectUrls,
+                ),
+                _TableSegment(:final content) => BbcodeTableWidget(
+                  bbcode: content,
+                  fontSize: fontSize,
+                  emojiMap: emojiMap,
+                  smilieIdMap: smilieIdMap ?? EmojiService().smilieIdMap,
+                  disabledTags: effectiveDisabled,
+                  autoDetectUrls: autoDetectUrls,
+                ),
+                _CodeSegment(:final content) => BbcodeCodeBlock(
+                  code: content,
+                  fontSize: fontSize.clamp(11, 16).toDouble(),
+                ),
+              },
+          ],
+        );
+    return SelectionArea(child: content);
   }
 
   /// 生成渲染段列表：先按 [code] 分割，再对非 code 段按 [table] 分割
@@ -159,6 +159,8 @@ class PostHtmlWidget extends StatelessWidget {
     Set<String> disabledTags,
     bool autoDetectUrls,
   ) {
+    final cs = Theme.of(context).colorScheme;
+
     final converter = BBCode2Html(
       emojiMap: emojiMap,
       smilieIdMap: smilieIdMap,
@@ -175,41 +177,41 @@ class PostHtmlWidget extends StatelessWidget {
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
         ),
-        'a': Style(textDecoration: TextDecoration.none),
+        'a': Style(
+          color: cs.linkColor,
+          textDecoration: TextDecoration.underline,
+        ),
         'blockquote': Style(
-          backgroundColor: const Color(0xFFFFF8E1),
+          backgroundColor: cs.quoteBg,
           margin: Margins.zero,
           padding: HtmlPaddings.only(left: 12, top: 8, bottom: 8),
         ),
-        'pre': Style(
-          backgroundColor: const Color(0xFF1E1E1E),
-          margin: Margins.zero,
-        ),
-        'code': Style(color: const Color(0xFF98C379), fontFamily: 'monospace'),
+        'pre': Style(backgroundColor: cs.codeBgColor, margin: Margins.zero),
+        'code': Style(color: cs.codeTextColor, fontFamily: 'monospace'),
         '.bbcode-hide': Style(
-          backgroundColor: const Color(0xFFFFF8E1),
+          backgroundColor: cs.quoteBg,
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
         ),
         '.bbcode-free': Style(
-          backgroundColor: const Color(0xFFF0FFF0),
+          backgroundColor: cs.quoteBg,
           margin: Margins.zero,
           padding: HtmlPaddings.all(8),
         ),
         '.bbcode-attach': Style(
-          backgroundColor: const Color(0xFFE3F2FD),
+          backgroundColor: cs.attachBgColor,
           margin: Margins.zero,
           padding: HtmlPaddings.all(8),
         ),
         '.bbcode-locked': Style(
-          backgroundColor: const Color(0xFFFFF3E0),
+          backgroundColor: cs.lockedBgColor,
           margin: Margins.zero,
           padding: HtmlPaddings.all(10),
           fontSize: FontSize(14),
         ),
         '.bbcode-pstatus': Style(
-          backgroundColor: const Color(0xFFF5F5F5),
-          color: const Color(0xFF999999),
+          backgroundColor: cs.pstatusBgColor,
+          color: cs.pstatusTextColor,
           margin: Margins.zero,
           padding: HtmlPaddings.symmetric(vertical: 4, horizontal: 8),
           fontSize: FontSize(12),
@@ -224,16 +226,17 @@ class PostHtmlWidget extends StatelessWidget {
           margin: Margins.symmetric(vertical: 8),
           padding: HtmlPaddings.zero,
         ),
-        'a': Style(
-          color: const Color(0xFF336699),
-          textDecoration: TextDecoration.underline,
-        ),
       },
       extensions: [
         ImageExtension(
           builder: (ctx) {
             final src = ctx.attributes['src'] ?? '';
             if (src.isEmpty) return const SizedBox.shrink();
+            // 通过 data-type="emoji" 区分表情图片和普通帖子图片
+            final isEmoji = ctx.attributes['data-type'] == 'emoji';
+            final cacheManager = isEmoji
+                ? emojiCacheManager
+                : imageCacheManager;
             final w = ctx.attributes['width'];
             final width = w != null ? double.tryParse(w) : null;
             double? height;
@@ -251,31 +254,32 @@ class PostHtmlWidget extends StatelessWidget {
               }
             }
             return GestureDetector(
-              onLongPress: () => showImageActions(
-                context,
-                imageUrls: [src],
-                sourceInfo: '帖子图片',
-              ),
-              child: Image.network(
-                src,
-                width: width,
-                height: height,
+              onLongPress: isEmoji
+                  ? null
+                  : () => showImageActions(
+                      context,
+                      imageUrls: [src],
+                      sourceInfo: '帖子图片',
+                    ),
+              child: CachedNetworkImage(
+                imageUrl: src,
+                cacheManager: cacheManager,
+                width: isEmoji ? 20 : width,
+                height: isEmoji ? 20 : height,
                 fit: BoxFit.contain,
-                loadingBuilder: (_, child, progress) => progress != null
-                    ? SizedBox(
-                        width: width,
-                        height: height ?? 100,
-                        child: const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                      )
-                    : child,
-                errorBuilder: (_, __, ___) => Icon(
-                  Icons.broken_image_outlined,
+                placeholder: (_, __) => SizedBox(
+                  width: width,
+                  height: height ?? 100,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Icon(
+                  Icons.emoji_emotions_outlined,
                   size: 48,
                   color: Colors.grey.shade400,
                 ),

@@ -175,6 +175,49 @@ void main() {
     });
   });
 
+  group('Html2BBCode - 52pojie 代码块转换', () {
+    test('parsedown-markdown 带 hljs 高亮的代码块', () {
+      // 52pojie（https://www.52pojie.cn/）的代码块样式
+      // <code data-highlighted="yes" class="hljs language-smali"> 内含 &amp; 等 HTML 实体
+      const html = ''
+          '<div class="parsedown-markdown">'
+          '<pre>'
+          '<em class="CopyMyCode" style="cursor: pointer; font-size: 12px; color: rgb(51, 102, 153) !important;"> 复制代码</em>'
+          '<em class="hideCode" style="cursor: pointer; font-size: 12px; color: rgb(51, 102, 153) !important;"> 隐藏代码<br></em>'
+          '<code data-highlighted="yes" class="hljs language-smali">'
+          'v33 = sub_3E398(&amp;v483); \n'
+          '   if ( v33 ) \n'
+          '     v34 = (time(nullptr) - v33) &gt; 0x4F19FF; \n'
+          '   else \n'
+          '     v34 = 1; \n'
+          '   v452 = v34;'
+          '</code>'
+          '</pre>'
+          '</div>';
+      final converter = Html2BBCode();
+      final result = converter.convert(html);
+      // 应跳过 <em> 按钮文本（复制代码/隐藏代码），只提取 <code> 内代码
+      expect(result, contains('[code]'));
+      expect(result, contains('[/code]'));
+      expect(result, isNot(contains('复制代码')));
+      expect(result, isNot(contains('隐藏代码')));
+      // HTML 实体应被解码（&amp; → &, &gt; → >）
+      expect(result, contains('&v483'));
+      expect(result, contains('> 0x4F19FF'));
+      // 代码内容应完整包含
+      expect(result, contains('v33 = sub_3E398'));
+      expect(result, contains('v452 = v34'));
+    });
+
+    test('parsedown-markdown 无 <code> 时回退到子节点', () {
+      // 如果 parsedown-markdown 内没有 <code>，不应产生 [code]
+      const html = '<div class="parsedown-markdown"><p>普通内容</p></div>';
+      final result = Html2BBCode().convert(html);
+      expect(result, isNot(contains('[code]')));
+      expect(result, contains('普通内容'));
+    });
+  });
+
   group('Html2BBCode - 真实帖子段落转换', () {
     test('段落 + 加粗 + 字体', () {
       const html =

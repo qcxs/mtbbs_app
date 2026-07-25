@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/site_store.dart';
+import '../../config/site_config.dart';
 import '../../config/nav_config.dart';
 import '../../core/shortcut_helper.dart';
 import '../../core/stagger_queue.dart';
@@ -48,6 +49,14 @@ class SettingsPage extends StatelessWidget {
                 context: context,
                 builder: (_) => const UserManagementDialog(),
               ),
+            ),
+            // UA 切换
+            ListTile(
+              leading: _iconBox(Icons.phone_android, const Color(0xFFFF5722)),
+              title: const Text('浏览模式'),
+              subtitle: Text(SiteStore.instance.isMobileUA ? '移动版（推荐）' : '桌面版'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showUADialog(context, settings),
             ),
           ]),
 
@@ -157,6 +166,13 @@ class SettingsPage extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showColorPicker(context, settings),
             ),
+            SwitchListTile(
+              secondary: _iconBox(Icons.dark_mode, const Color(0xFF3F51B5)),
+              title: const Text('纯黑主题'),
+              subtitle: const Text('深色模式下使用纯黑背景'),
+              value: settings.isPureBlackTheme,
+              onChanged: (v) => settings.setPureBlackTheme(v),
+            ),
             ListTile(
               leading: _iconBox(Icons.settings, const Color(0xFF607D8B)),
               title: const Text('编辑器设置'),
@@ -188,6 +204,17 @@ class SettingsPage extends StatelessWidget {
               subtitle: Text('${settings.staggerInterval}ms，头像/预览等批量请求逐个放行'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showStaggerDialog(context, settings),
+            ),
+          ]),
+
+          // ==================== 开发者选项 ====================
+          _section(cs, '开发者选项', [
+            SwitchListTile(
+              secondary: _iconBox(Icons.face, const Color(0xFF9E9E9E)),
+              title: const Text('显示头像'),
+              subtitle: const Text('关闭后不再请求头像图片，仅显示文字'),
+              value: settings.showAvatars,
+              onChanged: (v) => settings.setShowAvatars(v),
             ),
           ]),
 
@@ -361,6 +388,53 @@ class SettingsPage extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  void _showUADialog(BuildContext context, SettingsProvider settings) {
+    final site = SiteStore.instance.current;
+    final isMobile = site.isMobileUA;
+    final cs = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        constraints: const BoxConstraints(maxWidth: 360),
+        title: const Text('浏览模式'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('选择当前站点使用的页面渲染模式：'),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.phone_android, color: cs.primary),
+              title: const Text('移动版'),
+              subtitle: const Text('使用手机 UA 访问，克米模板卡片式布局，默认推荐'),
+              trailing: isMobile ? Icon(Icons.check, color: cs.primary) : null,
+              onTap: () async {
+                await settings.setSiteUA(Site.uaAndroid);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.desktop_windows, color: cs.onSurfaceVariant),
+              title: const Text('桌面版'),
+              subtitle: const Text('使用电脑 UA 访问，标准 Discuz 表格布局'),
+              trailing: !isMobile ? Icon(Icons.check, color: cs.primary) : null,
+              onTap: () async {
+                await settings.setSiteUA(Site.uaPc);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
     );
   }
 

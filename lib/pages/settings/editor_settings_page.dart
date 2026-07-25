@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
@@ -76,6 +77,13 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showToolbarDialog(context, settings),
+            ),
+            ListTile(
+              leading: _iconBox(Icons.keyboard, cs.onSurfaceVariant),
+              title: const Text('快捷键设置'),
+              subtitle: const Text('配置全局和工具栏快捷键'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/settings/shortcuts'),
             ),
           ]),
         ],

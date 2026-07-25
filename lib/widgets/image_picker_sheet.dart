@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:mtbbs/core/cache_utils.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/bbcode_controller.dart';
 
@@ -278,6 +279,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
                 borderRadius: BorderRadius.circular(6),
                 child: CachedNetworkImage(
                   imageUrl: fullSrc,
+                  cacheManager: imageCacheManager,
                   fit: BoxFit.cover,
                   errorWidget: (_, __, ___) => Container(
                     color: cs.surfaceContainerLow,

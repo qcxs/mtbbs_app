@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
+import 'package:flutter_highlight/themes/github.dart';
 import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/languages/all.dart';
+import '../config/brand_colors.dart';
 
 /// 常用语言列表（用于语言切换选择器）
 const _languages = [
@@ -219,18 +221,22 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = cs.brightness == Brightness.dark;
+    final codeTheme = isDark ? monokaiSublimeTheme : githubTheme;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF272822),
+        color: cs.codeBlockBg,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildTopBar(),
+          _buildTopBar(cs),
           ClipRRect(
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(6),
@@ -241,7 +247,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
                     child: HighlightView(
                       widget.code,
                       language: _renderLanguage,
-                      theme: monokaiSublimeTheme,
+                      theme: codeTheme,
                       padding: const EdgeInsets.all(12),
                       textStyle: TextStyle(
                         fontFamily: 'monospace',
@@ -255,7 +261,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
                     child: HighlightView(
                       widget.code,
                       language: _renderLanguage,
-                      theme: monokaiSublimeTheme,
+                      theme: codeTheme,
                       padding: const EdgeInsets.all(12),
                       textStyle: TextStyle(
                         fontFamily: 'monospace',
@@ -270,13 +276,11 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
     );
   }
 
-  Widget _buildTopBar() {
-    // 代码块背景始终是深色，顶栏文字使用固定亮色（不跟随主题）
-    const barTextColor = Color(0xFFB0B0B0);
+  Widget _buildTopBar(ColorScheme cs) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.2),
+        color: cs.codeBlockBarBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
       ),
       child: Row(
@@ -287,7 +291,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: cs.codeBlockIconActive.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(3),
               ),
               child: Row(
@@ -295,10 +299,14 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
                 children: [
                   Text(
                     _languageLabel,
-                    style: TextStyle(fontSize: 11, color: barTextColor),
+                    style: TextStyle(fontSize: 11, color: cs.codeBlockBarText),
                   ),
                   const SizedBox(width: 3),
-                  Icon(Icons.arrow_drop_down, size: 12, color: barTextColor),
+                  Icon(
+                    Icons.arrow_drop_down,
+                    size: 12,
+                    color: cs.codeBlockBarText,
+                  ),
                 ],
               ),
             ),
@@ -311,14 +319,16 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: _wordWrap
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : Colors.white.withValues(alpha: 0.05),
+                    ? cs.codeBlockIconActive.withValues(alpha: 0.15)
+                    : cs.codeBlockIconActive.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(3),
               ),
               child: Icon(
                 Icons.wrap_text,
                 size: 14,
-                color: _wordWrap ? Colors.white : const Color(0xFF888888),
+                color: _wordWrap
+                    ? cs.codeBlockIconActive
+                    : cs.codeBlockIconInactive,
               ),
             ),
           ),
@@ -337,17 +347,21 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: cs.codeBlockIconActive.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.copy_rounded, size: 12, color: barTextColor),
+                  Icon(
+                    Icons.copy_rounded,
+                    size: 12,
+                    color: cs.codeBlockBarText,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     '复制',
-                    style: TextStyle(fontSize: 11, color: barTextColor),
+                    style: TextStyle(fontSize: 11, color: cs.codeBlockBarText),
                   ),
                 ],
               ),

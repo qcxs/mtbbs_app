@@ -111,6 +111,18 @@ class Html2BBCode {
       }
       return '';
     }
+    // 52pojie 代码块：<div class="parsedown-markdown"><pre><code data-highlighted="yes"> → [code]
+    // 需跳过 <em> 按钮（复制代码/隐藏代码），只取 <code> 内的代码文本
+    if (cls.contains('parsedown-markdown')) {
+      final code = el.querySelector('code');
+      if (code != null) {
+        // code.text 由 dart:html 自动解码 HTML 实体（&amp; → & 等）
+        // 保留原始换行和缩进，不调用 _parseChildren（会混入 <em> 按钮文本）
+        return '\n[code]${code.text}[/code]\n';
+      }
+      return _parseChildren(el);
+    }
+
     // PC 模板代码块：.blockcode → [code]
     if (cls == 'blockcode') {
       // 从 <ol><li> 逐行提取，保留换行

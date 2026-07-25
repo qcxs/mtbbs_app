@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
@@ -34,6 +35,7 @@ void main() async {
   initCacheManagers(
     emojiDays: settings.emojiCacheDays,
     avatarDays: settings.avatarCacheDays,
+    imageDays: settings.imageCacheDays,
   );
 
   // 用 settings 中的站点配置初始化 ApiService
@@ -164,25 +166,34 @@ class MyApp extends StatelessWidget {
       child: Builder(
         builder: (context) {
           final s = context.watch<SettingsProvider>();
+          final schemeLight = SeedColorScheme.fromSeeds(
+            primaryKey: s.seedColor,
+            variant: FlexSchemeVariant.material3Legacy,
+            brightness: Brightness.light,
+          );
+          var schemeDark = SeedColorScheme.fromSeeds(
+            primaryKey: s.seedColor,
+            variant: FlexSchemeVariant.material3Legacy,
+            brightness: Brightness.dark,
+          );
+
+          // 纯黑主题：覆盖 surface 系列色为纯黑/近黑
+          if (s.isPureBlackTheme) {
+            schemeDark = schemeDark.copyWith(
+              surface: Colors.black,
+              surfaceContainerLowest: Colors.black,
+              surfaceContainerLow: const Color(0xFF0A0A0A),
+              surfaceContainer: const Color(0xFF121212),
+              surfaceContainerHigh: const Color(0xFF1A1A1A),
+              surfaceContainerHighest: const Color(0xFF242424),
+            );
+          }
+
           return MaterialApp.router(
             title: 'MTBBS',
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              fontFamily: 'sans-serif',
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: s.seedColor,
-                brightness: Brightness.light,
-              ),
-              useMaterial3: true,
-            ),
-            darkTheme: ThemeData(
-              fontFamily: 'sans-serif',
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: s.seedColor,
-                brightness: Brightness.dark,
-              ),
-              useMaterial3: true,
-            ),
+            theme: _buildThemeData(schemeLight),
+            darkTheme: _buildThemeData(schemeDark),
             themeMode: s.themeMode,
             routerConfig: router,
           );
@@ -190,4 +201,32 @@ class MyApp extends StatelessWidget {
       ),
     );
   }
+}
+
+ThemeData _buildThemeData(ColorScheme cs) {
+  return ThemeData(
+    useMaterial3: true,
+    fontFamily: 'sans-serif',
+    colorScheme: cs,
+    appBarTheme: AppBarTheme(
+      backgroundColor: cs.surface,
+      foregroundColor: cs.onSurface,
+      surfaceTintColor: Colors.transparent,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: cs.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
+    cardTheme: CardThemeData(color: cs.surfaceContainerLow),
+    dialogTheme: DialogThemeData(backgroundColor: cs.surface),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: cs.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: cs.inverseSurface,
+      contentTextStyle: TextStyle(color: cs.onInverseSurface),
+    ),
+  );
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/cache_utils.dart';
 
 /// 画廊容器 — 全屏图片查看器
 ///
@@ -60,6 +61,7 @@ class _GalleryViewerState extends State<GalleryViewer> {
                 return PhotoViewGalleryPageOptions(
                   imageProvider: CachedNetworkImageProvider(
                     widget.imageUrls[index],
+                    cacheManager: imageCacheManager,
                   ),
                   minScale: PhotoViewComputedScale.contained * 0.8,
                   maxScale: PhotoViewComputedScale.covered * 2.0,

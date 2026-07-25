@@ -48,6 +48,9 @@ dependencies:
   # 状态管理
   provider: ^6.1.0
 
+  # 配色方案
+  flex_seed_scheme: ^4.0.1
+
   # 图片缓存
   cached_network_image: ^3.3.0
   flutter_cache_manager: ^3.3.0
@@ -73,6 +76,7 @@ dependencies:
   highlight: ^0.7.0
   flutter_highlight: ^0.7.0
   re_highlight: ^0.0.3
+  charset: ^2.0.1
 
 dev_dependencies:
   flutter_test:

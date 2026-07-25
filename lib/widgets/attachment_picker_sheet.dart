@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:mtbbs/core/cache_utils.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/bbcode_controller.dart';
 
@@ -232,12 +234,13 @@ class _AttachmentPickerSheetState extends State<AttachmentPickerSheet> {
                   child: iconUrl.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(6),
-                          child: Image.network(
-                            iconUrl,
+                          child: CachedNetworkImage(
+                            imageUrl: iconUrl,
+                            cacheManager: imageCacheManager,
                             width: 36,
                             height: 36,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Icon(
+                            errorWidget: (_, __, ___) => Icon(
                               Icons.insert_drive_file_outlined,
                               size: 20,
                               color: cs.onSurfaceVariant,

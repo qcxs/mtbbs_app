@@ -373,14 +373,20 @@ class AuthProvider extends ChangeNotifier {
 
   List<Cookie> _parseCookieString(String cookieStr) {
     final cookies = <Cookie>[];
-    for (final pair in cookieStr.split('; ')) {
-      final eq = pair.indexOf('=');
+    for (final pair in cookieStr.split(';')) {
+      final trimmed = pair.trim();
+      if (trimmed.isEmpty) continue;
+      final eq = trimmed.indexOf('=');
       if (eq <= 0) continue;
-      final c = Cookie(pair.substring(0, eq), pair.substring(eq + 1));
-      c.domain = '.${Uri.parse(SiteStore.instance.baseUrl).host}';
-      c.path = '/';
-      c.maxAge = 86400 * 30;
-      cookies.add(c);
+      try {
+        final c = Cookie(trimmed.substring(0, eq), trimmed.substring(eq + 1));
+        c.domain = '.${Uri.parse(SiteStore.instance.baseUrl).host}';
+        c.path = '/';
+        c.maxAge = 86400 * 30;
+        cookies.add(c);
+      } catch (_) {
+        // 跳过值中包含非法字符（如逗号）的 Cookie
+      }
     }
     return cookies;
   }

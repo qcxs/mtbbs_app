@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/url_router.dart';
+import '../../core/cache_utils.dart';
 import '../../core/site_store.dart';
 import '../../models/managed_item.dart';
 import '../../providers/settings_provider.dart';
@@ -211,6 +212,7 @@ class _ShortcutTile extends StatelessWidget {
               child: imageUrl != null && imageUrl.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: imageUrl,
+                      cacheManager: imageCacheManager,
                       fit: BoxFit.cover,
                       errorWidget: (_, __, ___) =>
                           Icon(Icons.link, color: cs.onSurfaceVariant),

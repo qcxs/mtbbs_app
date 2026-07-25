@@ -37,6 +37,9 @@ class SettingsProvider extends ChangeNotifier {
   /// 表情缓存天数（-1 表示永不过期）
   int _emojiCacheDays = -1;
 
+  /// 帖子图片缓存天数（-1 表示永不过期）
+  int _imageCacheDays = 3;
+
   /// 用户自定义站点列表（持久化）
   List<Site> _sites = [];
 
@@ -76,6 +79,9 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 主题种子色
   Color _seedColor = const Color(0xFF9E9E9E);
+
+  /// 纯黑主题（仅深色模式下生效）
+  bool _isPureBlackTheme = false;
 
   /// 预设主题色
   static const Map<String, Color> presetColors = {
@@ -119,11 +125,21 @@ class SettingsProvider extends ChangeNotifier {
   /// 表情缓存天数（-1 = 永不过期）
   int get emojiCacheDays => _emojiCacheDays;
 
+  /// 帖子图片缓存天数（-1 = 永不过期）
+  int get imageCacheDays => _imageCacheDays;
+
   /// 主题模式
   ThemeMode get themeMode => _themeMode;
 
   /// 主题种子色
   Color get seedColor => _seedColor;
+
+  /// 纯黑主题
+  bool get isPureBlackTheme => _isPureBlackTheme;
+
+  /// 是否显示头像
+  bool _showAvatars = true;
+  bool get showAvatars => _showAvatars;
 
   /// 设置快捷键
   Future<void> setShortcut(String action, String keyString) async {
@@ -173,6 +189,14 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 设置帖子图片缓存天数（-1 = 永不过期）
+  Future<void> setImageCacheDays(int days) async {
+    _imageCacheDays = days.clamp(-1, 365);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('imageCacheDays', _imageCacheDays);
+    notifyListeners();
+  }
+
   /// 设置主题模式
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
@@ -186,6 +210,22 @@ class SettingsProvider extends ChangeNotifier {
     _seedColor = color;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('seedColor', color.toARGB32());
+    notifyListeners();
+  }
+
+  /// 设置纯黑主题
+  Future<void> setPureBlackTheme(bool value) async {
+    _isPureBlackTheme = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('pureBlackTheme', value);
+    notifyListeners();
+  }
+
+  /// 设置是否显示头像
+  Future<void> setShowAvatars(bool value) async {
+    _showAvatars = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('showAvatars', value);
     notifyListeners();
   }
 
@@ -324,6 +364,7 @@ class SettingsProvider extends ChangeNotifier {
     // 恢复缓存配置
     _avatarCacheDays = prefs.getInt('avatarCacheDays') ?? 7;
     _emojiCacheDays = prefs.getInt('emojiCacheDays') ?? -1;
+    _imageCacheDays = prefs.getInt('imageCacheDays') ?? 3;
 
     // 恢复快捷链接（每个域名独立存储）
     for (final site in _sites) {
@@ -381,6 +422,12 @@ class SettingsProvider extends ChangeNotifier {
     if (seedColorInt != null) {
       _seedColor = Color(seedColorInt);
     }
+
+    // 恢复纯黑主题
+    _isPureBlackTheme = prefs.getBool('pureBlackTheme') ?? false;
+
+    // 恢复头像设置
+    _showAvatars = prefs.getBool('showAvatars') ?? true;
 
     notifyListeners();
   }
@@ -633,6 +680,25 @@ class SettingsProvider extends ChangeNotifier {
       );
       if (idx >= 0) SiteStore.instance.switchTo(idx);
     }
+    await _persistSites();
+    notifyListeners();
+  }
+
+  /// 更新当前站点的 UA 设置
+  Future<void> setSiteUA(String userAgent) async {
+    final idx = _currentSiteIndex;
+    if (idx < 0 || idx >= _sites.length) return;
+    final old = _sites[idx];
+    _sites[idx] = Site(
+      name: old.name,
+      baseUrl: old.baseUrl,
+      cdn: old.cdn,
+      loginPagePath: old.loginPagePath,
+      forums: old.forums,
+      defaultForumOrder: old.defaultForumOrder,
+      userAgent: userAgent,
+    );
+    SiteStore.instance.switchTo(idx);
     await _persistSites();
     notifyListeners();
   }

@@ -156,6 +156,7 @@ class SiteManagement {
     final nameCtl = TextEditingController(text: site.name);
     final urlCtl = TextEditingController(text: site.baseUrl);
     final cdnCtl = TextEditingController(text: site.cdn ?? '');
+    final loginPathCtl = TextEditingController(text: site.loginPagePath);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -193,6 +194,16 @@ class SiteManagement {
               ),
               keyboardType: TextInputType.url,
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: loginPathCtl,
+              decoration: const InputDecoration(
+                labelText: '登录页路径（可选）',
+                hintText: '留空使用默认 /member.php?mod=logging&action=login',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -205,6 +216,7 @@ class SiteManagement {
               final name = nameCtl.text.trim();
               var url = urlCtl.text.trim();
               final cdnText = cdnCtl.text.trim();
+              final loginPath = loginPathCtl.text.trim();
               if (name.isEmpty || url.isEmpty) return;
               if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'https://$url';
@@ -216,9 +228,10 @@ class SiteManagement {
                   name: name,
                   baseUrl: url,
                   cdn: cdn,
-                  loginPagePath: site.loginPagePath,
+                  loginPagePath: loginPath,
                   forums: site.forums,
                   defaultForumOrder: site.defaultForumOrder,
+                  userAgent: site.userAgent,
                 ),
               );
               if (ctx.mounted) Navigator.of(ctx).pop();
@@ -291,6 +304,7 @@ class SiteManagement {
                   loginPagePath: '/member.php?mod=logging&action=login',
                   forums: {},
                   defaultForumOrder: [],
+                  userAgent: '',
                 ),
               );
               if (ctx.mounted) Navigator.of(ctx).pop();

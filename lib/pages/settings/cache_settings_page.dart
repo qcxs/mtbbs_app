@@ -20,8 +20,10 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   // 缓存信息（异步加载）
   ({int bytes, int files})? _avatarInfo;
   ({int bytes, int files})? _emojiInfo;
+  ({int bytes, int files})? _imageInfo;
   bool _loadingAvatar = true;
   bool _loadingEmoji = true;
+  bool _loadingImage = true;
 
   @override
   void initState() {
@@ -32,6 +34,17 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   void _refresh() {
     _loadAvatarInfo();
     _loadEmojiInfo();
+    _loadImageInfo();
+  }
+
+  Future<void> _loadImageInfo() async {
+    setState(() => _loadingImage = true);
+    final info = await getCacheInfo('image_cache');
+    if (mounted)
+      setState(() {
+        _imageInfo = info;
+        _loadingImage = false;
+      });
   }
 
   Future<void> _loadAvatarInfo() async {
@@ -230,6 +243,22 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
               title: '表情缓存过期',
               currentDays: settings.emojiCacheDays,
               onSave: (days) => settings.setEmojiCacheDays(days),
+            ),
+          ),
+
+          // 帖子图片缓存
+          _buildCacheTile(
+            title: '帖子图片缓存',
+            sizeText: _imageInfo != null
+                ? AppLogger.bytes(_imageInfo!.bytes)
+                : null,
+            countText: _imageInfo != null ? '${_imageInfo!.files} 个' : null,
+            loading: _loadingImage,
+            onClear: () => _clearAndRefresh('image_cache', _loadImageInfo),
+            onSettings: () => _showDayPicker(
+              title: '帖子图片缓存过期',
+              currentDays: settings.imageCacheDays,
+              onSave: (days) => settings.setImageCacheDays(days),
             ),
           ),
 

@@ -295,6 +295,15 @@ class EditorHistoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearAll() async {
+    await _ensureLoaded();
+    _autoMap.clear();
+    _manualMap.clear();
+    _submittedKeys.clear();
+    await _persist();
+    notifyListeners();
+  }
+
   Future<void> cleanup() async {
     await _ensureLoaded();
     final cutoff = DateTime.now().subtract(const Duration(days: 7));

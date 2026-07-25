@@ -173,7 +173,7 @@ class BBCode2Html {
     // 免费信息 [free]...[/free]
     html = html.replaceAllMapped(
       RegExp(r'\[free\]([\s\S]*?)\[/free\]', caseSensitive: false),
-      (m) => '<blockquote>${m.group(1)}</blockquote>',
+      (m) => '<blockquote class="bbcode-free">${m.group(1)}</blockquote>',
     );
 
     // 隐藏内容 [hide]...[/hide]（支持 [hide=参数]）
@@ -560,7 +560,7 @@ class BBCode2Html {
       html = html.replaceAllMapped(
         RegExp(escapedKey),
         (_) =>
-            '<img src="${entry.value}"  style="height:20px;vertical-align:middle;" />',
+            '<img src="${entry.value}" data-type="emoji" style="height:20px;vertical-align:middle;" />',
       );
     }
 

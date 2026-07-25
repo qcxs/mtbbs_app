@@ -95,19 +95,25 @@ class _HistoryPageState extends State<HistoryPage>
       appBar: AppBar(
         title: const Text('浏览记录'),
         surfaceTintColor: cs.surface,
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabs: [
-            Tab(text: '全部 (${history.totalCount})'),
-            Tab(text: '帖子 (${history.getByType('thread').length})'),
-            Tab(text: '用户 (${history.getByType('user').length})'),
-            Tab(text: '我的帖子 (${history.getByType('mythread').length})'),
-            Tab(text: '回复 (${history.getByType('reply').length})'),
-          ],
-          labelColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          unselectedLabelColor: cs.onSurfaceVariant,
-          indicatorColor: Theme.of(context).colorScheme.onSurfaceVariant,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+            indicatorPadding: EdgeInsets.zero,
+            tabs: [
+              Tab(text: '全部 (${history.totalCount})'),
+              Tab(text: '帖子 (${history.getByType('thread').length})'),
+              Tab(text: '用户 (${history.getByType('user').length})'),
+              Tab(text: '我的帖子 (${history.getByType('mythread').length})'),
+              Tab(text: '回复 (${history.getByType('reply').length})'),
+            ],
+            labelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            unselectedLabelColor: cs.onSurfaceVariant,
+            indicatorColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         actions: [
           PopupMenuButton<String>(

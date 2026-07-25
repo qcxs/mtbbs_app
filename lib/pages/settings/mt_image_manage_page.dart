@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/cache_utils.dart';
 import '../../services/mt_image_hosting.dart';
 
 /// MT 图床管理页面 — 查看/删除/隐藏历史上传
@@ -78,14 +80,15 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
                 return ListTile(
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      item.thumbnailUrl.isNotEmpty
+                    child: CachedNetworkImage(
+                      imageUrl: item.thumbnailUrl.isNotEmpty
                           ? item.thumbnailUrl
                           : item.url,
+                      cacheManager: imageCacheManager,
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorWidget: (_, __, ___) => Container(
                         width: 48,
                         height: 48,
                         color: cs.surfaceContainerHigh,
@@ -128,10 +131,7 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
                       const PopupMenuDivider(),
                       PopupMenuItem(
                         value: 'delete',
-                        child: Text(
-                          '删除',
-                          style: TextStyle(color: cs.error),
-                        ),
+                        child: Text('删除', style: TextStyle(color: cs.error)),
                       ),
                     ],
                   ),

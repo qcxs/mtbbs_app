@@ -6,7 +6,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/bbcode_parser.dart';
+import '../core/cache_utils.dart';
 import '../core/url_router.dart';
+import '../config/brand_colors.dart';
 import 'image_preview/image_preview.dart';
 
 /// 可被全局/局部禁用的 BBCode 项
@@ -140,31 +142,31 @@ class PostAstWidget extends StatelessWidget {
     }
   }
 
-  // ==================== 黄底容器 ====================
+  // ==================== 引用/免费/隐藏容器 ====================
 
   Widget _buildYellowContainer(BuildContext context, AstNode node) {
-    final label = node.type == 'hide' ? '隐藏内容' : '';
-    final labelColor = node.type == 'hide' ? Colors.red.shade700 : Colors.grey;
+    final cs = Theme.of(context).colorScheme;
+    final label = node.type == 'hide' ? '隐藏内容' : null;
 
     return SizedBox(
       width: double.infinity,
       child: Container(
         margin: EdgeInsets.symmetric(vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.amber.shade50,
+          color: cs.quoteBg,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (label.isNotEmpty)
+            if (label != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                 child: Text(
                   label,
                   style: TextStyle(
                     fontSize: fontSize - 4,
-                    color: labelColor,
+                    color: cs.hideLabelColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -194,7 +196,7 @@ class PostAstWidget extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(12, 36, 12, 12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade900,
+              color: Theme.of(context).colorScheme.codeBgColor,
               borderRadius: BorderRadius.circular(6),
             ),
             child: SelectableText(
@@ -202,7 +204,7 @@ class PostAstWidget extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: fontSize - 2,
-                color: Colors.green.shade200,
+                color: Theme.of(context).colorScheme.codeTextColor,
                 height: 1.5,
               ),
             ),
@@ -230,7 +232,7 @@ class PostAstWidget extends StatelessWidget {
                   '复制',
                   style: TextStyle(
                     fontSize: fontSize - 4,
-                    color: Colors.green.shade300,
+                    color: Theme.of(context).colorScheme.codeTextColor,
                   ),
                 ),
               ),
@@ -373,7 +375,7 @@ class PostAstWidget extends StatelessWidget {
       onTap: () => _handleLinkTap(context, url, node.type),
       child: _LinkStyle(
         style: TextStyle(
-          color: Color(0xFF336699),
+          color: Theme.of(context).colorScheme.linkColor,
           decoration: TextDecoration.underline,
         ),
         child: Builder(builder: (ctx) => _buildBlockContainer(ctx, node)),
@@ -756,6 +758,7 @@ class PostAstWidget extends StatelessWidget {
             onLongPress: onLongPress,
             child: CachedNetworkImage(
               imageUrl: src,
+              cacheManager: imageCacheManager,
               fit: BoxFit.contain,
               errorWidget: (_, __, ___) => Icon(
                 Icons.broken_image_outlined,
@@ -792,6 +795,7 @@ class PostAstWidget extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 2),
         child: CachedNetworkImage(
           imageUrl: url,
+          cacheManager: emojiCacheManager,
           width: 22,
           height: 22,
           errorWidget: (_, __, ___) => Icon(
@@ -1022,7 +1026,7 @@ class PostAstWidget extends StatelessWidget {
           }
           // Apply link default style (blue + underline) on top of inherited style
           final linkStyle = style.copyWith(
-            color: const Color(0xFF336699),
+            color: Theme.of(context).colorScheme.linkColor,
             decoration: TextDecoration.underline,
           );
           // Render children with link style
@@ -1054,6 +1058,7 @@ class PostAstWidget extends StatelessWidget {
                 ),
                 child: CachedNetworkImage(
                   imageUrl: src,
+                  cacheManager: imageCacheManager,
                   width: maxImageWidth * 0.2,
                   placeholder: (_, __) => const SizedBox(
                     width: 40,
@@ -1087,6 +1092,7 @@ class PostAstWidget extends StatelessWidget {
               alignment: PlaceholderAlignment.middle,
               child: CachedNetworkImage(
                 imageUrl: imgUrl,
+                cacheManager: emojiCacheManager,
                 width: 22,
                 height: 22,
                 errorWidget: (_, __, ___) => Icon(

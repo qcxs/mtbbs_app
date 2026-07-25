@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:charset/charset.dart';
 import '../config/site_config.dart';
 import '../core/site_store.dart';
 import '../core/logger.dart';
@@ -44,11 +46,44 @@ class ApiService {
         baseUrl: url,
         headers: {
           'User-Agent': Site.uaPc,
+          'Referer': url,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 15),
+        responseDecoder: (bytes, options, responseBody) {
+          try {
+            String? charset;
+            final ct = responseBody.headers['content-type']?.join(';');
+            if (ct != null) {
+              final m = RegExp(
+                r'charset=([^;\s]+)',
+                caseSensitive: false,
+              ).firstMatch(ct);
+              if (m != null) charset = m.group(1)!.toLowerCase();
+            }
+            // 响应头指定了编码 → 按指定编码解码
+            if (charset != null && !['utf-8', 'utf8'].contains(charset)) {
+              if (['gbk', 'gb2312'].contains(charset)) {
+                return gbk.decode(bytes);
+              }
+              final encoding = Encoding.getByName(charset);
+              if (encoding != null) return encoding.decode(bytes);
+            }
+            // 未指定编码 → 先试 UTF-8，若产生替换字符则试 GBK
+            final utf8Result = utf8.decode(bytes, allowMalformed: true);
+            if (charset == null && utf8Result.contains('\uFFFD')) {
+              try {
+                final gbkResult = gbk.decode(bytes);
+                if (!gbkResult.contains('\uFFFD')) return gbkResult;
+              } catch (_) {}
+            }
+            return utf8Result;
+          } catch (_) {
+            return utf8.decode(bytes, allowMalformed: true);
+          }
+        },
       ),
     );
 
@@ -112,7 +147,10 @@ class ApiService {
   /// 切换站点 — 更新 baseUrl + 重建 guest jar
   Future<void> switchSite() async {
     _currentHost = SiteStore.instance.host;
-    dio.options.baseUrl = SiteStore.instance.baseUrl;
+    final newUrl = SiteStore.instance.baseUrl;
+    dio.options.baseUrl = newUrl;
+    dio.options.headers['Referer'] = newUrl;
+    dio.options.headers['User-Agent'] = Site.uaPc;
 
     final dir = await getApplicationDocumentsDirectory();
     _guestJar = PersistCookieJar(

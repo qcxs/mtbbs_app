@@ -7,6 +7,6 @@ import 'package:mtbbs/core/site_store.dart';
 /// 未配置 CDN 时回退到站点 baseUrl。
 Future<Response<String>> getSmiliesJs(Dio dio) {
   return dio.get<String>(
-    '${SiteStore.instance.cdnUrl}/data/cache/common_smilies_var.js',
+    '${SiteStore.instance.baseUrl}/data/cache/common_smilies_var.js',
   );
 }

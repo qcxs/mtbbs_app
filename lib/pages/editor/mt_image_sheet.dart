@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/cache_utils.dart';
 import '../../services/mt_image_hosting.dart';
 import '../../services/clipboard_paste.dart';
 
@@ -121,6 +123,8 @@ class _MtImageSheetState extends State<MtImageSheet> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: true,
+      withReadStream: true,
+      allowCompression: false,
     );
     if (result == null || result.files.isEmpty) return;
 
@@ -152,7 +156,7 @@ class _MtImageSheetState extends State<MtImageSheet> {
       setState(() => _uploadingIndex = i);
 
       final item = _queue[i];
-      final result = await widget.hosting.upload(
+      await widget.hosting.upload(
         item.path,
         onProgress: (sent, total) {
           if (!mounted) return;
@@ -160,7 +164,6 @@ class _MtImageSheetState extends State<MtImageSheet> {
         },
       );
       if (!mounted) return;
-      if (result != null) widget.onInsert(result.bbcode);
     }
 
     if (!mounted) return;
@@ -435,12 +438,15 @@ class _MtImageSheetState extends State<MtImageSheet> {
               selectedTileColor: cs.onSurfaceVariant.withValues(alpha: 0.08),
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  item.thumbnailUrl.isNotEmpty ? item.thumbnailUrl : item.url,
+                child: CachedNetworkImage(
+                  imageUrl: item.thumbnailUrl.isNotEmpty
+                      ? item.thumbnailUrl
+                      : item.url,
+                  cacheManager: imageCacheManager,
                   width: 44,
                   height: 44,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorWidget: (_, __, ___) => Container(
                     width: 44,
                     height: 44,
                     color: cs.surfaceContainerHigh,

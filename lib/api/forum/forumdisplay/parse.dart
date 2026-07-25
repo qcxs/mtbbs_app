@@ -37,8 +37,12 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
 
   final pagination = extractPagination(doc);
 
-  // 检查是否包含帖子列表
-  if (doc.querySelector('[class*="forumlist_li"]') == null) {
+  // 检测是否包含帖子列表（兼容三种模板）
+  final hasThreadList = doc.querySelector(
+    '[class*="forumlist_li"], #threadlist, [class*="comiis_postlist"]',
+  ) != null;
+
+  if (!hasThreadList) {
     return {
       'success': true,
       'threads': <Map<String, dynamic>>[],
