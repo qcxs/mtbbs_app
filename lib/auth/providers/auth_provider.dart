@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
 
 /// 账号模型
@@ -394,10 +394,10 @@ class AuthProvider extends ChangeNotifier {
   // ==================== 初始化与恢复 ====================
 
   Future<void> tryRestore() async {
-    final prefs = await SharedPreferences.getInstance();
+    final db = DatabaseHelper.instance;
 
     // 恢复当前站点的账号列表
-    final jsonStr = prefs.getString('accounts_$_host');
+    final jsonStr = await db.getAccountsRaw(_host);
     if (jsonStr != null && jsonStr.isNotEmpty) {
       final list = jsonDecode(jsonStr) as List<dynamic>;
       _siteAccounts[_host] = list
@@ -407,7 +407,7 @@ class AuthProvider extends ChangeNotifier {
     _ensureGuestAccount();
 
     // 恢复活跃索引
-    final lastAccount = prefs.getString('last_account_$_host');
+    final lastAccount = await db.getLastAccount(_host);
     if (lastAccount != null && _currentAccounts.isNotEmpty) {
       _currentActiveIndex = _currentAccounts.indexWhere(
         (a) => a.username == lastAccount,
@@ -446,8 +446,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _restoreSiteAccounts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString('accounts_$_host');
+    final db = DatabaseHelper.instance;
+    final jsonStr = await db.getAccountsRaw(_host);
     if (jsonStr != null && jsonStr.isNotEmpty) {
       final list = jsonDecode(jsonStr) as List<dynamic>;
       _siteAccounts[_host] = list
@@ -458,7 +458,7 @@ class AuthProvider extends ChangeNotifier {
     }
     _ensureGuestAccount();
 
-    final lastAccount = prefs.getString('last_account_$_host');
+    final lastAccount = await db.getLastAccount(_host);
     if (lastAccount != null && _currentAccounts.isNotEmpty) {
       _currentActiveIndex = _currentAccounts.indexWhere(
         (a) => a.username == lastAccount,
@@ -515,26 +515,24 @@ class AuthProvider extends ChangeNotifier {
 
   // ==================== 持久化 ====================
 
-  void _saveState() {
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString(
-        'accounts_$_host',
-        jsonEncode(_currentAccounts.map((a) => a.toJson()).toList()),
-      );
-      _saveActive();
-    });
+  Future<void> _saveState() async {
+    final db = DatabaseHelper.instance;
+    await db.setAccountsRaw(
+      _host,
+      jsonEncode(_currentAccounts.map((a) => a.toJson()).toList()),
+    );
+    await _saveActive();
   }
 
-  void _saveActive() {
-    SharedPreferences.getInstance().then((prefs) {
-      if (_currentActiveIndex >= 0) {
-        prefs.setString(
-          'last_account_$_host',
-          _currentAccounts[_currentActiveIndex].username,
-        );
-      } else {
-        prefs.remove('last_account_$_host');
-      }
-    });
+  Future<void> _saveActive() async {
+    final db = DatabaseHelper.instance;
+    if (_currentActiveIndex >= 0) {
+      await db.setLastAccount(
+        _host,
+        _currentAccounts[_currentActiveIndex].username,
+      );
+    } else {
+      await db.deleteLastAccount(_host);
+    }
   }
 }

@@ -6,9 +6,6 @@ import 'package:html/parser.dart' as htmlParser;
 import 'package:dio/dio.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/core/app/site_store.dart';
-import 'package:mtbbs/widgets/dialog/rate_dialog.dart';
-import 'package:mtbbs/widgets/dialog/kick_dialog.dart';
-import 'package:mtbbs/widgets/dialog/favorite_dialog.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
@@ -69,13 +66,13 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   // ---- 滚动 ----
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _commentAnchorKey = GlobalKey();
 
   // ---- pid 定位 ----
   final Map<String, GlobalKey> _postKeys = {};
 
   // ---- 操作状态 ----
   bool _liked = false;
-  bool _favorited = false;
 
   @override
   void initState() {
@@ -353,44 +350,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     }
   }
 
-  Future<void> _handleFavorite(PostItem post) async {
-    if (post.favoriteUrl.isEmpty) return;
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录')));
-      return;
-    }
-    final result = await showFavoriteDialog(context, '', post.favoriteUrl);
-    if (result == true && mounted) setState(() => _favorited = true);
-  }
-
-  Future<void> _handleRate(PostItem post) async {
-    if (post.rateUrl.isEmpty) return;
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录')));
-      return;
-    }
-    await showRateDialog(context, '', post.rateUrl);
-  }
-
-  Future<void> _handleKick(PostItem post) async {
-    if (post.kickUrl.isEmpty) return;
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录')));
-      return;
-    }
-    final result = await showKickDialog(context, '', post.kickUrl);
-    if (result == true && mounted) _loadInitial();
-  }
-
   /// 记录帖子浏览历史（含当前页码）
   void _recordThreadHistory(String? title) {
     if (_data == null) return;
@@ -549,6 +508,23 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     context.push('/editor?type=comment&tid=${widget.tid}');
   }
 
+  /// 窄屏时滚动到评论区顶部
+  void _scrollToComments() {
+    final ctx = _commentAnchorKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 300),
+      alignment: 0.0,
+    );
+  }
+
+  /// 刷新当前评论页
+  Future<void> _refreshCurrentPage() async {
+    _commentPages.remove(_currentPage);
+    await _loadCommentPage(_currentPage);
+  }
+
   // ==================== Build ====================
 
   String get _threadUrl =>
@@ -557,14 +533,30 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isNarrow = MediaQuery.sizeOf(context).width <= 600;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _data?.title.isNotEmpty == true ? _data!.title : '帖子详情',
-          style: const TextStyle(fontSize: 15),
+        title: GestureDetector(
+          onTap: () {
+            _scrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          },
+          child: Text(
+            _data?.title.isNotEmpty == true ? _data!.title : '帖子详情',
+            style: const TextStyle(fontSize: 15),
+          ),
         ),
         surfaceTintColor: cs.surface,
         actions: [
+          if (isNarrow && _data != null && _commentPages.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.forum_outlined, size: 20),
+              tooltip: '滚动到评论区',
+              onPressed: _scrollToComments,
+            ),
           PageActions(
             url: _threadUrl,
             onRefresh: () => _loadInitial(),
@@ -636,6 +628,10 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
             if (_data!.mainPost != null) ...[
               SliverToBoxAdapter(child: _buildMainPostSection()),
               SliverToBoxAdapter(child: const Divider(height: 1)),
+              // 评论区锚点 — 窄屏"滚动到评论区"的目标
+              SliverToBoxAdapter(
+                child: SizedBox(key: _commentAnchorKey, height: 1),
+              ),
             ],
             SliverPersistentHeader(
               pinned: true,
@@ -652,6 +648,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
                       ? () => _goToPage(_currentPage + 1)
                       : null,
                   onPageTap: _showPagePicker,
+                  onRefresh: _refreshCurrentPage,
                 ),
               ),
             ),
@@ -688,9 +685,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       onReply: (post) =>
           context.push('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}'),
       onRecommend: _handleRecommend,
-      onFavorite: _handleFavorite,
-      onRate: _handleRate,
-      onKick: _handleKick,
       onPopupAction: (action, post) {
         switch (action) {
           case PostCardAction.showBbcode:
@@ -717,6 +711,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
               ? () => _goToPage(_currentPage + 1)
               : null,
           onPageTap: _showPagePicker,
+          onRefresh: _refreshCurrentPage,
         ),
         const Divider(height: 1),
         Expanded(
@@ -737,13 +732,9 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       post: post,
       isLoaded: _mainPostLoaded,
       isLiked: _liked,
-      isFavorited: _favorited,
       tid: widget.tid,
       onTap: () => setState(() => _mainPostLoaded = true),
       onRecommend: () => _handleRecommend(post),
-      onFavorite: () => _handleFavorite(post),
-      onRate: () => _handleRate(post),
-      onKick: () => _handleKick(post),
       onPopupAction: (action) {
         switch (action) {
           case PostCardAction.showBbcode:

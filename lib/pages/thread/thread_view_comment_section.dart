@@ -46,9 +46,6 @@ class CommentSection extends StatelessWidget {
   final void Function(ScrollNotification) onScrollNotification;
   final void Function(PostItem post)? onReply;
   final void Function(PostItem post)? onRecommend;
-  final void Function(PostItem post)? onFavorite;
-  final void Function(PostItem post)? onRate;
-  final void Function(PostItem post)? onKick;
   final void Function(PostCardAction action, PostItem post)? onPopupAction;
 
   const CommentSection({
@@ -65,9 +62,6 @@ class CommentSection extends StatelessWidget {
     required this.onScrollNotification,
     this.onReply,
     this.onRecommend,
-    this.onFavorite,
-    this.onRate,
-    this.onKick,
     this.onPopupAction,
   });
 
@@ -93,15 +87,11 @@ class CommentSection extends StatelessWidget {
               index: currentPage,
               tid: tid,
               isLiked: false,
-              isFavorited: false,
               isLoggedIn: auth.isLoggedIn,
               currentUid: auth.uid,
               globalDisabledTags: settings.disabledBbcodeTags,
               onReply: () => onReply?.call(post),
               onRecommend: () => onRecommend?.call(post),
-              onFavorite: () => onFavorite?.call(post),
-              onRate: () => onRate?.call(post),
-              onKick: () => onKick?.call(post),
               onPopupAction: (action) => onPopupAction?.call(action, post),
             ),
           ),
@@ -130,7 +120,7 @@ class CommentSection extends StatelessWidget {
     );
   }
 
-  /// 评论区头部（标题 + 分页控件）
+  /// 评论区头部（标题 + 分页控件 + 刷新）
   static Widget buildHeader({
     required BuildContext context,
     required int currentPage,
@@ -139,6 +129,7 @@ class CommentSection extends StatelessWidget {
     required VoidCallback? onPrev,
     required VoidCallback? onNext,
     required VoidCallback? onPageTap,
+    required VoidCallback? onRefresh,
   }) {
     final cs = Theme.of(context).colorScheme;
     return Container(
@@ -157,6 +148,14 @@ class CommentSection extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 18),
+            onPressed: onRefresh,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.zero,
+            tooltip: '刷新当前页',
+          ),
+          const SizedBox(width: 2),
           IconButton(
             icon: const Icon(Icons.chevron_left, size: 20),
             onPressed: onPrev,

@@ -1,17 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mtbbs/core/utils/database_helper.dart';
 
 /// MT 图床服务 — 管理认证、上传、历史记录
 ///
-/// 懒加载：首次上传时自动 GET / → 从 Set-Cookie 获取 session，
-/// 从 HTML <meta name="csrf-token"> 获取 CSRF token。
-/// 认证信息缓存约 2 小时，过期或 401 时自动重新获取。
+/// 历史记录通过 [DatabaseHelper] 持久化。
 class MtImageHosting {
   static const _baseUrl = 'https://img.binmt.cc';
   static const _uploadUrl = '$_baseUrl/upload';
-  static const _historyKey = 'mt_image_history';
 
   final Dio _dio;
 
@@ -207,8 +204,8 @@ class MtImageHosting {
     int limit = 20,
     bool includeHidden = false,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_historyKey);
+    final db = DatabaseHelper.instance;
+    final raw = await db.getImageHistoryRaw();
     if (raw == null || raw.isEmpty) return [];
     try {
       var list = jsonDecode(raw) as List;
@@ -224,8 +221,8 @@ class MtImageHosting {
   }
 
   Future<void> _addHistory(MtUploadResult result) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_historyKey);
+    final db = DatabaseHelper.instance;
+    final raw = await db.getImageHistoryRaw();
     final list = (raw != null && raw.isNotEmpty)
         ? (jsonDecode(raw) as List)
         : <dynamic>[];
@@ -234,23 +231,23 @@ class MtImageHosting {
     list.insert(0, result.toJson());
     if (list.length > 200) list.removeRange(200, list.length);
 
-    await prefs.setString(_historyKey, jsonEncode(list));
+    await db.setImageHistoryRaw(jsonEncode(list));
   }
 
   /// 永久删除单条历史
   Future<void> deleteHistory(String url) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_historyKey);
+    final db = DatabaseHelper.instance;
+    final raw = await db.getImageHistoryRaw();
     if (raw == null || raw.isEmpty) return;
     final list = jsonDecode(raw) as List;
     list.removeWhere((e) => (e as Map)['url'] == url);
-    await prefs.setString(_historyKey, jsonEncode(list));
+    await db.setImageHistoryRaw(jsonEncode(list));
   }
 
   /// 切换隐藏/显示
   Future<void> toggleHistoryHidden(String url) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_historyKey);
+    final db = DatabaseHelper.instance;
+    final raw = await db.getImageHistoryRaw();
     if (raw == null || raw.isEmpty) return;
     final list = jsonDecode(raw) as List;
     for (final e in list) {
@@ -260,7 +257,7 @@ class MtImageHosting {
         break;
       }
     }
-    await prefs.setString(_historyKey, jsonEncode(list));
+    await db.setImageHistoryRaw(jsonEncode(list));
   }
 }
 

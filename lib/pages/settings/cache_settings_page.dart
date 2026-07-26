@@ -222,7 +222,8 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                 : null,
             countText: _avatarInfo != null ? '${_avatarInfo!.files} 个' : null,
             loading: _loadingAvatar,
-            onClear: () => _clearAndRefresh('avatar_cache', _loadAvatarInfo),
+            onClear: () =>
+                _clearAndRefresh('avatar_cache', '头像图片缓存', _loadAvatarInfo),
             onSettings: () => _showDayPicker(
               title: '头像缓存过期',
               currentDays: settings.avatarCacheDays,
@@ -238,7 +239,8 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                 : null,
             countText: _emojiInfo != null ? '${_emojiInfo!.files} 个' : null,
             loading: _loadingEmoji,
-            onClear: () => _clearAndRefresh('emoji_cache', _loadEmojiInfo),
+            onClear: () =>
+                _clearAndRefresh('emoji_cache', '表情图片缓存', _loadEmojiInfo),
             onSettings: () => _showDayPicker(
               title: '表情缓存过期',
               currentDays: settings.emojiCacheDays,
@@ -254,7 +256,8 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                 : null,
             countText: _imageInfo != null ? '${_imageInfo!.files} 个' : null,
             loading: _loadingImage,
-            onClear: () => _clearAndRefresh('image_cache', _loadImageInfo),
+            onClear: () =>
+                _clearAndRefresh('image_cache', '帖子图片缓存', _loadImageInfo),
             onSettings: () => _showDayPicker(
               title: '帖子图片缓存过期',
               currentDays: settings.imageCacheDays,
@@ -275,7 +278,8 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   foregroundColor: cs.error,
                   visualDensity: VisualDensity.compact,
                 ),
-                onPressed: () {
+                onPressed: () async {
+                  if (!await _confirmClear('表情元数据')) return;
                   EmojiService().clearCache();
                   if (mounted) {
                     ScaffoldMessenger.of(
@@ -301,6 +305,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   visualDensity: VisualDensity.compact,
                 ),
                 onPressed: () async {
+                  if (!await _confirmClear('帖子预览缓存')) return;
                   await PostPreviewManager.instance.clear();
                   if (mounted) {
                     ScaffoldMessenger.of(
@@ -318,10 +323,37 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     );
   }
 
+  /// 二次确认后清空缓存
+  Future<bool> _confirmClear(String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认清空'),
+        content: Text('确定要清空 $name 吗？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   Future<void> _clearAndRefresh(
     String cacheKey,
+    String label,
     Future<void> Function() refreshFn,
   ) async {
+    if (!await _confirmClear(label)) return;
     await clearCacheByKey(cacheKey);
     if (mounted) refreshFn();
   }

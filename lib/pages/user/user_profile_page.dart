@@ -164,9 +164,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         children: [
           _buildHeader(),
           const SizedBox(height: 8),
-          _buildStatsCard(),
-          const SizedBox(height: 8),
-          _buildActivityStats(),
+          _buildPointsSection(),
           const SizedBox(height: 8),
           if (_profile!['signature'] != null) _buildSignature(),
           if (_profile!['customTitle'] != null) ...[
@@ -276,200 +274,174 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  // ==================== 积分卡片 ====================
+  // ==================== 积分与活跃卡片（统一自适应） ====================
 
-  Widget _buildStatsCard() {
-    final points = _profile!['points'] as Map<String, dynamic>?;
-    if (points == null) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      color: _cs.surface,
-      child: Row(
-        children: [
-          _statBox(
-            '积分',
-            points['credits']?.toString() ?? '0',
-            Icons.monetization_on_outlined,
-            const Color(0xFFFF9800),
-            onTap: _showCreditDialog,
-          ),
-          _divider(),
-          _statBox(
-            '好评',
-            points['reputation']?.toString() ?? '0',
-            Icons.thumb_up_outlined,
-            const Color(0xFF4CAF50),
-          ),
-          _divider(),
-          _statBox(
-            '金币',
-            points['goldCoins']?.toString() ?? '0',
-            Icons.workspace_premium_outlined,
-            const Color(0xFFFFC107),
-          ),
-          _divider(),
-          _statBox(
-            '信誉',
-            points['credit']?.toString() ?? '0',
-            Icons.verified_outlined,
-            const Color(0xFF2196F3),
-          ),
-        ],
+  /// 统一的信息块 — 图标 + 标签 + 数值
+  Widget _infoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    final clickable = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 3),
+            Container(
+              decoration: clickable
+                  ? BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: _cs.onSurfaceVariant.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                    )
+                  : null,
+              padding: clickable ? const EdgeInsets.only(bottom: 1) : null,
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _statBox(
-    String label,
-    String value,
-    IconData icon,
-    Color color, {
-    VoidCallback? onTap,
-  }) {
-    final clickable = onTap != null;
-    final content = Column(
-      children: [
-        Icon(icon, size: 22, color: color),
-        const SizedBox(height: 4),
-        Container(
-          decoration: clickable
-              ? BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: _cs.onSurfaceVariant.withValues(alpha: 0.35),
-                      width: 1,
-                    ),
-                  ),
-                )
-              : null,
-          padding: clickable ? const EdgeInsets.only(bottom: 1) : null,
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
+  /// 自适应瓦片行 — 根据可用宽度自动计算每行数量，等宽填充
+  Widget _buildTileRow(List<Widget> tiles) {
+    if (tiles.isEmpty) return const SizedBox.shrink();
+    const spacing = 4.0;
+    // 期望每个 tile 约 90px 宽，以此计算列数
+    const targetTileWidth = 90.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final cols = ((availableWidth + spacing) / (targetTileWidth + spacing))
+            .floor()
+            .clamp(1, tiles.length);
+        // 实际 tile 宽度等分填充行
+        final tileWidth = (availableWidth - spacing * (cols - 1)) / cols;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 4,
+          children: tiles
+              .map((t) => SizedBox(width: tileWidth, child: t))
+              .toList(),
+        );
+      },
     );
-    if (clickable) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: content,
-        ),
-      );
-    }
-    return Expanded(child: content);
   }
 
-  Widget _divider() {
-    return Container(width: 1, height: 36, color: _cs.outlineVariant);
-  }
-
-  // ==================== 活跃统计 ====================
-
-  Widget _buildActivityStats() {
+  /// 积分与活跃数据 — 合并显示，自适应排列
+  Widget _buildPointsSection() {
+    final points = _profile!['points'] as Map<String, dynamic>?;
     final stats = _profile!['stats'] as Map<String, dynamic>?;
-    if (stats == null) return const SizedBox.shrink();
+    if (points == null && stats == null) return const SizedBox.shrink();
 
     final uid = widget.uid;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      color: _cs.surface,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _activityStatItem(
-            Icons.people_outline,
-            '好友',
-            stats['friends']?.toString() ?? '0',
-            const Color(0xFFE91E63),
-          ),
-          _activityStatItem(
-            Icons.reply_outlined,
-            '回帖',
-            stats['replies']?.toString() ?? '0',
-            const Color(0xFF00BCD4),
-            onTap: () => context.push('/my-threads?type=reply&uid=$uid'),
-          ),
-          _activityStatItem(
-            Icons.article_outlined,
-            '主题',
-            stats['threads']?.toString() ?? '0',
-            const Color(0xFF9C27B0),
-            onTap: () => context.push('/my-threads?uid=$uid'),
-          ),
-          _activityStatItem(
-            Icons.share_outlined,
-            '分享',
-            stats['shares']?.toString() ?? '0',
-            const Color(0xFFFF5722),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _activityStatItem(
-    IconData icon,
-    String label,
-    String value,
-    Color color, {
-    VoidCallback? onTap,
-  }) {
-    final clickable = onTap != null;
-    final content = Column(
-      children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(height: 2),
-        Container(
-          decoration: clickable
-              ? BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: _cs.onSurfaceVariant.withValues(alpha: 0.35),
-                      width: 1,
-                    ),
-                  ),
-                )
-              : null,
-          padding: clickable ? const EdgeInsets.only(bottom: 1) : null,
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 12, color: _cs.onSurfaceVariant),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
-    );
-    if (clickable) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: content,
+    final tiles = <Widget>[];
+    void add(
+      String label,
+      String value,
+      IconData icon,
+      Color color, {
+      VoidCallback? onTap,
+    }) {
+      tiles.add(
+        _infoTile(
+          icon: icon,
+          label: label,
+          value: value,
+          color: color,
+          onTap: onTap,
         ),
       );
     }
-    return content;
+
+    if (points != null) {
+      add(
+        '积分',
+        points['credits']?.toString() ?? '0',
+        Icons.monetization_on_outlined,
+        const Color(0xFFFF9800),
+        onTap: _showCreditDialog,
+      );
+      add(
+        '好评',
+        points['reputation']?.toString() ?? '0',
+        Icons.thumb_up_outlined,
+        const Color(0xFF4CAF50),
+      );
+      add(
+        '金币',
+        points['goldCoins']?.toString() ?? '0',
+        Icons.workspace_premium_outlined,
+        const Color(0xFFFFC107),
+      );
+      add(
+        '信誉',
+        points['credit']?.toString() ?? '0',
+        Icons.verified_outlined,
+        const Color(0xFF2196F3),
+      );
+    }
+    if (stats != null) {
+      add(
+        '好友',
+        stats['friends']?.toString() ?? '0',
+        Icons.people_outlined,
+        const Color(0xFFE91E63),
+      );
+      add(
+        '回帖',
+        stats['replies']?.toString() ?? '0',
+        Icons.reply_outlined,
+        const Color(0xFF00BCD4),
+        onTap: () => context.push('/my-threads?type=reply&uid=$uid'),
+      );
+      add(
+        '主题',
+        stats['threads']?.toString() ?? '0',
+        Icons.article_outlined,
+        const Color(0xFF9C27B0),
+        onTap: () => context.push('/my-threads?uid=$uid'),
+      );
+      add(
+        '分享',
+        stats['shares']?.toString() ?? '0',
+        Icons.share_outlined,
+        const Color(0xFFFF5722),
+      );
+    }
+
+    if (tiles.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      color: _cs.surface,
+      child: _buildTileRow(tiles),
+    );
   }
 
   // ==================== 积分分析弹窗 ====================
@@ -870,61 +842,56 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ],
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            height: 88,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.zero,
-              itemCount: medals.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, i) {
-                final medal = medals[i] as Map<String, dynamic>;
-                final name = medal['name'] as String? ?? '';
-                final icon = medal['icon'] as String? ?? '';
-                return SizedBox(
-                  width: 64,
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: SizedBox(
-                          width: 36,
-                          height: 36,
-                          child: icon.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: icon,
-                                  cacheManager: imageCacheManager,
-                                  fit: BoxFit.contain,
-                                )
-                              : Container(
-                                  color: _cs.surfaceContainerLow,
-                                  child: Icon(
-                                    Icons.emoji_events_outlined,
-                                    size: 18,
-                                    color: _cs.onSurfaceVariant,
-                                  ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: medals.map((m) {
+              final medal = m as Map<String, dynamic>;
+              final name = medal['name'] as String? ?? '';
+              final icon = medal['icon'] as String? ?? '';
+              return SizedBox(
+                width: 64,
+                height: 68,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: icon.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: icon,
+                                cacheManager: imageCacheManager,
+                                fit: BoxFit.contain,
+                              )
+                            : Container(
+                                color: _cs.surfaceContainerLow,
+                                child: Icon(
+                                  Icons.emoji_events_outlined,
+                                  size: 18,
+                                  color: _cs.onSurfaceVariant,
                                 ),
-                        ),
+                              ),
                       ),
-                      const SizedBox(height: 4),
-                      Flexible(
-                        child: Text(
-                          name,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: _cs.onSurfaceVariant,
-                            height: 1.2,
-                          ),
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _cs.onSurfaceVariant,
+                        height: 1.2,
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

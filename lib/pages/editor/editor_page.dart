@@ -423,11 +423,7 @@ class _EditorPageState extends State<EditorPage> {
     await context.read<EditorHistoryProvider>().addManualSnapshot(snapshot);
     _updateLastSaved();
     AppLogger.i('EDITOR', 'manual snapshot saved: ${snapshot.wordCount} chars');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已手动保存'), duration: Duration(seconds: 1)),
-      );
-    }
+    if (mounted) showToast(context, '已手动保存');
   }
 
   EditorSnapshot _buildSnapshot({required bool isManual}) {
@@ -1027,9 +1023,7 @@ class _EditorPageState extends State<EditorPage> {
       case ToolbarAction.emoji:
         final emojiService = EmojiService();
         if (!emojiService.isLoaded) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('暂无表情数据，请在设置中加载')));
+          showToast(context, '暂无表情数据，请在设置中加载');
           return;
         }
         _showEmojiPickerSheet(emojiService.groups);
@@ -1100,12 +1094,7 @@ class _EditorPageState extends State<EditorPage> {
     // 尝试剪贴板图片
     final imgFile = await ClipboardPasteService.pasteImage();
     if (imgFile != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('正在上传剪贴板图片…'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+      showToast(context, '正在上传剪贴板图片…');
       await _uploadDefaultImage(imgFile);
       await imgFile.delete();
       return;
@@ -1127,11 +1116,7 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _uploadDefaultImage(File file) async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn || _pageData.uploadHash.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('未登录或无上传权限')));
-      }
+      if (mounted) showToast(context, '未登录或无上传权限');
       return;
     }
 
@@ -1161,33 +1146,20 @@ class _EditorPageState extends State<EditorPage> {
           _contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
           _focusContent();
         }
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('剪贴板图片已上传')));
-        }
+        if (mounted) showToast(context, '剪贴板图片已上传');
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('上传失败: ${uploadResult['error'] ?? '未知错误'}')),
-          );
-        }
+        if (mounted)
+          showToast(context, '上传失败: ${uploadResult['error'] ?? '未知错误'}');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('上传失败: $e')));
-      }
+      if (mounted) showToast(context, '上传失败: $e');
     }
   }
 
   void _showHistoryDialog() {
     final history = context.read<HistoryProvider>();
     if (history.totalCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('暂无浏览记录'), duration: Duration(seconds: 1)),
-      );
+      showToast(context, '暂无浏览记录');
       return;
     }
     showDialog(
@@ -1281,15 +1253,11 @@ class _EditorPageState extends State<EditorPage> {
   void _showImagePickerSheet() {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录')));
+      showToast(context, '请先登录');
       return;
     }
     if (_pageData.uploadHash.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('页面数据未加载，无法上传')));
+      showToast(context, '页面数据未加载，无法上传');
       return;
     }
     // 同步活跃 AID
@@ -1325,15 +1293,11 @@ class _EditorPageState extends State<EditorPage> {
   void _showAttachmentPickerSheet() {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录')));
+      showToast(context, '请先登录');
       return;
     }
     if (_pageData.uploadHash.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('页面数据未加载，无法上传')));
+      showToast(context, '页面数据未加载，无法上传');
       return;
     }
 
@@ -1367,36 +1331,24 @@ class _EditorPageState extends State<EditorPage> {
     final title = _titleCtl.text.trim();
     final content = _contentCtl.text.trim();
     if (content.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('请输入内容')));
-      }
+      if (mounted) showToast(context, '请输入内容');
       return;
     }
     if (widget.type == EditorType.post && title.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('请输入标题')));
-      }
+      if (mounted) showToast(context, '请输入标题');
       return;
     }
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('请先登录')));
+        showToast(context, '请先登录');
       }
       return;
     }
     if (_isEdit &&
         (!_pageData.formhash.isNotEmpty || !_pageData.posttime.isNotEmpty)) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('页面数据未加载，请稍后')));
+        showToast(context, '页面数据未加载，请稍后');
       }
       return;
     }
@@ -1429,9 +1381,7 @@ class _EditorPageState extends State<EditorPage> {
             'type': widget.type.name,
           }),
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
+        showToast(context, msg);
         _isLeavingNormally = true;
         _autoSaveTimer?.cancel();
         context.read<EditorHistoryProvider>().markSubmitted(_sessionKey);
@@ -1446,9 +1396,7 @@ class _EditorPageState extends State<EditorPage> {
             'error': result.message,
           }),
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('操作失败: ${result.message}')));
+        showToast(context, '操作失败: ${result.message}');
       }
     } catch (e) {
       if (mounted) {
@@ -1457,9 +1405,7 @@ class _EditorPageState extends State<EditorPage> {
           'EDITOR',
           jsonEncode({'action': 'submit_error', 'error': e.toString()}),
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('网络错误: $e')));
+        showToast(context, '网络错误: $e');
       }
     }
   }
@@ -1482,22 +1428,17 @@ class _EditorPageState extends State<EditorPage> {
     final historyProv = context.read<EditorHistoryProvider>();
     final snapshot = historyProv.getSnapshotById(snapshotId);
     if (snapshot == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('快照不存在')));
+      showToast(context, '快照不存在');
       return;
     }
 
     // 校验编辑器类型一致性，防止跨类型恢复导致 fid/tid/pid 错乱
     if (snapshot.editorType != widget.type.name) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '无法恢复：快照类型为"${_typeLabel(snapshot.editorType)}"，'
-            '当前为"${_pageTitle}"',
-          ),
-        ),
+      showToast(
+        context,
+        '无法恢复：快照类型为"${_typeLabel(snapshot.editorType)}"，'
+        '当前为"$_pageTitle"',
       );
       return;
     }
@@ -1531,12 +1472,7 @@ class _EditorPageState extends State<EditorPage> {
     _updateHasChanges();
     setState(() {});
     _doFetchPage(preserveContent: true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('已恢复快照，正在刷新页面数据...'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    showToast(context, '已恢复快照，正在刷新页面数据...');
     AppLogger.i('EDITOR', 'restored snapshot: $snapshotId');
   }
 
@@ -2069,12 +2005,7 @@ class _EditorPageState extends State<EditorPage> {
           TextButton(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: bbcode));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已复制'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
+              showToast(context, '已复制');
               Navigator.of(ctx).pop();
             },
             child: const Text('复制'),

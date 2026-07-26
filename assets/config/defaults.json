@@ -1,0 +1,64 @@
+{
+  "version": 1,
+
+  "sites": [
+    {
+      "name": "MT论坛",
+      "baseUrl": "https://bbs.binmt.cc",
+      "cdn": "https://cdn-bbs.mt2.cn",
+      "loginPagePath": "/member.php?mod=logging&action=login"
+    }
+  ],
+
+  "shortcutLinks": {
+    "bbs.binmt.cc": [
+      { "id": "sign",           "name": "签到",       "url": "https://bbs.binmt.cc/k_misign-sign.html" },
+      { "id": "shop",           "name": "积分商城",   "url": "https://bbs.binmt.cc/keke_integralmall-keke_integralmall.html" },
+      { "id": "apply_essence",  "name": "申请精华",   "url": "https://bbs.binmt.cc/thread-86543-1-1.html" },
+      { "id": "rules",          "name": "总版规",     "url": "https://bbs.binmt.cc/thread-85763-1-1.html" },
+      { "id": "image_bed",      "name": "MT图床",     "url": "https://bbs.binmt.cc/thread-98890-1-1.html" },
+      { "id": "cloud_drive",    "name": "网盘清单",   "url": "https://bbs.binmt.cc/thread-156696-1-1.html" },
+      { "id": "my_threads",     "name": "我的帖子",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=thread&view=me" },
+      { "id": "my_favorites",   "name": "我的收藏",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=favorite&view=me&type=all" },
+      { "id": "my_friends",     "name": "我的好友",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=friend" },
+      { "id": "notices",        "name": "消息提醒",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=notice" }
+    ]
+  },
+
+  "toolbar": [
+    { "action": "undo",           "id": "undo",           "name": "撤销",     "shortcut": "",               "visible": true },
+    { "action": "redo",           "id": "redo",           "name": "重做",     "shortcut": "",               "visible": true },
+    { "action": "select",         "id": "select",         "name": "选中",     "shortcut": "Ctrl+D",         "visible": true },
+    { "action": "clearStyles",    "id": "clearStyles",    "name": "清除样式", "shortcut": "Ctrl+\\",         "visible": true },
+    { "action": "bold",           "id": "bold",           "name": "加粗",     "shortcut": "Ctrl+B",         "visible": true },
+    { "action": "link",           "id": "link",           "name": "链接",     "shortcut": "",               "visible": true },
+    { "action": "image",          "id": "image",          "name": "图片",     "shortcut": "",               "visible": true },
+    { "action": "emoji",          "id": "emoji",          "name": "表情",     "shortcut": "",               "visible": true },
+    { "action": "quote",          "id": "quote",          "name": "引用",     "shortcut": "",               "visible": true },
+    { "action": "hide",           "id": "hide",           "name": "隐藏",     "shortcut": "",               "visible": true },
+    { "action": "free",           "id": "free",           "name": "免费",     "shortcut": "",               "visible": true },
+    { "action": "code",           "id": "code",           "name": "代码",     "shortcut": "",               "visible": true },
+    { "action": "history",        "id": "history",        "name": "历史",     "shortcut": "",               "visible": true },
+    { "action": "mtImage",        "id": "mtImage",        "name": "MT图床",   "shortcut": "",               "visible": true },
+    { "action": "attach",         "id": "attach",         "name": "附件",     "shortcut": "",               "visible": true },
+    { "action": "italic",         "id": "italic",         "name": "斜体",     "shortcut": "Ctrl+I",         "visible": true },
+    { "action": "underline",      "id": "underline",      "name": "下划线",   "shortcut": "Ctrl+U",         "visible": true },
+    { "action": "strikethrough",  "id": "strikethrough",  "name": "删除线",   "shortcut": "Ctrl+Shift+S",   "visible": true },
+    { "action": "color",          "id": "color",          "name": "颜色",     "shortcut": "Ctrl+Shift+C",   "visible": true },
+    { "action": "backcolor",      "id": "backcolor",      "name": "背景色",   "shortcut": "Ctrl+Shift+B",   "visible": true },
+    { "action": "hr",             "id": "hr",             "name": "分隔线",   "shortcut": "",               "visible": true },
+    { "action": "fontSize",       "id": "fontSize",       "name": "字号",     "shortcut": "",               "visible": true },
+    { "action": "alignLeft",      "id": "alignLeft",      "name": "左对齐",   "shortcut": "Ctrl+L",         "visible": false },
+    { "action": "alignCenter",    "id": "alignCenter",    "name": "居中",     "shortcut": "Ctrl+E",         "visible": false },
+    { "action": "alignRight",     "id": "alignRight",     "name": "右对齐",   "shortcut": "Ctrl+R",         "visible": false },
+    { "action": "listUl",         "id": "listUl",         "name": "无序",     "shortcut": "Ctrl+Shift+L",   "visible": false },
+    { "action": "listOl",         "id": "listOl",         "name": "有序",     "shortcut": "",               "visible": false }
+  ],
+
+  "shortcuts": {
+    "refresh": "F5",
+    "goBack": "Escape",
+    "switchTabNext": "Ctrl+Tab",
+    "switchTabPrev": "Ctrl+Shift+Tab"
+  }
+}

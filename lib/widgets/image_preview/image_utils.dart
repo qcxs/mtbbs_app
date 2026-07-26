@@ -12,7 +12,12 @@ bool isLongPic(double imageWidth, double imageHeight, double containerHeight) {
 }
 
 /// 计算长图模式的最小缩放（适配宽度）
-double calcLongPicMinScale(double imageWidth, double imageHeight, double containerWidth, double containerHeight) {
+double calcLongPicMinScale(
+  double imageWidth,
+  double imageHeight,
+  double containerWidth,
+  double containerHeight,
+) {
   if (imageWidth <= 0) return 1.0;
   final ratio = imageHeight / imageWidth;
   return containerWidth / containerHeight * ratio;
@@ -25,7 +30,9 @@ void showImageInfoDialog(
   String? sourceInfo,
   Map<String, dynamic>? meta,
 }) {
-  final sizeStr = meta != null ? '${meta['width'] ?? '?'} × ${meta['height'] ?? '?'}' : null;
+  final sizeStr = meta != null
+      ? '${meta['width'] ?? '?'} × ${meta['height'] ?? '?'}'
+      : null;
   final nameStr = meta?['name'] as String?;
   final downloadsStr = meta?['downloads'] as String?;
   final uploadTimeStr = meta?['uploadTime'] as String?;
@@ -46,7 +53,10 @@ void showImageInfoDialog(
             if (uploadTimeStr != null) _infoRow('上传时间', uploadTimeStr, cs),
             if (sourceInfo != null) _infoRow('来源', sourceInfo, cs),
             const SizedBox(height: 8),
-            Text('URL:', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+            Text(
+              'URL:',
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+            ),
             const SizedBox(height: 4),
             SelectableText(url, style: const TextStyle(fontSize: 12)),
           ],
@@ -57,7 +67,10 @@ void showImageInfoDialog(
               Clipboard.setData(ClipboardData(text: url));
               Navigator.of(ctx).pop();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已复制链接'), duration: Duration(seconds: 1)),
+                const SnackBar(
+                  content: Text('已复制链接'),
+                  duration: Duration(seconds: 1),
+                ),
               );
             },
             child: const Text('复制链接'),
@@ -80,11 +93,12 @@ Widget _infoRow(String label, String value, ColorScheme cs) {
       children: [
         SizedBox(
           width: 64,
-          child: Text(label, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+          ),
         ),
-        Expanded(
-          child: Text(value, style: const TextStyle(fontSize: 13)),
-        ),
+        Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
       ],
     ),
   );

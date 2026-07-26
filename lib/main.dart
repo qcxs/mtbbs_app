@@ -10,9 +10,10 @@ import 'package:mtbbs/providers/search_history_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
-import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/event_bus.dart';
+import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/api/forum/misc/export.dart' as forum_misc;
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/models/post_preview.dart';
@@ -21,6 +22,9 @@ import 'package:mtbbs/core/utils/cache_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 加载默认配置（从 assets/config/defaults.json）
+  await DefaultConfig.instance.load();
 
   // 初始化站点配置默认值
   SiteStore.instance.init();

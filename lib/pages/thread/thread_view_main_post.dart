@@ -12,15 +12,11 @@ class MainPostSection extends StatelessWidget {
   final PostItem post;
   final bool isLoaded;
   final bool isLiked;
-  final bool isFavorited;
   final String tid;
   final VoidCallback? onTap;
 
   // 操作回调
   final VoidCallback? onRecommend;
-  final VoidCallback? onFavorite;
-  final VoidCallback? onRate;
-  final VoidCallback? onKick;
   final void Function(PostCardAction action)? onPopupAction;
 
   const MainPostSection({
@@ -28,13 +24,9 @@ class MainPostSection extends StatelessWidget {
     required this.post,
     required this.isLoaded,
     required this.isLiked,
-    required this.isFavorited,
     required this.tid,
     this.onTap,
     this.onRecommend,
-    this.onFavorite,
-    this.onRate,
-    this.onKick,
     this.onPopupAction,
   });
 
@@ -81,14 +73,10 @@ class MainPostSection extends StatelessWidget {
       index: 0,
       tid: tid,
       isLiked: isLiked,
-      isFavorited: isFavorited,
       isLoggedIn: auth.isLoggedIn,
       currentUid: auth.uid,
       globalDisabledTags: settings.disabledBbcodeTags,
       onRecommend: onRecommend,
-      onFavorite: onFavorite,
-      onRate: onRate,
-      onKick: onKick,
       onPopupAction: onPopupAction,
     );
   }

@@ -6,6 +6,7 @@
 library;
 
 import 'package:mtbbs/models/managed_item.dart';
+import 'package:mtbbs/core/app/default_config.dart';
 
 /// 工具栏操作枚举
 ///
@@ -178,17 +179,29 @@ const allToolbarItemConfigs = [
 ];
 
 /// 生成默认的工具栏项列表
-List<ManagedItem> defaultToolbarItems() => allToolbarItemConfigs
-    .map((c) => ManagedItem(id: c.id, name: c.name, visible: c.defaultVisible))
-    .toList();
+/// 优先从 [DefaultConfig] 加载（对应 defaults.json），失败时用代码内嵌默认值。
+List<ManagedItem> defaultToolbarItems() {
+  final fromConfig = DefaultConfig.instance.defaultToolbarItems;
+  if (fromConfig.isNotEmpty) return fromConfig;
+  return allToolbarItemConfigs
+      .map(
+        (c) => ManagedItem(id: c.id, name: c.name, visible: c.defaultVisible),
+      )
+      .toList();
+}
 
 /// 生成默认的工具栏快捷键映射（仅含有关联快捷键的项）
-Map<String, String> defaultToolbarShortcuts() => {
-  for (final c in allToolbarItemConfigs.where(
-    (c) => c.defaultShortcut.isNotEmpty,
-  ))
-    c.id: c.defaultShortcut,
-};
+/// 优先从 [DefaultConfig] 加载，失败时用代码内嵌默认值。
+Map<String, String> defaultToolbarShortcuts() {
+  final fromConfig = DefaultConfig.instance.defaultToolbarShortcuts;
+  if (fromConfig.isNotEmpty) return fromConfig;
+  return {
+    for (final c in allToolbarItemConfigs.where(
+      (c) => c.defaultShortcut.isNotEmpty,
+    ))
+      c.id: c.defaultShortcut,
+  };
+}
 
 /// 根据 item id 解析对应的 ToolbarAction
 ToolbarAction? resolveToolbarAction(String id) {

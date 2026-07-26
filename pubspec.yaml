@@ -40,7 +40,6 @@ dependencies:
   path_provider: ^2.1.0
 
   # 存储
-  shared_preferences: ^2.2.0
   sembast: ^3.8.9
   path: ^1.9.0
 
@@ -102,9 +101,8 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - assets/smile/
+  assets:
+    - assets/config/defaults.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

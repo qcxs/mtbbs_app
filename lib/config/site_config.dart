@@ -1,20 +1,14 @@
-/// 站点配置 — 仅保留常量和数据模型
+import 'package:mtbbs/core/app/default_config.dart';
+
+/// 站点配置 — 数据模型 + 默认值委托
 class SiteConfig {
   SiteConfig._();
 
   static const String cookieDir = 'cookies';
 
   /// 默认站点列表（首次运行或重置时使用）
-  static List<Site> defaultSites() => [
-    Site(
-      name: 'MT论坛',
-      baseUrl: 'https://bbs.binmt.cc',
-      cdn: 'https://cdn-bbs.mt2.cn',
-      loginPagePath: '/member.php?mod=logging&action=login',
-      forums: {},
-      defaultForumOrder: [],
-    ),
-  ];
+  /// 优先从 [DefaultConfig] 加载，失败时回退到内嵌硬编码。
+  static List<Site> defaultSites() => DefaultConfig.instance.defaultSites;
 }
 
 /// 单个站点配置
