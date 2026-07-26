@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:html/parser.dart' as htmlParser;
-import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 小黑屋 JSON 响应解析
 ///

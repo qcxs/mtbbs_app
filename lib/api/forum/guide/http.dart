@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/site_store.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 导读 HTTP 请求 — 基于 Dio
 ///

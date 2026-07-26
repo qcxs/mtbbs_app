@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
-import '../../config/site_config.dart';
-import '../../core/site_store.dart';
-import '../../api/misc/userstatus/export.dart' as userstatus_api;
-import '../../core/cookie_sync.dart';
-import '../providers/auth_provider.dart';
+import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
+import 'package:mtbbs/core/app/cookie_sync.dart';
+import 'package:mtbbs/auth/providers/auth_provider.dart';
 
 /// WebView 登录页面
 ///

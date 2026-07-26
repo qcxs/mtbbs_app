@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/forum/forumdisplay/export.dart' as forum_api;
-import 'package:mtbbs/core/site_store.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
-import '../../controllers/thread_list_controller.dart';
-import '../../widgets/thread_grid.dart';
-import '../../widgets/tab_page_layout.dart';
+import 'package:mtbbs/controllers/thread_list_controller.dart';
+import 'package:mtbbs/widgets/thread/thread_grid.dart';
+import 'package:mtbbs/widgets/layout/tab_page_layout.dart';
 
 /// 版块页面
 ///

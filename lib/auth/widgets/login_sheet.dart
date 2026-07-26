@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../pages/web_login_page.dart';
+import 'package:mtbbs/auth/pages/web_login_page.dart';
 
 /// 直接打开 WebView 登录页
 ///

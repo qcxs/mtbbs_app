@@ -4,10 +4,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-import '../../services/api_service.dart';
-import '../../config/site_config.dart';
-import '../../core/site_store.dart';
-import '../../api/misc/userstatus/export.dart' as userstatus_api;
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
 
 /// 账号模型
 class Account {

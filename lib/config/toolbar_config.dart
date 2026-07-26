@@ -5,7 +5,7 @@
 /// 全部从此文件的配置衍生，三者不再各自独立定义。
 library;
 
-import '../models/managed_item.dart';
+import 'package:mtbbs/models/managed_item.dart';
 
 /// 工具栏操作枚举
 ///

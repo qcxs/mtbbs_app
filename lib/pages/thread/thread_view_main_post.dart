@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../auth/providers/auth_provider.dart';
-import '../../providers/settings_provider.dart';
-import '../../models/thread_detail.dart';
-import '../../widgets/thread_post_card.dart';
+import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/models/thread_detail.dart';
+import 'package:mtbbs/widgets/thread/thread_post_card.dart';
 
 /// 主帖区组件
 ///

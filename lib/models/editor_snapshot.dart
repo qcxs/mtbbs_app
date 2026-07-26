@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:mtbbs/core/page_fetcher.dart';
+import 'package:mtbbs/core/parser/page_fetcher.dart';
 
 // ==================== 编辑器类型 ====================
 

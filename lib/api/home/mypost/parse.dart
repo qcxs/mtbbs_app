@@ -1,7 +1,7 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
-import 'package:mtbbs/core/page_helper.dart';
-import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 我的帖子 HTML 解析
 ///

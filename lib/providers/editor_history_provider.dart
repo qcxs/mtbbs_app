@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mtbbs/core/utils/database_helper.dart';
 
 import 'package:mtbbs/models/editor_snapshot.dart';
 
@@ -30,9 +30,10 @@ class EditorSessionSummary {
 // ==================== Provider ====================
 
 /// 编辑器历史记录管理
+///
+/// 使用 SQLite 持久化（editor_snapshots 表），增量写入。
+/// 内存缓存 + 增量写入，避免全量 JSON 序列化/反序列化。
 class EditorHistoryProvider extends ChangeNotifier {
-  static const String _storageKey = 'editor_history';
-
   static const int defaultMaxAutoSnapshots = 10;
   static const Duration defaultAutoSaveInterval = Duration(seconds: 30);
   static const int defaultMinSnapshotWordCount = 10;
@@ -55,33 +56,31 @@ class EditorHistoryProvider extends ChangeNotifier {
 
   Future<void> _load() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_storageKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-        _autoMap.clear();
-        _manualMap.clear();
-        _submittedKeys.clear();
+      final db = DatabaseHelper.instance;
 
-        final autoRaw = data['auto'] as Map<String, dynamic>? ?? {};
-        final manualRaw = data['manual'] as Map<String, dynamic>? ?? {};
-        final submittedRaw = data['submitted'] as List<dynamic>? ?? [];
+      // 从 meta_store 加载提交记录
+      final submittedJson = await db.getMeta('editor_submitted_keys');
+      if (submittedJson != null && submittedJson.isNotEmpty) {
+        final list = jsonDecode(submittedJson) as List<dynamic>;
+        _submittedKeys.addAll(list.map((e) => e.toString()));
+      }
 
-        for (final entry in autoRaw.entries) {
-          final list = (entry.value as List<dynamic>)
-              .map((e) => EditorSnapshot.fromJson(e as Map<String, dynamic>))
-              .toList();
-          _autoMap[entry.key] = list;
+      // 加载所有快照，按 session 分组
+      _autoMap.clear();
+      _manualMap.clear();
+      final keys = await db.getAllSessionKeys();
+      for (final key in keys) {
+        final snapshots = await db.getAllSnapshotsBySession(key);
+        for (final s in snapshots) {
+          if (s.isManual) {
+            _manualMap.putIfAbsent(key, () => []).add(s);
+          } else {
+            _autoMap.putIfAbsent(key, () => []).add(s);
+          }
         }
-        for (final entry in manualRaw.entries) {
-          final list = (entry.value as List<dynamic>)
-              .map((e) => EditorSnapshot.fromJson(e as Map<String, dynamic>))
-              .toList();
-          _manualMap[entry.key] = list;
-        }
-        for (final k in submittedRaw) {
-          _submittedKeys.add(k.toString());
-        }
+        // 确保按 created_at 升序排列（与旧行为一致：最早的在前面）
+        _autoMap[key]?.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        _manualMap[key]?.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       }
     } catch (_) {
       _autoMap.clear();
@@ -91,19 +90,12 @@ class EditorHistoryProvider extends ChangeNotifier {
     _loaded = true;
   }
 
-  Future<void> _persist() async {
+  Future<void> _saveSubmittedKeys() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = {
-        'auto': _autoMap.map(
-          (k, v) => MapEntry(k, v.map((e) => e.toJson()).toList()),
-        ),
-        'manual': _manualMap.map(
-          (k, v) => MapEntry(k, v.map((e) => e.toJson()).toList()),
-        ),
-        'submitted': _submittedKeys.toList(),
-      };
-      await prefs.setString(_storageKey, jsonEncode(data));
+      await DatabaseHelper.instance.setMeta(
+        'editor_submitted_keys',
+        jsonEncode(_submittedKeys.toList()),
+      );
     } catch (_) {}
   }
 
@@ -174,7 +166,7 @@ class EditorHistoryProvider extends ChangeNotifier {
   Future<void> markSubmitted(String key) async {
     await _ensureLoaded();
     _submittedKeys.add(key);
-    await _persist();
+    await _saveSubmittedKeys();
     notifyListeners();
   }
 
@@ -186,8 +178,8 @@ class EditorHistoryProvider extends ChangeNotifier {
     final latest = manuals.isNotEmpty
         ? manuals.last
         : autos.isNotEmpty
-        ? autos.last
-        : null;
+            ? autos.last
+            : null;
     if (latest == null) return '(空)';
 
     final parts = <String>[];
@@ -246,10 +238,16 @@ class EditorHistoryProvider extends ChangeNotifier {
       }
     }
     list.add(snapshot);
-    while (list.length > maxAutoSnapshots) {
-      list.removeAt(0);
+
+    // 写 DB
+    await DatabaseHelper.instance.insertEditorSnapshot(snapshot);
+
+    // 超限淘汰（从 DB 和内存中同时删除最旧的）
+    if (list.length > maxAutoSnapshots) {
+      final removed = list.removeAt(0);
+      await DatabaseHelper.instance.deleteEditorSnapshot(removed.id);
     }
-    await _persist();
+
     notifyListeners();
   }
 
@@ -258,8 +256,17 @@ class EditorHistoryProvider extends ChangeNotifier {
   /// 手动保存不受字数过滤限制，即使标题/内容为空也保存。
   Future<void> addManualSnapshot(EditorSnapshot snapshot) async {
     await _ensureLoaded();
-    _manualMap[snapshot.sessionKey] = [snapshot]; // 替换为单条
-    await _persist();
+
+    // 删除旧的 manual 快照（该 session key 下只保留一条）
+    final oldList = _manualMap[snapshot.sessionKey];
+    if (oldList != null && oldList.isNotEmpty) {
+      for (final old in oldList) {
+        await DatabaseHelper.instance.deleteEditorSnapshot(old.id);
+      }
+    }
+
+    _manualMap[snapshot.sessionKey] = [snapshot];
+    await DatabaseHelper.instance.insertEditorSnapshot(snapshot);
     notifyListeners();
   }
 
@@ -281,7 +288,7 @@ class EditorHistoryProvider extends ChangeNotifier {
       changed = true;
     }
     if (changed) {
-      await _persist();
+      await DatabaseHelper.instance.deleteEditorSnapshot(snapshotId);
       notifyListeners();
     }
   }
@@ -291,7 +298,8 @@ class EditorHistoryProvider extends ChangeNotifier {
     _autoMap.remove(key);
     _manualMap.remove(key);
     _submittedKeys.remove(key);
-    await _persist();
+    await DatabaseHelper.instance.deleteSnapshotsBySession(key);
+    await _saveSubmittedKeys();
     notifyListeners();
   }
 
@@ -300,7 +308,8 @@ class EditorHistoryProvider extends ChangeNotifier {
     _autoMap.clear();
     _manualMap.clear();
     _submittedKeys.clear();
-    await _persist();
+    await DatabaseHelper.instance.clearAllEditorSnapshots();
+    await _saveSubmittedKeys();
     notifyListeners();
   }
 
@@ -328,7 +337,7 @@ class EditorHistoryProvider extends ChangeNotifier {
     clean(_autoMap);
     clean(_manualMap);
     if (changed) {
-      await _persist();
+      await DatabaseHelper.instance.deleteSnapshotsBefore(cutoff);
       notifyListeners();
     }
   }

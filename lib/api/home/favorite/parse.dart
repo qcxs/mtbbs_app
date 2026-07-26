@@ -1,5 +1,5 @@
 import 'package:html/parser.dart' as htmlParser;
-import '../../../core/logger.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 收藏列表 HTML 解析
 ///

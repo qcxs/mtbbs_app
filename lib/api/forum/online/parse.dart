@@ -1,6 +1,6 @@
 import 'package:html/parser.dart' as htmlParser;
 import 'package:html/dom.dart' as dom;
-import '../../../core/logger.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// Discuz 在线用户 HTML 解析
 ///

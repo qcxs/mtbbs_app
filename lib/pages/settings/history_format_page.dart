@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/settings_provider.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 
 /// 浏览历史 — 插入格式设置页
 ///

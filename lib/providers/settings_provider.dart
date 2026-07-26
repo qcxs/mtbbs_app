@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../config/site_config.dart';
-import '../config/toolbar_config.dart';
-import '../core/shortcut_helper.dart';
-import '../api/home/credit/export.dart' as credit_api;
-import '../services/api_service.dart';
-import '../models/managed_item.dart';
-import '../core/site_store.dart';
+import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/config/toolbar_config.dart';
+import 'package:mtbbs/core/utils/shortcut_helper.dart';
+import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/models/managed_item.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 设置管理
 class SettingsProvider extends ChangeNotifier {

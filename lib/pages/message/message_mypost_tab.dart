@@ -3,12 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'package:mtbbs/core/url_router.dart';
-import 'package:mtbbs/core/emoji_loader.dart';
+import 'package:mtbbs/core/utils/url_router.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
-import 'package:mtbbs/widgets/user_avatar.dart';
-import 'package:mtbbs/widgets/post_html_widget.dart';
+import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 
 /// 我的帖子 Tab
 class MypostTab extends StatefulWidget {

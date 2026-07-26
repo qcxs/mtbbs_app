@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/xml_helper.dart';
-import '../../helpers.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
+import 'package:mtbbs/api/helpers.dart';
 import 'http.dart' as http;
 
 /// 发布新帖（纯提交，formhash/posttime 由调用方提供）

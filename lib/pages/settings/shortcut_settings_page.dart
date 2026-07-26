@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/shortcut_helper.dart';
-import '../../config/toolbar_config.dart';
-import '../../providers/settings_provider.dart';
-import '../../widgets/key_recorder_dialog.dart';
+import 'package:mtbbs/core/utils/shortcut_helper.dart';
+import 'package:mtbbs/config/toolbar_config.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/dialog/key_recorder_dialog.dart';
 
 /// 快捷键设置页
 ///

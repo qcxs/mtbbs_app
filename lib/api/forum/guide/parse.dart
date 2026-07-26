@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:html/parser.dart' as htmlParser;
-import 'package:mtbbs/core/thread_parser.dart';
-import 'package:mtbbs/core/page_helper.dart';
-import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/parser/thread_parser.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 导读响应解析
 ///

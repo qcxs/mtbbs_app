@@ -1,10 +1,9 @@
 import 'dart:collection';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'package:mtbbs/core/logger.dart';
-import 'package:mtbbs/core/stagger_queue.dart';
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/app/stagger_queue.dart';
 
 /// 帖子预览数据
 class PostPreviewData {
@@ -31,47 +30,37 @@ class PostPreviewData {
 
 /// 帖子预览缓存（FIFO，最多 100 条）
 ///
-/// 内存 + SharedPreferences 双重存储：
+/// 内存 + SQLite 双重存储：
 /// - 内存中 LinkedHashMap 保持插入顺序，O(1) 访问
-/// - 每次写入后异步持久化到本地
-/// - 启动时从本地恢复缓存
+/// - 每次写入后增量持久化到 SQLite
+/// - 启动时从 SQLite 恢复缓存
 class PostPreviewCache {
   static const int _maxSize = 100;
-  static const String _storageKey = 'post_preview_cache';
 
   final LinkedHashMap<String, PostPreviewData> _cache = LinkedHashMap();
   bool _loaded = false;
 
   int get size => _cache.length;
 
-  /// 从本地存储加载缓存
+  /// 从 SQLite 加载缓存
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_storageKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final list = jsonDecode(jsonStr) as List<dynamic>;
-        for (final entry in list) {
-          final data = PostPreviewData.fromJson(entry as Map<String, dynamic>);
-          final key = '${data.tid}_${data.pid}';
-          _cache[key] = data;
-        }
-        AppLogger.i('CACHE', 'loaded ${_cache.length} previews from disk');
+      _cache.clear();
+      final rows = await DatabaseHelper.instance.getAllPreviewCache();
+      for (final row in rows) {
+        final key = row['id'] as String;
+        _cache[key] = PostPreviewData(
+          tid: row['tid'] as String,
+          pid: row['pid'] as String,
+          bbcode: row['bbcode'] as String,
+        );
       }
+      AppLogger.i('CACHE', 'loaded ${_cache.length} previews');
     } catch (_) {
       _cache.clear();
     }
     _loaded = true;
-  }
-
-  /// 持久化到本地存储
-  Future<void> _persist() async {
-    try {
-      final list = _cache.values.map((e) => e.toJson()).toList();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_storageKey, jsonEncode(list));
-    } catch (_) {}
   }
 
   PostPreviewData? get(String tid, String pid) {
@@ -82,17 +71,21 @@ class PostPreviewCache {
     await _ensureLoaded();
     final key = '${tid}_$pid';
     _cache[key] = data;
+
+    // 增量写入 SQLite
+    await DatabaseHelper.instance.upsertPreviewCache(tid, pid, data.bbcode);
+
+    // FIFO 淘汰：内存中移除最旧条目，DB 中删除超出限制的行
     if (_cache.length > _maxSize) {
       _cache.remove(_cache.keys.first);
+      await DatabaseHelper.instance.trimPreviewCache(_maxSize);
     }
-    await _persist();
   }
 
   /// 清空所有帖子预览缓存
   Future<void> clear() async {
     _cache.clear();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
+    await DatabaseHelper.instance.clearPreviewCache();
   }
 }
 

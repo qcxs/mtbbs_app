@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/cache_utils.dart';
-import '../../services/mt_image_hosting.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/services/mt_image_hosting.dart';
 
 /// MT 图床管理页面 — 查看/删除/隐藏历史上传
 class MtImageManagePage extends StatefulWidget {

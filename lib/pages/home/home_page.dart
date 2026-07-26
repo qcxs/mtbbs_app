@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/url_router.dart';
-import '../../core/cache_utils.dart';
-import '../../core/site_store.dart';
-import '../../models/managed_item.dart';
-import '../../providers/settings_provider.dart';
-import '../../widgets/ranklist_section.dart';
-import '../../widgets/rss_section.dart';
+import 'package:mtbbs/core/utils/url_router.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/models/managed_item.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/ranklist_section.dart';
+import 'package:mtbbs/widgets/common/rss_section.dart';
 
 /// 首页
 ///

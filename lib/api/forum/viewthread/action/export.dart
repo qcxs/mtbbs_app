@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/xml_helper.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/api/helpers.dart';
 import 'http.dart' as http;
 import 'parse.dart' as parse;

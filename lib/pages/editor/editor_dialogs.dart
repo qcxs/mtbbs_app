@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:mtbbs/widgets/bbcode_controller.dart';
-import 'package:mtbbs/widgets/bbcode_toolbar.dart';
+import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
+import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 
 /// 显示字体大小选择对话框
 void showFontSizePicker(

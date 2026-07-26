@@ -1,5 +1,5 @@
 import 'package:html/parser.dart' as html_parser;
-import '../../../core/xml_helper.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
 
 /// 论坛导航响应解析
 ///

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../api/forum/darkroom/export.dart' as darkroom_api;
-import '../../services/api_service.dart';
-import '../../widgets/user_avatar.dart';
-import '../../widgets/page_error_widget.dart';
+import 'package:mtbbs/api/forum/darkroom/export.dart' as darkroom_api;
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 
 /// 小黑屋页面
 ///

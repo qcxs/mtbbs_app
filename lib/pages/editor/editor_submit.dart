@@ -3,14 +3,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mtbbs/config/site_config.dart';
-import 'package:mtbbs/core/page_fetcher.dart';
-import 'package:mtbbs/core/xml_helper.dart';
-import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/parser/page_fetcher.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/forum/post/export.dart' as post_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/models/editor_snapshot.dart';
-import 'package:mtbbs/widgets/bbcode_controller.dart';
+import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 
 /// 编辑器页面加载和提交逻辑
 ///

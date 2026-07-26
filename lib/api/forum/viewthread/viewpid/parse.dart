@@ -1,7 +1,7 @@
 import 'package:html/dom.dart' as dom;
 
-import '../../../../core/post_parser.dart';
-import '../../../../core/xml_helper.dart';
+import 'package:mtbbs/core/parser/post_parser.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
 
 /// 单帖详情（viewpid）响应解析
 ///

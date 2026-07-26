@@ -1,4 +1,4 @@
-import 'package:mtbbs/core/site_store.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 解析 common_smilies_var.js → 结构化表情数据
 ///

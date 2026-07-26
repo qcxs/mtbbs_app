@@ -1,5 +1,5 @@
-import '../../../core/thread_parser.dart';
-import '../../../core/logger.dart';
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/parser/thread_parser.dart';
 
 /// 我的帖子/回复列表响应解析
 ///

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import '../../helpers.dart';
-import '../../../core/url_util.dart';
+import 'package:mtbbs/api/helpers.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'http.dart' as http;
 import 'parse.dart' as parse;
 

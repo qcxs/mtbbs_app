@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import '../../../config/site_config.dart';
+import 'package:mtbbs/config/site_config.dart';
 
 /// 在线用户 HTTP 请求
 ///

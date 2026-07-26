@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import '../../../config/site_config.dart';
+import 'package:mtbbs/config/site_config.dart';
 
 /// 帖子排行榜 HTTP 请求
 ///

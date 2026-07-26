@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../config/nav_config.dart';
-import '../../providers/settings_provider.dart';
+import 'package:mtbbs/config/nav_config.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 
 /// 默认启动页设置对话框
 ///

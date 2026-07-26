@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
-import 'package:mtbbs/core/page_helper.dart';
-import 'package:mtbbs/core/xml_helper.dart';
-import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 排行榜条目
 class RankItem {

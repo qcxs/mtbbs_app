@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/cache_utils.dart';
-import '../../core/emoji_loader.dart';
-import '../../core/logger.dart';
-import '../../models/post_preview.dart';
-import '../../providers/settings_provider.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/models/post_preview.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 
 /// 缓存管理页面
 ///

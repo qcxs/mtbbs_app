@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:html/dom.dart' as dom;
-import 'package:mtbbs/core/logger.dart';
-import 'package:mtbbs/core/xml_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
 
 /// 上传图片到论坛
 ///

@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/site_store.dart';
-import '../../core/cache_utils.dart';
-import '../../api/home/space/export.dart' as space_api;
-import '../../services/api_service.dart';
-import '../../models/user_profile.dart';
-import '../../providers/settings_provider.dart';
-import '../../models/browse_record.dart';
-import '../../providers/history_provider.dart';
-import '../../widgets/user_avatar.dart';
-import '../../widgets/pie_chart.dart';
-import '../../widgets/page_actions.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/models/user_profile.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/models/browse_record.dart';
+import 'package:mtbbs/providers/history_provider.dart';
+import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/common/pie_chart.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 
 /// 用户主页
 ///

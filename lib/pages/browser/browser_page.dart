@@ -3,12 +3,12 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
-import '../../auth/providers/auth_provider.dart';
-import '../../config/site_config.dart';
-import '../../core/site_store.dart';
-import '../../core/clipboard_helper.dart';
-import '../../core/cookie_sync.dart';
-import '../../core/url_router.dart';
+import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
+import 'package:mtbbs/core/app/cookie_sync.dart';
+import 'package:mtbbs/core/utils/url_router.dart';
 
 /// 内置浏览器页面
 ///

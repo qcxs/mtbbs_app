@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mtbbs/core/thread_parser.dart';
-import 'package:mtbbs/core/site_store.dart';
+import 'package:mtbbs/core/parser/thread_parser.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 void main() {
   setUpAll(() {

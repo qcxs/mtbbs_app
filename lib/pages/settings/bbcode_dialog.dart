@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../providers/settings_provider.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 
 /// BBCode 样式标签禁用对话框 — 独立组件，可在任意页面调用
 class BbcodeDialog {

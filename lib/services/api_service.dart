@@ -3,11 +3,11 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:cookie_jar/cookie_jar.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:charset/charset.dart';
-import '../config/site_config.dart';
-import '../core/site_store.dart';
-import '../core/logger.dart';
+import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/app_paths.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// API 服务 — 基于 Dio + CookieManager 的统一 HTTP 客户端
 ///
@@ -34,9 +34,8 @@ class ApiService {
     if (_initialized) return;
 
     _currentHost = SiteStore.instance.host;
-    final dir = await getApplicationDocumentsDirectory();
     _guestJar = PersistCookieJar(
-      storage: FileStorage('${dir.path}/${SiteConfig.cookieDir}/$_currentHost'),
+      storage: FileStorage(await AppPaths.cookiesDirForHost(_currentHost)),
       ignoreExpires: true,
     );
 
@@ -152,9 +151,8 @@ class ApiService {
     dio.options.headers['Referer'] = newUrl;
     dio.options.headers['User-Agent'] = Site.uaPc;
 
-    final dir = await getApplicationDocumentsDirectory();
     _guestJar = PersistCookieJar(
-      storage: FileStorage('${dir.path}/cookies/$_currentHost'),
+      storage: FileStorage(await AppPaths.cookiesDirForHost(_currentHost)),
       ignoreExpires: true,
     );
     _replaceCookieManager(_guestJar!);
@@ -163,9 +161,10 @@ class ApiService {
 
   /// 切换到指定账号的 CookieJar（路径含 host）
   Future<void> switchToAccount(String accountName) async {
-    final dir = await getApplicationDocumentsDirectory();
     final jar = PersistCookieJar(
-      storage: FileStorage('${dir.path}/cookies/$_currentHost/$accountName'),
+      storage: FileStorage(
+        await AppPaths.cookiesDirForAccount(_currentHost, accountName),
+      ),
       ignoreExpires: true,
     );
     _replaceCookieManager(jar);
@@ -180,11 +179,13 @@ class ApiService {
 
   /// 删除指定账号的磁盘 Cookie 文件
   Future<void> deleteAccountJar(String accountName) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final storagePath = '${dir.path}/cookies/$_currentHost/$accountName';
-    final dir_ = Directory(storagePath);
-    if (await dir_.exists()) {
-      await dir_.delete(recursive: true);
+    final storagePath = await AppPaths.cookiesDirForAccount(
+      _currentHost,
+      accountName,
+    );
+    final dir = Directory(storagePath);
+    if (await dir.exists()) {
+      await dir.delete(recursive: true);
     }
     if (_activeAccount == accountName) {
       await switchToGuest();
@@ -193,13 +194,13 @@ class ApiService {
 
   /// 删除当前站点所有账号的 Cookie 目录
   Future<void> deleteAllAccountJars() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final siteDir = Directory('${dir.path}/cookies/$_currentHost');
+    final sitePath = await AppPaths.cookiesDirForHost(_currentHost);
+    final siteDir = Directory(sitePath);
     if (await siteDir.exists()) {
       await siteDir.delete(recursive: true);
     }
     _guestJar = PersistCookieJar(
-      storage: FileStorage('${dir.path}/cookies/$_currentHost'),
+      storage: FileStorage(sitePath),
       ignoreExpires: true,
     );
     _replaceCookieManager(_guestJar!);

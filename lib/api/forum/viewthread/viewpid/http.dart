@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import '../../../../config/site_config.dart';
+import 'package:mtbbs/config/site_config.dart';
 
 /// 单帖详情 HTTP 请求（inajax）
 

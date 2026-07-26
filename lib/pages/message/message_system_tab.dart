@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/system/export.dart' as system_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'package:mtbbs/core/url_router.dart';
+import 'package:mtbbs/core/utils/url_router.dart';
 
 /// 系统提醒 Tab
 class SystemTab extends StatefulWidget {

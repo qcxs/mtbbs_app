@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../providers/history_provider.dart';
-import '../../models/browse_record.dart';
+import 'package:mtbbs/providers/history_provider.dart';
+import 'package:mtbbs/models/browse_record.dart';
 
 /// 浏览历史记录页面
 ///

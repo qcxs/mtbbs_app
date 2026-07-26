@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/site_store.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 版块帖子列表 HTTP 请求（forumdisplay）— 基于 Dio
 /// 只负责发请求，不做 print 或解析。

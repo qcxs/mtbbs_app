@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../auth/providers/auth_provider.dart';
-import '../../providers/settings_provider.dart';
-import '../../widgets/user_avatar.dart';
-import '../settings/user_management_dialog.dart';
+import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/pages/settings/user_management_dialog.dart';
 
 /// 我的页面
 class ProfilePage extends StatelessWidget {

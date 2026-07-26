@@ -4,13 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
-import 'package:mtbbs/core/shortcut_helper.dart';
+import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/auth/widgets/login_sheet.dart';
 import 'package:mtbbs/models/managed_item.dart';
-import 'package:mtbbs/widgets/managed_list_dialog.dart';
-import '../../controllers/thread_list_controller.dart';
-import '../../widgets/thread_grid.dart';
+import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
+import 'package:mtbbs/controllers/thread_list_controller.dart';
+import 'package:mtbbs/widgets/thread/thread_grid.dart';
 
 /// 导读首页
 ///

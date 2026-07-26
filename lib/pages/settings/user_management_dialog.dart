@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../../auth/providers/auth_provider.dart';
-import '../../../auth/pages/web_login_page.dart';
-import '../../../auth/widgets/login_sheet.dart' show showLoginSheet;
-import '../../../widgets/user_avatar.dart';
-import '../../../core/clipboard_helper.dart';
+import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/auth/pages/web_login_page.dart';
+import 'package:mtbbs/auth/widgets/login_sheet.dart' show showLoginSheet;
+import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 
 /// 用户管理弹窗 — 账号切换、登录、导出
 class UserManagementDialog extends StatelessWidget {

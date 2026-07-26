@@ -1,6 +1,6 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
-import 'package:mtbbs/core/page_helper.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
 
 /// 从发帖/回复页面的 HTML 中提取会话字段
 ///

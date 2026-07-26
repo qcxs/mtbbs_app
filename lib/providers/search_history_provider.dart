@@ -1,6 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mtbbs/core/utils/database_helper.dart';
 
 /// 搜索历史记录
 class SearchHistoryItem {
@@ -24,7 +23,7 @@ class SearchHistoryItem {
 
 /// 搜索历史管理
 ///
-/// 独立于浏览历史，单独持久化到 'search_history' key。
+/// 使用 SQLite 持久化（search_history 表），增量写入。
 class SearchHistoryProvider extends ChangeNotifier {
   List<SearchHistoryItem> _items = [];
   static const int _maxCount = 100;
@@ -45,44 +44,44 @@ class SearchHistoryProvider extends ChangeNotifier {
     while (_items.length > _maxCount) {
       _items.removeLast();
     }
-    await _persist();
+
+    // 增量写入：先删旧记录再插入新记录
+    await DatabaseHelper.instance.deleteSearchHistoryByText(trimmed);
+    await DatabaseHelper.instance.insertSearchHistory(
+      trimmed,
+      DateTime.now().toIso8601String(),
+    );
+    // 超限时从 DB 删除最旧的
+    await DatabaseHelper.instance.trimSearchHistory(_maxCount);
+
     notifyListeners();
   }
 
   /// 删除单条
   Future<void> remove(String text) async {
     _items.removeWhere((i) => i.text == text);
-    await _persist();
+    await DatabaseHelper.instance.deleteSearchHistoryByText(text);
     notifyListeners();
   }
 
   /// 清空所有
   Future<void> clear() async {
     _items.clear();
-    await _persist();
+    await DatabaseHelper.instance.clearSearchHistory();
     notifyListeners();
   }
 
-  /// 从 SharedPreferences 恢复
+  /// 从 SQLite 恢复
   Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString('search_history');
-    if (jsonStr != null && jsonStr.isNotEmpty) {
-      try {
-        final list = (jsonDecode(jsonStr) as List<dynamic>)
-            .map((e) => SearchHistoryItem.fromJson(e as Map<String, dynamic>))
-            .toList();
-        _items = list;
-      } catch (_) {
-        _items = [];
-      }
-    }
+    final rows = await DatabaseHelper.instance.getAllSearchHistory();
+    _items = rows.map((row) {
+      return SearchHistoryItem(
+        text: row.value['text'] as String? ?? '',
+        time:
+            DateTime.tryParse(row.value['time'] as String? ?? '') ??
+            DateTime.now(),
+      );
+    }).toList();
     notifyListeners();
-  }
-
-  Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = jsonEncode(_items.map((e) => e.toJson()).toList());
-    await prefs.setString('search_history', jsonStr);
   }
 }

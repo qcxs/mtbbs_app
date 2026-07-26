@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:html/parser.dart' as html_parser;
-import 'package:mtbbs/core/page_helper.dart';
-import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 积分公式响应解析
 ///

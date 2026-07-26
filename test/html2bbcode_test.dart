@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mtbbs/core/site_store.dart';
-import 'package:mtbbs/core/html2bbcode.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/parser/html2bbcode.dart';
 
 void main() {
   setUpAll(() {

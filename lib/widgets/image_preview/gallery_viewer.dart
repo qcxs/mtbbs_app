@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/cache_utils.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
 
 /// 画廊容器 — 全屏图片查看器
 ///

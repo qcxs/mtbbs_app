@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../api/forum/online/export.dart' as online_api;
-import '../../services/api_service.dart';
-import '../../core/logger.dart';
-import '../../widgets/page_error_widget.dart';
-import '../../widgets/user_avatar.dart';
+import 'package:mtbbs/api/forum/online/export.dart' as online_api;
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/common/user_avatar.dart';
 
 /// 在线用户页面
 ///

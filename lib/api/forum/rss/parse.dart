@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:xml/xml.dart';
-import 'package:mtbbs/core/logger.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// RSS 订阅条目
 class RssItem {

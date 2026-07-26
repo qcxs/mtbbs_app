@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/cache_utils.dart';
-import '../../services/mt_image_hosting.dart';
-import '../../services/clipboard_paste.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/services/mt_image_hosting.dart';
+import 'package:mtbbs/services/clipboard_paste.dart';
 
 /// MT 图床底部抽屉 — 上传图片 + 历史记录
 class MtImageSheet extends StatefulWidget {

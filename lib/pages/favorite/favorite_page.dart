@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../api/home/favorite/export.dart' as favorite_api;
-import '../../services/api_service.dart';
-import '../../core/logger.dart';
-import '../../widgets/page_error_widget.dart';
+import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 
 /// 我的收藏页面
 ///

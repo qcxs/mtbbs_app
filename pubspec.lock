@@ -505,7 +505,7 @@ packages:
     source: hosted
     version: "2.2.0"
   path:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path
       sha256: "75cca69d1490965be98c73ceaea117e8a04dd21217b37b292c9ddbec0d955bc5"
@@ -632,6 +632,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.28.0"
+  sembast:
+    dependency: "direct main"
+    description:
+      name: sembast
+      sha256: a58b26925e23071cf0f4754d8449aabe829e9a9930a872fb18e6ae4c2c88e025
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "3.8.9+1"
   shared_preferences:
     dependency: "direct main"
     description:

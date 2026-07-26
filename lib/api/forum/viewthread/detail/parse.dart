@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
-import 'package:mtbbs/core/page_helper.dart';
-import 'package:mtbbs/core/logger.dart';
-import 'package:mtbbs/core/post_parser.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/parser/post_parser.dart';
 
 /// 帖子详情响应解析（PC 模板）
 ///

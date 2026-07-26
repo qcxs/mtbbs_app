@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../core/site_store.dart';
-import '../../core/url_router.dart';
-import '../../core/username_validator.dart';
-import '../../providers/search_history_provider.dart';
-import '../../api/home/space/export.dart' as space_api;
-import '../../services/api_service.dart';
-import '../../models/user_profile.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_router.dart';
+import 'package:mtbbs/core/utils/username_validator.dart';
+import 'package:mtbbs/providers/search_history_provider.dart';
+import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/models/user_profile.dart';
 
 /// 搜索页面
 ///

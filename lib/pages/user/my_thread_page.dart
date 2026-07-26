@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../controllers/thread_list_controller.dart';
-import '../../widgets/thread_grid.dart';
-import '../../services/api_service.dart';
-import '../../api/home/mythread/export.dart' as my_thread_api;
-import '../../api/forum/viewthread/detail/export.dart' as detail_api;
-import '../../models/thread_detail.dart';
-import '../../providers/history_provider.dart';
-import '../../auth/providers/auth_provider.dart';
-import '../../models/browse_record.dart';
+import 'package:mtbbs/controllers/thread_list_controller.dart';
+import 'package:mtbbs/widgets/thread/thread_grid.dart';
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/api/home/mythread/export.dart' as my_thread_api;
+import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
+import 'package:mtbbs/models/thread_detail.dart';
+import 'package:mtbbs/providers/history_provider.dart';
+import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/models/browse_record.dart';
 
 /// 我的帖子/回复页面
 class MyThreadPage extends StatefulWidget {

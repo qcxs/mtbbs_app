@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
-import 'package:mtbbs/widgets/managed_list_dialog.dart';
+import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
 
 /// 编辑器设置页 — 编辑器相关的所有设置
 class EditorSettingsPage extends StatefulWidget {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'image_utils.dart';
+import 'package:mtbbs/widgets/image_preview/image_utils.dart';
 
 /// 长按图片时弹出操作菜单
 ///
@@ -30,8 +30,6 @@ void showImageActions(
                 : null,
             onTap: () {
               Navigator.of(ctx).pop();
-              // 延迟一帧确保底部弹窗完全关闭后再打开，
-              // 避免 Navigator 过渡态导致 canPop 判断异常
               Future.microtask(
                 () => showImageViewer(
                   context,

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mtbbs/core/bbcode2html.dart';
+import 'package:mtbbs/core/parser/bbcode2html.dart';
 
 void main() {
   group('BBCode2Html - 表格渲染', () {

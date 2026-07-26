@@ -1,6 +1,6 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
-import 'package:mtbbs/core/xml_helper.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
 
 // ============================================================
 // Data classes

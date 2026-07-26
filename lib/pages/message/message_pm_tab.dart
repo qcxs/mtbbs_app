@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'package:mtbbs/core/site_store.dart';
-import 'package:mtbbs/widgets/user_avatar.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/widgets/common/user_avatar.dart';
 
 /// 私人消息 Tab
 class PmTab extends StatefulWidget {

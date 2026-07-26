@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../models/thread_item.dart';
-import '../core/logger.dart';
+import 'package:mtbbs/models/thread_item.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 帖子列表加载状态
 enum LoadState { initial, loading, loaded, error }

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import '../core/logger.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 从 Dio Response 中安全解码响应体
 String safeDecode(Response<String> resp) => resp.data ?? '';

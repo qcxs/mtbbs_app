@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/site_store.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 获取 Discuz 表情缓存 JS
 ///

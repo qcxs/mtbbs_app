@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../../models/managed_item.dart';
-import '../../providers/settings_provider.dart';
-import '../../widgets/managed_list_dialog.dart';
+import 'package:mtbbs/models/managed_item.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
 
 /// 快捷链接管理对话框 — 独立组件，可在任意页面调用
 class ShortcutLinksDialog {

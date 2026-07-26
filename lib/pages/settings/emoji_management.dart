@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mtbbs/core/emoji_loader.dart';
-import 'package:mtbbs/widgets/staggered_emoji_image.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/widgets/common/staggered_emoji_image.dart';
 
 /// 表情管理页 — 查看当前站点的所有表情分组和列表
 class EmojiManagementPage extends StatefulWidget {

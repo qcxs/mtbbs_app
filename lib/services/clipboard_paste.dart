@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:mtbbs/core/app/app_paths.dart';
 
 /// 剪贴板图片粘贴服务
 ///
@@ -16,7 +17,7 @@ class ClipboardPasteService {
   static Future<File?> pasteImage() async {
     if (!Platform.isWindows) return null;
     try {
-      final cacheDir = Directory('${Directory.systemTemp.path}\\mtbbs_clip');
+      final cacheDir = Directory(await AppPaths.clipboardDir);
       if (!await cacheDir.exists()) await cacheDir.create(recursive: true);
 
       final outPath =

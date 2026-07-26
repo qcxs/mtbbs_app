@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../config/site_config.dart';
-import '../../../core/site_store.dart';
-import '../../../providers/settings_provider.dart';
-import '../../../auth/providers/auth_provider.dart';
-import '../../../core/app_orchestrator.dart';
+import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/core/app/app_orchestrator.dart';
 
 /// 站点管理 — 切换、添加、删除站点
 class SiteManagement {
