@@ -80,6 +80,7 @@ GoRouter buildRouter({String initialLocation = '/'}) {
           GoRoute(
             path: '/thread/:tid',
             pageBuilder: (_, state) {
+              final tid = state.pathParameters['tid'] ?? '';
               final pageStr = state.uri.queryParameters['page'];
               final pid = state.uri.queryParameters['pid'];
               final authorid = state.uri.queryParameters['authorid'];
@@ -88,8 +89,11 @@ GoRouter buildRouter({String initialLocation = '/'}) {
                   ? 1
                   : (int.tryParse(pageStr ?? '') ?? 1);
               return NoTransitionPage(
+                key: ValueKey(
+                  'thread_page_$tid${pid != null ? '_pid$pid' : ''}',
+                ),
                 child: ThreadViewPage(
-                  tid: state.pathParameters['tid'] ?? '',
+                  tid: tid,
                   initialPage: initialPage,
                   pid: pid,
                   authorid: authorid,
@@ -128,9 +132,13 @@ GoRouter buildRouter({String initialLocation = '/'}) {
           ),
           GoRoute(
             path: '/user/:uid',
-            pageBuilder: (_, state) => NoTransitionPage(
-              child: UserProfilePage(uid: state.pathParameters['uid'] ?? ''),
-            ),
+            pageBuilder: (_, state) {
+              final uid = state.pathParameters['uid'] ?? '';
+              return NoTransitionPage(
+                key: ValueKey('user_page_$uid'),
+                child: UserProfilePage(uid: uid),
+              );
+            },
           ),
           GoRoute(
             path: '/browser',

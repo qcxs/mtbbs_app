@@ -96,10 +96,12 @@ class _GlobalShortcutsWrapperState extends State<GlobalShortcutsWrapper>
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
+    final goBackKey = context.select<SettingsProvider, String?>(
+      (s) => s.shortcut('goBack'),
+    );
 
     final shortcuts = <ShortcutActivator, Intent>{};
-    final backKey = ShortcutHelper.parse(settings.shortcut('goBack'));
+    final backKey = ShortcutHelper.parse(goBackKey ?? '');
     if (backKey != null) shortcuts[backKey] = GoBackIntent();
 
     return Actions(

@@ -13,6 +13,7 @@ import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/common/pie_chart.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
+import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 
 /// 用户主页
 ///
@@ -30,6 +31,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Map<String, dynamic>? _profile;
   bool _loading = true;
   String? _error;
+  bool _showRawSignature = false;
 
   @override
   void initState() {
@@ -67,9 +69,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
           BrowseRecord(
             id: 'user_${widget.uid}',
             type: 'user',
-            title: profile.nickname.isNotEmpty
-                ? profile.nickname
-                : '用户${widget.uid}',
             routePath: '/user/${widget.uid}',
             timestamp: DateTime.now(),
             info: {
@@ -77,7 +76,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               'nickname': profile.nickname,
               'avatar': profile.avatar,
               'url':
-                  '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}',
+                  '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
             },
           ),
         );
@@ -90,30 +89,128 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
+  int? get _uidNum => int.tryParse(widget.uid);
+
+  void _navigateToUid(int uid) => GoRouter.of(context).replace('/user/$uid');
+
+  void _showUidPicker() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('跳转用户'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入 UID',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final uid = int.tryParse(controller.text);
+              if (uid != null && uid > 0) {
+                Navigator.of(ctx).pop();
+                _navigateToUid(uid);
+              }
+            },
+            child: const Text('跳转'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = _cs;
+    final uidNum = _uidNum;
     return Scaffold(
       backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
-        title: Text(
-          _profile != null ? '${_profile!['nickname'] ?? '用户'}的主页' : '用户主页',
+        title: GestureDetector(
+          onTap: _showUidPicker,
+          child: Text(
+            _profile != null
+                ? '${_profile!['nickname'] ?? '用户'}的主页 (${widget.uid})'
+                : '用户主页 (${widget.uid})',
+          ),
         ),
         surfaceTintColor: _cs.surface,
         elevation: 0.5,
         actions: [
-          if (_profile != null)
-            IconButton(
-              icon: const Icon(Icons.pie_chart_outline, size: 20),
-              tooltip: '积分分析',
-              onPressed: _showCreditDialog,
-            ),
           PageActions(
             url:
-                '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}',
+                '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
             onRefresh: _load,
             loading: _loading,
             copyLabel: '复制个人主页链接',
+            extraItems: [
+              if (uidNum != null) ...[
+                PopupMenuItem<String>(
+                  value: 'prev_user',
+                  enabled: uidNum > 1,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chevron_left,
+                        size: 18,
+                        color: uidNum > 1
+                            ? null
+                            : Theme.of(context).disabledColor,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('上一个用户'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'next_user',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chevron_right, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('下一个用户'),
+                    ],
+                  ),
+                ),
+              ],
+              if (_profile != null) ...[
+                if (uidNum != null) const PopupMenuDivider(),
+                PopupMenuItem<String>(
+                  value: 'credit_analysis',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.pie_chart_outline, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('积分分析'),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+            onExtraSelected: (action) {
+              switch (action) {
+                case 'prev_user':
+                  if (uidNum != null && uidNum > 1) {
+                    _navigateToUid(uidNum - 1);
+                  }
+                case 'next_user':
+                  if (uidNum != null) {
+                    _navigateToUid(uidNum + 1);
+                  }
+                case 'credit_analysis':
+                  _showCreditDialog();
+              }
+            },
           ),
         ],
       ),
@@ -701,17 +798,42 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   color: _cs.onSurfaceVariant,
                 ),
               ),
+              const Spacer(),
+              IconButton(
+                icon: Text(
+                  _showRawSignature ? 'T̶' : 'T',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _showRawSignature ? _cs.error : _cs.onSurfaceVariant,
+                  ),
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: _showRawSignature ? '渲染 BBCode' : '显示原始 BBCode',
+                onPressed: () =>
+                    setState(() => _showRawSignature = !_showRawSignature),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            sig.replaceAll(RegExp(r'\[/?\w+(=[^\]]*)?\]'), ''),
-            style: TextStyle(
+          if (_showRawSignature)
+            SelectableText(
+              sig,
+              style: TextStyle(
+                fontSize: 11,
+                color: _cs.onSurfaceVariant,
+                height: 1.5,
+                fontFamily: 'monospace',
+              ),
+            )
+          else
+            PostHtmlWidget(
+              bbcode: sig,
               fontSize: 14,
-              color: _cs.onSurfaceVariant,
-              height: 1.5,
+              disabledTags: const {},
+              autoDetectUrls: true,
             ),
-          ),
         ],
       ),
     );
@@ -817,6 +939,53 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final medals = _profile!['medals'] as List<dynamic>? ?? [];
     if (medals.isEmpty) return const SizedBox.shrink();
 
+    final medalWidgets = medals.map((m) {
+      final medal = m as Map<String, dynamic>;
+      final name = medal['name'] as String? ?? '';
+      final icon = medal['icon'] as String? ?? '';
+      return SizedBox(
+        height: 64,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                width: 36,
+                height: 36,
+                child: icon.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: icon,
+                        cacheManager: medalCacheManager,
+                        fit: BoxFit.contain,
+                      )
+                    : Container(
+                        color: _cs.surfaceContainerLow,
+                        child: Icon(
+                          Icons.emoji_events_outlined,
+                          size: 18,
+                          color: _cs.onSurfaceVariant,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                color: _cs.onSurfaceVariant,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+
     return Container(
       padding: const EdgeInsets.all(16),
       color: _cs.surface,
@@ -842,57 +1011,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: medals.map((m) {
-              final medal = m as Map<String, dynamic>;
-              final name = medal['name'] as String? ?? '';
-              final icon = medal['icon'] as String? ?? '';
-              return SizedBox(
-                width: 64,
-                height: 68,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: SizedBox(
-                        width: 36,
-                        height: 36,
-                        child: icon.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: icon,
-                                cacheManager: imageCacheManager,
-                                fit: BoxFit.contain,
-                              )
-                            : Container(
-                                color: _cs.surfaceContainerLow,
-                                child: Icon(
-                                  Icons.emoji_events_outlined,
-                                  size: 18,
-                                  color: _cs.onSurfaceVariant,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      name,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: _cs.onSurfaceVariant,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
+          _buildTileRow(medalWidgets),
         ],
       ),
     );

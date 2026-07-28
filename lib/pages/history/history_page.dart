@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
 
 /// 浏览历史记录页面
@@ -144,6 +145,15 @@ class _HistoryPageState extends State<HistoryPage>
 
 // ==================== 详情底部弹窗 ====================
 
+/// 根据记录类型获取标题模板
+String _titleTemplateFor(SettingsProvider s, String type) => switch (type) {
+  'thread' => s.historyTitleFormatThread,
+  'user' => s.historyTitleFormatUser,
+  'mythread' => s.historyTitleFormatMythread,
+  'reply' => s.historyTitleFormatReply,
+  _ => '{typeLabel}',
+};
+
 class _RecordDetailSheet extends StatelessWidget {
   final BrowseRecord record;
   const _RecordDetailSheet({required this.record});
@@ -157,6 +167,9 @@ class _RecordDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final info = record.info;
+    final title = record.displayTitle(
+      _titleTemplateFor(context.read<SettingsProvider>(), record.type),
+    );
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
@@ -190,7 +203,7 @@ class _RecordDetailSheet extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               children: [
-                _infoRow(context, '标题', record.title),
+                _infoRow(context, '标题', title),
                 _infoRow(context, '类型', _RecordList._typeLabel(record.type)),
                 _infoRow(context, '路由', record.routePath),
                 _infoRow(context, 'ID', record.id),
@@ -341,6 +354,9 @@ class _RecordList extends StatelessWidget {
           Divider(height: 1, indent: 56, color: cs.outlineVariant),
       itemBuilder: (context, index) {
         final record = records[index];
+        final title = record.displayTitle(
+          _titleTemplateFor(context.read<SettingsProvider>(), record.type),
+        );
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: cs.onSurfaceVariant.withValues(alpha: 0.1),
@@ -351,7 +367,7 @@ class _RecordList extends StatelessWidget {
             ),
           ),
           title: Text(
-            record.title,
+            title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 14),

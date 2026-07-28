@@ -81,7 +81,6 @@ class _MyThreadPageState extends State<MyThreadPage> {
       BrowseRecord(
         id: recordId,
         type: recordType,
-        title: '$_title (UID=$uid, 第${_controller.page}页)',
         routePath: '/my-threads$queryString',
         timestamp: DateTime.now(),
         info: {'uid': uid, 'page': _controller.page, 'type': widget.type ?? ''},

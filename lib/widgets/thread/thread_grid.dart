@@ -40,6 +40,9 @@ class _ThreadGridState extends State<ThreadGrid>
     with AutomaticKeepAliveClientMixin {
   bool _everLoaded = false;
   final ScrollController _scrollController = ScrollController();
+  int _lastItemCount = 0;
+  int _lastPage = 1;
+  LoadState _lastState = LoadState.initial;
 
   @override
   bool get wantKeepAlive => true;
@@ -86,7 +89,17 @@ class _ThreadGridState extends State<ThreadGrid>
   }
 
   void _onStateChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final ctrl = widget.controller;
+    // 数据或状态任一变化时触发重建，避免空数据时 state 变化被忽略
+    if (ctrl.items.length == _lastItemCount &&
+        ctrl.page == _lastPage &&
+        ctrl.state == _lastState)
+      return;
+    _lastItemCount = ctrl.items.length;
+    _lastPage = ctrl.page;
+    _lastState = ctrl.state;
+    setState(() {});
   }
 
   /// 页面切换时滚动到顶部
@@ -213,6 +226,7 @@ class _ThreadGridState extends State<ThreadGrid>
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ThreadCard(
+            key: ValueKey('thread_${item.threadId}'),
             item: item,
             onTap: () {
               final tid = item.threadId;

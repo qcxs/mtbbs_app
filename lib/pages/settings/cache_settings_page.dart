@@ -21,9 +21,11 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   ({int bytes, int files})? _avatarInfo;
   ({int bytes, int files})? _emojiInfo;
   ({int bytes, int files})? _imageInfo;
+  ({int bytes, int files})? _medalInfo;
   bool _loadingAvatar = true;
   bool _loadingEmoji = true;
   bool _loadingImage = true;
+  bool _loadingMedal = true;
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     _loadAvatarInfo();
     _loadEmojiInfo();
     _loadImageInfo();
+    _loadMedalInfo();
   }
 
   Future<void> _loadImageInfo() async {
@@ -64,6 +67,16 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
       setState(() {
         _emojiInfo = info;
         _loadingEmoji = false;
+      });
+  }
+
+  Future<void> _loadMedalInfo() async {
+    setState(() => _loadingMedal = true);
+    final info = await getCacheInfo('medal_cache');
+    if (mounted)
+      setState(() {
+        _medalInfo = info;
+        _loadingMedal = false;
       });
   }
 
@@ -262,6 +275,53 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
               title: '帖子图片缓存过期',
               currentDays: settings.imageCacheDays,
               onSave: (days) => settings.setImageCacheDays(days),
+            ),
+          ),
+
+          // 勋章图片缓存
+          _buildCacheTile(
+            title: '勋章图片缓存',
+            sizeText: _medalInfo != null
+                ? AppLogger.bytes(_medalInfo!.bytes)
+                : null,
+            countText: _medalInfo != null ? '${_medalInfo!.files} 个' : null,
+            loading: _loadingMedal,
+            onClear: () =>
+                _clearAndRefresh('medal_cache', '勋章图片缓存', _loadMedalInfo),
+            onSettings: () => _showDayPicker(
+              title: '勋章缓存过期',
+              currentDays: settings.medalCacheDays,
+              onSave: (days) => settings.setMedalCacheDays(days),
+            ),
+          ),
+
+          // 浏览器缓存
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: ListTile(
+              title: const Text('浏览器缓存'),
+              subtitle: const Text('内置浏览器的网页资源、Cookie、Web 存储'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              trailing: TextButton.icon(
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: const Text('清空'),
+                style: TextButton.styleFrom(
+                  foregroundColor: cs.error,
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: () async {
+                  if (!await _confirmClear('浏览器缓存')) return;
+                  await clearWebViewCache();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('浏览器缓存已清空'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+              ),
             ),
           ),
 

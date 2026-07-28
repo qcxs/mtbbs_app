@@ -108,7 +108,13 @@ class BBCode2Html {
     );
 
     // 对齐 [align=...]
-    html = _replaceTag(html, 'align', (_, v) => '<div align="$v">', '</div>');
+    // 使用 CSS text-align 而非 HTML align 属性，因为 flutter_html 不支持 align 属性
+    html = _replaceTag(
+      html,
+      'align',
+      (_, v) => '<div style="text-align:$v">',
+      '</div>',
+    );
 
     // 粗体
     html = html.replaceAllMapped(

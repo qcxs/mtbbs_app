@@ -40,6 +40,7 @@ void main() async {
     emojiDays: settings.emojiCacheDays,
     avatarDays: settings.avatarCacheDays,
     imageDays: settings.imageCacheDays,
+    medalDays: settings.medalCacheDays,
   );
 
   // 用 settings 中的站点配置初始化 ApiService

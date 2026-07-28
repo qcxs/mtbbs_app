@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
 
 /// 历史记录选择器 — 用于编辑器弹窗
@@ -111,6 +112,19 @@ class _PickerList extends StatelessWidget {
       );
     }
 
+    final settings = context.read<SettingsProvider>();
+
+    String titleFor(BrowseRecord r) {
+      final template = switch (r.type) {
+        'thread' => settings.historyTitleFormatThread,
+        'user' => settings.historyTitleFormatUser,
+        'mythread' => settings.historyTitleFormatMythread,
+        'reply' => settings.historyTitleFormatReply,
+        _ => '{typeLabel}',
+      };
+      return r.displayTitle(template);
+    }
+
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 2),
       itemCount: records.length,
@@ -126,7 +140,7 @@ class _PickerList extends StatelessWidget {
             child: Icon(_typeIcon(record.type), color: typeColor, size: 16),
           ),
           title: Text(
-            record.title,
+            titleFor(record),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 13),

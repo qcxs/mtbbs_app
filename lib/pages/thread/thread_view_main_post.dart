@@ -66,16 +66,20 @@ class MainPostSection extends StatelessWidget {
   }
 
   Widget _buildPostCard(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final settings = context.watch<SettingsProvider>();
+    final isLoggedIn =
+        context.select<AuthProvider, bool>((a) => a.isLoggedIn);
+    final currentUid = context.select<AuthProvider, String>((a) => a.uid);
+    final disabledTags = context.select<SettingsProvider, Set<String>>(
+      (s) => s.disabledBbcodeTags,
+    );
     return ThreadPostCard(
       post: post,
       index: 0,
       tid: tid,
       isLiked: isLiked,
-      isLoggedIn: auth.isLoggedIn,
-      currentUid: auth.uid,
-      globalDisabledTags: settings.disabledBbcodeTags,
+      isLoggedIn: isLoggedIn,
+      currentUid: currentUid,
+      globalDisabledTags: disabledTags,
       onRecommend: onRecommend,
       onPopupAction: onPopupAction,
     );

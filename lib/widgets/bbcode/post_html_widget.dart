@@ -81,8 +81,10 @@ class PostHtmlWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
-    final effectiveDisabled = disabledTags ?? settings.disabledBbcodeTags;
+    final effectiveDisabled = disabledTags ??
+        context.select<SettingsProvider, Set<String>>(
+          (s) => s.disabledBbcodeTags,
+        );
 
     // 1. 先按 [code] 分割，再对非 code 段按 [table] 分割
     final segments = _buildSegments(bbcode);
@@ -266,6 +268,8 @@ class PostHtmlWidget extends StatelessWidget {
                 cacheManager: cacheManager,
                 width: isEmoji ? 20 : width,
                 height: isEmoji ? 20 : height,
+                memCacheWidth: width != null ? (width * 2).toInt() : null,
+                memCacheHeight: height != null ? (height * 2).toInt() : null,
                 fit: BoxFit.contain,
                 placeholder: (_, __) => SizedBox(
                   width: width,

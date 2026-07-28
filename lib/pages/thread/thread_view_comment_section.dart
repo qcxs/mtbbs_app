@@ -72,8 +72,12 @@ class CommentSection extends StatelessWidget {
     }
     if (posts.isEmpty) return _buildEmpty(context);
 
-    final auth = context.watch<AuthProvider>();
-    final settings = context.watch<SettingsProvider>();
+    final isLoggedIn =
+        context.select<AuthProvider, bool>((a) => a.isLoggedIn);
+    final currentUid = context.select<AuthProvider, String>((a) => a.uid);
+    final disabledTags = context.select<SettingsProvider, Set<String>>(
+      (s) => s.disabledBbcodeTags,
+    );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -87,9 +91,9 @@ class CommentSection extends StatelessWidget {
               index: currentPage,
               tid: tid,
               isLiked: false,
-              isLoggedIn: auth.isLoggedIn,
-              currentUid: auth.uid,
-              globalDisabledTags: settings.disabledBbcodeTags,
+              isLoggedIn: isLoggedIn,
+              currentUid: currentUid,
+              globalDisabledTags: disabledTags,
               onReply: () => onReply?.call(post),
               onRecommend: () => onRecommend?.call(post),
               onPopupAction: (action) => onPopupAction?.call(action, post),

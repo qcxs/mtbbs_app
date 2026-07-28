@@ -143,7 +143,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       _liked = d.mainPost?.isLiked ?? false;
 
       final title = d.title.isNotEmpty ? d.title : '帖子${widget.tid}';
-      _recordThreadHistory(title);
+      _recordThreadHistory();
 
       _commentPages[1] = List<PostItem>.from(d.posts);
       _currentPage = targetPage.clamp(1, _totalPages);
@@ -247,7 +247,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     setState(() {
       _currentPage = page;
     });
-    _recordThreadHistory(null);
+    _recordThreadHistory();
     if (!_commentPages.containsKey(page)) _loadCommentPage(page);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final posts = _commentPages[_currentPage];
@@ -351,14 +351,12 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   }
 
   /// 记录帖子浏览历史（含当前页码）
-  void _recordThreadHistory(String? title) {
+  void _recordThreadHistory() {
     if (_data == null) return;
-    final t = title ?? _data!.title;
     context.read<HistoryProvider>().addRecord(
       BrowseRecord(
         id: 'thread_${widget.tid}',
         type: 'thread',
-        title: t.isNotEmpty ? t : '帖子${widget.tid}',
         routePath: '/thread/${widget.tid}',
         timestamp: DateTime.now(),
         info: {
@@ -562,6 +560,51 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
             onRefresh: () => _loadInitial(),
             loading: _loading,
             copyLabel: '复制帖子链接',
+            extraItems: () {
+              final tidNum = int.tryParse(widget.tid);
+              if (tidNum == null) return <PopupMenuEntry<String>>[];
+              return [
+                PopupMenuItem<String>(
+                  value: 'prev_thread',
+                  enabled: tidNum > 1,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chevron_left,
+                        size: 18,
+                        color: tidNum > 1
+                            ? null
+                            : Theme.of(context).disabledColor,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('上一篇'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'next_thread',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chevron_right, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('下一篇'),
+                    ],
+                  ),
+                ),
+              ];
+            }(),
+            onExtraSelected: (action) {
+              final tidNum = int.tryParse(widget.tid);
+              if (tidNum == null) return;
+              switch (action) {
+                case 'prev_thread':
+                  if (tidNum > 1) {
+                    GoRouter.of(context).replace('/thread/${tidNum - 1}');
+                  }
+                case 'next_thread':
+                  GoRouter.of(context).replace('/thread/${tidNum + 1}');
+              }
+            },
           ),
         ],
       ),

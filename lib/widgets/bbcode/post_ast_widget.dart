@@ -835,7 +835,11 @@ class PostAstWidget extends StatelessWidget {
 
   // ==================== 段落分段 ====================
 
-  Widget _buildSegmentParagraph(BuildContext context, AstNode node) {
+  Widget _buildSegmentParagraph(
+    BuildContext context,
+    AstNode node, {
+    TextAlign? textAlign,
+  }) {
     final segments = <Widget>[];
     final buf = <AstNode>[];
 
@@ -847,6 +851,7 @@ class PostAstWidget extends StatelessWidget {
           child: _buildRichText(
             context,
             AstNode(type: 'paragraph', children: List.from(buf)),
+            textAlign: textAlign,
           ),
         ),
       );
@@ -906,7 +911,9 @@ class PostAstWidget extends StatelessWidget {
     for (final child in children) {
       if (child.type == 'paragraph') {
         if (child.children.any((c) => !_canBeInline(c))) {
-          list.add(_buildSegmentParagraph(context, child));
+          list.add(
+            _buildSegmentParagraph(context, child, textAlign: textAlign),
+          );
         } else {
           list.add(
             Padding(
@@ -1060,6 +1067,7 @@ class PostAstWidget extends StatelessWidget {
                   imageUrl: src,
                   cacheManager: imageCacheManager,
                   width: maxImageWidth * 0.2,
+                  memCacheWidth: (maxImageWidth * 0.2 * 2).toInt(),
                   placeholder: (_, __) => const SizedBox(
                     width: 40,
                     height: 40,

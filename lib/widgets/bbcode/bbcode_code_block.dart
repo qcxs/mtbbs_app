@@ -219,6 +219,64 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
     );
   }
 
+  void _showSelectableDialog() {
+    final cs = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.code, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Text(_languageLabel, style: const TextStyle(fontSize: 15)),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              tooltip: '复制',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: widget.code));
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('已复制'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+          ),
+          decoration: BoxDecoration(
+            color: cs.codeBlockBg,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              widget.code,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: widget.fontSize,
+                color: cs.codeTextColor,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -333,6 +391,29 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
             ),
           ),
           const SizedBox(width: 6),
+          // 文本选择按钮（弹窗可自由选择/复制）
+          GestureDetector(
+            onTap: _showSelectableDialog,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.codeBlockIconActive.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.text_fields, size: 12, color: cs.codeBlockBarText),
+                  const SizedBox(width: 4),
+                  Text(
+                    '自由复制',
+                    style: TextStyle(fontSize: 11, color: cs.codeBlockBarText),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
           // 复制按钮
           GestureDetector(
             onTap: () {
@@ -357,11 +438,6 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
                     Icons.copy_rounded,
                     size: 12,
                     color: cs.codeBlockBarText,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '复制',
-                    style: TextStyle(fontSize: 11, color: cs.codeBlockBarText),
                   ),
                 ],
               ),

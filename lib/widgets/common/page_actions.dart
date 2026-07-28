@@ -57,6 +57,10 @@ class PageActions extends StatelessWidget {
     );
   }
 
+  void _openSearch(BuildContext context) {
+    context.push('/search');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -77,6 +81,8 @@ class PageActions extends StatelessWidget {
                 _openInBrowser(context);
               case '_copyLink':
                 _copyLink(context);
+              case '_search':
+                _openSearch(context);
               default:
                 onExtraSelected?.call(value);
             }
@@ -84,6 +90,7 @@ class PageActions extends StatelessWidget {
           itemBuilder: (_) => [
             const PopupMenuItem(value: '_openBrowser', child: Text('在浏览器中打开')),
             PopupMenuItem(value: '_copyLink', child: Text(copyLabel ?? '复制链接')),
+            PopupMenuItem(value: '_search', child: Text('搜索')),
             if (extraItems != null && extraItems!.isNotEmpty) ...[
               const PopupMenuDivider(),
               ...extraItems!,

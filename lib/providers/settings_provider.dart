@@ -41,6 +41,9 @@ class SettingsProvider extends ChangeNotifier {
   /// 帖子图片缓存天数（-1 表示永不过期）
   int _imageCacheDays = 3;
 
+  /// 勋章图片缓存天数（-1 表示永不过期）
+  int _medalCacheDays = -1;
+
   /// 用户自定义站点列表（持久化）
   List<Site> _sites = [];
 
@@ -74,6 +77,18 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 最大记录数
   int _historyMaxCount = 200;
+
+  /// 历史记录标题格式 — 帖子
+  String _historyTitleFormatThread = '{title} by:{author} {time}';
+
+  /// 历史记录标题格式 — 用户
+  String _historyTitleFormatUser = '{nickname}(UID={uid})';
+
+  /// 历史记录标题格式 — 我的帖子
+  String _historyTitleFormatMythread = '{typeLabel}(UID={uid}, 第{page}页)';
+
+  /// 历史记录标题格式 — 回复
+  String _historyTitleFormatReply = '{typeLabel}(UID={uid}, 第{page}页)';
 
   /// 主题模式
   ThemeMode _themeMode = ThemeMode.system;
@@ -121,6 +136,7 @@ class SettingsProvider extends ChangeNotifier {
   int get avatarCacheDays => _avatarCacheDays;
   int get emojiCacheDays => _emojiCacheDays;
   int get imageCacheDays => _imageCacheDays;
+  int get medalCacheDays => _medalCacheDays;
   ThemeMode get themeMode => _themeMode;
   Color get seedColor => _seedColor;
   bool get isPureBlackTheme => _isPureBlackTheme;
@@ -143,6 +159,10 @@ class SettingsProvider extends ChangeNotifier {
   String get historyFormatThread => _historyFormatThread;
   String get historyFormatUser => _historyFormatUser;
   int get historyMaxCount => _historyMaxCount;
+  String get historyTitleFormatThread => _historyTitleFormatThread;
+  String get historyTitleFormatUser => _historyTitleFormatUser;
+  String get historyTitleFormatMythread => _historyTitleFormatMythread;
+  String get historyTitleFormatReply => _historyTitleFormatReply;
 
   static const tabLabels = {
     'newthread': '最新发表',
@@ -167,6 +187,7 @@ class SettingsProvider extends ChangeNotifier {
     _avatarCacheDays = (await _db.getSettingInt('avatarCacheDays')) ?? 7;
     _emojiCacheDays = (await _db.getSettingInt('emojiCacheDays')) ?? -1;
     _imageCacheDays = (await _db.getSettingInt('imageCacheDays')) ?? 3;
+    _medalCacheDays = (await _db.getSettingInt('medalCacheDays')) ?? -1;
     _minSnapshotWordCount =
         (await _db.getSettingInt('minSnapshotWordCount')) ?? 10;
     _autoSaveInterval = (await _db.getSettingInt('autoSaveInterval')) ?? 30;
@@ -177,6 +198,16 @@ class SettingsProvider extends ChangeNotifier {
         (await _db.getSetting('historyFormat_thread')) ?? '{title}';
     _historyFormatUser =
         (await _db.getSetting('historyFormat_user')) ?? '{nickname}';
+    _historyTitleFormatThread =
+        (await _db.getSetting('historyTitleFormat_thread')) ?? '{title}';
+    _historyTitleFormatUser =
+        (await _db.getSetting('historyTitleFormat_user')) ?? '{nickname}';
+    _historyTitleFormatMythread =
+        (await _db.getSetting('historyTitleFormat_mythread')) ??
+        '{typeLabel}(UID={uid}, 第{page}页)';
+    _historyTitleFormatReply =
+        (await _db.getSetting('historyTitleFormat_reply')) ??
+        '{typeLabel}(UID={uid}, 第{page}页)';
 
     // 积分公式（按站点）
     _creditFormula =
@@ -324,6 +355,12 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setMedalCacheDays(int days) async {
+    _medalCacheDays = days.clamp(-1, 365);
+    await _db.setSettingInt('medalCacheDays', _medalCacheDays);
+    notifyListeners();
+  }
+
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     await _db.setSetting('themeMode', mode.name);
@@ -405,6 +442,30 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setHistoryMaxCount(int count) async {
     _historyMaxCount = count.clamp(10, 1000);
     await _db.setSettingInt('historyMaxCount', _historyMaxCount);
+    notifyListeners();
+  }
+
+  Future<void> setHistoryTitleFormatThread(String format) async {
+    _historyTitleFormatThread = format;
+    await _db.setSetting('historyTitleFormat_thread', format);
+    notifyListeners();
+  }
+
+  Future<void> setHistoryTitleFormatUser(String format) async {
+    _historyTitleFormatUser = format;
+    await _db.setSetting('historyTitleFormat_user', format);
+    notifyListeners();
+  }
+
+  Future<void> setHistoryTitleFormatMythread(String format) async {
+    _historyTitleFormatMythread = format;
+    await _db.setSetting('historyTitleFormat_mythread', format);
+    notifyListeners();
+  }
+
+  Future<void> setHistoryTitleFormatReply(String format) async {
+    _historyTitleFormatReply = format;
+    await _db.setSetting('historyTitleFormat_reply', format);
     notifyListeners();
   }
 

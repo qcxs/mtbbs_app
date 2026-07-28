@@ -59,6 +59,7 @@ class ThreadCommentList extends StatelessWidget {
 
   Widget _buildPostCard(BuildContext context, PostItem post, int index) {
     return ThreadPostCard(
+      key: ValueKey('post_${post.pid}'),
       post: post,
       index: index,
       tid: tid,

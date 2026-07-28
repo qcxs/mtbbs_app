@@ -9,6 +9,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
 
 /// 内置浏览器页面
 ///
@@ -208,6 +209,36 @@ class _BrowserPageState extends State<BrowserPage> {
     }
   }
 
+  Future<void> _clearCache() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认清空'),
+        content: const Text('确定要清除浏览器缓存吗？此操作将清空网页资源缓存、Cookie 和本地存储数据。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await clearWebViewCache();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('浏览器缓存已清空'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   /// 用 App 本地页面打开当前 URL（如果支持）
   void _openInApp() {
     final result = UrlRouter.parse(_currentUrl);
@@ -333,6 +364,8 @@ class _BrowserPageState extends State<BrowserPage> {
                       ),
                     );
                     _controller?.reload();
+                  case 'clearCache':
+                    _clearCache();
                   case 'copyUrl':
                     _copyUrl();
                   case 'openExternal':
@@ -350,6 +383,17 @@ class _BrowserPageState extends State<BrowserPage> {
                       const Spacer(),
                       if (_desktopMode)
                         Icon(Icons.check, size: 16, color: cs.onSurfaceVariant),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'clearCache',
+                  child: Row(
+                    children: [
+                      Icon(Icons.cached, size: 18),
+                      SizedBox(width: 8),
+                      Text('清除缓存'),
                     ],
                   ),
                 ),

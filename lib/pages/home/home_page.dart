@@ -47,13 +47,14 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
-    final siteStore = context.watch<SiteStore>();
-    final links = settings.shortcutLinks.where((e) => e.visible).toList();
+    final links = context.select<SettingsProvider, List<ManagedItem>>(
+      (s) => s.shortcutLinks.where((e) => e.visible).toList(),
+    );
+    final baseUrl = context.select<SiteStore, String>((s) => s.baseUrl);
     final refreshKey = ValueKey('refresh_$_refreshCounter');
 
     return RefreshIndicator(
-      key: ValueKey('home_${siteStore.baseUrl}'),
+      key: ValueKey('home_$baseUrl'),
       onRefresh: _refreshAll,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),

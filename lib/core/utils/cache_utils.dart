@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -69,6 +70,7 @@ class IgnoreCacheFileService extends FileService {
 CacheManager? _emojiCacheManager;
 CacheManager? _avatarCacheManager;
 CacheManager? _imageCacheManager;
+CacheManager? _medalCacheManager;
 
 Duration _stalePeriod(int days) =>
     days > 0 ? Duration(days: days) : const Duration(days: 36500);
@@ -95,6 +97,15 @@ CacheManager _createImage(int days) => CacheManager(
   Config(
     'image_cache',
     stalePeriod: _stalePeriod(days),
+    maxNrOfCacheObjects: 2000,
+    fileService: IgnoreCacheFileService(stalePeriod: _stalePeriod(days)),
+  ),
+);
+
+CacheManager _createMedal(int days) => CacheManager(
+  Config(
+    'medal_cache',
+    stalePeriod: _stalePeriod(days),
     maxNrOfCacheObjects: 500,
     fileService: IgnoreCacheFileService(stalePeriod: _stalePeriod(days)),
   ),
@@ -105,13 +116,16 @@ void initCacheManagers({
   required int emojiDays,
   required int avatarDays,
   required int imageDays,
+  required int medalDays,
 }) {
   _emojiCacheManager?.dispose();
   _avatarCacheManager?.dispose();
   _imageCacheManager?.dispose();
+  _medalCacheManager?.dispose();
   _emojiCacheManager = _createEmoji(emojiDays);
   _avatarCacheManager = _createAvatar(avatarDays);
   _imageCacheManager = _createImage(imageDays);
+  _medalCacheManager = _createMedal(medalDays);
 }
 
 /// 表情图片缓存管理器
@@ -122,6 +136,9 @@ CacheManager get avatarCacheManager => _avatarCacheManager ??= _createAvatar(7);
 
 /// 通用图片缓存管理器（帖子图片、封面图等），默认携带 Referer
 CacheManager get imageCacheManager => _imageCacheManager ??= _createImage(30);
+
+/// 勋章图片缓存管理器（默认永不过期）
+CacheManager get medalCacheManager => _medalCacheManager ??= _createMedal(-1);
 
 // ==================== 缓存统计与清空 ====================
 
@@ -153,3 +170,26 @@ Future<void> clearCacheByKey(String cacheKey) async {
 
 /// 清空指定缓存管理器的所有缓存文件。
 Future<void> clearCache(CacheManager manager) => manager.emptyCache();
+
+// ==================== WebView 浏览器缓存 ====================
+
+/// 清除内置浏览器的所有缓存数据（资源缓存、Web 存储、Cookie）
+///
+/// 使用 [flutter_inappwebview] 的静态 API，无需活动 WebView 实例。
+Future<void> clearWebViewCache() async {
+  try {
+    await InAppWebViewController.clearAllCache(includeDiskFiles: true);
+  } catch (e) {
+    AppLogger.w('CACHE', 'clearAllCache error: $e');
+  }
+  try {
+    await WebStorageManager.instance().deleteAllData();
+  } catch (e) {
+    AppLogger.w('CACHE', 'deleteAllData error: $e');
+  }
+  try {
+    await CookieManager.instance().deleteAllCookies();
+  } catch (e) {
+    AppLogger.w('CACHE', 'deleteAllCookies error: $e');
+  }
+}

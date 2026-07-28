@@ -228,7 +228,7 @@ void _parseSignature(dom.Element profileBox, Map<String, dynamic> profile) {
       if (td != null) {
         // 转换为 BBCode
         final converter = Html2BBCode();
-        final bbcode = converter.convertElement(td);
+        final bbcode = converter.convertElementContent(td);
         if (bbcode.isNotEmpty) {
           profile['signature'] = bbcode;
         }

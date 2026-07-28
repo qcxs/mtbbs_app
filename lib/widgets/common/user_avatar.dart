@@ -66,6 +66,8 @@ class UserAvatar extends StatefulWidget {
 class _UserAvatarState extends State<UserAvatar> {
   StaggerSlot? _loadTask;
   bool _ready = false;
+  bool _scheduledOnce = false;
+  bool _lastShowAvatars = true;
   String? _resolvedUrl;
 
   /// 301 重定向缓存，映射原始 URL → 最终 URL（null 表示无重定向）
@@ -106,6 +108,7 @@ class _UserAvatarState extends State<UserAvatar> {
     if (oldWidget.uid != widget.uid) {
       _loadTask?.cancel();
       _ready = false;
+      _scheduledOnce = false;
       _resolvedUrl = null;
       _schedule();
     }
@@ -114,13 +117,20 @@ class _UserAvatarState extends State<UserAvatar> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 设置变更（如头像开关）时重新检查
-    if (!_ready) _schedule();
+    // 仅在头像设置从禁用→启用时重新调度，避免父级 rebuild 重复触发磁盘 I/O
+    // build 方法已通过 context.select 订阅 showAvatars 变化，此处只需读当前值
+    final showAvatars = context.read<SettingsProvider>().showAvatars;
+    if (showAvatars && !_lastShowAvatars) {
+      _lastShowAvatars = true;
+      if (!_scheduledOnce) _schedule();
+    }
+    _lastShowAvatars = showAvatars;
   }
 
-  /// 解析 301 重定向 → 检查缓存 → 排队加载
+  /// 解析 301 重定向 → 检查缓存 → 排队加载（仅执行一次）
   Future<void> _schedule() async {
-    if (!mounted) return;
+    if (_scheduledOnce || !mounted) return;
+    _scheduledOnce = true;
 
     // 头像已禁用 → 跳过所有网络请求
     if (!context.read<SettingsProvider>().showAvatars) return;

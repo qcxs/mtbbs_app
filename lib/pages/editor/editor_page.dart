@@ -248,6 +248,16 @@ class _EditorPageState extends State<EditorPage> {
     );
 
     if (!result.success) {
+      // 未登录时允许进入体验模式（除发布/上传外，编辑功能均可离线使用）
+      if (result.loginRequired) {
+        AppLogger.i('EDITOR', 'not logged in — entering preview mode');
+        setState(() {
+          _loadingPage = false;
+          _pageError = null;
+          _pageData = const PageFormData(success: true);
+        });
+        return;
+      }
       setState(() {
         _loadingPage = false;
         _pageError = result.error ?? '加载失败';

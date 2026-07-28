@@ -16,6 +16,10 @@ class HistoryFormatPage extends StatefulWidget {
 class _HistoryFormatPageState extends State<HistoryFormatPage> {
   late TextEditingController _threadCtl;
   late TextEditingController _userCtl;
+  late TextEditingController _titleThreadCtl;
+  late TextEditingController _titleUserCtl;
+  late TextEditingController _titleMythreadCtl;
+  late TextEditingController _titleReplyCtl;
 
   @override
   void initState() {
@@ -23,12 +27,28 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
     final settings = context.read<SettingsProvider>();
     _threadCtl = TextEditingController(text: settings.historyFormatThread);
     _userCtl = TextEditingController(text: settings.historyFormatUser);
+    _titleThreadCtl = TextEditingController(
+      text: settings.historyTitleFormatThread,
+    );
+    _titleUserCtl = TextEditingController(
+      text: settings.historyTitleFormatUser,
+    );
+    _titleMythreadCtl = TextEditingController(
+      text: settings.historyTitleFormatMythread,
+    );
+    _titleReplyCtl = TextEditingController(
+      text: settings.historyTitleFormatReply,
+    );
   }
 
   @override
   void dispose() {
     _threadCtl.dispose();
     _userCtl.dispose();
+    _titleThreadCtl.dispose();
+    _titleUserCtl.dispose();
+    _titleMythreadCtl.dispose();
+    _titleReplyCtl.dispose();
     super.dispose();
   }
 
@@ -36,6 +56,10 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
     final settings = context.read<SettingsProvider>();
     await settings.setHistoryFormatThread(_threadCtl.text.trim());
     await settings.setHistoryFormatUser(_userCtl.text.trim());
+    await settings.setHistoryTitleFormatThread(_titleThreadCtl.text.trim());
+    await settings.setHistoryTitleFormatUser(_titleUserCtl.text.trim());
+    await settings.setHistoryTitleFormatMythread(_titleMythreadCtl.text.trim());
+    await settings.setHistoryTitleFormatReply(_titleReplyCtl.text.trim());
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已保存'), duration: Duration(seconds: 1)),
@@ -140,6 +164,124 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
               ],
             ),
           ),
+
+          const SizedBox(height: 32),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
+
+          // ==================== 列表标题格式 ====================
+          Text(
+            '列表标题格式',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '浏览历史列表中每条记录的标题格式，修改后立刻生效。',
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '可用占位符会根据记录类型自动替换。{typeLabel} 自动显示为帖子/用户/我的帖子/回复。',
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 20),
+
+          // -- 帖子 --
+          Text(
+            '帖子格式',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePlaceholderHint('thread'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _titleThreadCtl,
+            decoration: const InputDecoration(
+              hintText: '{title}',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePreview(cs, '帖子', _titleThreadCtl.text, {
+            'title': '求助帖',
+            'author': '小明',
+            'tid': '123',
+          }),
+
+          const SizedBox(height: 20),
+
+          // -- 用户 --
+          Text(
+            '用户格式',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePlaceholderHint('user'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _titleUserCtl,
+            decoration: const InputDecoration(
+              hintText: '{nickname}',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePreview(cs, '用户', _titleUserCtl.text, {
+            'nickname': '张三',
+            'uid': '123',
+          }),
+
+          const SizedBox(height: 20),
+
+          // -- 我的帖子 --
+          Text(
+            '我的帖子格式',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePlaceholderHint('mythread'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _titleMythreadCtl,
+            decoration: const InputDecoration(
+              hintText: '{typeLabel}(UID={uid}, 第{page}页)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePreview(cs, '我的帖子', _titleMythreadCtl.text, {
+            'uid': '33',
+            'page': '1',
+            'typeLabel': '我的帖子',
+          }),
+
+          const SizedBox(height: 20),
+
+          // -- 回复 --
+          Text(
+            '回复格式',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePlaceholderHint('reply'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _titleReplyCtl,
+            decoration: const InputDecoration(
+              hintText: '{typeLabel}(UID={uid}, 第{page}页)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _buildTitlePreview(cs, '回复', _titleReplyCtl.text, {
+            'uid': '33',
+            'page': '1',
+            'typeLabel': '回复',
+          }),
         ],
       ),
     );
@@ -166,6 +308,46 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildTitlePlaceholderHint(String type) {
+    final cs = Theme.of(context).colorScheme;
+    final placeholders = switch (type) {
+      'thread' => ['{title}', '{tid}', '{author}', '{authorUid}', '{page}'],
+      'user' => ['{nickname}', '{uid}'],
+      'mythread' || 'reply' => ['{uid}', '{page}', '{typeLabel}'],
+      _ => ['{typeLabel}'],
+    };
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: placeholders.map((p) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            p,
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildTitlePreview(
+    ColorScheme cs,
+    String label,
+    String format,
+    Map<String, String> sample,
+  ) {
+    final result = _formatPlaceholders(format, sample);
+    return Text(
+      '预览: $result',
+      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
     );
   }
 

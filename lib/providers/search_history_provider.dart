@@ -74,14 +74,17 @@ class SearchHistoryProvider extends ChangeNotifier {
   /// 从 SQLite 恢复
   Future<void> load() async {
     final rows = await DatabaseHelper.instance.getAllSearchHistory();
-    _items = rows.map((row) {
-      return SearchHistoryItem(
-        text: row.value['text'] as String? ?? '',
-        time:
-            DateTime.tryParse(row.value['time'] as String? ?? '') ??
-            DateTime.now(),
-      );
-    }).toList();
+    _items = rows
+        .map((row) {
+          return SearchHistoryItem(
+            text: row.value['text'] as String? ?? '',
+            time:
+                DateTime.tryParse(row.value['time'] as String? ?? '') ??
+                DateTime.now(),
+          );
+        })
+        .toList()
+      ..sort((a, b) => b.time.compareTo(a.time));
     notifyListeners();
   }
 }
