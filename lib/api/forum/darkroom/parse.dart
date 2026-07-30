@@ -44,9 +44,12 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     for (final entry in rawData.entries) {
       if (entry.value is Map) {
         final item = Map<String, dynamic>.from(entry.value as Map);
-        // 处理 dateline：HTML span → textContent
-        final rawDateline = item['dateline'] as String? ?? '';
-        item['dateline'] = _extractDatelineText(rawDateline);
+        // 清洗所有字符串字段中的 HTML → 纯文本
+        for (final key in item.keys) {
+          if (item[key] is String) {
+            item[key] = _extractDatelineText(item[key] as String);
+          }
+        }
         items.add(item);
       }
     }
@@ -81,13 +84,16 @@ String _extractDatelineText(String raw) {
   if (!raw.contains('<') && !raw.contains('&')) return raw;
   try {
     final doc = htmlParser.parseFragment(raw);
-    var text = doc.text?.trim() ?? raw;
-    // htmlParser 对 &nbsp; 可能保留为 \u00A0，统一转成常规空格
-    text = text.replaceAll('\u00A0', ' ');
-    return text;
-  } catch (_) {
-    return raw;
-  }
+    final text = doc.text?.trim();
+    if (text != null && text.isNotEmpty) {
+      return text.replaceAll('\u00A0', ' ');
+    }
+  } catch (_) {}
+  // 退路：剥标签 + 解码 &nbsp;
+  return raw
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .trim();
 }
 
 /// Discuz 小黑屋 API 返回的 JSON 中 data 对象的数字键没有引号，

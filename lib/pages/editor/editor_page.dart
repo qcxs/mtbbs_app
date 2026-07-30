@@ -248,9 +248,9 @@ class _EditorPageState extends State<EditorPage> {
     );
 
     if (!result.success) {
-      // 未登录时允许进入体验模式（除发布/上传外，编辑功能均可离线使用）
-      if (result.loginRequired) {
-        AppLogger.i('EDITOR', 'not logged in — entering preview mode');
+      // 自检开关关闭时，忽略所有启动报错，无条件进入预览模式
+      if (!context.read<SettingsProvider>().editorStartupCheck) {
+        AppLogger.i('EDITOR', 'startup check disabled — entering preview mode');
         setState(() {
           _loadingPage = false;
           _pageError = null;

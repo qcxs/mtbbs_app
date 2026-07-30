@@ -143,6 +143,10 @@ class SettingsProvider extends ChangeNotifier {
   bool _showAvatars = true;
   bool get showAvatars => _showAvatars;
 
+  /// 编辑器启动自检（默认开启，关闭后跳过启动报错，无条件进入编辑器）
+  bool _editorStartupCheck = true;
+  bool get editorStartupCheck => _editorStartupCheck;
+
   String get creditFormula => _creditFormula;
 
   List<ManagedItem> get shortcutLinks =>
@@ -308,6 +312,10 @@ class SettingsProvider extends ChangeNotifier {
     // 头像设置
     _showAvatars = (await _db.getSettingBool('showAvatars')) ?? true;
 
+    // 编辑器启动自检
+    _editorStartupCheck =
+        (await _db.getSettingBool('editorStartupCheck')) ?? true;
+
     notifyListeners();
   }
 
@@ -382,6 +390,12 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setShowAvatars(bool value) async {
     _showAvatars = value;
     await _db.setSettingBool('showAvatars', value);
+    notifyListeners();
+  }
+
+  Future<void> setEditorStartupCheck(bool value) async {
+    _editorStartupCheck = value;
+    await _db.setSettingBool('editorStartupCheck', value);
     notifyListeners();
   }
 

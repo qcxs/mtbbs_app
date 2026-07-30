@@ -121,9 +121,11 @@ class MtImageHosting {
   ///
   /// 返回 [MtUploadResult] 或 null。
   /// [onProgress] 进度回调 (sent, total)。
+  /// [onError] 服务端错误消息回调。
   Future<MtUploadResult?> upload(
     String filePath, {
     void Function(int sent, int total)? onProgress,
+    void Function(String message)? onError,
   }) async {
     final file = File(filePath);
     if (!file.existsSync()) return null;
@@ -174,11 +176,15 @@ class MtImageHosting {
         return result;
       }
 
-      // token 过期 → 清除缓存
-      if (body is Map && _isAuthError(body)) {
-        _cookie = null;
-        _csrfToken = null;
-        _authExpiry = null;
+      // 通知调用方服务端错误消息
+      if (body is Map) {
+        final msg = body['message'] as String?;
+        if (msg != null && msg.isNotEmpty) onError?.call(msg);
+        if (_isAuthError(body)) {
+          _cookie = null;
+          _csrfToken = null;
+          _authExpiry = null;
+        }
       }
 
       return null;

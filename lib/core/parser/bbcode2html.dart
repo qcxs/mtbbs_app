@@ -56,12 +56,16 @@ class BBCode2Html {
       },
     );
 
-    // ========== 1. 移除被禁用的标签（保留内容） ==========
+    // ========== 1. 预处理器：闭合列表标签 ==========
+    // 将 [*]item\n 转换为 <li>item</li>，避免 \n→<br> 后 <li> 内残留 <br>
+    html = _preprocessListItems(html);
+
+    // ========== 2. 移除被禁用的标签（保留内容） ==========
     if (_disabledTags != null && _disabledTags.isNotEmpty) {
       html = _stripDisabledTags(html);
     }
 
-    // ========== 2. 保护 [code] 块 ==========
+    // ========== 3. 保护 [code] 块 ==========
     html = html.replaceAllMapped(
       RegExp(r'\[code\]([\s\S]*?)\[/code\]', caseSensitive: false),
       (m) {
@@ -97,7 +101,14 @@ class BBCode2Html {
     }, '</span>');
 
     // 颜色 [color=...]
-    html = _replaceTag(html, 'color', (_, v) => '<font color="$v">', '</font>');
+    // 使用 <span style="color:..."> 而非 <font color="...">，因为 flutter_html
+    // 对 <font color> 属性中的 rgb()/rgba() 格式支持不完整，而 inline style 是 CSS 标准
+    html = _replaceTag(
+      html,
+      'color',
+      (_, v) => '<span style="color:$v">',
+      '</span>',
+    );
 
     // 背景色 [backcolor=...]
     html = _replaceTag(
@@ -173,19 +184,21 @@ class BBCode2Html {
     // 引用 [quote]...[/quote]
     html = html.replaceAllMapped(
       RegExp(r'\[quote\]([\s\S]*?)\[/quote\]', caseSensitive: false),
-      (m) => '<blockquote>${m.group(1)}</blockquote>',
+      (m) => '<blockquote>${m.group(1)!.trim()}</blockquote>',
     );
 
     // 免费信息 [free]...[/free]
     html = html.replaceAllMapped(
       RegExp(r'\[free\]([\s\S]*?)\[/free\]', caseSensitive: false),
-      (m) => '<blockquote class="bbcode-free">${m.group(1)}</blockquote>',
+      (m) =>
+          '<blockquote class="bbcode-free">${m.group(1)!.trim()}</blockquote>',
     );
 
     // 隐藏内容 [hide]...[/hide]（支持 [hide=参数]）
     html = html.replaceAllMapped(
       RegExp(r'\[hide(?:=[^\]]*)?\]([\s\S]*?)\[/hide\]', caseSensitive: false),
-      (m) => '<blockquote>${_labelBlock('隐藏内容', m.group(1)!)}</blockquote>',
+      (m) =>
+          '<blockquote>${_labelBlock('隐藏内容', m.group(1)!.trim())}</blockquote>',
     );
 
     // 列表 [list] / [list=1] / [list=a]
@@ -324,6 +337,15 @@ class BBCode2Html {
     // ========== 5. 换行 ==========
     html = html.replaceAll('\n', '<br>');
 
+    // 折叠连续 3+ 的 <br> 为最多 2 个，防止因格式化换行导致大量空白
+    html = html.replaceAll(
+      RegExp(r'(<br>\s*){3,}', caseSensitive: false),
+      '<br><br>',
+    );
+
+    // 清理块级 HTML 容器前后的格式化 <br>
+    html = _removeAdjacentLineBreaks(html);
+
     // ========== 6. 自动识别纯文本 URL ==========
     if (_autoDetectUrls) {
       html = _autoLinkUrls(html);
@@ -354,10 +376,36 @@ class BBCode2Html {
           return _renderImageAttach(data);
         case 'locked':
           final msg = _escapeHtml(data['message'] as String? ?? '');
-          return '<div class="bbcode-locked">$msg</div>';
+          return '<div class="bbcode-locked"><span class="bbcode-reward-icon">🔒</span>$msg</div>';
         case 'pstatus':
           final msg = _escapeHtml(data['message'] as String? ?? '');
           return '<div class="bbcode-pstatus">$msg</div>';
+        case 'reward':
+          final amount = _escapeHtml(data['amount'] as String? ?? '');
+          final unit = _escapeHtml(data['unit'] as String? ?? '');
+          return '<div class="bbcode-reward"><span class="bbcode-reward-icon">🎁</span>回帖奖励 <span class="bbcode-reward-amount">$amount</span> $unit</div>';
+        case 'bounty':
+          final amount = _escapeHtml(data['amount'] as String? ?? '');
+          final unit = _escapeHtml(data['unit'] as String? ?? '');
+          return '<div class="bbcode-reward"><span class="bbcode-reward-icon">💰</span>悬赏 <span class="bbcode-reward-amount">$amount</span> $unit</div>';
+        case 'poll':
+          final pollType = _escapeHtml(data['pollType'] as String? ?? '');
+          final voterCount = _escapeHtml(data['voterCount'] as String? ?? '');
+          final options =
+              (data['options'] as List<dynamic>?)?.cast<String>() ?? <String>[];
+          final status = _escapeHtml(data['status'] as String? ?? '');
+          final optionsHtml = options
+              .asMap()
+              .entries
+              .map(
+                (e) =>
+                    '<div style="padding:4px 0">${e.key + 1}. ${_escapeHtml(e.value)}</div>',
+              )
+              .join();
+          final statusHtml = status.isNotEmpty
+              ? '<div style="padding:4px 0;color:#999">$status</div>'
+              : '';
+          return '<div class="bbcode-poll"><div>📊 $pollType · $voterCount 人参与</div>$optionsHtml$statusHtml</div>';
         default:
           return '';
       }
@@ -573,9 +621,54 @@ class BBCode2Html {
     return html;
   }
 
+  /// 预处理器：将 `[*]item\n` 转换为闭合的 `<li>item</li>`。
+  ///
+  /// BBCode 中列表项没有 `[/li]` 关闭标签，原有的 `[*]`→`<li>` 转换
+  /// 产生未闭合的 `<li>`，后续 `\n`→`<br>` 会在 `<li>` 内生成多余空行。
+  ///
+  /// 预处理在 `\n`→`<br>` 之前执行，捕获 `[*]` 后的内容并闭合 `<li>`。
+  /// 之后主流程中的 `[*]`→`<li>` 因 `[*]` 已被替换而自动失效。
+  String _preprocessListItems(String html) {
+    return html.replaceAllMapped(
+      RegExp(r'\[\*\]\s*([^\n]*?)\s*\n', caseSensitive: false),
+      (m) => '<li>${m.group(1)}</li>',
+    );
+  }
+
   /// 内容块标识 — 橙色标签 + 换行 + 内容
   /// 用于 quote / free / hide 等块级 BBCode
   String _labelBlock(String label, String content) {
     return '<span style="color:#FF9900">$label:</span><br>$content';
+  }
+
+  /// 移除块级 HTML 容器前后多余的 `<br>`。
+  ///
+  /// BBCode 原文中常有排版用的换行和缩进，例如：
+  /// ```bbcode
+  /// [font=...]
+  ///   [hide]
+  ///     [appdata]{...}[/appdata]
+  ///   [/hide]
+  /// [/font]
+  /// ```
+  /// 或列表：
+  /// ```bbcode
+  /// [list]
+  ///   [*]item
+  /// [/list]
+  /// ```
+  /// 在 `\n` → `<br>` 阶段，这些排版换行也被转成了 `<br>`，
+  /// 出现在块级容器周围。块级容器自身已产生段落换行，
+  /// 其前后的 `<br>` 没有语义含义，只增加空白。
+  String _removeAdjacentLineBreaks(String html) {
+    // 移除 <blockquote> 前的 <br>（来自 [font]\n[hide] 等）
+    html = html.replaceAll(RegExp(r'<br>\s*(?=<blockquote)'), '');
+    // 移除 </blockquote> 后的 <br>（来自 [/hide]\n[/font] 等）
+    html = html.replaceAll(RegExp(r'(?<=</blockquote>)\s*<br>'), '');
+    // 移除 <li> 前的 <br>（来自 [list]\n 的排版换行）
+    html = html.replaceAll(RegExp(r'<br>\s*(?=<li)'), '');
+    // 移除 </li> 后的 <br>（来自 \n 在 [*]item\n 末尾的排版换行）
+    html = html.replaceAll(RegExp(r'(?<=</li>)\s*<br>'), '');
+    return html;
   }
 }

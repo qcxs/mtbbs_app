@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// MT 图床底部抽屉 — 上传图片 + 历史记录
 class MtImageSheet extends StatefulWidget {
@@ -161,6 +162,9 @@ class _MtImageSheetState extends State<MtImageSheet> {
         onProgress: (sent, total) {
           if (!mounted) return;
           setState(() => _currentProgress = sent / total);
+        },
+        onError: (msg) {
+          if (mounted) showToast(context, msg);
         },
       );
       if (!mounted) return;

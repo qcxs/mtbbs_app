@@ -52,13 +52,31 @@ dart run lib/api/forum/guide/test.dart
 
 ## 本地打包
 
-### Windows x64
+### Windows x64（安装包）
+
+#### 前置条件
+
+- Visual Studio 2019/2022（含**使用 C++ 的桌面开发**工作负载）
+- [Inno Setup 7](https://jrsoftware.org/isinfo.php)（Unicode 版），安装后确保 `iscc` 在 PATH 中
+
+#### 步骤
 
 ```powershell
+# 编译 release 版
 flutter build windows --release
+
+# 生成安装包（如需修改版本号，改 installer\setup.iss 中的 MyAppVersion）
+iscc installer\setup.iss
 ```
 
-输出在 `build\windows\x64\runner\Release\`。
+**安装包路径**：`build\MTBBS_v{version}_Setup.exe`
+
+**注意**：编译前确保没有 mtbbs.exe 进程在运行，否则 MSBuild 因文件锁定会报错。
+
+```powershell
+# 如遇文件锁定，先结束进程
+Get-Process mtbbs -ErrorAction SilentlyContinue | Stop-Process -Force
+```
 
 ### Android x64（仅 x86_64）
 

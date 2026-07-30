@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:dio/dio.dart';
@@ -11,7 +10,7 @@ import 'package:mtbbs/auth/providers/auth_provider.dart';
 
 /// WebView 登录页面
 ///
-/// 顶栏：标题 + URL 编辑栏 + 填充账号按钮
+/// 顶栏：标题 + URL 编辑栏 + Cookie 登录按钮
 /// 中间：WebView 浏览器控件（基于 flutter_inappwebview）
 /// 加载状态：进度条（无遮罩层）
 /// 登录检测：URL 不包含 action=login 即为成功
@@ -29,8 +28,6 @@ class _WebLoginPageState extends State<WebLoginPage> {
   bool _loginDone = false;
   double _progress = 0;
   late final TextEditingController _urlController;
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
 
   WebUri get _loginUrl {
     final path = SiteStore.instance.loginPagePath;
@@ -56,8 +53,6 @@ class _WebLoginPageState extends State<WebLoginPage> {
   @override
   void dispose() {
     _urlController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -192,106 +187,6 @@ class _WebLoginPageState extends State<WebLoginPage> {
         Navigator.of(context).pop(false);
       }
     }
-  }
-
-  // ==================== 填充账号密码 ====================
-
-  /// 向网页填充账号密码字段
-  Future<void> _fillAccount() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (username.isEmpty || password.isEmpty) {
-      _showCredentialDialog();
-      return;
-    }
-
-    final controller = _controller;
-    if (controller == null) return;
-
-    final u = jsonEncode(username);
-    final p = jsonEncode(password);
-
-    await controller.evaluateJavascript(
-      source:
-          '''
-      (function() {
-        var userField = document.querySelector('input[name="username"]');
-        var passField = document.querySelector('input[name="password"]');
-        if (userField) {
-          userField.value = $u;
-          userField.dispatchEvent(new Event('input', {bubbles: true}));
-          userField.dispatchEvent(new Event('change', {bubbles: true}));
-        }
-        if (passField) {
-          passField.value = $p;
-          passField.dispatchEvent(new Event('input', {bubbles: true}));
-          passField.dispatchEvent(new Event('change', {bubbles: true}));
-        }
-      })();
-    ''',
-    );
-    // evaluateJavascript returns void, not the JS return value
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('已填充账号密码，请手动点击登录按钮'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  /// 显示账号密码输入对话框
-  void _showCredentialDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('账号信息'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: '用户名',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(
-                labelText: '密码',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              obscureText: true,
-              onSubmitted: (_) {
-                Navigator.of(ctx).pop();
-                _fillAccount();
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _fillAccount();
-            },
-            child: const Text('填充'),
-          ),
-        ],
-      ),
-    );
   }
 
   // ==================== Cookie 登录 ====================
@@ -449,18 +344,6 @@ class _WebLoginPageState extends State<WebLoginPage> {
           ),
         ),
         actions: [
-          SizedBox(
-            height: 32,
-            child: TextButton.icon(
-              onPressed: _showCredentialDialog,
-              icon: const Icon(Icons.person_add, size: 16),
-              label: const Text('填充账号', style: TextStyle(fontSize: 12)),
-              style: TextButton.styleFrom(
-                foregroundColor: cs.onSurfaceVariant,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-            ),
-          ),
           SizedBox(
             height: 32,
             child: TextButton.icon(

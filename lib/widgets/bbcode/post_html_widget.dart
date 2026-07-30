@@ -81,7 +81,8 @@ class PostHtmlWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveDisabled = disabledTags ??
+    final effectiveDisabled =
+        disabledTags ??
         context.select<SettingsProvider, Set<String>>(
           (s) => s.disabledBbcodeTags,
         );
@@ -190,11 +191,6 @@ class PostHtmlWidget extends StatelessWidget {
         ),
         'pre': Style(backgroundColor: cs.codeBgColor, margin: Margins.zero),
         'code': Style(color: cs.codeTextColor, fontFamily: 'monospace'),
-        '.bbcode-hide': Style(
-          backgroundColor: cs.quoteBg,
-          margin: Margins.zero,
-          padding: HtmlPaddings.zero,
-        ),
         '.bbcode-free': Style(
           backgroundColor: cs.quoteBg,
           margin: Margins.zero,
@@ -206,20 +202,30 @@ class PostHtmlWidget extends StatelessWidget {
           padding: HtmlPaddings.all(8),
         ),
         '.bbcode-locked': Style(
-          backgroundColor: cs.lockedBgColor,
+          backgroundColor: cs.quoteBg,
           margin: Margins.zero,
-          padding: HtmlPaddings.all(10),
-          fontSize: FontSize(14),
+          padding: HtmlPaddings.only(left: 12, top: 8, bottom: 8),
         ),
         '.bbcode-pstatus': Style(
-          backgroundColor: cs.pstatusBgColor,
-          color: cs.pstatusTextColor,
-          margin: Margins.zero,
-          padding: HtmlPaddings.symmetric(vertical: 4, horizontal: 8),
           fontSize: FontSize(12),
+          margin: Margins.zero,
+          // 居中
+          textAlign: TextAlign.center,
+          padding: HtmlPaddings.zero,
         ),
-        'ul': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
-        'ol': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
+        '.bbcode-reward': Style(
+          backgroundColor: cs.quoteBg,
+          margin: Margins.zero,
+          padding: HtmlPaddings.only(left: 12, top: 8, bottom: 8),
+        ),
+        '.bbcode-poll': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
+        'ul': Style(margin: Margins.zero, padding: HtmlPaddings.only(left: 24)),
+        'ol': Style(margin: Margins.zero, padding: HtmlPaddings.only(left: 24)),
+        // 让嵌套的list不缩进
+        'ul ul': Style(padding: HtmlPaddings.zero),
+        'ol ol': Style(padding: HtmlPaddings.zero),
+        'ul ol': Style(padding: HtmlPaddings.zero),
+        'ol ul': Style(padding: HtmlPaddings.zero),
         'li': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
         'hr': Style(
           height: Height(1),

@@ -235,9 +235,15 @@ class _AppShellState extends State<AppShell> {
           ),
           Container(width: 1, color: cs.outlineVariant),
           Expanded(
-            child: _isTabRoute
-                ? IndexedStack(index: _currentIndex, children: _buildTabPages())
-                : widget.child,
+            child: SafeArea(
+              left: false,
+              child: _isTabRoute
+                  ? IndexedStack(
+                      index: _currentIndex,
+                      children: _buildTabPages(),
+                    )
+                  : widget.child,
+            ),
           ),
         ],
       ),

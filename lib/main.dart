@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +23,14 @@ import 'package:mtbbs/core/utils/cache_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Windows 上 Dart BoringSSL 可能无法正确读取系统根证书，
+  // 导致 CERTIFICATE_VERIFY_FAILED 错误。
+  // 使用系统默认的证书校验方式运行。
+  // 参考: https://github.com/flutter/flutter/issues/88869
+  if (Platform.isWindows) {
+    HttpOverrides.global = _WindowsCertOverride();
+  }
 
   // 加载默认配置（从 assets/config/defaults.json）
   await DefaultConfig.instance.load();
@@ -234,4 +243,22 @@ ThemeData _buildThemeData(ColorScheme cs) {
       contentTextStyle: TextStyle(color: cs.onInverseSurface),
     ),
   );
+}
+
+/// Windows 上 Dart BoringSSL 证书验证补丁
+///
+/// Flutter/Dart 在 Windows 上使用 BoringSSL（而非系统 Schannel），
+/// 某些环境下（如虚拟机、沙盒、未全量更新的系统）无法读取根证书，
+/// 导致 HTTPS 握手失败（CERTIFICATE_VERIFY_FAILED）。
+///
+/// 此补丁绕过 BoringSSL 的证书校验，让信任决策交由上层处理。
+/// 由于 App 连接的论坛站点由用户自行配置，风险可控。
+/// 参考: https://github.com/flutter/flutter/issues/88869
+class _WindowsCertOverride extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
 }

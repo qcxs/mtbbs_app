@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:mtbbs/config/site_config.dart';
@@ -13,7 +15,7 @@ import 'package:mtbbs/config/site_config.dart';
 ///
 /// 目录结构：
 /// ```
-/// {appDataDir}/                 ← getApplicationSupportDirectory()
+/// {appDataDir}/                 ← 见 [appDataDir]
 ///   cookies/{host}/              — CookieJar 持久化（游客）
 ///   cookies/{host}/{account}/    — CookieJar 持久化（登录用户）
 ///   mtbbs.sembast                — sembast 数据库（纯 Dart，无需原生依赖）
@@ -31,10 +33,17 @@ class AppPaths {
 
   /// 应用私有数据根目录
   ///
-  /// Windows: `%APPDATA%\{AppName}\`（如 `C:\Users\admin\AppData\Roaming\MT论坛\`）
-  /// Android: `/data/data/{package}/app_flutter/`
-  static Future<String> get appDataDir async =>
-      (await getApplicationSupportDirectory()).path;
+  /// Windows release: `%APPDATA%\qcxs\mtbbs\`
+  /// Windows debug:   `%APPDATA%\qcxs\mtbbs_debug\`
+  /// Android:         `/data/data/{package}/app_flutter/`
+  static Future<String> get appDataDir async {
+    if (Platform.isWindows) {
+      final appData = Platform.environment['APPDATA'] ?? '';
+      final suffix = kDebugMode ? '_debug' : '';
+      return '$appData\\qcxs\\mtbbs$suffix';
+    }
+    return (await getApplicationSupportDirectory()).path;
+  }
 
   // ==================== 临时目录 ====================
 

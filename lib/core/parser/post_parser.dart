@@ -104,6 +104,49 @@ Map<String, dynamic> parsePostFromTable(
       bbcode = converter.convertElementContent(msgEl);
     }
 
+    // 帖内标题：div.pcb > h2（不在 td.t_f 内）
+    final pcbTitle = plc.querySelector('div.pcb h2');
+    if (pcbTitle != null) {
+      final titleCode = sanitizeText(pcbTitle.text).trim();
+      if (titleCode.isNotEmpty) {
+        bbcode = '[b]$titleCode[/b]\n$bbcode';
+      }
+    }
+
+    // 回帖奖励：h3.psth → [appdata]
+    // DOM 结构：div.pct > div.cm > h3.psth，不在 td.t_f 内容区内
+    final rewardEl = plc.querySelector('h3.psth');
+    if (rewardEl != null) {
+      // <h3 class="psth">回帖奖励 <span class="xw1 xs2 xi1">+30</span> 金币</h3>
+      final amountSpan = rewardEl.querySelector('span.xw1.xs2.xi1');
+      if (amountSpan != null) {
+        final amount = sanitizeText(amountSpan.text).trim();
+        if (amount.isNotEmpty) {
+          final text = sanitizeText(rewardEl.text).trim();
+          final unit = text
+              .replaceAll(RegExp(r'回帖奖励\s*'), '')
+              .replaceAll(amount, '')
+              .trim();
+          bbcode =
+              '[appdata]${jsonEncode({"type": "reward", "amount": amount, "unit": unit})}[/appdata]\n$bbcode';
+        }
+      }
+    }
+
+    // 求助帖奖励（悬赏金）：.rusld → [appdata]
+    // DOM 结构：div.pcbs > div.rwd > div.rusld.z > cite{amount}unit
+    final helpReward = plc.querySelector('.rusld cite');
+    if (helpReward != null) {
+      final amount = sanitizeText(helpReward.text).trim();
+      if (amount.isNotEmpty) {
+        // 取 cite 后的单位文本（如 "金币"）
+        final parentText = sanitizeText(helpReward.parent?.text ?? '').trim();
+        final unit = parentText.replaceAll(amount, '').trim();
+        bbcode =
+            '[appdata]${jsonEncode({"type": "bounty", "amount": amount, "unit": unit})}[/appdata]\n$bbcode';
+      }
+    }
+
     // 锁定帖（仅作者可见等）：使用 appdata 专属标签
     // 保底策略：html2bbcode 已处理则跳过，否则补充识别
     final lockedEl = plc.querySelector('.locked');
@@ -117,6 +160,34 @@ Map<String, dynamic> parsePostFromTable(
           bbcode =
               '[appdata]${jsonEncode({"type": "locked", "message": lockedMsg})}[/appdata]\n$bbcode';
         }
+      }
+    }
+
+    // 投票帖：form#poll → [appdata]
+    // DOM 结构：div.pcbs > form#poll
+    final pollForm = plc.querySelector('form#poll');
+    if (pollForm != null) {
+      final pinf = pollForm.querySelector('.pinf');
+      final pollType = pinf?.querySelector('strong')?.text.trim() ?? '';
+      final voterText = pinf?.text.replaceAll(pollType, '').trim() ?? '';
+      final voterMatch = RegExp(r'(\d+)').firstMatch(voterText);
+      final voterCount = voterMatch?.group(1) ?? '';
+      // 选项
+      final options = pollForm
+          .querySelectorAll('.pvt label')
+          .map(
+            (l) => sanitizeText(
+              l.text,
+            ).trim().replaceAll(RegExp(r'^\d+\.\s*'), ''),
+          )
+          .where((o) => o.isNotEmpty)
+          .toList();
+      // 状态
+      final statusEl = pollForm.querySelector('tr:last-child td[colspan="2"]');
+      final status = statusEl != null ? sanitizeText(statusEl.text).trim() : '';
+      if (pollType.isNotEmpty) {
+        bbcode +=
+            '\n[appdata]${jsonEncode({"type": "poll", "pollType": pollType, "voterCount": voterCount, "options": options, if (status.isNotEmpty) "status": status})}[/appdata]';
       }
     }
 

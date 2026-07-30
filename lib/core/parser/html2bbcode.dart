@@ -74,6 +74,19 @@ class Html2BBCode {
         .trim();
   }
 
+  /// 从 CSS 内联样式字符串中提取指定属性的值。
+  ///
+  /// 例如 `_extractStyleValue("color:red; font-size:16px", "color")` → `"red"`。
+  /// 属性名不区分大小写，未找到时返回 `null`。
+  String? _extractStyleValue(String style, String property) {
+    final regex = RegExp(
+      '${RegExp.escape(property)}\\s*:\\s*([^;]+)',
+      caseSensitive: false,
+    );
+    final match = regex.firstMatch(style);
+    return match?.group(1)?.trim();
+  }
+
   // ==================== class 匹配 ====================
 
   String? _matchByClass(dom.Element el) {
@@ -348,17 +361,23 @@ class Html2BBCode {
     // 字体
     if (tag == 'font') {
       var res = _parseChildren(el);
-      final color = el.attributes['color'];
-      final size = el.attributes['size'];
-      final face = el.attributes['face'];
       final styleAttr = el.attributes['style'] ?? '';
-      final bgMatch = RegExp(
-        r'background-color:\s*([^;]+)',
-      ).firstMatch(styleAttr);
-      final bg = bgMatch?.group(1);
-      if (color != null) res = '[color=$color]$res[/color]';
-      if (size != null) res = '[size=$size]$res[/size]';
-      if (face != null) res = '[font=$face]$res[/font]';
+
+      // HTML 属性（<font color="red" size="3" face="Arial">）
+      final attrColor = el.attributes['color'];
+      final attrSize = el.attributes['size'];
+      final attrFace = el.attributes['face'];
+
+      // 内联样式（<font style="color:rgb(...);font-size:16px">）兜底
+      final styleColor = attrColor ?? _extractStyleValue(styleAttr, 'color');
+      final styleSize = attrSize ?? _extractStyleValue(styleAttr, 'font-size');
+      final styleFace =
+          attrFace ?? _extractStyleValue(styleAttr, 'font-family');
+      final bg = _extractStyleValue(styleAttr, 'background-color');
+
+      if (styleColor != null) res = '[color=$styleColor]$res[/color]';
+      if (styleSize != null) res = '[size=$styleSize]$res[/size]';
+      if (styleFace != null) res = '[font=$styleFace]$res[/font]';
       if (bg != null && bg.isNotEmpty)
         res = '[background=$bg]$res[/background]';
       return res;
