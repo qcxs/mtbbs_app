@@ -5,6 +5,7 @@ import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 缓存管理页面
 ///
@@ -313,12 +314,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   if (!await _confirmClear('浏览器缓存')) return;
                   await clearWebViewCache();
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('浏览器缓存已清空'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
+                    showToast('浏览器缓存已清空');
                   }
                 },
               ),
@@ -342,9 +338,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   if (!await _confirmClear('表情元数据')) return;
                   EmojiService().clearCache();
                   if (mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('表情元数据已清空')));
+                    showToast('表情元数据已清空');
                   }
                 },
               ),
@@ -368,9 +362,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   if (!await _confirmClear('帖子预览缓存')) return;
                   await PostPreviewManager.instance.clear();
                   if (mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('帖子预览缓存已清空')));
+                    showToast('帖子预览缓存已清空');
                   }
                 },
               ),

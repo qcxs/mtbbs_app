@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 长图检测阈值（宽高比大于此值视为长图）
 const double kLongPicRatio = 2.6;
@@ -66,12 +67,7 @@ void showImageInfoDialog(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: url));
               Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已复制链接'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
+              showToast('已复制链接', duration: const Duration(seconds: 1));
             },
             child: const Text('复制链接'),
           ),

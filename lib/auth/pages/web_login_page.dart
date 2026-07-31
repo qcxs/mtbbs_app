@@ -7,6 +7,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
 import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// WebView 登录页面
 ///
@@ -169,15 +170,11 @@ class _WebLoginPageState extends State<WebLoginPage> {
         );
         if (!mounted) return;
         Navigator.of(context).pop(true);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('登录成功')));
+        showToast('登录成功');
       } else {
         _loginDone = false;
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('登录验证失败，请重试')));
+          showToast('登录验证失败，请重试');
         }
       }
     } catch (e) {
@@ -277,18 +274,14 @@ class _WebLoginPageState extends State<WebLoginPage> {
     // 1. 校验格式
     if (!_isValidCookieFormat(cookieStr)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Cookie 格式错误，请检查后重试')));
+      showToast('Cookie 格式错误，请检查后重试');
       return;
     }
 
     // 2. 检测 _auth 凭证（格式校验通过后的内容校验）
     if (!_hasAuthCookie(cookieStr)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Cookie 中未包含有效的登录凭证')));
+      showToast('Cookie 中未包含有效的登录凭证');
       return;
     }
 

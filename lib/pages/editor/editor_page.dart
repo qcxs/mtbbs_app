@@ -433,7 +433,7 @@ class _EditorPageState extends State<EditorPage> {
     await context.read<EditorHistoryProvider>().addManualSnapshot(snapshot);
     _updateLastSaved();
     AppLogger.i('EDITOR', 'manual snapshot saved: ${snapshot.wordCount} chars');
-    if (mounted) showToast(context, '已手动保存');
+    if (mounted) showToast('已手动保存');
   }
 
   EditorSnapshot _buildSnapshot({required bool isManual}) {
@@ -597,11 +597,11 @@ class _EditorPageState extends State<EditorPage> {
 
     if (!mounted) return;
     if (successCount > 0 && failCount == 0) {
-      showToast(context, '上传成功 $successCount 张图片');
+      showToast('上传成功 $successCount 张图片');
     } else if (successCount > 0 && failCount > 0) {
-      showToast(context, '上传完成：成功 $successCount 张，失败 $failCount 张');
+      showToast('上传完成：成功 $successCount 张，失败 $failCount 张');
     } else {
-      showToast(context, '上传失败');
+      showToast('上传失败');
     }
   }
 
@@ -625,13 +625,13 @@ class _EditorPageState extends State<EditorPage> {
         'EDITOR',
         jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': true}),
       );
-      showToast(context, '已删除');
+      showToast('已删除');
     } else {
       AppLogger.w(
         'EDITOR',
         jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': false}),
       );
-      showToast(context, '删除失败');
+      showToast('删除失败');
     }
   }
 
@@ -854,11 +854,11 @@ class _EditorPageState extends State<EditorPage> {
 
     if (!mounted) return;
     if (successCount > 0 && failCount == 0) {
-      showToast(context, '上传成功 $successCount 个附件');
+      showToast('上传成功 $successCount 个附件');
     } else if (successCount > 0 && failCount > 0) {
-      showToast(context, '上传完成：成功 $successCount 个，失败 $failCount 个');
+      showToast('上传完成：成功 $successCount 个，失败 $failCount 个');
     } else {
-      showToast(context, '上传失败');
+      showToast('上传失败');
     }
   }
 
@@ -882,7 +882,7 @@ class _EditorPageState extends State<EditorPage> {
         'EDITOR',
         jsonEncode({'action': 'deleteAttachment', 'aid': aid, 'success': true}),
       );
-      showToast(context, '已删除');
+      showToast('已删除');
     } else {
       AppLogger.w(
         'EDITOR',
@@ -892,7 +892,7 @@ class _EditorPageState extends State<EditorPage> {
           'success': false,
         }),
       );
-      showToast(context, '删除失败');
+      showToast('删除失败');
     }
   }
 
@@ -1033,7 +1033,7 @@ class _EditorPageState extends State<EditorPage> {
       case ToolbarAction.emoji:
         final emojiService = EmojiService();
         if (!emojiService.isLoaded) {
-          showToast(context, '暂无表情数据，请在设置中加载');
+          showToast('暂无表情数据，请在设置中加载');
           return;
         }
         _showEmojiPickerSheet(emojiService.groups);
@@ -1104,7 +1104,7 @@ class _EditorPageState extends State<EditorPage> {
     // 尝试剪贴板图片
     final imgFile = await ClipboardPasteService.pasteImage();
     if (imgFile != null && mounted) {
-      showToast(context, '正在上传剪贴板图片…');
+      showToast('正在上传剪贴板图片…');
       await _uploadDefaultImage(imgFile);
       await imgFile.delete();
       return;
@@ -1126,7 +1126,7 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _uploadDefaultImage(File file) async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn || _pageData.uploadHash.isEmpty) {
-      if (mounted) showToast(context, '未登录或无上传权限');
+      if (mounted) showToast('未登录或无上传权限');
       return;
     }
 
@@ -1156,20 +1156,19 @@ class _EditorPageState extends State<EditorPage> {
           _contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
           _focusContent();
         }
-        if (mounted) showToast(context, '剪贴板图片已上传');
+        if (mounted) showToast('剪贴板图片已上传');
       } else {
-        if (mounted)
-          showToast(context, '上传失败: ${uploadResult['error'] ?? '未知错误'}');
+        if (mounted) showToast('上传失败: ${uploadResult['error'] ?? '未知错误'}');
       }
     } catch (e) {
-      if (mounted) showToast(context, '上传失败: $e');
+      if (mounted) showToast('上传失败: $e');
     }
   }
 
   void _showHistoryDialog() {
     final history = context.read<HistoryProvider>();
     if (history.totalCount == 0) {
-      showToast(context, '暂无浏览记录');
+      showToast('暂无浏览记录');
       return;
     }
     showDialog(
@@ -1263,11 +1262,11 @@ class _EditorPageState extends State<EditorPage> {
   void _showImagePickerSheet() {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
-      showToast(context, '请先登录');
+      showToast('请先登录');
       return;
     }
     if (_pageData.uploadHash.isEmpty) {
-      showToast(context, '页面数据未加载，无法上传');
+      showToast('页面数据未加载，无法上传');
       return;
     }
     // 同步活跃 AID
@@ -1303,11 +1302,11 @@ class _EditorPageState extends State<EditorPage> {
   void _showAttachmentPickerSheet() {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
-      showToast(context, '请先登录');
+      showToast('请先登录');
       return;
     }
     if (_pageData.uploadHash.isEmpty) {
-      showToast(context, '页面数据未加载，无法上传');
+      showToast('页面数据未加载，无法上传');
       return;
     }
 
@@ -1341,24 +1340,24 @@ class _EditorPageState extends State<EditorPage> {
     final title = _titleCtl.text.trim();
     final content = _contentCtl.text.trim();
     if (content.isEmpty) {
-      if (mounted) showToast(context, '请输入内容');
+      if (mounted) showToast('请输入内容');
       return;
     }
     if (widget.type == EditorType.post && title.isEmpty) {
-      if (mounted) showToast(context, '请输入标题');
+      if (mounted) showToast('请输入标题');
       return;
     }
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       if (mounted) {
-        showToast(context, '请先登录');
+        showToast('请先登录');
       }
       return;
     }
     if (_isEdit &&
         (!_pageData.formhash.isNotEmpty || !_pageData.posttime.isNotEmpty)) {
       if (mounted) {
-        showToast(context, '页面数据未加载，请稍后');
+        showToast('页面数据未加载，请稍后');
       }
       return;
     }
@@ -1391,7 +1390,7 @@ class _EditorPageState extends State<EditorPage> {
             'type': widget.type.name,
           }),
         );
-        showToast(context, msg);
+        showToast(msg);
         _isLeavingNormally = true;
         _autoSaveTimer?.cancel();
         context.read<EditorHistoryProvider>().markSubmitted(_sessionKey);
@@ -1406,7 +1405,7 @@ class _EditorPageState extends State<EditorPage> {
             'error': result.message,
           }),
         );
-        showToast(context, '操作失败: ${result.message}');
+        showToast('操作失败: ${result.message}');
       }
     } catch (e) {
       if (mounted) {
@@ -1415,7 +1414,7 @@ class _EditorPageState extends State<EditorPage> {
           'EDITOR',
           jsonEncode({'action': 'submit_error', 'error': e.toString()}),
         );
-        showToast(context, '网络错误: $e');
+        showToast('网络错误: $e');
       }
     }
   }
@@ -1438,7 +1437,7 @@ class _EditorPageState extends State<EditorPage> {
     final historyProv = context.read<EditorHistoryProvider>();
     final snapshot = historyProv.getSnapshotById(snapshotId);
     if (snapshot == null) {
-      showToast(context, '快照不存在');
+      showToast('快照不存在');
       return;
     }
 
@@ -1446,7 +1445,6 @@ class _EditorPageState extends State<EditorPage> {
     if (snapshot.editorType != widget.type.name) {
       if (!mounted) return;
       showToast(
-        context,
         '无法恢复：快照类型为"${_typeLabel(snapshot.editorType)}"，'
         '当前为"$_pageTitle"',
       );
@@ -1482,7 +1480,7 @@ class _EditorPageState extends State<EditorPage> {
     _updateHasChanges();
     setState(() {});
     _doFetchPage(preserveContent: true);
-    showToast(context, '已恢复快照，正在刷新页面数据...');
+    showToast('已恢复快照，正在刷新页面数据...');
     AppLogger.i('EDITOR', 'restored snapshot: $snapshotId');
   }
 
@@ -2015,7 +2013,7 @@ class _EditorPageState extends State<EditorPage> {
           TextButton(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: bbcode));
-              showToast(context, '已复制');
+              showToast('已复制');
               Navigator.of(ctx).pop();
             },
             child: const Text('复制'),

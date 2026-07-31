@@ -7,6 +7,7 @@ import 'package:mtbbs/auth/pages/web_login_page.dart';
 import 'package:mtbbs/auth/widgets/login_sheet.dart' show showLoginSheet;
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 用户管理弹窗 — 账号切换、登录、导出
 class UserManagementDialog extends StatelessWidget {
@@ -52,9 +53,7 @@ class UserManagementDialog extends StatelessWidget {
                         MaterialPageRoute(builder: (_) => const WebLoginPage()),
                       );
                       if (ok != true || !context.mounted) return;
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text('登录成功')));
+                      showToast('登录成功');
                     },
                   ),
                   const SizedBox(width: 8),
@@ -124,9 +123,7 @@ class UserManagementDialog extends StatelessWidget {
                               onPressed: () async {
                                 await auth.refreshCurrentUserInfo();
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('用户信息已刷新')),
-                                  );
+                                  showToast('用户信息已刷新');
                                 }
                               },
                             ),
@@ -251,24 +248,18 @@ class UserManagementDialog extends StatelessWidget {
     Navigator.of(context).pop();
     final jsonStr = auth.exportAccounts();
     if (jsonStr == '[]') {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('没有可导出的账号')));
+      showToast('没有可导出的账号');
       return;
     }
     Clipboard.setData(ClipboardData(text: jsonStr));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已导出到剪切板')));
+    showToast('已导出到剪切板');
   }
 
   void _import(BuildContext context, AuthProvider auth) {
     Navigator.of(context).pop(); // 关闭用户管理弹窗
     ClipboardHelper.read().then((text) {
       if (text == null || text.trim().isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('剪切板为空')));
+        showToast('剪切板为空');
         return;
       }
       _showImportPreview(context, auth, text.trim());
@@ -320,40 +311,28 @@ class UserManagementDialog extends StatelessWidget {
               try {
                 final parsed = jsonDecode(raw);
                 if (parsed is! List) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('JSON 格式错误：应为数组')),
-                  );
+                  showToast('JSON 格式错误：应为数组');
                   return;
                 }
                 for (final item in parsed) {
                   if (item is! Map ||
                       !item.containsKey('username') ||
                       !item.containsKey('uid')) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text('JSON 格式错误：缺少 username 或 uid'),
-                      ),
-                    );
+                    showToast('JSON 格式错误：缺少 username 或 uid');
                     return;
                   }
                 }
               } catch (e) {
-                ScaffoldMessenger.of(
-                  ctx,
-                ).showSnackBar(SnackBar(content: Text('JSON 解析失败: $e')));
+                showToast('JSON 解析失败: $e');
                 return;
               }
               Navigator.of(ctx).pop();
               final result = auth.importAccounts(raw);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      result['success'] == true
-                          ? '成功导入'
-                          : '导入失败: ${result['message']}',
-                    ),
-                  ),
+                showToast(
+                  result['success'] == true
+                      ? '成功导入'
+                      : '导入失败: ${result['message']}',
                 );
               }
             },

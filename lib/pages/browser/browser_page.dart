@@ -10,6 +10,7 @@ import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 内置浏览器页面
 ///
@@ -93,9 +94,7 @@ class _BrowserPageState extends State<BrowserPage> {
 
     if (accounts.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('当前站点无可用账号')));
+      showToast('当前站点无可用账号');
       return;
     }
 
@@ -196,9 +195,7 @@ class _BrowserPageState extends State<BrowserPage> {
   void _copyUrl() {
     ClipboardHelper.write(_currentUrl);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('链接已复制'), duration: Duration(seconds: 1)),
-      );
+      showToast('链接已复制', duration: const Duration(seconds: 1));
     }
   }
 
@@ -230,12 +227,7 @@ class _BrowserPageState extends State<BrowserPage> {
     if (confirmed != true || !mounted) return;
     await clearWebViewCache();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('浏览器缓存已清空'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      showToast('浏览器缓存已清空');
     }
   }
 
@@ -245,11 +237,9 @@ class _BrowserPageState extends State<BrowserPage> {
 
     // 检查是否属于其他站点
     if (result.isOtherSite && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('请切换站点${result.siteName ?? ""}后再打开'),
-          duration: const Duration(seconds: 3),
-        ),
+      showToast(
+        '请切换站点${result.siteName ?? ""}后再打开',
+        duration: const Duration(seconds: 3),
       );
       return;
     }
@@ -257,12 +247,7 @@ class _BrowserPageState extends State<BrowserPage> {
     if (result.appPath != null && mounted) {
       context.push(result.appPath!);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('不支持在当前页面打开：${result.label}'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showToast('不支持在当前页面打开：${result.label}');
     }
   }
 
@@ -476,12 +461,7 @@ class _BrowserPageState extends State<BrowserPage> {
         final result = UrlRouter.parse(url);
         if (result.appPath != null && mounted) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('拦截：已在 App 中打开'),
-                duration: Duration(seconds: 1),
-              ),
-            );
+            showToast('拦截：已在 App 中打开', duration: const Duration(seconds: 1));
           }
           context.push(result.appPath!);
           return NavigationActionPolicy.CANCEL;

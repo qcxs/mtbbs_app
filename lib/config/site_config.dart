@@ -23,6 +23,11 @@ class Site {
   /// 当前站点使用的 User-Agent，空字符串表示使用默认（Android 手机 UA）
   final String userAgent;
 
+  /// 站点头像 URL 模板，为空时使用默认 API 方案
+  /// （`{baseurl}/uc_server/avatar.php?uid={uid}&size={size}`），
+  /// 见 [resolveAvatarUrl]
+  final String? avatarTemplate;
+
   const Site({
     required this.name,
     required this.baseUrl,
@@ -31,13 +36,13 @@ class Site {
     required this.forums,
     required this.defaultForumOrder,
     this.userAgent = '',
+    this.avatarTemplate,
   });
 
   String get host => Uri.parse(baseUrl).host;
 
   /// 当前站点的有效 User-Agent
-  String get effectiveUserAgent =>
-      userAgent.isNotEmpty ? userAgent : uaAndroid;
+  String get effectiveUserAgent => userAgent.isNotEmpty ? userAgent : uaAndroid;
 
   /// 是否使用移动端 UA（含 "Mobile" 关键字）
   bool get isMobileUA => effectiveUserAgent.contains('Mobile');
@@ -61,6 +66,8 @@ class Site {
     'forums': forums,
     'defaultForumOrder': defaultForumOrder,
     if (userAgent.isNotEmpty) 'userAgent': userAgent,
+    if (avatarTemplate != null && avatarTemplate!.isNotEmpty)
+      'avatarTemplate': avatarTemplate,
   };
 
   factory Site.fromJson(Map<String, dynamic> json) => Site(
@@ -75,6 +82,7 @@ class Site {
       json['defaultForumOrder'] as List? ?? [],
     ),
     userAgent: json['userAgent']?.toString() ?? '',
+    avatarTemplate: json['avatarTemplate']?.toString(),
   );
 
   static const String uaAndroid =

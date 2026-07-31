@@ -176,6 +176,18 @@ class ProfilePage extends StatelessWidget {
               ],
             ),
           ),
+
+          // 开源信息
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+            child: Text(
+              'https://github.com/qcxs/mtbbs_app',
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -14,7 +14,7 @@ import 'package:mtbbs/core/utils/database_helper.dart';
 class SettingsProvider extends ChangeNotifier {
   double _fontSize = 16;
   String _creditFormula = defaultFormula;
-  List<String> _tabOrder = _defaultTabOrder;
+  List<ManagedItem> _guideTabs = defaultGuideTabs();
   int _currentSiteIndex = 0;
 
   /// 默认启动 Tab (0=首页, 1=导读, 2=社区, 3=我的)
@@ -111,7 +111,14 @@ class SettingsProvider extends ChangeNotifier {
 
   static const String defaultFormula = '';
 
-  static const _defaultTabOrder = ['newthread', 'hot', 'new', 'digest', 'sofa'];
+  /// 导读 Tab 默认 id 列表（顺序即默认顺序）
+  static const _defaultTabIds = ['newthread', 'hot', 'new', 'digest', 'sofa'];
+
+  /// 生成默认导读 Tab 列表（全量含可见性）
+  static List<ManagedItem> defaultGuideTabs() => [
+    for (final id in _defaultTabIds)
+      ManagedItem(id: id, name: tabLabels[id] ?? id),
+  ];
 
   // ==================== 数据库快捷引用 ====================
 
@@ -120,7 +127,15 @@ class SettingsProvider extends ChangeNotifier {
   // ==================== Getter ====================
 
   double get fontSize => _fontSize;
-  List<String> get tabOrder => List.unmodifiable(_tabOrder);
+
+  /// 完整导读 Tab 列表（含隐藏项，供排序弹窗使用）
+  List<ManagedItem> get guideTabs => List.unmodifiable(_guideTabs);
+
+  /// 可见导读 Tab id（按当前顺序）
+  List<String> get tabOrder => [
+    for (final t in _guideTabs)
+      if (t.visible) t.id,
+  ];
   int get currentSiteIndex => _currentSiteIndex;
   int get defaultTabIndex => _defaultTabIndex;
   List<Site> get sites => _sites;
@@ -233,14 +248,28 @@ class SettingsProvider extends ChangeNotifier {
     _currentSiteIndex = _currentSiteIndex.clamp(0, _sites.length - 1);
     SiteStore.instance.switchTo(_currentSiteIndex);
 
-    // Tab 排序
-    final saved = await _db.getSetting('tabOrder');
-    if (saved != null && saved.isNotEmpty) {
-      final parsed = saved
-          .split(',')
-          .where((v) => tabLabels.containsKey(v))
-          .toList();
-      if (parsed.isNotEmpty) _tabOrder = parsed;
+    // 导读 Tab（完整列表含可见性；兼容旧版 tabOrder 逗号字符串迁移）
+    final guideJson = await _db.getSetting('guideTabs');
+    if (guideJson != null && guideJson.isNotEmpty) {
+      try {
+        final loaded = ManagedItem.decodeList(
+          guideJson,
+        ).where((e) => tabLabels.containsKey(e.id)).toList();
+        if (loaded.isNotEmpty) _guideTabs = loaded;
+      } catch (_) {}
+    } else {
+      final legacy = await _db.getSetting('tabOrder');
+      if (legacy != null && legacy.isNotEmpty) {
+        final visible = legacy.split(',').toSet();
+        _guideTabs = [
+          for (final id in _defaultTabIds)
+            ManagedItem(
+              id: id,
+              name: tabLabels[id] ?? id,
+              visible: visible.contains(id),
+            ),
+        ];
+      }
     }
 
     // 快捷键映射
@@ -429,12 +458,6 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setTabOrder(List<String> order) async {
-    _tabOrder = List.from(order);
-    await _db.setSetting('tabOrder', order.join(','));
-    notifyListeners();
-  }
-
   Future<void> setDefaultTabIndex(int index) async {
     _defaultTabIndex = index.clamp(0, 3);
     await _db.setSettingInt('defaultTabIndex', _defaultTabIndex);
@@ -518,18 +541,12 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> moveToolbarItem(int from, int to) async {
-    final item = _toolbarItems.removeAt(from);
-    final idx = to > from ? to - 1 : to;
-    _toolbarItems.insert(idx.clamp(0, _toolbarItems.length), item);
+    reorderManagedItems(_toolbarItems, from, to);
     await _persistToolbar();
   }
 
   Future<void> toggleToolbarItem(String id) async {
-    final idx = _toolbarItems.indexWhere((e) => e.id == id);
-    if (idx < 0) return;
-    _toolbarItems[idx] = _toolbarItems[idx].copyWith(
-      visible: !_toolbarItems[idx].visible,
-    );
+    toggleManagedItem(_toolbarItems, id);
     await _persistToolbar();
   }
 
@@ -578,41 +595,29 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> moveShortcutLink(int from, int to) async {
-    final list = _linksForCurrent();
-    final item = list.removeAt(from);
-    list.insert(to.clamp(0, list.length), item);
+    reorderManagedItems(_linksForCurrent(), from, to);
     await _persistLinks();
   }
 
   Future<void> toggleShortcutLink(String id) async {
-    final idx = _linksForCurrent().indexWhere((e) => e.id == id);
-    if (idx < 0) return;
-    _linksForCurrent()[idx] = _linksForCurrent()[idx].copyWith(
-      visible: !_linksForCurrent()[idx].visible,
-    );
+    toggleManagedItem(_linksForCurrent(), id);
     await _persistLinks();
   }
 
-  // ==================== Tab 排序 ====================
+  // ==================== 导读 Tab ====================
 
   Future<void> moveTab(int from, int to) async {
-    final item = _tabOrder.removeAt(from);
-    final idx = to > from ? to - 1 : to;
-    _tabOrder.insert(idx.clamp(0, _tabOrder.length), item);
-    await _persistTabOrder();
+    reorderManagedItems(_guideTabs, from, to);
+    await _persistGuideTabs();
   }
 
-  Future<void> toggleTab(String view) async {
-    if (_tabOrder.contains(view)) {
-      _tabOrder.remove(view);
-    } else {
-      _tabOrder.add(view);
-    }
-    await _persistTabOrder();
+  Future<void> toggleTab(String id) async {
+    toggleManagedItem(_guideTabs, id);
+    await _persistGuideTabs();
   }
 
-  Future<void> _persistTabOrder() async {
-    await _db.setSetting('tabOrder', _tabOrder.join(','));
+  Future<void> _persistGuideTabs() async {
+    await _db.setSetting('guideTabs', ManagedItem.encodeList(_guideTabs));
     notifyListeners();
   }
 
@@ -657,6 +662,28 @@ class SettingsProvider extends ChangeNotifier {
       forums: old.forums,
       defaultForumOrder: old.defaultForumOrder,
       userAgent: userAgent,
+      avatarTemplate: old.avatarTemplate,
+    );
+    SiteStore.instance.switchTo(idx);
+    await _persistSites();
+    notifyListeners();
+  }
+
+  /// 设置当前站点的头像 URL 模板，空字符串恢复默认 API 方案
+  Future<void> setSiteAvatarTemplate(String template) async {
+    final idx = _currentSiteIndex;
+    if (idx < 0 || idx >= _sites.length) return;
+    final old = _sites[idx];
+    final t = template.trim();
+    _sites[idx] = Site(
+      name: old.name,
+      baseUrl: old.baseUrl,
+      cdn: old.cdn,
+      loginPagePath: old.loginPagePath,
+      forums: old.forums,
+      defaultForumOrder: old.defaultForumOrder,
+      userAgent: old.userAgent,
+      avatarTemplate: t.isEmpty ? null : t,
     );
     SiteStore.instance.switchTo(idx);
     await _persistSites();
@@ -666,6 +693,62 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> replaceSites(List<Site> newSites) async {
     _sites = List.from(newSites);
     await _persistSites();
+  }
+
+  /// 从默认配置（defaults.json）同步站点列表。
+  ///
+  /// - 已存在（按 [Site.baseUrl] 匹配）的站点：覆盖为默认配置，保留 forums / defaultForumOrder
+  /// - 缺失的内置站点：追加到列表末尾（例如应用更新后新增的默认站点）
+  /// - 自定义添加的站点：不受影响
+  /// 返回发生变化的站点数量。
+  Future<int> restoreDefaultSites() async {
+    final defaults = SiteConfig.defaultSites();
+    if (defaults.isEmpty) return 0;
+    var count = 0;
+    // 覆盖已存在的内置站点
+    for (var i = 0; i < _sites.length; i++) {
+      final current = _sites[i];
+      Site? def;
+      for (final d in defaults) {
+        if (d.baseUrl == current.baseUrl) {
+          def = d;
+          break;
+        }
+      }
+      if (def == null) continue;
+      _sites[i] = Site(
+        name: def.name,
+        baseUrl: def.baseUrl,
+        cdn: def.cdn,
+        loginPagePath: def.loginPagePath,
+        forums: current.forums,
+        defaultForumOrder: current.defaultForumOrder,
+        userAgent: def.userAgent,
+        avatarTemplate: def.avatarTemplate,
+      );
+      count++;
+    }
+    // 追加缺失的内置站点
+    final existing = _sites.map((s) => s.baseUrl).toSet();
+    for (final d in defaults) {
+      if (existing.contains(d.baseUrl)) continue;
+      _sites.add(
+        Site(
+          name: d.name,
+          baseUrl: d.baseUrl,
+          cdn: d.cdn,
+          loginPagePath: d.loginPagePath,
+          forums: {},
+          defaultForumOrder: [],
+          userAgent: d.userAgent,
+          avatarTemplate: d.avatarTemplate,
+        ),
+      );
+      count++;
+    }
+    await _persistSites();
+    notifyListeners();
+    return count;
   }
 
   List<MapEntry<String, String>> get forumEntries {
@@ -685,9 +768,12 @@ class SettingsProvider extends ChangeNotifier {
     _sites[idx] = Site(
       name: old.name,
       baseUrl: old.baseUrl,
+      cdn: old.cdn,
       loginPagePath: old.loginPagePath,
       forums: newForums,
       defaultForumOrder: newOrder,
+      userAgent: old.userAgent,
+      avatarTemplate: old.avatarTemplate,
     );
     await _persistSites();
   }
@@ -701,9 +787,12 @@ class SettingsProvider extends ChangeNotifier {
     _sites[idx] = Site(
       name: old.name,
       baseUrl: old.baseUrl,
+      cdn: old.cdn,
       loginPagePath: old.loginPagePath,
       forums: newForums,
       defaultForumOrder: newOrder,
+      userAgent: old.userAgent,
+      avatarTemplate: old.avatarTemplate,
     );
     await _persistSites();
     notifyListeners();
@@ -724,6 +813,8 @@ class SettingsProvider extends ChangeNotifier {
       loginPagePath: _sites[idx].loginPagePath,
       forums: _sites[idx].forums,
       defaultForumOrder: order,
+      userAgent: _sites[idx].userAgent,
+      avatarTemplate: _sites[idx].avatarTemplate,
     );
     await _persistSites();
     notifyListeners();
@@ -737,9 +828,12 @@ class SettingsProvider extends ChangeNotifier {
     _sites[idx] = Site(
       name: old.name,
       baseUrl: old.baseUrl,
+      cdn: old.cdn,
       loginPagePath: old.loginPagePath,
       forums: newForums,
       defaultForumOrder: List.from(old.defaultForumOrder),
+      userAgent: old.userAgent,
+      avatarTemplate: old.avatarTemplate,
     );
     await _persistSites();
   }
@@ -761,6 +855,8 @@ class SettingsProvider extends ChangeNotifier {
       loginPagePath: old.loginPagePath,
       forums: Map.from(newForums),
       defaultForumOrder: newOrder,
+      userAgent: old.userAgent,
+      avatarTemplate: old.avatarTemplate,
     );
     await _persistSites();
   }

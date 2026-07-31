@@ -95,6 +95,8 @@ class SiteStore extends ChangeNotifier {
       loginPagePath: old.loginPagePath,
       forums: Map.from(newForums),
       defaultForumOrder: newOrder,
+      userAgent: old.userAgent,
+      avatarTemplate: old.avatarTemplate,
     );
     notifyListeners();
   }

@@ -87,8 +87,8 @@ class DiscuzTableParser implements ThreadListParser {
           null;
       if (!hasCite && hasForumLink) {
         forumTd = by;
-      } else if (authorTd == null) {
-        authorTd = by;
+      } else {
+        authorTd ??= by;
       }
     }
     if (forumTd != null) {

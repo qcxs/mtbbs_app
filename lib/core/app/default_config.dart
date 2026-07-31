@@ -41,6 +41,16 @@ class DefaultConfig {
         forums: {},
         defaultForumOrder: [],
       ),
+      Site(
+        name: '吾爱破解',
+        baseUrl: 'https://www.52pojie.cn',
+        cdn: 'https://static.52pojie.cn/',
+        loginPagePath: '/member.php?mod=logging&action=login',
+        forums: {},
+        defaultForumOrder: [],
+        avatarTemplate:
+            'https://avatar.52pojie.cn/data/avatar/{dir}/{tail}_avatar_{size}.jpg',
+      ),
     ];
   }
 

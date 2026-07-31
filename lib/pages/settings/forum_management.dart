@@ -4,6 +4,7 @@ import 'package:mtbbs/api/forum/misc/export.dart' as forum_misc;
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 论坛管理 — 查看、添加、编辑、删除论坛
 ///
@@ -80,16 +81,12 @@ class ForumManagement {
                 await settings.replaceForums(refreshed);
               }
             }
-            // 弹窗已关，用设置页 context 显示 SnackBar
+            // 弹窗已关，用设置页 context 显示 Toast
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    result['success'] == true
-                        ? '板块已更新'
-                        : '刷新失败: ${result['message']}',
-                  ),
-                ),
+              showToast(
+                result['success'] == true
+                    ? '板块已更新'
+                    : '刷新失败: ${result['message']}',
               );
             }
           },

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 编辑器设置页 — 编辑器相关的所有设置
 class EditorSettingsPage extends StatefulWidget {
@@ -189,12 +190,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
           onPressed: () async {
             await settings.resetToolbarItems();
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已重置为默认排序'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
+              showToast('已重置为默认排序', duration: const Duration(seconds: 1));
             }
           },
         ),
@@ -234,9 +230,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
         await prov.deleteSession(session.key);
       }
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('已清空')));
+        showToast('已清空');
       }
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 通用页面顶部操作组件
 /// ```dart
@@ -49,12 +50,7 @@ class PageActions extends StatelessWidget {
 
   void _copyLink(BuildContext context) {
     Clipboard.setData(ClipboardData(text: url));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(copyLabel ?? '链接已复制'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    showToast(copyLabel ?? '链接已复制', duration: const Duration(seconds: 1));
   }
 
   void _openSearch(BuildContext context) {

@@ -8,6 +8,7 @@ import 'package:mtbbs/providers/search_history_provider.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/user_profile.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 搜索页面
 ///
@@ -86,11 +87,9 @@ class _SearchPageState extends State<SearchPage> {
 
     if (result.isOtherSite) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('请切换站点${result.siteName ?? ""}后再打开'),
-          duration: const Duration(seconds: 3),
-        ),
+      showToast(
+        '请切换站点${result.siteName ?? ""}后再打开',
+        duration: const Duration(seconds: 3),
       );
       return;
     }
@@ -165,9 +164,7 @@ class _SearchPageState extends State<SearchPage> {
     if (!mounted) return;
 
     if (uid == null || uid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('未找到该用户'), duration: Duration(seconds: 2)),
-      );
+      showToast('未找到该用户');
       return;
     }
 

@@ -660,15 +660,38 @@ class BBCode2Html {
   /// 在 `\n` → `<br>` 阶段，这些排版换行也被转成了 `<br>`，
   /// 出现在块级容器周围。块级容器自身已产生段落换行，
   /// 其前后的 `<br>` 没有语义含义，只增加空白。
+  ///
+  /// 通用规则：移除与块级标签紧邻（中间仅空白）的 `<br>`，四个方向：
+  /// 开标签前 / 闭标签后 / 闭标签前 / 开标签后。
+  /// 未来新增块级标签，同步加入以下四个正则的标签组即可。
+  /// [code] 占位符（\x00CODE\d+\x00）还原后是 <pre> 块级容器，也视为边界；
+  /// 其还原后的内部 `<li><br></li>`（代码行尾换行）在清理之后生成，不受影响。
+  static final RegExp _brBeforeOpen = RegExp(
+    r'<br>\s*(?=<(?:div|blockquote|ul|ol|li|table|tr|td|pre|hr)(?:\s|>)|\x00CODE\d+\x00)',
+    caseSensitive: false,
+  );
+  static final RegExp _brAfterClose = RegExp(
+    r'((?:</(?:div|blockquote|ul|ol|li|table|tr|td|pre)>|\x00CODE\d+\x00))\s*<br>',
+    caseSensitive: false,
+  );
+  static final RegExp _brBeforeClose = RegExp(
+    r'<br>\s*(?=</(?:div|blockquote|ul|ol|li|table|tr|td|pre)>)',
+    caseSensitive: false,
+  );
+  static final RegExp _brAfterOpen = RegExp(
+    r'(<(?:div|blockquote|ul|ol|li|table|tr|td|pre)(?:\s[^>]*)?>)\s*<br>',
+    caseSensitive: false,
+  );
+
   String _removeAdjacentLineBreaks(String html) {
-    // 移除 <blockquote> 前的 <br>（来自 [font]\n[hide] 等）
-    html = html.replaceAll(RegExp(r'<br>\s*(?=<blockquote)'), '');
-    // 移除 </blockquote> 后的 <br>（来自 [/hide]\n[/font] 等）
-    html = html.replaceAll(RegExp(r'(?<=</blockquote>)\s*<br>'), '');
-    // 移除 <li> 前的 <br>（来自 [list]\n 的排版换行）
-    html = html.replaceAll(RegExp(r'<br>\s*(?=<li)'), '');
-    // 移除 </li> 后的 <br>（来自 \n 在 [*]item\n 末尾的排版换行）
-    html = html.replaceAll(RegExp(r'(?<=</li>)\s*<br>'), '');
+    // 开标签前的 <br>（如 text\n[list]、[/quote]\n[list]）
+    html = html.replaceAll(_brBeforeOpen, '');
+    // 闭标签后的 <br>（如 [/list]\n[list]）
+    html = html.replaceAll(_brAfterClose, r'$1');
+    // 闭标签前的 <br>（如 [/appdata]\n[/list]，本次修复的核心场景）
+    html = html.replaceAll(_brBeforeClose, '');
+    // 开标签后的 <br>（如 [list]\n 起始、[align=center]\n）
+    html = html.replaceAll(_brAfterOpen, r'$1');
     return html;
   }
 }

@@ -217,14 +217,9 @@ class SettingsPage extends StatelessWidget {
               onChanged: (v) => settings.setShowAvatars(v),
             ),
             SwitchListTile(
-              secondary: _iconBox(
-                Icons.auto_fix_high,
-                const Color(0xFF9E9E9E),
-              ),
+              secondary: _iconBox(Icons.auto_fix_high, const Color(0xFF9E9E9E)),
               title: const Text('编辑器启动自检'),
-              subtitle: const Text(
-                '关闭后编辑器忽略启动报错（如未登录、无权限等），无条件进入',
-              ),
+              subtitle: const Text('关闭后编辑器忽略启动报错（如未登录、无权限等），无条件进入'),
               value: settings.editorStartupCheck,
               onChanged: (v) => settings.setEditorStartupCheck(v),
             ),

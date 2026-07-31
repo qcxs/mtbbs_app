@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/widgets/common/staggered_emoji_image.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 表情管理页 — 查看当前站点的所有表情分组和列表
 class EmojiManagementPage extends StatefulWidget {
@@ -65,13 +66,7 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
         _loading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _groups.isNotEmpty ? '表情已更新，共 ${_emojiTotal()} 个' : '暂无表情数据',
-            ),
-          ),
-        );
+        showToast(_groups.isNotEmpty ? '表情已更新，共 ${_emojiTotal()} 个' : '暂无表情数据');
       }
     } catch (e) {
       if (mounted) {

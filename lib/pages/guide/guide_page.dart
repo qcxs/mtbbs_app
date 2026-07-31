@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
 import 'package:mtbbs/services/api_service.dart';
@@ -7,7 +8,6 @@ import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/auth/widgets/login_sheet.dart';
-import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
 import 'package:mtbbs/controllers/thread_list_controller.dart';
 import 'package:mtbbs/widgets/thread/thread_grid.dart';
@@ -24,7 +24,10 @@ class GuidePage extends StatefulWidget {
 
 class _GuidePageState extends State<GuidePage> {
   final _pageController = PageController();
-  String _focusView = 'newthread';
+
+  /// 当前选中 Tab；初始为空串，首次构建时回退到第一个可见 Tab，
+  /// 避免顺序变化后仍停留在旧 Tab 导致 PageView 错位不加载。
+  String _focusView = '';
   static final Map<String, ThreadListController> _ctrlMap = {};
 
   @override
@@ -53,21 +56,11 @@ class _GuidePageState extends State<GuidePage> {
 
   void _showOrderDialog() {
     final settings = context.read<SettingsProvider>();
-    const all = ['newthread', 'hot', 'new', 'digest', 'sofa'];
-    final items = all
-        .map(
-          (v) => ManagedItem(
-            id: v,
-            name: SettingsProvider.tabLabels[v] ?? v,
-            visible: settings.tabOrder.contains(v),
-          ),
-        )
-        .toList();
-
+    final before = settings.tabOrder;
     showManagedListDialog(
       context: context,
       title: 'Tab 排序',
-      items: items,
+      items: settings.guideTabs,
       allowAdd: false,
       allowDelete: false,
       allowEdit: false,
@@ -79,10 +72,16 @@ class _GuidePageState extends State<GuidePage> {
     ).then((_) {
       if (!context.mounted) return;
       final views = _views(context.read<AuthProvider>().isLoggedIn);
-      if (!views.contains(_focusView)) {
-        setState(
-          () => _focusView = views.isNotEmpty ? views.first : 'newthread',
-        );
+      // 顺序/显隐有变化，或当前 Tab 已不可见 → 回到第一个 Tab
+      if (!listEquals(before, settings.tabOrder) ||
+          !views.contains(_focusView)) {
+        final target = views.isNotEmpty ? views.first : '';
+        setState(() => _focusView = target);
+        final idx = views.indexOf(target);
+        // 同步 PageView 位置，避免 _focusView 与显示页错位导致内容不加载
+        if (idx >= 0 && _pageController.hasClients) {
+          _pageController.jumpToPage(idx);
+        }
       }
     });
   }

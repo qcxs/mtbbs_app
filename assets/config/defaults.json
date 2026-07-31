@@ -7,6 +7,13 @@
       "baseUrl": "https://bbs.binmt.cc",
       "cdn": "https://cdn-bbs.mt2.cn",
       "loginPagePath": "/member.php?mod=logging&action=login"
+    },
+    {
+      "name": "吾爱破解",
+      "baseUrl": "https://www.52pojie.cn",
+      "cdn": "https://static.52pojie.cn/",
+      "loginPagePath": "/member.php?mod=logging&action=login",
+      "avatarTemplate": "https://avatar.52pojie.cn/data/avatar/{dir}/{tail}_avatar_{size}.jpg"
     }
   ],
 

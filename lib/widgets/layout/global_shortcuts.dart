@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 包裹所有路由，提供全局快捷键（Esc 返回）。
 /// 独立于 AppShell，确保设置页、帖子详情、编辑器等所有页面都能响应。
@@ -63,9 +64,7 @@ class _GlobalShortcutsWrapperState extends State<GlobalShortcutsWrapper>
       return;
     }
     _lastBackPress = now;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('再按一次退出'), duration: Duration(seconds: 2)),
-    );
+    showToast('再按一次退出');
   }
 
   /// Esc 键 — 只做栈式后退，不做页面级行为

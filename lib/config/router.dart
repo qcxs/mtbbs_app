@@ -28,8 +28,12 @@ import 'package:mtbbs/pages/online/online_page.dart';
 import 'package:mtbbs/pages/favorite/favorite_page.dart';
 import 'package:mtbbs/widgets/image_preview/gallery_viewer.dart';
 
-GoRouter buildRouter({String initialLocation = '/'}) {
+GoRouter buildRouter({
+  GlobalKey<NavigatorState>? navigatorKey,
+  String initialLocation = '/',
+}) {
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: initialLocation,
     routes: [
       ShellRoute(

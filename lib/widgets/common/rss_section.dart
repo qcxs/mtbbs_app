@@ -75,6 +75,7 @@ class _RssSectionState extends State<RssSection>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // 注册 keep-alive，防止 Tab 切换时状态丢失
     final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -102,9 +102,7 @@ class ComiisTableParser implements ThreadListParser {
       final authorEl = p.querySelector('.km_user a');
       if (authorEl != null) {
         author = sanitizeText(authorEl.text);
-        if (uid == null) {
-          uid = _extractUid(authorEl.attributes['href'] ?? '');
-        }
+        uid ??= _extractUid(authorEl.attributes['href'] ?? '');
       }
     }
 

@@ -7,6 +7,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 帖子卡片操作类型（PopupMenu）
 enum PostCardAction { showBbcode, editPost, viewTime }
@@ -315,14 +316,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
               final url =
                   '${SiteStore.instance.baseUrl}/forum.php?mod=redirect&goto=findpost&ptid=${widget.tid}&pid=${widget.post.pid}';
               Clipboard.setData(ClipboardData(text: url));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '复制楼层成功：tid：${widget.tid}，pid：${widget.post.pid}',
-                  ),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              showToast('复制楼层成功：tid：${widget.tid}，pid：${widget.post.pid}');
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),

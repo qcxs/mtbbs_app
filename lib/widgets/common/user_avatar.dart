@@ -6,10 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/image_preview/image_preview.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 头像点击行为
 enum AvatarTapAction {
@@ -82,8 +84,14 @@ class _UserAvatarState extends State<UserAvatar> {
     return 'small';
   }
 
-  String get _originalUrl =>
-      '${SiteStore.instance.baseUrl}/uc_server/avatar.php?uid=${widget.uid}&size=$_urlSize';
+  /// 原始头像 URL：按站点配置的模板解析，未配置时回退默认 API 方案
+  String get _originalUrl => resolveAvatarUrl(
+    template: SiteStore.instance.current.avatarTemplate ?? '',
+    baseUrl: SiteStore.instance.baseUrl,
+    cdn: SiteStore.instance.cdnUrl,
+    uid: widget.uid,
+    size: _urlSize,
+  );
 
   /// 最终使用的图片 URL（已解析重定向，或原始 URL）
   String get _imageUrl => _resolvedUrl ?? _originalUrl;
@@ -223,9 +231,7 @@ class _UserAvatarState extends State<UserAvatar> {
         return;
       case AvatarTapAction.openUserSpace:
         if (widget.uid == '0') {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('请先登录')));
+          showToast('请先登录');
           return;
         }
         context.push('/user/${widget.uid}');

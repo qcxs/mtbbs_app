@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 积分公式查看对话框 — 独立组件，可在任意页面调用
 class FormulaDialog {
@@ -18,13 +19,7 @@ class FormulaDialog {
                     final result = await settings.fetchAndUpdateFormula();
                     if (ctx.mounted) {
                       setD(() {});
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            result != null ? '公式已更新' : '刷新失败（可能未登录）',
-                          ),
-                        ),
-                      );
+                      showToast(result != null ? '公式已更新' : '刷新失败（可能未登录）');
                     }
                   },
                   child: Container(

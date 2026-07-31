@@ -5,6 +5,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/core/app/app_orchestrator.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 站点管理 — 切换、添加、删除站点
 class SiteManagement {
@@ -19,6 +20,17 @@ class SiteManagement {
           title: Row(
             children: [
               const Expanded(child: Text('切换站点')),
+              GestureDetector(
+                onTap: () => _confirmReset(context, settings, setD),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.restart_alt,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
               GestureDetector(
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -41,6 +53,10 @@ class SiteManagement {
                 if (site.cdn != null && site.cdn!.isNotEmpty) {
                   subtitle.write('\nCDN: ${site.cdn}');
                 }
+                if (site.avatarTemplate != null &&
+                    site.avatarTemplate!.isNotEmpty) {
+                  subtitle.write('\n头像: 自定义模板');
+                }
                 return RadioListTile<int>(
                   title: Text(site.name),
                   subtitle: Text(
@@ -58,11 +74,9 @@ class SiteManagement {
                     await orchestrator.switchSite(v);
                     if (ctx.mounted) Navigator.of(ctx).pop();
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('已切换到 ${site.name}'),
-                          duration: const Duration(seconds: 1),
-                        ),
+                      showToast(
+                        '已切换到 ${site.name}',
+                        duration: const Duration(seconds: 1),
                       );
                     }
                   },
@@ -106,12 +120,51 @@ class SiteManagement {
     );
   }
 
+  /// 重置站点配置确认框：从 defaults.json 恢复内置站点配置
+  static void _confirmReset(
+    BuildContext context,
+    SettingsProvider settings,
+    void Function(VoidCallback) setD,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('重置站点配置'),
+        content: const Text(
+          '将把内置站点（MT论坛、吾爱破解等）的配置恢复为默认，'
+          '并补回缺失的内置站点。自定义添加的站点不受影响。确定继续吗？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dctx).pop();
+              final count = await settings.restoreDefaultSites();
+              if (context.mounted) {
+                showToast('已重置 $count 个站点配置');
+                setD(() {});
+              }
+            },
+            child: const Text('重置'),
+          ),
+        ],
+      ),
+    );
+  }
+
   static void _deleteSite(
     BuildContext context,
     SettingsProvider settings,
     String name,
     int index,
   ) {
+    if (SiteStore.instance.sites.length <= 1) {
+      showToast('至少保留一个站点');
+      return;
+    }
     final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
@@ -135,9 +188,7 @@ class SiteManagement {
                 await context.read<AuthProvider>().onSiteChanged();
               }
               if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('已删除')));
+                showToast('已删除');
               }
             },
             child: const Text('删除'),
@@ -157,54 +208,70 @@ class SiteManagement {
     final urlCtl = TextEditingController(text: site.baseUrl);
     final cdnCtl = TextEditingController(text: site.cdn ?? '');
     final loginPathCtl = TextEditingController(text: site.loginPagePath);
+    final avatarCtl = TextEditingController(text: site.avatarTemplate ?? '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('编辑站点'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtl,
-              decoration: const InputDecoration(
-                labelText: '站点名称',
-                border: OutlineInputBorder(),
-                isDense: true,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtl,
+                decoration: const InputDecoration(
+                  labelText: '站点名称',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                autofocus: true,
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlCtl,
-              decoration: const InputDecoration(
-                labelText: '站点地址',
-                border: OutlineInputBorder(),
-                isDense: true,
+              const SizedBox(height: 12),
+              TextField(
+                controller: urlCtl,
+                decoration: const InputDecoration(
+                  labelText: '站点地址',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.url,
               ),
-              keyboardType: TextInputType.url,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: cdnCtl,
-              decoration: const InputDecoration(
-                labelText: 'CDN 地址（可选）',
-                hintText: '留空则使用站点地址',
-                border: OutlineInputBorder(),
-                isDense: true,
+              const SizedBox(height: 12),
+              TextField(
+                controller: cdnCtl,
+                decoration: const InputDecoration(
+                  labelText: 'CDN 地址（可选）',
+                  hintText: '留空则使用站点地址',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.url,
               ),
-              keyboardType: TextInputType.url,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: loginPathCtl,
-              decoration: const InputDecoration(
-                labelText: '登录页路径（可选）',
-                hintText: '留空使用默认 /member.php?mod=logging&action=login',
-                border: OutlineInputBorder(),
-                isDense: true,
+              const SizedBox(height: 12),
+              TextField(
+                controller: loginPathCtl,
+                decoration: const InputDecoration(
+                  labelText: '登录页路径（可选）',
+                  hintText: '留空使用默认 /member.php?mod=logging&action=login',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: avatarCtl,
+                decoration: const InputDecoration(
+                  labelText: '头像 URL 模板（可选）',
+                  hintText:
+                      '留空使用默认 API 方案，例如：\nhttps://avatar.xxx.com/data/avatar/{dir}/{tail}_avatar_{size}.jpg',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                maxLines: 2,
+                keyboardType: TextInputType.url,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -217,6 +284,7 @@ class SiteManagement {
               var url = urlCtl.text.trim();
               final cdnText = cdnCtl.text.trim();
               final loginPath = loginPathCtl.text.trim();
+              final avatarTemplate = avatarCtl.text.trim();
               if (name.isEmpty || url.isEmpty) return;
               if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'https://$url';
@@ -232,16 +300,14 @@ class SiteManagement {
                   forums: site.forums,
                   defaultForumOrder: site.defaultForumOrder,
                   userAgent: site.userAgent,
+                  avatarTemplate: avatarTemplate.isEmpty
+                      ? null
+                      : avatarTemplate,
                 ),
               );
               if (ctx.mounted) Navigator.of(ctx).pop();
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('已更新「$name」'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
+                showToast('已更新「$name」', duration: const Duration(seconds: 1));
               }
             },
             child: const Text('保存'),
@@ -309,9 +375,7 @@ class SiteManagement {
               );
               if (ctx.mounted) Navigator.of(ctx).pop();
               if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('已添加「$name」')));
+                showToast('已添加「$name」');
               }
             },
             child: const Text('添加'),

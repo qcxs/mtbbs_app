@@ -1,5 +1,3 @@
-import 'package:html/dom.dart' as dom;
-
 import 'package:mtbbs/core/parser/post_parser.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 

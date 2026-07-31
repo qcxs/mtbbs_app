@@ -6,6 +6,7 @@ import 'package:flutter_highlight/themes/github.dart';
 import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/languages/all.dart';
 import 'package:mtbbs/config/brand_colors.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 常用语言列表（用于语言切换选择器）
 const _languages = [
@@ -235,12 +236,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
               tooltip: '复制',
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: widget.code));
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('已复制'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
+                showToast('已复制', duration: const Duration(seconds: 1));
               },
             ),
           ],
@@ -418,12 +414,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
           GestureDetector(
             onTap: () {
               Clipboard.setData(ClipboardData(text: widget.code));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已复制'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
+              showToast('已复制', duration: const Duration(seconds: 1));
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

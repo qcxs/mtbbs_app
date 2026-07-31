@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 浏览历史 — 插入格式设置页
 ///
@@ -61,9 +62,7 @@ class _HistoryFormatPageState extends State<HistoryFormatPage> {
     await settings.setHistoryTitleFormatMythread(_titleMythreadCtl.text.trim());
     await settings.setHistoryTitleFormatReply(_titleReplyCtl.text.trim());
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已保存'), duration: Duration(seconds: 1)),
-      );
+      showToast('已保存', duration: const Duration(seconds: 1));
     }
   }
 

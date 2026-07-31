@@ -20,6 +20,7 @@ import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,6 +85,7 @@ void main() async {
 
   // 根据设置初始化路由（默认启动 Tab）
   final router = buildRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation:
         navItems[settings.defaultTabIndex.clamp(0, navItems.length - 1)].path,
   );

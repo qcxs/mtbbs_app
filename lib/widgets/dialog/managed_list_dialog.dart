@@ -116,13 +116,13 @@ class _ManagedListDialogContent extends StatefulWidget {
 }
 
 class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
-  late List<_ItemHolder> _items;
+  late List<ManagedItem> _items;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    _items = widget.items.map((e) => _ItemHolder(e)).toList();
+    _items = List.from(widget.items);
   }
 
   bool _isValidId(String id) => widget.initialIds.contains(id);
@@ -143,7 +143,7 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
     if (!_isValidId(item.id)) return;
     if (!mounted) return;
     Navigator.of(context).pop(); // 先关主对话框
-    final updated = await widget.onEdit!(item.item);
+    final updated = await widget.onEdit!(item);
     if (updated != null && widget.allowEdit) {
       // 如果 onEdit 返回了条目，调用方需要自行管理
     }
@@ -192,19 +192,14 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
     final item = _items[index];
     if (!_isValidId(item.id)) return;
     widget.onToggleVisibility!(item.id);
-    setState(
-      () => _items[index] = _ItemHolder(
-        item.item.copyWith(visible: !item.item.visible),
-      ),
-    );
+    toggleManagedItem(_items, item.id);
+    setState(() {});
   }
 
   void _handleReorder(int oldIndex, int newIndex) {
     if (!widget.allowReorder || widget.onReorder == null) return;
-    final idx = newIndex > oldIndex ? newIndex - 1 : newIndex;
-    final moved = _items.removeAt(oldIndex);
-    _items.insert(idx, moved);
-    widget.onReorder!(oldIndex, idx);
+    reorderManagedItems(_items, oldIndex, newIndex);
+    widget.onReorder!(oldIndex, newIndex);
   }
 
   @override
@@ -244,7 +239,7 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
                 buildDefaultDragHandles: false,
                 itemBuilder: (ctx, i) {
                   final item = _items[i];
-                  final isVisible = item.item.visible;
+                  final isVisible = item.visible;
                   return ListTile(
                     key: ValueKey(item.id),
                     leading: widget.allowReorder
@@ -257,7 +252,7 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
                           )
                         : null,
                     title: widget.itemBuilder != null
-                        ? widget.itemBuilder!(item.item, isVisible)
+                        ? widget.itemBuilder!(item, isVisible)
                         : Text(
                             item.name,
                             style: TextStyle(
@@ -326,11 +321,4 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
       ],
     );
   }
-}
-
-class _ItemHolder {
-  final String id;
-  final String name;
-  final ManagedItem item;
-  _ItemHolder(this.item) : id = item.id, name = item.name;
 }

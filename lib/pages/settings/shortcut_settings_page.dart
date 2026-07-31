@@ -4,6 +4,7 @@ import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/dialog/key_recorder_dialog.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 快捷键设置页
 ///
@@ -38,13 +39,9 @@ class ShortcutSettingsPage extends StatelessWidget {
                 if (result != null && result.isNotEmpty) {
                   await settings.setShortcut(action, result);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${ShortcutHelper.labels[action] ?? action} 已设置为 $result',
-                        ),
-                        duration: const Duration(seconds: 1),
-                      ),
+                    showToast(
+                      '${ShortcutHelper.labels[action] ?? action} 已设置为 $result',
+                      duration: const Duration(seconds: 1),
                     );
                   }
                 }
@@ -74,11 +71,9 @@ class ShortcutSettingsPage extends StatelessWidget {
                 if (result != null && result.isNotEmpty) {
                   await settings.setToolbarShortcut(config.id, result);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${config.name} 已设置为 $result'),
-                        duration: const Duration(seconds: 1),
-                      ),
+                    showToast(
+                      '${config.name} 已设置为 $result',
+                      duration: const Duration(seconds: 1),
                     );
                   }
                 }

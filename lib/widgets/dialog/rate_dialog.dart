@@ -5,6 +5,7 @@ import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
 import 'package:mtbbs/api/forum/viewthread/action/parse.dart' as action_parse;
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 显示评分对话框
 ///
@@ -83,7 +84,7 @@ class _RateDialogContentState extends State<_RateDialogContent> {
     } catch (e) {
       if (!mounted) return;
       final msg = (e is FormatException ? e.message : e.toString());
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      showToast(msg);
       Navigator.of(context).pop();
     }
   }
@@ -93,9 +94,7 @@ class _RateDialogContentState extends State<_RateDialogContent> {
 
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录')));
+      showToast('请先登录');
       return;
     }
 
@@ -137,22 +136,14 @@ class _RateDialogContentState extends State<_RateDialogContent> {
       if (!mounted) return;
 
       if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message.isNotEmpty ? result.message : '评分成功'),
-          ),
-        );
+        showToast(result.message.isNotEmpty ? result.message : '评分成功');
         Navigator.of(context).pop(true);
       } else {
         setState(() {
           _submitting = false;
           _submitError = result.message;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message.isNotEmpty ? result.message : '评分失败'),
-          ),
-        );
+        showToast(result.message.isNotEmpty ? result.message : '评分失败');
       }
     } catch (e) {
       if (!mounted) return;
@@ -160,9 +151,7 @@ class _RateDialogContentState extends State<_RateDialogContent> {
         _submitting = false;
         _submitError = e.toString();
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('网络错误: $e')));
+      showToast('网络错误: $e');
     }
   }
 

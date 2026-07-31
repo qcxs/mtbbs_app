@@ -14,6 +14,7 @@ import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/common/pie_chart.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 用户主页
 ///
@@ -547,9 +548,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void _showCreditDialog() {
     final settings = context.read<SettingsProvider>();
     if (settings.creditFormula.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请登录后在设置页面中刷新积分公式后使用')));
+      showToast('请登录后在设置页面中刷新积分公式后使用');
       return;
     }
 

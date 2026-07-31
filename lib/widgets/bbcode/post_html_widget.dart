@@ -15,6 +15,7 @@ import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_table.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_code_block.dart';
 import 'package:mtbbs/widgets/image_preview/image_preview.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 渲染段类型
 sealed class _Segment {}
@@ -319,12 +320,7 @@ class PostHtmlWidget extends StatelessWidget {
           copyValue: qqMatch.group(1)!,
           onAction: () {
             Clipboard.setData(ClipboardData(text: qqMatch.group(1)!));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('已复制'),
-                duration: Duration(seconds: 1),
-              ),
-            );
+            showToast('已复制', duration: const Duration(seconds: 1));
           },
         );
         return;
@@ -397,12 +393,7 @@ class PostHtmlWidget extends StatelessWidget {
       case 'copy':
         await Clipboard.setData(ClipboardData(text: copyValue));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已复制'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          showToast('已复制', duration: const Duration(seconds: 1));
         }
     }
   }

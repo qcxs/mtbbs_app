@@ -8,6 +8,7 @@ import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
 import 'package:mtbbs/services/api_service.dart';
@@ -325,9 +326,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     if (post.recommendUrl.isEmpty) return;
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录')));
+      showToast('请先登录');
       return;
     }
     try {
@@ -337,16 +336,10 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       );
       if (!mounted) return;
       if (result.success) setState(() => _liked = !_liked);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message.isNotEmpty ? result.message : '操作成功'),
-        ),
-      );
+      showToast(result.message.isNotEmpty ? result.message : '操作成功');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('网络错误: $e')));
+      showToast('网络错误: $e');
     }
   }
 
@@ -443,24 +436,17 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       if (timeMatch != null) postTime = timeMatch.group(1);
       if (mounted) {
         final time = postTime ?? post.postTime;
-        if (time.isNotEmpty)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('发表于 $time')));
+        if (time.isNotEmpty) showToast('发表于 $time');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('获取详情失败: $e')));
+      showToast('获取详情失败: $e');
     }
   }
 
   void _copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1)),
-    );
+    showToast('已复制到剪贴板', duration: const Duration(seconds: 1));
   }
 
   void _showPagePicker() {

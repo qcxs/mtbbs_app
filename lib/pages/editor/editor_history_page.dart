@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 编辑器类型显示名
 const _typeLabels = {
@@ -471,9 +472,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
       await context.read<EditorHistoryProvider>().deleteSnapshot(snapshot.id);
       _load();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('已删除')));
+        showToast('已删除');
       }
     }
   }
@@ -513,9 +512,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
       await context.read<EditorHistoryProvider>().clearAll();
       _load();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('已清空所有历史')));
+        showToast('已清空所有历史');
       }
     }
   }
@@ -575,12 +572,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
             TextButton.icon(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: snapshot.content));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('已复制'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
+                showToast('已复制', duration: const Duration(seconds: 1));
               },
               icon: const Icon(Icons.copy, size: 16),
               label: const Text('复制'),

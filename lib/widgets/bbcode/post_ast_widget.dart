@@ -10,6 +10,7 @@ import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/widgets/image_preview/image_preview.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 可被全局/局部禁用的 BBCode 项
 const bbcodeStyleTags = <String>{
@@ -215,12 +216,7 @@ class PostAstWidget extends StatelessWidget {
             child: GestureDetector(
               onTap: () {
                 Clipboard.setData(ClipboardData(text: code));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('已复制'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
+                showToast('已复制', duration: const Duration(seconds: 1));
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -393,12 +389,7 @@ class PostAstWidget extends StatelessWidget {
         copyValue: url,
         onAction: () {
           Clipboard.setData(ClipboardData(text: url));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已复制'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          showToast('已复制', duration: const Duration(seconds: 1));
         },
       );
       return;
@@ -406,9 +397,7 @@ class PostAstWidget extends StatelessWidget {
 
     final uri = Uri.tryParse(url);
     if (uri == null || !uri.hasScheme) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('无效的$type: $url')));
+      showToast('无效的$type: $url');
       return;
     }
     final labels = switch (type) {
@@ -635,12 +624,7 @@ class PostAstWidget extends StatelessWidget {
       case 'copy':
         await Clipboard.setData(ClipboardData(text: copyValue));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已复制'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          showToast('已复制', duration: const Duration(seconds: 1));
         }
     }
   }
@@ -779,9 +763,7 @@ class PostAstWidget extends StatelessWidget {
   void _openUrl(BuildContext context, String url) {
     final uri = Uri.tryParse(url);
     if (uri != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('下载链接: $url')));
+      showToast('下载链接: $url');
     }
   }
 

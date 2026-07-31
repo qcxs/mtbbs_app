@@ -22,27 +22,26 @@ class ManagedItem {
     String? name,
     bool? visible,
     Map<String, dynamic>? data,
-  }) =>
-      ManagedItem(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        visible: visible ?? this.visible,
-        data: data ?? this.data,
-      );
+  }) => ManagedItem(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    visible: visible ?? this.visible,
+    data: data ?? this.data,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'visible': visible,
-        if (data != null) 'data': data,
-      };
+    'id': id,
+    'name': name,
+    'visible': visible,
+    if (data != null) 'data': data,
+  };
 
   factory ManagedItem.fromJson(Map<String, dynamic> json) => ManagedItem(
-        id: json['id']?.toString() ?? '',
-        name: json['name']?.toString() ?? '',
-        visible: json['visible'] == true,
-        data: json['data'] as Map<String, dynamic>?,
-      );
+    id: json['id']?.toString() ?? '',
+    name: json['name']?.toString() ?? '',
+    visible: json['visible'] == true,
+    data: json['data'] as Map<String, dynamic>?,
+  );
 
   static String encodeList(List<ManagedItem> items) =>
       jsonEncode(items.map((e) => e.toJson()).toList());
@@ -53,4 +52,22 @@ class ManagedItem {
         .map((e) => ManagedItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+}
+
+/// 按 ReorderableListView.onReorderItem 语义移动条目。
+///
+/// onReorderItem 回调的 [to] 已是「移除后」的最终插入位（框架在
+/// newIndex > oldIndex 时已内部减 1），此处只做越界保护，不再二次修正。
+/// 弹窗与 Provider 共用此函数，避免索引计算分叉。
+void reorderManagedItems(List<ManagedItem> items, int from, int to) {
+  if (from < 0 || from >= items.length) return;
+  final item = items.removeAt(from);
+  items.insert(to.clamp(0, items.length), item);
+}
+
+/// 切换条目可见性；id 不存在时安全返回。
+void toggleManagedItem(List<ManagedItem> items, String id) {
+  final i = items.indexWhere((e) => e.id == id);
+  if (i < 0) return;
+  items[i] = items[i].copyWith(visible: !items[i].visible);
 }

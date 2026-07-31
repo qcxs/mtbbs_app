@@ -10,6 +10,7 @@ import 'package:mtbbs/pages/home/home_page.dart';
 import 'package:mtbbs/pages/guide/guide_page.dart';
 import 'package:mtbbs/pages/message/message_page.dart';
 import 'package:mtbbs/pages/user/my_profile_page.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 响应式外壳（底部导航栏 + 侧边栏）
 class AppShell extends StatefulWidget {
@@ -120,9 +121,7 @@ class _AppShellState extends State<AppShell> {
             onPressed: () {
               final forums = SiteStore.instance.forums;
               if (forums.isEmpty) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('无可发帖的版块')));
+                showToast('无可发帖的版块');
                 return;
               }
               if (forums.length == 1) {
@@ -273,9 +272,7 @@ class _AppShellState extends State<AppShell> {
           onPressed: () {
             final forums = SiteStore.instance.forums;
             if (forums.isEmpty) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('无可发帖的版块')));
+              showToast('无可发帖的版块');
               return;
             }
             if (forums.length == 1) {
