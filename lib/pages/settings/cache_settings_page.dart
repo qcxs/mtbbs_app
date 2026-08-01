@@ -6,6 +6,7 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 缓存管理页面
 ///
@@ -377,25 +378,12 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
 
   /// 二次确认后清空缓存
   Future<bool> _confirmClear(String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认清空'),
-        content: Text('确定要清空 $name 吗？此操作不可恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认清空',
+      message: '确定要清空 $name 吗？此操作不可恢复。',
+      confirmText: '清空',
+      danger: true,
     );
     return confirmed == true;
   }

@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/config/site_config.dart';
 
 /// 我的帖子 HTTP 请求
 
@@ -14,6 +13,5 @@ Future<Response<String>> getMypostList(
   final pageParam = page > 1 ? '&page=$page' : '';
   return dio.get<String>(
     '/home.php?mod=space&do=notice&view=mypost&type=$type$pageParam',
-    options: Options(headers: {'User-Agent': Site.uaPc}),
   );
 }

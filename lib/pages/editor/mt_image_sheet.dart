@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
+import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -106,7 +108,7 @@ class _MtImageSheetState extends State<MtImageSheet> {
         ),
       );
       if (choice == 'clipboard') {
-        final name = clipImg.path.split(RegExp(r'[/\\]')).last;
+        final name = basename(clipImg.path);
         final size = await clipImg.length();
         setState(() {
           _queue.add(_QueuedFile(path: clipImg.path, name: name, size: size));
@@ -373,7 +375,7 @@ class _MtImageSheetState extends State<MtImageSheet> {
               subtitle: isCurrent
                   ? LinearProgressIndicator(value: _currentProgress)
                   : Text(
-                      _formatSize(item.size),
+                      formatBytes(item.size),
                       style: const TextStyle(fontSize: 12),
                     ),
               trailing: _uploading
@@ -469,7 +471,7 @@ class _MtImageSheetState extends State<MtImageSheet> {
                 style: const TextStyle(fontSize: 14),
               ),
               subtitle: Text(
-                '${item.sizeText}  ·  ${_dateText(item.uploadedAt)}',
+                '${item.sizeText}  ·  ${formatRelativeTimeShort(item.uploadedAt)}',
                 style: const TextStyle(fontSize: 12),
               ),
               onTap: () =>
@@ -519,21 +521,6 @@ class _MtImageSheetState extends State<MtImageSheet> {
         ),
       ),
     );
-  }
-
-  String _dateText(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
-    if (diff.inHours < 24) return '${diff.inHours} 小时前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-    return '${dt.month}/${dt.day}';
-  }
-
-  String _formatSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }
 

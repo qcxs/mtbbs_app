@@ -45,7 +45,7 @@ PageCheckResult checkPageError(dom.Document doc, String rawHtml) {
   //    <div id="messagetext"><p>...</p></div>
   final msgText = doc.getElementById('messagetext');
   if (msgText != null) {
-    final text = _elText(msgText);
+    final text = extractElementText(msgText);
     if (text.isNotEmpty) {
       AppLogger.w('PAGE_CHECK', '#messagetext → "$text"');
       return PageCheckResult(isError: true, message: text);
@@ -56,7 +56,7 @@ PageCheckResult checkPageError(dom.Document doc, String rawHtml) {
   //    <div id="message"><ul><li>...</li></ul></div>
   final sysError = doc.querySelector('#message li, .bodytext#message li');
   if (sysError != null) {
-    final text = _elText(sysError);
+    final text = extractElementText(sysError);
     if (text.isNotEmpty) {
       AppLogger.w('PAGE_CHECK', '#message li → "$text"');
       return PageCheckResult(isError: true, message: text);
@@ -78,8 +78,11 @@ PageCheckResult checkPageError(dom.Document doc, String rawHtml) {
   return const PageCheckResult(isError: false);
 }
 
-/// 从 DOM 元素提取纯净文本（剔除 script/style）
-String _elText(dom.Element? el) {
+/// 从 DOM 元素提取纯净文本（剔除 script/style），合并空白并 trim。
+///
+/// 与 [sanitizeText] 配合：本函数负责“取元素干净文本”，
+/// [sanitizeText] 负责“清洗字符串”。
+String extractElementText(dom.Element? el) {
   if (el == null) return '';
   final clone = el.clone(true);
   clone.querySelectorAll('script, style').forEach((e) => e.remove());

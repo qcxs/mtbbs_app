@@ -175,11 +175,49 @@ void main() {
     });
   });
 
+  group('Html2BBCode - 内联样式属性提取', () {
+    test('背景色不误提取 color（background-color 含 color 后缀）', () {
+      final result = Html2BBCode().convert(
+        '<font style="background-color:green">背景绿</font>',
+      );
+      expect(result, '[background=green]背景绿[/background]');
+    });
+
+    test('color 与 background-color 并存（color 在前）', () {
+      final result = Html2BBCode().convert(
+        '<font style="color:red;background-color:green">文字</font>',
+      );
+      expect(result, '[background=green][color=red]文字[/color][/background]');
+    });
+
+    test('color 与 background-color 并存（background-color 在前）', () {
+      final result = Html2BBCode().convert(
+        '<font style="background-color:green;color:red">文字</font>',
+      );
+      expect(result, '[background=green][color=red]文字[/color][/background]');
+    });
+
+    test('font-size 与 color 并存', () {
+      final result = Html2BBCode().convert(
+        '<font style="font-size:16px;color:red">文字</font>',
+      );
+      expect(result, '[size=16px][color=red]文字[/color][/size]');
+    });
+
+    test('background-color 内部不应被单独提取出 color', () {
+      final result = Html2BBCode().convert(
+        '<font style="background-color:rgb(0,128,0)">文字</font>',
+      );
+      expect(result, '[background=rgb(0,128,0)]文字[/background]');
+    });
+  });
+
   group('Html2BBCode - 52pojie 代码块转换', () {
     test('parsedown-markdown 带 hljs 高亮的代码块', () {
       // 52pojie（https://www.52pojie.cn/）的代码块样式
       // <code data-highlighted="yes" class="hljs language-smali"> 内含 &amp; 等 HTML 实体
-      const html = ''
+      const html =
+          ''
           '<div class="parsedown-markdown">'
           '<pre>'
           '<em class="CopyMyCode" style="cursor: pointer; font-size: 12px; color: rgb(51, 102, 153) !important;"> 复制代码</em>'

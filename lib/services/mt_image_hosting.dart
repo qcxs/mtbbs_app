@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
+import 'package:mtbbs/core/utils/string_utils.dart';
 
 /// MT 图床服务 — 管理认证、上传、历史记录
 ///
@@ -130,7 +132,7 @@ class MtImageHosting {
     final file = File(filePath);
     if (!file.existsSync()) return null;
 
-    final filename = file.path.split(RegExp(r'[/\\]')).last;
+    final filename = basename(file.path);
 
     try {
       final form = FormData.fromMap({
@@ -319,10 +321,5 @@ class MtUploadResult {
     hidden: hidden ?? this.hidden,
   );
 
-  String get sizeText {
-    final bytes = size.toInt();
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
+  String get sizeText => formatBytes(size.toInt());
 }

@@ -43,8 +43,12 @@ class ApiService {
     dio = Dio(
       BaseOptions(
         baseUrl: url,
+        // 默认 UA 为 PC 版（Discuz 按 UA 返回不同模板）；
+        // 个别接口（导读/版块/我的帖子）按需用 Options 覆盖为站点配置 UA
+        // X-Requested-With 统一标记 AJAX 请求
         headers: {
           'User-Agent': Site.uaPc,
+          'X-Requested-With': 'XMLHttpRequest',
           'Referer': url,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -210,39 +214,5 @@ class ApiService {
   void _replaceCookieManager(CookieJar jar) {
     dio.interceptors.removeWhere((i) => i is CookieManager);
     dio.interceptors.insert(0, CookieManager(jar));
-  }
-
-  /// GET 请求
-  Future<Response<String>> get(
-    String path, {
-    Map<String, dynamic>? queryParameters,
-  }) {
-    return dio.get<String>(
-      path,
-      queryParameters: queryParameters,
-      options: Options(
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      ),
-    );
-  }
-
-  /// POST 请求
-  Future<Response<String>> post(
-    String path, {
-    Map<String, dynamic>? data,
-    Map<String, String>? headers,
-  }) {
-    return dio.post<String>(
-      path,
-      data: data,
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-        headers: headers,
-      ),
-    );
   }
 }

@@ -6,6 +6,7 @@ import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 编辑器设置页 — 编辑器相关的所有设置
 class EditorSettingsPage extends StatefulWidget {
@@ -202,25 +203,13 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
     BuildContext context,
     EditorHistoryProvider editorHistory,
   ) async {
-    final cs = Theme.of(context).colorScheme;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 360),
-        title: const Text('清空编辑历史'),
-        content: const Text('确定删除所有编辑历史记录吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: cs.error),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: '清空编辑历史',
+      message: '确定删除所有编辑历史记录吗？此操作不可撤销。',
+      confirmText: '清空',
+      danger: true,
+      maxWidth: 360,
     );
 
     if (confirm == true && context.mounted) {

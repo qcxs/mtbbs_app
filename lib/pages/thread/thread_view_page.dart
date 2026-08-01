@@ -9,6 +9,8 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/page_jump_dialog.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
 import 'package:mtbbs/services/api_service.dart';
@@ -74,6 +76,9 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   // ---- 操作状态 ----
   bool _liked = false;
+
+  /// 顶栏"全局禁用样式"开关（作用于当前帖子页所有帖子）
+  bool _globalDisableStyle = false;
 
   @override
   void initState() {
@@ -450,38 +455,15 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   }
 
   void _showPagePicker() {
-    final controller = TextEditingController(text: '$_currentPage');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('跳转页码'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入页码',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final p = int.tryParse(controller.text);
-              if (p != null && p >= 1 && p <= _totalPages) {
-                Navigator.of(ctx).pop();
-                _goToPage(p);
-              }
-            },
-            child: const Text('跳转'),
-          ),
-        ],
-      ),
+    showPageJumpDialog(
+      context,
+      currentPage: _currentPage,
+      totalPages: _totalPages,
+      title: '跳转页码',
+      initialText: '$_currentPage',
+      autofocus: true,
+      showSummary: false,
+      onGoToPage: _goToPage,
     );
   }
 
@@ -541,6 +523,20 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
               tooltip: '滚动到评论区',
               onPressed: _scrollToComments,
             ),
+          // 全局禁用样式 toggle（刷新按钮左侧）
+          IconButton(
+            icon: Text(
+              _globalDisableStyle ? 'T̶' : 'T',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _globalDisableStyle ? cs.error : cs.onSurfaceVariant,
+              ),
+            ),
+            tooltip: _globalDisableStyle ? '恢复样式渲染（全局）' : '全局禁用样式',
+            onPressed: () =>
+                setState(() => _globalDisableStyle = !_globalDisableStyle),
+          ),
           PageActions(
             url: _threadUrl,
             onRefresh: () => _loadInitial(),
@@ -596,16 +592,13 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          if (_loading)
-            return const Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            );
+          if (_loading) return const LoadingView();
           if (_error != null)
             return PageErrorWidget(
               message: _error!,
               onRetry: () => _loadInitial(),
             );
-          if (_data == null) return const Center(child: Text('暂无数据'));
+          if (_data == null) return const EmptyView(text: '暂无数据');
           final isWide = constraints.maxWidth > 600;
           if (isWide) return _buildWideLayout();
           return _buildNarrowLayout();
@@ -643,7 +636,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     if ((currentPosts == null || currentPosts.isEmpty) &&
         _data!.mainPost == null &&
         !_pageLoading) {
-      return const Center(child: Text('暂无数据'));
+      return const EmptyView(text: '暂无数据');
     }
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
@@ -710,6 +703,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       totalPages: _totalPages,
       pageLoading: _pageLoading,
       tid: widget.tid,
+      globalDisableStyle: _globalDisableStyle,
       onScrollNotification: _handleScrollNotification,
       onReply: (post) =>
           context.push('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}'),
@@ -762,6 +756,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       isLoaded: _mainPostLoaded,
       isLiked: _liked,
       tid: widget.tid,
+      globalDisableStyle: _globalDisableStyle,
       onTap: () => setState(() => _mainPostLoaded = true),
       onRecommend: () => _handleRecommend(post),
       onPopupAction: (action) {

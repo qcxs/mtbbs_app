@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/parser/page_fetcher.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
@@ -65,10 +64,7 @@ class EditorSubmitHelper {
     if (url.isEmpty) return const PageFormData(success: false, error: 'URL 为空');
 
     try {
-      final resp = await ApiService().dio.get(
-        url,
-        options: Options(headers: {'User-Agent': Site.uaPc}),
-      );
+      final resp = await ApiService().dio.get(url);
       final html = resp.data is String ? (resp.data as String) : '';
       final result = PageFetcher.parsePage(html, url: url);
       if (result.success) {
@@ -163,10 +159,7 @@ class EditorSubmitHelper {
           followRedirects: false,
           sendTimeout: const Duration(seconds: 60),
           receiveTimeout: const Duration(seconds: 60),
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
+          headers: {'Content-Type': Headers.formUrlEncodedContentType},
         ),
       );
 

@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 
-/// 我的帖子列表 HTTP 请求（UA 由站点配置决定）
+/// 我的帖子列表 HTTP 请求（UA 使用站点配置，默认移动端）
 Future<Response<String>> getMyThreads(
   Dio dio, {
   int page = 1,

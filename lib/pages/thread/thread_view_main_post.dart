@@ -15,6 +15,9 @@ class MainPostSection extends StatelessWidget {
   final String tid;
   final VoidCallback? onTap;
 
+  /// 页面级"全局禁用样式"开关（顶栏 toggle），开启时禁用所有样式
+  final bool globalDisableStyle;
+
   // 操作回调
   final VoidCallback? onRecommend;
   final void Function(PostCardAction action)? onPopupAction;
@@ -28,6 +31,7 @@ class MainPostSection extends StatelessWidget {
     this.onTap,
     this.onRecommend,
     this.onPopupAction,
+    this.globalDisableStyle = false,
   });
 
   @override
@@ -66,8 +70,7 @@ class MainPostSection extends StatelessWidget {
   }
 
   Widget _buildPostCard(BuildContext context) {
-    final isLoggedIn =
-        context.select<AuthProvider, bool>((a) => a.isLoggedIn);
+    final isLoggedIn = context.select<AuthProvider, bool>((a) => a.isLoggedIn);
     final currentUid = context.select<AuthProvider, String>((a) => a.uid);
     final disabledTags = context.select<SettingsProvider, Set<String>>(
       (s) => s.disabledBbcodeTags,
@@ -80,6 +83,7 @@ class MainPostSection extends StatelessWidget {
       isLoggedIn: isLoggedIn,
       currentUid: currentUid,
       globalDisabledTags: disabledTags,
+      globalDisableStyle: globalDisableStyle,
       onRecommend: onRecommend,
       onPopupAction: onPopupAction,
     );

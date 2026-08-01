@@ -1,25 +1,12 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:mtbbs/core/parser/page_fetcher.dart';
+import 'package:mtbbs/core/utils/string_utils.dart';
 
 // ==================== 编辑器类型 ====================
 
 /// 编辑器操作类型
-enum EditorType {
-  post,
-  comment,
-  reply,
-  editPost,
-  editReply,
-}
-
-/// 生成唯一 ID（基于时间戳 + 随机数，不依赖 uuid 包）
-String _generateId() {
-  final ts = DateTime.now().millisecondsSinceEpoch;
-  final r = Random().nextInt(99999);
-  return '${ts}_$r';
-}
+enum EditorType { post, comment, reply, editPost, editReply }
 
 // ==================== PageFormDataSnapshot ====================
 
@@ -100,21 +87,21 @@ class PageFormDataSnapshot {
   }
 
   Map<String, dynamic> toJson() => {
-        'formhash': formhash,
-        'posttime': posttime,
-        'fid': fid,
-        'tid': tid,
-        'pid': pid,
-        'noticeauthor': noticeauthor,
-        'reppid': reppid,
-        'noticetrimstr': noticetrimstr,
-        'noticeauthormsg': noticeauthormsg,
-        'title': title,
-        'content': content,
-        'uploadHash': uploadHash,
-        'fetchedUrl': fetchedUrl,
-        'images': images,
-      };
+    'formhash': formhash,
+    'posttime': posttime,
+    'fid': fid,
+    'tid': tid,
+    'pid': pid,
+    'noticeauthor': noticeauthor,
+    'reppid': reppid,
+    'noticetrimstr': noticetrimstr,
+    'noticeauthormsg': noticeauthormsg,
+    'title': title,
+    'content': content,
+    'uploadHash': uploadHash,
+    'fetchedUrl': fetchedUrl,
+    'images': images,
+  };
 
   factory PageFormDataSnapshot.fromJson(Map<String, dynamic> json) {
     final rawImages = json['images'];
@@ -232,28 +219,30 @@ class EditorSnapshot {
   static final RegExp _bbcodePattern = RegExp(r'\[/?[a-z0-9=,#]+\]');
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'sessionKey': sessionKey,
-        'editorType': editorType,
-        'label': label,
-        'title': title,
-        'content': content,
-        'pendingAids': pendingAids,
-        'quotedPost': quotedPost,
-        'createdAt': createdAt.toIso8601String(),
-        'isManual': isManual,
-        'tid': tid,
-        'pid': pid,
-        'fid': fid,
-        'pageData': pageData.toJson(),
-        'emojiMap': emojiMap,
-      };
+    'id': id,
+    'sessionKey': sessionKey,
+    'editorType': editorType,
+    'label': label,
+    'title': title,
+    'content': content,
+    'pendingAids': pendingAids,
+    'quotedPost': quotedPost,
+    'createdAt': createdAt.toIso8601String(),
+    'isManual': isManual,
+    'tid': tid,
+    'pid': pid,
+    'fid': fid,
+    'pageData': pageData.toJson(),
+    'emojiMap': emojiMap,
+  };
 
   factory EditorSnapshot.fromJson(Map<String, dynamic> json) {
     final rawQuoted = json['quotedPost'];
     Map<String, String>? quotedPost;
     if (rawQuoted is Map) {
-      quotedPost = rawQuoted.map((k, v) => MapEntry(k.toString(), v.toString()));
+      quotedPost = rawQuoted.map(
+        (k, v) => MapEntry(k.toString(), v.toString()),
+      );
     }
 
     final rawEmoji = json['emojiMap'];
@@ -273,7 +262,7 @@ class EditorSnapshot {
     }
 
     return EditorSnapshot(
-      id: json['id']?.toString() ?? _generateId(),
+      id: json['id']?.toString() ?? genId(),
       sessionKey: json['sessionKey']?.toString() ?? '',
       editorType: json['editorType']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
@@ -281,14 +270,16 @@ class EditorSnapshot {
       content: json['content']?.toString() ?? '',
       pendingAids: pendingAids,
       quotedPost: quotedPost,
-      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       isManual: json['isManual'] == true,
       tid: json['tid']?.toString() ?? '',
       pid: json['pid']?.toString() ?? '',
       fid: json['fid']?.toString() ?? '',
-      pageData:
-          PageFormDataSnapshot.fromJson(json['pageData'] as Map<String, dynamic>? ?? {}),
+      pageData: PageFormDataSnapshot.fromJson(
+        json['pageData'] as Map<String, dynamic>? ?? {},
+      ),
       emojiMap: emojiMap,
     );
   }

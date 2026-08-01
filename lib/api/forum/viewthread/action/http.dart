@@ -23,13 +23,11 @@ Future<Response<String>> submitRate(
   Map<String, dynamic> data,
 ) {
   final separator = action.contains('?') ? '&' : '?';
+  // Discuz 表单校验依赖 $_POST，必须显式声明 form-urlencoded（Dio 不会自动补 Content-Type）
   return dio.post<String>(
     '$action${separator}inajax=1',
     options: Options(
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
     ),
     data: data,
   );
@@ -42,13 +40,11 @@ Future<Response<String>> submitKick(
   Map<String, dynamic> data,
 ) {
   final separator = action.contains('?') ? '&' : '?';
+  // Discuz 表单校验依赖 $_POST，必须显式声明 form-urlencoded（Dio 不会自动补 Content-Type）
   return dio.post<String>(
     '$action${separator}inajax=1',
     options: Options(
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
     ),
     data: data,
   );
@@ -61,13 +57,11 @@ Future<Response<String>> submitFavorite(
   Map<String, dynamic> data,
 ) {
   final separator = action.contains('?') ? '&' : '?';
+  // Discuz 表单校验依赖 $_POST，必须显式声明 form-urlencoded（Dio 不会自动补 Content-Type）
   return dio.post<String>(
     '$action${separator}inajax=1',
     options: Options(
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
     ),
     data: data,
   );

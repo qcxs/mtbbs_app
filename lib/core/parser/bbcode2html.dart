@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:mtbbs/core/utils/string_utils.dart';
+
 /// BBCode → HTML 转换器
 ///
 /// 将 BBCode 字符串转换为 HTML，由 [flutter_html] 渲染为 Flutter Widget。
@@ -33,7 +35,7 @@ class BBCode2Html {
 
   /// 转换主入口
   String convert(String input) {
-    var html = _escapeHtml(input);
+    var html = htmlEscape(input);
     final codes = <String>[];
     final appdataList = <String>[];
 
@@ -42,7 +44,7 @@ class BBCode2Html {
       RegExp(r'\[appdata\]([\s\S]*?)\[/appdata\]', caseSensitive: false),
       (m) {
         final raw = m.group(1) ?? '';
-        // 此时 raw 已被 _escapeHtml 转义过，需要还原才能解析 JSON
+        // 此时 raw 已被 htmlEscape 转义过，需要还原才能解析 JSON
         final json = raw
             .replaceAll('&amp;', '&')
             .replaceAll('&lt;', '<')
@@ -375,31 +377,31 @@ class BBCode2Html {
         case 'image_attach':
           return _renderImageAttach(data);
         case 'locked':
-          final msg = _escapeHtml(data['message'] as String? ?? '');
+          final msg = htmlEscape(data['message'] as String? ?? '');
           return '<div class="bbcode-locked"><span class="bbcode-reward-icon">🔒</span>$msg</div>';
         case 'pstatus':
-          final msg = _escapeHtml(data['message'] as String? ?? '');
+          final msg = htmlEscape(data['message'] as String? ?? '');
           return '<div class="bbcode-pstatus">$msg</div>';
         case 'reward':
-          final amount = _escapeHtml(data['amount'] as String? ?? '');
-          final unit = _escapeHtml(data['unit'] as String? ?? '');
+          final amount = htmlEscape(data['amount'] as String? ?? '');
+          final unit = htmlEscape(data['unit'] as String? ?? '');
           return '<div class="bbcode-reward"><span class="bbcode-reward-icon">🎁</span>回帖奖励 <span class="bbcode-reward-amount">$amount</span> $unit</div>';
         case 'bounty':
-          final amount = _escapeHtml(data['amount'] as String? ?? '');
-          final unit = _escapeHtml(data['unit'] as String? ?? '');
+          final amount = htmlEscape(data['amount'] as String? ?? '');
+          final unit = htmlEscape(data['unit'] as String? ?? '');
           return '<div class="bbcode-reward"><span class="bbcode-reward-icon">💰</span>悬赏 <span class="bbcode-reward-amount">$amount</span> $unit</div>';
         case 'poll':
-          final pollType = _escapeHtml(data['pollType'] as String? ?? '');
-          final voterCount = _escapeHtml(data['voterCount'] as String? ?? '');
+          final pollType = htmlEscape(data['pollType'] as String? ?? '');
+          final voterCount = htmlEscape(data['voterCount'] as String? ?? '');
           final options =
               (data['options'] as List<dynamic>?)?.cast<String>() ?? <String>[];
-          final status = _escapeHtml(data['status'] as String? ?? '');
+          final status = htmlEscape(data['status'] as String? ?? '');
           final optionsHtml = options
               .asMap()
               .entries
               .map(
                 (e) =>
-                    '<div style="padding:4px 0">${e.key + 1}. ${_escapeHtml(e.value)}</div>',
+                    '<div style="padding:4px 0">${e.key + 1}. ${htmlEscape(e.value)}</div>',
               )
               .join();
           final statusHtml = status.isNotEmpty
@@ -416,7 +418,7 @@ class BBCode2Html {
 
   /// 渲染附件类型 appdata
   String _renderAttach(Map<String, dynamic> data) {
-    final name = _escapeHtml(data['name'] as String? ?? '附件');
+    final name = htmlEscape(data['name'] as String? ?? '附件');
     final size = data['size'] as String? ?? '';
     final downloads = data['downloads'] as String? ?? '';
     final url = data['url'] as String? ?? '';
@@ -454,19 +456,9 @@ class BBCode2Html {
     if (url.isEmpty) return '';
     final width = data['width'] as String? ?? '';
     final resolvedUrl = _resolveUrl(url);
-    final escapedUrl = _escapeHtml(resolvedUrl);
+    final escapedUrl = htmlEscape(resolvedUrl);
     final w = width.isNotEmpty ? ' width="$width"' : '';
     return '<img src="$escapedUrl"$w style="max-width:100%;" />';
-  }
-
-  /// HTML 转义
-  String _escapeHtml(String s) {
-    return s
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
   }
 
   /// 将相对 URL 解析为绝对 URL
@@ -686,12 +678,13 @@ class BBCode2Html {
   String _removeAdjacentLineBreaks(String html) {
     // 开标签前的 <br>（如 text\n[list]、[/quote]\n[list]）
     html = html.replaceAll(_brBeforeOpen, '');
-    // 闭标签后的 <br>（如 [/list]\n[list]）
-    html = html.replaceAll(_brAfterClose, r'$1');
+    // 闭标签后的 <br>（如 [/list]\n[list]）。
+    // 注意：Dart 的 replaceAll 不展开 $1 组引用，须用 replaceAllMapped 取组。
+    html = html.replaceAllMapped(_brAfterClose, (m) => m[1]!);
     // 闭标签前的 <br>（如 [/appdata]\n[/list]，本次修复的核心场景）
     html = html.replaceAll(_brBeforeClose, '');
     // 开标签后的 <br>（如 [list]\n 起始、[align=center]\n）
-    html = html.replaceAll(_brAfterOpen, r'$1');
+    html = html.replaceAllMapped(_brAfterOpen, (m) => m[1]!);
     return html;
   }
 }

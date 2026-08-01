@@ -26,6 +26,7 @@ import 'package:mtbbs/pages/history/history_page.dart';
 import 'package:mtbbs/pages/darkroom/darkroom_page.dart';
 import 'package:mtbbs/pages/online/online_page.dart';
 import 'package:mtbbs/pages/favorite/favorite_page.dart';
+import 'package:mtbbs/pages/friend/friend_page.dart';
 import 'package:mtbbs/widgets/image_preview/gallery_viewer.dart';
 
 GoRouter buildRouter({
@@ -176,6 +177,17 @@ GoRouter buildRouter({
           GoRoute(
             path: '/online',
             pageBuilder: (_, __) => const NoTransitionPage(child: OnlinePage()),
+          ),
+          GoRoute(
+            path: '/friends',
+            pageBuilder: (_, state) {
+              final uid = state.uri.queryParameters['uid'];
+              final page =
+                  int.tryParse(state.uri.queryParameters['page'] ?? '') ?? 1;
+              return NoTransitionPage(
+                child: FriendPage(uid: uid, initialPage: page),
+              );
+            },
           ),
           GoRoute(
             path: '/favorite',

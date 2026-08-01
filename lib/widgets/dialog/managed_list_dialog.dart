@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/models/managed_item.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 统一有序列表管理弹窗
 ///
@@ -154,25 +155,12 @@ class _ManagedListDialogContentState extends State<_ManagedListDialogContent> {
     final item = _items[index];
     if (!_isValidId(item.id)) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除「${item.name}」吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: '确认删除',
+      message: '确定要删除「${item.name}」吗？',
+      confirmText: '删除',
+      danger: true,
     );
     if (confirm != true) return;
 

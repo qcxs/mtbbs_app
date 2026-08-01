@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/user_profile.dart';
@@ -15,6 +16,8 @@ import 'package:mtbbs/widgets/common/pie_chart.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 用户主页
 ///
@@ -220,40 +223,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _buildBody() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_loading) return const LoadingView();
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.person_off_outlined,
-                size: 48,
-                color: _cs.onSurfaceVariant,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: _cs.onSurfaceVariant),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('重试'),
-              ),
-            ],
-          ),
-        ),
-      );
+      return PageErrorWidget(message: _error!, onRetry: _load, showBack: false);
     }
     if (_profile == null) {
-      return const Center(child: Text('无数据'));
+      return const EmptyView(icon: Icons.person_off_outlined, text: '无数据');
     }
 
     return RefreshIndicator(
@@ -510,6 +485,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         stats['friends']?.toString() ?? '0',
         Icons.people_outlined,
         const Color(0xFFE91E63),
+        onTap: () => context.push('/friends?uid=$uid'),
       );
       add(
         '回帖',
@@ -770,7 +746,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   double _n(dynamic v) {
     if (v == null) return 0;
     if (v is num) return v.toDouble();
-    return double.tryParse(v.toString().replaceAll(',', '').trim()) ?? 0;
+    return parseDoubleWithComma(v);
   }
 
   // ==================== 个性签名 ====================

@@ -4,7 +4,11 @@ import 'package:provider/provider.dart';
 
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 编辑器类型显示名
 const _typeLabels = {
@@ -100,44 +104,14 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Widget _buildBody() {
-    final cs = Theme.of(context).colorScheme;
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-    }
+    if (_loading) return const LoadingView();
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: cs.outlineVariant),
-            const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('重试'),
-            ),
-          ],
-        ),
-      );
+      return PageErrorWidget(message: _error!, onRetry: _load, showBack: false);
     }
 
     if (_sessions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.history, size: 48, color: cs.outlineVariant),
-            const SizedBox(height: 12),
-            Text(
-              '暂无编辑历史',
-              style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      );
+      return const EmptyView(icon: Icons.history, text: '暂无编辑历史');
     }
 
     return ListView.builder(
@@ -292,7 +266,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
 
   Widget _buildSnapshotTile(EditorSnapshot snapshot) {
     final cs = Theme.of(context).colorScheme;
-    final timeStr = _formatTime(snapshot.createdAt);
+    final timeStr = formatSmartTime(snapshot.createdAt);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -436,36 +410,15 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Future<void> _delete(EditorSnapshot snapshot) async {
-    final cs = Theme.of(context).colorScheme;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 360),
-        title: const Row(
-          children: [
-            Expanded(
-              child: Text(
-                '删除快照',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          '确定删除 "${snapshot.title.isNotEmpty ? snapshot.title : _timeLabel(snapshot.createdAt)}" 吗？',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: cs.error),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: '删除快照',
+      titleStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      message:
+          '确定删除 "${snapshot.title.isNotEmpty ? snapshot.title : formatFullTime(snapshot.createdAt)}" 吗？',
+      confirmText: '删除',
+      danger: true,
+      maxWidth: 360,
     );
 
     if (confirm == true && context.mounted) {
@@ -478,34 +431,14 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
   }
 
   Future<void> _confirmClearAll() async {
-    final cs = Theme.of(context).colorScheme;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 360),
-        title: const Row(
-          children: [
-            Expanded(
-              child: Text(
-                '清空所有历史',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-        content: const Text('确定要删除所有编辑历史吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: cs.error),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: '清空所有历史',
+      titleStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      message: '确定要删除所有编辑历史吗？此操作不可撤销。',
+      confirmText: '清空',
+      danger: true,
+      maxWidth: 360,
     );
 
     if (confirm == true && context.mounted) {
@@ -547,7 +480,7 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _detailRow('时间', _formatTime(snapshot.createdAt)),
+              _detailRow('时间', formatDateTimeFull(snapshot.createdAt)),
               _detailRow('类型', snapshot.isManual ? '手动保存' : '自动快照'),
               _detailRow('字数', '${snapshot.wordCount} 字'),
               if (snapshot.pendingAids.isNotEmpty)
@@ -608,25 +541,5 @@ class _EditorHistoryPageState extends State<EditorHistoryPage> {
         ],
       ),
     );
-  }
-
-  // ==================== 工具 ====================
-
-  String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(dt.year, dt.month, dt.day);
-
-    if (date == today) {
-      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    } else if (date == today.subtract(const Duration(days: 1))) {
-      return '昨天 ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    } else {
-      return '${dt.month}/${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    }
-  }
-
-  String _timeLabel(DateTime dt) {
-    return '${dt.month}月${dt.day}日 ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }

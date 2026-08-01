@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/widgets/layout/load_more_footer.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 我的收藏页面
 ///
@@ -142,29 +144,14 @@ class _FavoritePageState extends State<FavoritePage> {
   }
 
   Widget _buildBody() {
-    final cs = Theme.of(context).colorScheme;
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_isLoading) return const LoadingView();
 
     if (_error != null) {
       return PageErrorWidget(message: _error!, onRetry: _fetch);
     }
 
     if (_items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.bookmark_border, size: 48, color: cs.outlineVariant),
-            const SizedBox(height: 12),
-            Text(
-              '暂无收藏',
-              style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      );
+      return const EmptyView(icon: Icons.bookmark_border, text: '暂无收藏');
     }
 
     return LayoutBuilder(
@@ -186,14 +173,12 @@ class _FavoritePageState extends State<FavoritePage> {
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(8),
-            itemCount: _items.length + (_isLoadingMore ? 1 : 0),
+            itemCount: _items.length + (_isLoadingMore || !_hasMore ? 1 : 0),
             itemBuilder: (context, index) {
               if (index >= _items.length) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
+                return LoadMoreFooter(
+                  loading: _isLoadingMore,
+                  hasMore: _hasMore,
                 );
               }
 

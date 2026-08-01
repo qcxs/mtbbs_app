@@ -1,6 +1,8 @@
 /// 用户个人资料强类型模型
 ///
 /// 对应 home.php?mod=space&uid={uid}&do=profile 返回的个人资料。
+import 'package:mtbbs/core/utils/string_utils.dart';
+
 class UserProfile {
   // === 基本信息 ===
   final String uid;
@@ -186,7 +188,7 @@ class UserProfile {
   static int _i(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v;
-    return int.tryParse(v.toString().replaceAll(',', '')) ?? 0;
+    return parseIntWithComma(v);
   }
 }
 

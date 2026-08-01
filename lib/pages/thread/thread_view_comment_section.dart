@@ -48,6 +48,9 @@ class CommentSection extends StatelessWidget {
   final void Function(PostItem post)? onRecommend;
   final void Function(PostCardAction action, PostItem post)? onPopupAction;
 
+  /// 页面级"全局禁用样式"开关（顶栏 toggle），开启时禁用所有样式
+  final bool globalDisableStyle;
+
   const CommentSection({
     super.key,
     required this.posts,
@@ -63,6 +66,7 @@ class CommentSection extends StatelessWidget {
     this.onReply,
     this.onRecommend,
     this.onPopupAction,
+    this.globalDisableStyle = false,
   });
 
   @override
@@ -72,8 +76,7 @@ class CommentSection extends StatelessWidget {
     }
     if (posts.isEmpty) return _buildEmpty(context);
 
-    final isLoggedIn =
-        context.select<AuthProvider, bool>((a) => a.isLoggedIn);
+    final isLoggedIn = context.select<AuthProvider, bool>((a) => a.isLoggedIn);
     final currentUid = context.select<AuthProvider, String>((a) => a.uid);
     final disabledTags = context.select<SettingsProvider, Set<String>>(
       (s) => s.disabledBbcodeTags,
@@ -94,6 +97,7 @@ class CommentSection extends StatelessWidget {
               isLoggedIn: isLoggedIn,
               currentUid: currentUid,
               globalDisabledTags: disabledTags,
+              globalDisableStyle: globalDisableStyle,
               onReply: () => onReply?.call(post),
               onRecommend: () => onRecommend?.call(post),
               onPopupAction: (action) => onPopupAction?.call(action, post),

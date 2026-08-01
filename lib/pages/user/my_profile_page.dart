@@ -140,6 +140,13 @@ class ProfilePage extends StatelessWidget {
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(
+                  leading: const Icon(Icons.people_outline),
+                  title: const Text('我的好友'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/friends'),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
                   leading: const Icon(Icons.history_outlined),
                   title: const Text('浏览记录'),
                   trailing: const Icon(Icons.chevron_right),

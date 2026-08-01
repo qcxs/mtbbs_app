@@ -1,7 +1,8 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/models/thread_item.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'parser_utils.dart';
 import 'thread_list_parser.dart';
 
 /// 标准 Discuz 表格帖子列表解析器
@@ -65,10 +66,8 @@ class DiscuzTableParser implements ThreadListParser {
       if (link != null) {
         title = sanitizeText(link.text);
         threadUrl = link.attributes['href'] ?? '';
-        threadId = _extractThreadId(threadUrl);
-        if (threadUrl.isNotEmpty && !threadUrl.startsWith('http')) {
-          threadUrl = '${SiteStore.instance.baseUrl}/$threadUrl';
-        }
+        threadId = extractThreadIdFromUrl(threadUrl);
+        if (threadUrl.isNotEmpty) threadUrl = normalizeUrl(threadUrl);
       }
     }
 
@@ -96,7 +95,7 @@ class DiscuzTableParser implements ThreadListParser {
       if (link != null) {
         boardName = sanitizeText(link.text);
         boardUrl = link.attributes['href'] ?? '';
-        if (boardUrl.isNotEmpty) boardId = _extractBoardId(boardUrl);
+        if (boardUrl.isNotEmpty) boardId = extractBoardIdFromUrl(boardUrl);
       }
     }
 
@@ -108,7 +107,7 @@ class DiscuzTableParser implements ThreadListParser {
       final cite = authorTd.querySelector('cite a');
       if (cite != null) {
         author = sanitizeText(cite.text);
-        uid = _extractUid(cite.attributes['href'] ?? '');
+        uid = extractUidFromUrl(cite.attributes['href'] ?? '');
       }
       final emTime = authorTd.querySelector('em span, em');
       if (emTime != null) {
@@ -143,28 +142,5 @@ class DiscuzTableParser implements ThreadListParser {
       comments: replies,
       views: views,
     );
-  }
-
-  int? _extractUid(String url) {
-    try {
-      final uri = Uri.parse(url);
-      final uidStr = uri.queryParameters['uid'];
-      if (uidStr != null) return int.tryParse(uidStr);
-      final m = RegExp(r'space-uid-(\d+)').firstMatch(url);
-      if (m != null) return int.tryParse(m.group(1)!);
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  int? _extractThreadId(String url) {
-    final result = parseThreadUrl(url);
-    return result['tid'] != 0 ? result['tid'] : null;
-  }
-
-  int? _extractBoardId(String url) {
-    final m = RegExp(r'forum[_-](\d+)').firstMatch(url);
-    return m != null ? int.tryParse(m.group(1)!) : null;
   }
 }

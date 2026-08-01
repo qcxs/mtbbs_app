@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/layout/pagination_bar.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 私人消息 Tab
 class PmTab extends StatefulWidget {
@@ -63,88 +66,18 @@ class _PmTabState extends State<PmTab> {
     _load(p);
   }
 
-  void _showPicker() {
-    final tc = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('跳转页'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('共 $_totalPages 页，当前第 $_page 页'),
-              const SizedBox(height: 8),
-              TextField(
-                controller: tc,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: '输入页码 (1-$_totalPages)',
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final p = int.tryParse(tc.text);
-              if (p != null && p >= 1 && p <= _totalPages) {
-                Navigator.of(ctx).pop();
-                _goToPage(p);
-              }
-            },
-            child: const Text('跳转'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    if (_loading)
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    if (_loading) return const LoadingView();
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: cs.onSurfaceVariant),
-            const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => _load(1),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('重试'),
-            ),
-          ],
-        ),
+      return PageErrorWidget(
+        message: _error!,
+        onRetry: () => _load(1),
+        showBack: false,
       );
     }
     if (_items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.forum_outlined, size: 48, color: cs.onSurfaceVariant),
-            const SizedBox(height: 8),
-            Text('暂无消息', style: TextStyle(color: cs.onSurfaceVariant)),
-          ],
-        ),
-      );
+      return const EmptyView(icon: Icons.forum_outlined, text: '暂无消息');
     }
 
     return Column(
@@ -159,51 +92,16 @@ class _PmTabState extends State<PmTab> {
             ),
           ),
         ),
-        _buildPagination(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          color: Theme.of(context).colorScheme.surface,
+          child: PaginationBar(
+            page: _page,
+            totalPages: _totalPages,
+            onGoToPage: _goToPage,
+          ),
+        ),
       ],
-    );
-  }
-
-  Widget _buildPagination() {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: cs.surface,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left, size: 20),
-            onPressed: _page > 1 ? () => _goToPage(_page - 1) : null,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            padding: EdgeInsets.zero,
-            tooltip: '上一页',
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: _showPicker,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$_page / $_totalPages',
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, size: 20),
-            onPressed: _page < _totalPages ? () => _goToPage(_page + 1) : null,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            padding: EdgeInsets.zero,
-            tooltip: '下一页',
-          ),
-        ],
-      ),
     );
   }
 
@@ -301,9 +199,7 @@ class _PmTabState extends State<PmTab> {
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
                         onTap: () {
-                          final fullUrl = replyUrl.startsWith('http')
-                              ? replyUrl
-                              : '${SiteStore.instance.baseUrl}/$replyUrl';
+                          final fullUrl = normalizeUrl(replyUrl);
                           context.push(
                             '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
                           );

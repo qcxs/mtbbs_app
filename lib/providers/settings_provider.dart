@@ -32,17 +32,17 @@ class SettingsProvider extends ChangeNotifier {
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;
 
-  /// 头像缓存天数（-1 表示永不过期）
-  int _avatarCacheDays = 7;
+  /// 头像缓存天数（-1 表示永不过期），默认取自 defaults.json
+  int _avatarCacheDays = DefaultConfig.instance.cacheExpireDays.avatar;
 
   /// 表情缓存天数（-1 表示永不过期）
-  int _emojiCacheDays = -1;
+  int _emojiCacheDays = DefaultConfig.instance.cacheExpireDays.emoji;
 
   /// 帖子图片缓存天数（-1 表示永不过期）
-  int _imageCacheDays = 3;
+  int _imageCacheDays = DefaultConfig.instance.cacheExpireDays.image;
 
   /// 勋章图片缓存天数（-1 表示永不过期）
-  int _medalCacheDays = -1;
+  int _medalCacheDays = DefaultConfig.instance.cacheExpireDays.medal;
 
   /// 用户自定义站点列表（持久化）
   List<Site> _sites = [];
@@ -203,10 +203,16 @@ class SettingsProvider extends ChangeNotifier {
 
     _autoDetectUrls = (await _db.getSettingBool('autoDetectUrls')) ?? true;
     _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
-    _avatarCacheDays = (await _db.getSettingInt('avatarCacheDays')) ?? 7;
-    _emojiCacheDays = (await _db.getSettingInt('emojiCacheDays')) ?? -1;
-    _imageCacheDays = (await _db.getSettingInt('imageCacheDays')) ?? 3;
-    _medalCacheDays = (await _db.getSettingInt('medalCacheDays')) ?? -1;
+    // 缓存过期天数（默认取自 defaults.json，无配置或 JSON 错误时为 1 天）
+    final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
+    _avatarCacheDays =
+        (await _db.getSettingInt('avatarCacheDays')) ?? cacheDefaults.avatar;
+    _emojiCacheDays =
+        (await _db.getSettingInt('emojiCacheDays')) ?? cacheDefaults.emoji;
+    _imageCacheDays =
+        (await _db.getSettingInt('imageCacheDays')) ?? cacheDefaults.image;
+    _medalCacheDays =
+        (await _db.getSettingInt('medalCacheDays')) ?? cacheDefaults.medal;
     _minSnapshotWordCount =
         (await _db.getSettingInt('minSnapshotWordCount')) ?? 10;
     _autoSaveInterval = (await _db.getSettingInt('autoSaveInterval')) ?? 30;

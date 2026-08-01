@@ -9,6 +9,8 @@ import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/ranklist_section.dart';
 import 'package:mtbbs/widgets/common/rss_section.dart';
+import 'package:mtbbs/pages/settings/shortcut_links_dialog.dart';
+import 'package:mtbbs/pages/settings/forum_management.dart';
 
 /// 首页
 ///
@@ -66,6 +68,13 @@ class _HomePageState extends State<HomePage> {
               title: '快捷链接',
               expanded: _expandedSections.contains('快捷链接'),
               onToggle: () => _toggleSection('快捷链接'),
+              trailing: _SectionEditButton(
+                tooltip: '管理快捷链接',
+                onPressed: () => ShortcutLinksDialog.show(
+                  context,
+                  context.read<SettingsProvider>(),
+                ),
+              ),
               child: Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -82,6 +91,13 @@ class _HomePageState extends State<HomePage> {
             title: '版块',
             expanded: _expandedSections.contains('版块'),
             onToggle: () => _toggleSection('版块'),
+            trailing: _SectionEditButton(
+              tooltip: '管理版块',
+              onPressed: () => ForumManagement.showPicker(
+                context,
+                context.read<SettingsProvider>(),
+              ),
+            ),
             child: _ForumList(),
           ),
           const SizedBox(height: 12),
@@ -116,11 +132,15 @@ class _CollapsibleSection extends StatelessWidget {
   final VoidCallback onToggle;
   final Widget child;
 
+  /// 标题右侧操作按钮（如编辑），点击不触发折叠
+  final Widget? trailing;
+
   const _CollapsibleSection({
     required this.title,
     required this.expanded,
     required this.onToggle,
     required this.child,
+    this.trailing,
   });
 
   @override
@@ -150,6 +170,8 @@ class _CollapsibleSection extends StatelessWidget {
                     color: cs.onSurface,
                   ),
                 ),
+                const Spacer(),
+                ?trailing,
               ],
             ),
           ),
@@ -169,6 +191,24 @@ class _CollapsibleSection extends StatelessWidget {
 
 // ==================== 快捷链接瓦片 ====================
 // 保持内联，因逻辑简单且仅首页使用
+
+/// 分区标题栏右侧的编辑按钮（点击不触发折叠）
+class _SectionEditButton extends StatelessWidget {
+  final String tooltip;
+  final VoidCallback onPressed;
+  const _SectionEditButton({required this.tooltip, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.edit_outlined, size: 18),
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      onPressed: onPressed,
+    );
+  }
+}
 
 class _ShortcutTile extends StatelessWidget {
   final ManagedItem link;

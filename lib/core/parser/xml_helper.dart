@@ -1,5 +1,7 @@
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
+import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/string_utils.dart';
 
 /// Discuz inajax 响应解析结果
 class InajaxResult {
@@ -51,22 +53,6 @@ class SubmitResult {
   });
 }
 
-/// 从 DOM 元素中提取纯净文本（相当于 textContent，剔除 script/style 内容）
-String _domText(dom.Element? el) {
-  return extractTextContent(el);
-}
-
-/// 公开版本：从 DOM 元素提取纯净文本（剔除 script/style）
-///
-/// 可用于响应体中提取 Discuz 提示消息，无需自行拼接 textContent。
-String extractTextContent(dom.Element? el) {
-  if (el == null) return '';
-  // 克隆后移除 script/style 标签，避免它们的文本污染结果
-  final clone = el.clone(true);
-  clone.querySelectorAll('script, style').forEach((e) => e.remove());
-  return clone.text.trim().replaceAll(RegExp(r'\s+'), ' ');
-}
-
 /// 解析 inajax XML 提交响应，统一处理各种 Discuz 响应格式
 ///
 /// 检测顺序（优先级从高到低）：
@@ -86,7 +72,10 @@ SubmitResult parseSubmitResponse(String body) {
   if (doc != null) {
     final sysError = doc.querySelector('#message li, .bodytext#message li');
     if (sysError != null) {
-      return SubmitResult(success: false, message: _domText(sysError));
+      return SubmitResult(
+        success: false,
+        message: extractElementText(sysError),
+      );
     }
   }
 
@@ -133,7 +122,7 @@ SubmitResult parseSubmitResponse(String body) {
   if (doc != null) {
     final msgText = doc.getElementById('messagetext');
     if (msgText != null) {
-      final text = _domText(msgText);
+      final text = extractElementText(msgText);
       if (text.isNotEmpty) {
         if (text == 'ok' || text == 'OK') {
           return const SubmitResult(success: true, message: '操作成功');
@@ -155,7 +144,7 @@ SubmitResult parseSubmitResponse(String body) {
     // 也试一下 .comiis_tip dt 内的文本（克米模板的通用提示）
     final tipText = doc.querySelector('.comiis_tip dt');
     if (tipText != null) {
-      final text = _domText(tipText);
+      final text = extractElementText(tipText);
       if (text.isNotEmpty && text != 'ok' && text != 'OK') {
         if (text.contains('成功') || text.contains('感谢')) {
           return SubmitResult(success: true, message: text);
@@ -166,7 +155,7 @@ SubmitResult parseSubmitResponse(String body) {
   }
 
   // 6. 去标签后文本兜底
-  final clean = cdata.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+  final clean = stripTags(cdata).trim();
   if (clean.isNotEmpty) {
     if (clean == 'ok' || clean == 'OK') {
       return const SubmitResult(success: true, message: '操作成功');

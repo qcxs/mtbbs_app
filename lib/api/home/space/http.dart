@@ -1,10 +1,8 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/config/site_config.dart';
 
 /// 用户空间主页 HTTP 请求 — 基于 Dio
 ///
-/// baseUrl 由 Dio 实例的 BaseOptions 提供
-/// 注意：此接口需要 PC User-Agent，桌面版 HTML
+/// baseUrl / UA（PC 版）由 ApiService 的 BaseOptions 统一提供。
 
 /// 获取用户个人资料页面
 ///
@@ -18,10 +16,7 @@ Future<Response<String>> getUserProfile(
   String username = '',
 }) {
   final path = _buildPath(uid, username);
-  return dio.get<String>(
-    path,
-    options: Options(headers: {'User-Agent': Site.uaPc}),
-  );
+  return dio.get<String>(path);
 }
 
 String _buildPath(String uid, String username) {

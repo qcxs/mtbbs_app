@@ -79,8 +79,10 @@ class Html2BBCode {
   /// 例如 `_extractStyleValue("color:red; font-size:16px", "color")` → `"red"`。
   /// 属性名不区分大小写，未找到时返回 `null`。
   String? _extractStyleValue(String style, String property) {
+    // 锚定属性名起点（^ 或 ;），避免匹配其他属性的后缀，
+    // 如 background-color:green 中误提取 color（"color" 是 "background-color" 的后缀）
     final regex = RegExp(
-      '${RegExp.escape(property)}\\s*:\\s*([^;]+)',
+      '(?:^|;)\\s*${RegExp.escape(property)}\\s*:\\s*([^;]+)',
       caseSensitive: false,
     );
     final match = regex.firstMatch(style);

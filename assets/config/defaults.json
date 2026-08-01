@@ -22,13 +22,15 @@
       { "id": "sign",           "name": "签到",       "url": "https://bbs.binmt.cc/k_misign-sign.html" },
       { "id": "shop",           "name": "积分商城",   "url": "https://bbs.binmt.cc/keke_integralmall-keke_integralmall.html" },
       { "id": "apply_essence",  "name": "申请精华",   "url": "https://bbs.binmt.cc/thread-86543-1-1.html" },
+      { "id": "bbcode",         "name": "BBCode汇总", "url": "https://bbs.binmt.cc/thread-161119-1-1.html" },
       { "id": "rules",          "name": "总版规",     "url": "https://bbs.binmt.cc/thread-85763-1-1.html" },
       { "id": "image_bed",      "name": "MT图床",     "url": "https://bbs.binmt.cc/thread-98890-1-1.html" },
       { "id": "cloud_drive",    "name": "网盘清单",   "url": "https://bbs.binmt.cc/thread-156696-1-1.html" },
       { "id": "my_threads",     "name": "我的帖子",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=thread&view=me" },
       { "id": "my_favorites",   "name": "我的收藏",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=favorite&view=me&type=all" },
       { "id": "my_friends",     "name": "我的好友",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=friend" },
-      { "id": "notices",        "name": "消息提醒",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=notice" }
+      { "id": "notices",        "name": "消息提醒",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=notice" },
+      { "id": "app",            "name": "app开源地址","url": "https://github.com/qcxs/mtbbs_app" }
     ]
   },
 
@@ -61,6 +63,13 @@
     { "action": "listUl",         "id": "listUl",         "name": "无序",     "shortcut": "Ctrl+Shift+L",   "visible": false },
     { "action": "listOl",         "id": "listOl",         "name": "有序",     "shortcut": "",               "visible": false }
   ],
+
+  "cacheExpire": {
+    "emoji": -1,
+    "avatar": 7,
+    "image": 3,
+    "medal": -1
+  },
 
   "shortcuts": {
     "refresh": "F5",

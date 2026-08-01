@@ -16,10 +16,14 @@ class PageErrorWidget extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
 
+  /// 是否显示"返回"按钮（默认显示，内嵌页面可关闭）
+  final bool showBack;
+
   const PageErrorWidget({
     super.key,
     required this.message,
     this.onRetry,
+    this.showBack = true,
   });
 
   @override
@@ -58,10 +62,11 @@ class PageErrorWidget extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                 ],
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  child: const Text('返回'),
-                ),
+                if (showBack)
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: const Text('返回'),
+                  ),
               ],
             ),
           ],

@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 浏览历史记录页面
 ///
@@ -51,23 +54,12 @@ class _HistoryPageState extends State<HistoryPage>
   Future<void> _confirmClear(BuildContext context, int tabIndex) async {
     final type = _typeForIndex(tabIndex);
     final label = _tabs[tabIndex];
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 400),
-        title: const Text('清空记录'),
-        content: Text('确定清空「$label」的浏览记录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '清空记录',
+      message: '确定清空「$label」的浏览记录吗？',
+      confirmText: '清空',
+      maxWidth: 400,
     );
     if (confirmed == true && context.mounted) {
       final history = context.read<HistoryProvider>();
@@ -158,11 +150,6 @@ class _RecordDetailSheet extends StatelessWidget {
   final BrowseRecord record;
   const _RecordDetailSheet({required this.record});
 
-  String _formatTime(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -207,7 +194,7 @@ class _RecordDetailSheet extends StatelessWidget {
                 _infoRow(context, '类型', _RecordList._typeLabel(record.type)),
                 _infoRow(context, '路由', record.routePath),
                 _infoRow(context, 'ID', record.id),
-                _infoRow(context, '时间', _formatTime(record.timestamp)),
+                _infoRow(context, '时间', formatDateTimeFull(record.timestamp)),
                 if (info.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(height: 1),
@@ -295,20 +282,6 @@ class _RecordList extends StatelessWidget {
   final void Function(BrowseRecord) onShowDetail;
   const _RecordList({required this.type, required this.onShowDetail});
 
-  String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inHours < 1) return '${diff.inMinutes} 分钟前';
-    if (diff.inDays < 1) return '${diff.inHours} 小时前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    final h = dt.hour.toString().padLeft(2, '0');
-    final min = dt.minute.toString().padLeft(2, '0');
-    return '$m-$d $h:$min';
-  }
-
   static IconData _typeIcon(String t) => switch (t) {
     'thread' => Icons.article_outlined,
     'user' => Icons.person_outline,
@@ -332,19 +305,7 @@ class _RecordList extends StatelessWidget {
     final records = type.isEmpty ? history.getAll() : history.getByType(type);
 
     if (records.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.history, size: 48, color: cs.outlineVariant),
-            const SizedBox(height: 8),
-            Text(
-              '暂无浏览记录',
-              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      );
+      return const EmptyView(icon: Icons.history, text: '暂无浏览记录');
     }
 
     return ListView.separated(
@@ -387,7 +348,7 @@ class _RecordList extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                _formatTime(record.timestamp),
+                formatRelativeTime(record.timestamp),
                 style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],

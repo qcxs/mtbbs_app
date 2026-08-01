@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/widgets/common/staggered_emoji_image.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 表情管理页 — 查看当前站点的所有表情分组和列表
 class EmojiManagementPage extends StatefulWidget {
@@ -107,40 +109,20 @@ class _EmojiManagementPageState extends State<EmojiManagementPage> {
   }
 
   Widget _buildBody() {
-    final cs = Theme.of(context).colorScheme;
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-    }
+    if (_loading) return const LoadingView();
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.emoji_emotions_outlined,
-                size: 48,
-                color: cs.onSurfaceVariant,
-              ),
-              const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: cs.onSurfaceVariant)),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _refresh,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('重试'),
-              ),
-            ],
-          ),
-        ),
+      return PageErrorWidget(
+        message: _error!,
+        onRetry: _refresh,
+        showBack: false,
       );
     }
 
     if (_groups.isEmpty) {
-      return Center(
-        child: Text('暂无表情数据', style: TextStyle(color: cs.onSurfaceVariant)),
+      return const EmptyView(
+        icon: Icons.emoji_emotions_outlined,
+        text: '暂无表情数据',
       );
     }
 

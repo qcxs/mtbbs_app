@@ -1,8 +1,8 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/models/thread_item.dart';
-import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'parser_utils.dart';
 import 'thread_list_parser.dart';
 
 /// 克米模板卡片式帖子列表解析器
@@ -50,7 +50,7 @@ class ComiisCardParser implements ThreadListParser {
       'a.wblist_tximg, a[href*="space&uid="]',
     );
     final avatarHref = avatarLink?.attributes['href'];
-    if (avatarHref != null) uid = _extractUid(avatarHref);
+    if (avatarHref != null) uid = extractUidFromUrl(avatarHref);
 
     // 昵称
     final nameEl = li.querySelector('.top_user, a[href*="space-username-"]');
@@ -77,13 +77,13 @@ class ComiisCardParser implements ThreadListParser {
     if (titleEl != null) {
       final titleLink = titleEl.querySelector('a');
       if (titleLink != null) {
-        title = sanitizeText(_cleanText(titleLink, excludeTags: {'span', 'i'}));
+        title = sanitizeText(
+          cleanElementText(titleLink, excludeTags: {'span', 'i'}),
+        );
         threadUrl = titleLink.attributes['href'];
-        threadId = _extractThreadId(threadUrl ?? '');
+        threadId = extractThreadIdFromUrl(threadUrl ?? '');
       }
-      if (threadUrl != null && !threadUrl.startsWith('http')) {
-        threadUrl = '${SiteStore.instance.baseUrl}/$threadUrl';
-      }
+      if (threadUrl != null) threadUrl = normalizeUrl(threadUrl);
       final summaryEl = li.querySelector('.list_body');
       if (summaryEl != null) summary = sanitizeText(summaryEl.text);
     } else {
@@ -92,10 +92,8 @@ class ComiisCardParser implements ThreadListParser {
       if (bodyLink != null) {
         title = sanitizeText(bodyLink.text);
         threadUrl = bodyLink.attributes['href'];
-        threadId = _extractThreadId(threadUrl ?? '');
-        if (threadUrl != null && !threadUrl.startsWith('http')) {
-          threadUrl = '${SiteStore.instance.baseUrl}/$threadUrl';
-        }
+        threadId = extractThreadIdFromUrl(threadUrl ?? '');
+        if (threadUrl != null) threadUrl = normalizeUrl(threadUrl);
       }
     }
 
@@ -105,7 +103,7 @@ class ComiisCardParser implements ThreadListParser {
     );
     final boardName = boardEl != null
         ? sanitizeText(
-            _cleanText(
+            cleanElementText(
               boardEl,
               excludeTags: {'i'},
             ).replaceAll(RegExp(r'^[\s\u00a0]*来自?\s*'), ''),
@@ -114,16 +112,16 @@ class ComiisCardParser implements ThreadListParser {
     final boardUrl = boardEl?.attributes['href'];
 
     int? boardId;
-    if (boardUrl != null) boardId = _extractBoardId(boardUrl);
+    if (boardUrl != null) boardId = extractBoardIdFromUrl(boardUrl);
 
     // 统计
     int? likes, comments, views;
     final bottomUl = li.querySelector('.comiis_xznalist_bottom');
     if (bottomUl != null) {
       final statLis = bottomUl.querySelectorAll('li');
-      if (statLis.length >= 1) likes = _extractInt(statLis[0].text);
-      if (statLis.length >= 2) comments = _extractInt(statLis[1].text);
-      if (statLis.length >= 3) views = _extractInt(statLis[2].text);
+      if (statLis.length >= 1) likes = extractIntFromText(statLis[0].text);
+      if (statLis.length >= 2) comments = extractIntFromText(statLis[1].text);
+      if (statLis.length >= 3) views = extractIntFromText(statLis[2].text);
     }
 
     // 图片
@@ -146,7 +144,7 @@ class ComiisCardParser implements ThreadListParser {
     }
 
     if (threadId == null && threadUrl != null) {
-      threadId = _extractThreadId(threadUrl);
+      threadId = extractThreadIdFromUrl(threadUrl);
     }
 
     return ThreadItem(
@@ -167,42 +165,5 @@ class ComiisCardParser implements ThreadListParser {
       views: views,
       images: images,
     );
-  }
-
-  int? _extractUid(String url) {
-    try {
-      final uri = Uri.parse(url);
-      final uidStr = uri.queryParameters['uid'];
-      if (uidStr != null) return int.tryParse(uidStr);
-      final m = RegExp(r'space-uid-(\d+)').firstMatch(url);
-      if (m != null) return int.tryParse(m.group(1)!);
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  int? _extractThreadId(String url) {
-    final result = parseThreadUrl(url);
-    return result['tid'] != 0 ? result['tid'] : null;
-  }
-
-  int? _extractInt(String text) {
-    final cleaned = text.replaceAll(RegExp(r'[^\d]'), '');
-    return cleaned.isEmpty ? null : int.parse(cleaned);
-  }
-
-  int? _extractBoardId(String url) {
-    final m = RegExp(r'forum[_-](\d+)').firstMatch(url);
-    return m != null ? int.tryParse(m.group(1)!) : null;
-  }
-
-  String _cleanText(dom.Element el, {Set<String> excludeTags = const {}}) {
-    final buf = StringBuffer();
-    for (final node in el.nodes) {
-      if (node is dom.Element && excludeTags.contains(node.localName)) continue;
-      buf.write(node.text);
-    }
-    return buf.toString().trim();
   }
 }

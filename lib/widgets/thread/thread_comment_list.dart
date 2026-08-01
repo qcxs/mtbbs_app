@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/models/thread_detail.dart';
+import 'package:mtbbs/widgets/layout/load_more_footer.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
 
 /// 评论区列表（支持下拉刷新 + 触底加载）
@@ -47,13 +48,12 @@ class ThreadCommentList extends StatelessWidget {
   });
 
   List<Widget> _buildPostCards(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return [
       for (int i = 0; i < posts.length; i++) ...[
         if (i > 0) const Divider(height: 1),
         _buildPostCard(context, posts[i], i + 1),
       ],
-      _buildFooter(cs),
+      LoadMoreFooter(loading: isLoadingMore, hasMore: hasMore),
     ];
   }
 
@@ -131,37 +131,10 @@ class ThreadCommentList extends StatelessWidget {
             if (i < posts.length) {
               return _buildPostCard(context, posts[i], i + 1);
             }
-            return _buildFooter(Theme.of(context).colorScheme);
+            return LoadMoreFooter(loading: isLoadingMore, hasMore: hasMore);
           },
         ),
       ),
     );
-  }
-
-  Widget _buildFooter(ColorScheme cs) {
-    if (isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-    if (!hasMore) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Center(
-          child: Text(
-            '没有更多了',
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-          ),
-        ),
-      );
-    }
-    return const SizedBox.shrink();
   }
 }

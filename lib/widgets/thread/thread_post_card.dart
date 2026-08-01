@@ -26,6 +26,9 @@ class ThreadPostCard extends StatefulWidget {
   /// 全局禁用的样式标签（从 SettingsProvider 传入）
   final Set<String>? globalDisabledTags;
 
+  /// 页面级"全局禁用样式"开关（顶栏 toggle），开启时禁用所有样式
+  final bool globalDisableStyle;
+
   final VoidCallback? onReply;
   final VoidCallback? onRecommend;
   final void Function(PostCardAction action)? onPopupAction;
@@ -39,6 +42,7 @@ class ThreadPostCard extends StatefulWidget {
     this.isLoggedIn = false,
     this.currentUid = '',
     this.globalDisabledTags,
+    this.globalDisableStyle = false,
     this.onReply,
     this.onRecommend,
     this.onPopupAction,
@@ -52,9 +56,11 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
   /// 单帖临时禁用所有样式
   bool _disableStyle = false;
 
-  /// 合并全局 + 局部的禁用标签
+  /// 合并全局设置 + 单帖开关 + 页面级全局开关的禁用标签
   Set<String> get _effectiveDisabledTags {
-    if (!_disableStyle) return widget.globalDisabledTags ?? const {};
+    if (!_disableStyle && !widget.globalDisableStyle) {
+      return widget.globalDisabledTags ?? const {};
+    }
     final combined = Set<String>.from(widget.globalDisabledTags ?? const {});
     combined.addAll(bbcodeStyleTags);
     return combined;

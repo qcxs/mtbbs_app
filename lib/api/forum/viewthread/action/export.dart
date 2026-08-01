@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/api/helpers.dart';
 import 'http.dart' as http;
 import 'parse.dart' as parse;
@@ -17,7 +18,7 @@ Future<parse.RateFormData> fetchRateDialog(Dio dio, String rateUrl) async {
       xml.htmlDoc.getElementById('messagetext') != null &&
       xml.htmlDoc.querySelector('form') == null) {
     final msgEl = xml.htmlDoc.getElementById('messagetext');
-    final errMsg = extractTextContent(msgEl);
+    final errMsg = extractElementText(msgEl);
     throw FormatException(errMsg.isNotEmpty ? errMsg : '操作失败');
   }
 
@@ -43,7 +44,7 @@ Future<parse.FavoriteFormData> fetchFavoriteDialog(
   // 已收藏检测
   final xml = parseInajaxXml(body);
   if (xml != null) {
-    final tipText = extractTextContent(xml.htmlDoc.body);
+    final tipText = extractElementText(xml.htmlDoc.body);
     if (tipText.contains('已收藏') || tipText.contains('请勿重复收藏')) {
       throw FormatException('您已收藏');
     }

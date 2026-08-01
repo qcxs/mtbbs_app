@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/api/forum/darkroom/export.dart' as darkroom_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/layout/load_more_footer.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 小黑屋页面
 ///
@@ -194,10 +196,7 @@ class _DarkroomPageState extends State<DarkroomPage> {
   }
 
   Widget _buildBody() {
-    final cs = Theme.of(context).colorScheme;
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_isLoading) return const LoadingView();
 
     if (_error != null) {
       return PageErrorWidget(message: _error!, onRetry: _onRefresh);
@@ -206,24 +205,11 @@ class _DarkroomPageState extends State<DarkroomPage> {
     final shown = _filteredItems;
 
     if (shown.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _searchQuery.isNotEmpty
-                  ? Icons.search_off
-                  : Icons.shield_outlined,
-              size: 48,
-              color: cs.outlineVariant,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _searchQuery.isNotEmpty ? '未找到匹配结果' : '暂无数据',
-              style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
+      return EmptyView(
+        icon: _searchQuery.isNotEmpty
+            ? Icons.search_off
+            : Icons.shield_outlined,
+        text: _searchQuery.isNotEmpty ? '未找到匹配结果' : '暂无数据',
       );
     }
 
@@ -258,14 +244,12 @@ class _DarkroomPageState extends State<DarkroomPage> {
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(6, 4, 6, 12),
-            itemCount: rows + (_isLoadingMore ? 1 : 0),
+            itemCount: rows + (_isLoadingMore || !_hasMore ? 1 : 0),
             itemBuilder: (context, index) {
               if (index >= rows) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
+                return LoadMoreFooter(
+                  loading: _isLoadingMore,
+                  hasMore: _hasMore,
                 );
               }
 

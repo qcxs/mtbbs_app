@@ -1,7 +1,8 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/models/thread_item.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'parser_utils.dart';
 import 'thread_list_parser.dart';
 
 /// 空间帖子列表解析器（我的帖子/好友的帖子）
@@ -81,14 +82,12 @@ class SpaceThreadParser implements ThreadListParser {
         final ptidMatch = RegExp(r'ptid=(\d+)').firstMatch(href);
         if (ptidMatch != null) {
           threadId = int.tryParse(ptidMatch.group(1)!);
-          threadUrl = '${SiteStore.instance.baseUrl}/thread-$threadId-1-1.html';
+          threadUrl = normalizeUrl('thread-$threadId-1-1.html');
         } else {
           threadUrl = href;
-          threadId = _extractThreadId(threadUrl);
+          threadId = extractThreadIdFromUrl(threadUrl);
         }
-        if (threadUrl.isNotEmpty && !threadUrl.startsWith('http')) {
-          threadUrl = '${SiteStore.instance.baseUrl}/$threadUrl';
-        }
+        if (threadUrl.isNotEmpty) threadUrl = normalizeUrl(threadUrl);
       }
     }
 
@@ -102,7 +101,7 @@ class SpaceThreadParser implements ThreadListParser {
     if (forumLink != null) {
       boardName = sanitizeText(forumLink.text);
       boardUrl = forumLink.attributes['href'] ?? '';
-      if (boardUrl.isNotEmpty) boardId = _extractBoardId(boardUrl);
+      if (boardUrl.isNotEmpty) boardId = extractBoardIdFromUrl(boardUrl);
     }
 
     // 统计：<td class="num">
@@ -142,15 +141,5 @@ class SpaceThreadParser implements ThreadListParser {
       comments: replies,
       views: views,
     );
-  }
-
-  int? _extractThreadId(String url) {
-    final result = parseThreadUrl(url);
-    return result['tid'] != 0 ? result['tid'] : null;
-  }
-
-  int? _extractBoardId(String url) {
-    final m = RegExp(r'forum[_-](\d+)').firstMatch(url);
-    return m != null ? int.tryParse(m.group(1)!) : null;
   }
 }

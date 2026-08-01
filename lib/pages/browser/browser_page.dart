@@ -11,6 +11,7 @@ import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 内置浏览器页面
 ///
@@ -207,22 +208,11 @@ class _BrowserPageState extends State<BrowserPage> {
   }
 
   Future<void> _clearCache() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认清空'),
-        content: const Text('确定要清除浏览器缓存吗？此操作将清空网页资源缓存、Cookie 和本地存储数据。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认清空',
+      message: '确定要清除浏览器缓存吗？此操作将清空网页资源缓存、Cookie 和本地存储数据。',
+      confirmText: '清空',
     );
     if (confirmed != true || !mounted) return;
     await clearWebViewCache();

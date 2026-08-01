@@ -1,7 +1,8 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/models/thread_item.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'parser_utils.dart';
 import 'thread_list_parser.dart';
 
 /// 克米模板表格混合式帖子列表解析器
@@ -62,7 +63,7 @@ class ComiisTableParser implements ThreadListParser {
     int? uid;
     final avatarLink = postlist.querySelector('.comiis_listtx a');
     if (avatarLink != null) {
-      uid = _extractUid(avatarLink.attributes['href'] ?? '');
+      uid = extractUidFromUrl(avatarLink.attributes['href'] ?? '');
     }
 
     // 标题
@@ -74,10 +75,8 @@ class ComiisTableParser implements ThreadListParser {
     if (titleSpan != null) {
       title = sanitizeText(titleSpan.text);
       threadUrl = titleSpan.attributes['href'] ?? '';
-      threadId = _extractThreadId(threadUrl);
-      if (threadUrl.isNotEmpty && !threadUrl.startsWith('http')) {
-        threadUrl = '${SiteStore.instance.baseUrl}/$threadUrl';
-      }
+      threadId = extractThreadIdFromUrl(threadUrl);
+      if (threadUrl.isNotEmpty) threadUrl = normalizeUrl(threadUrl);
     }
 
     // 从 <p> 段落提取各字段
@@ -102,7 +101,7 @@ class ComiisTableParser implements ThreadListParser {
       final authorEl = p.querySelector('.km_user a');
       if (authorEl != null) {
         author = sanitizeText(authorEl.text);
-        uid ??= _extractUid(authorEl.attributes['href'] ?? '');
+        uid ??= extractUidFromUrl(authorEl.attributes['href'] ?? '');
       }
     }
 
@@ -137,7 +136,7 @@ class ComiisTableParser implements ThreadListParser {
       if (forumLink != null) {
         boardName = sanitizeText(forumLink.text);
         boardUrl = forumLink.attributes['href'] ?? '';
-        if (boardUrl.isNotEmpty) boardId = _extractBoardId(boardUrl);
+        if (boardUrl.isNotEmpty) boardId = extractBoardIdFromUrl(boardUrl);
       }
     }
 
@@ -154,28 +153,5 @@ class ComiisTableParser implements ThreadListParser {
       comments: replies,
       views: views,
     );
-  }
-
-  int? _extractUid(String url) {
-    try {
-      final uri = Uri.parse(url);
-      final uidStr = uri.queryParameters['uid'];
-      if (uidStr != null) return int.tryParse(uidStr);
-      final m = RegExp(r'space-uid-(\d+)').firstMatch(url);
-      if (m != null) return int.tryParse(m.group(1)!);
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  int? _extractThreadId(String url) {
-    final result = parseThreadUrl(url);
-    return result['tid'] != 0 ? result['tid'] : null;
-  }
-
-  int? _extractBoardId(String url) {
-    final m = RegExp(r'forum[_-](\d+)').firstMatch(url);
-    return m != null ? int.tryParse(m.group(1)!) : null;
   }
 }

@@ -177,6 +177,25 @@ class UrlRouter {
       final mod = query['mod'];
       if (mod == 'space') {
         final uid = query['uid'];
+        // 好友列表：home.php?mod=space[&uid=X]&do=friend[&view=me][&page=N]
+        // uid 为空（含空 uid= 的“我的好友”写法）→ /friends；指定 uid → /friends?uid=X
+        if (query['do'] == 'friend') {
+          final hasUid = uid != null && uid.isNotEmpty;
+          final page = _resolvePage(query['page']);
+          final params = <String, String>{
+            if (hasUid) 'uid': uid!,
+            if (page > 1) 'page': '$page',
+          };
+          final qs = params.isEmpty
+              ? ''
+              : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+          return UrlRouteResult(
+            label: hasUid ? '好友列表' : '我的好友',
+            appPath: '/friends$qs',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
         if (uid != null && uid.isNotEmpty) {
           return UrlRouteResult(
             label: '用户主页',

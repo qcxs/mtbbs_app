@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/config/site_config.dart';
 
 Future<Response<String>> getThreadDetail(
   Dio dio, {
@@ -11,8 +10,5 @@ Future<Response<String>> getThreadDetail(
   if (authorid != null && authorid.isNotEmpty) {
     url += '&authorid=$authorid';
   }
-  return dio.get<String>(
-    url,
-    options: Options(headers: {'User-Agent': Site.uaPc}),
-  );
+  return dio.get<String>(url);
 }

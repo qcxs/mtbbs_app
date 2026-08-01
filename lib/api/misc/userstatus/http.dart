@@ -4,10 +4,7 @@ import 'package:dio/dio.dart';
 ///
 /// 返回 JSON 格式的登录用户状态。
 /// 未登录时 uid 为 "0"，登录时包含 userstatus HTML。
+/// X-Requested-With 由 ApiService 统一注入。
 Future<Response<String>> getUserStatus(Dio dio) {
-  return dio.get<String>('/misc.php?mod=userstatus', options: Options(
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-  ));
+  return dio.get<String>('/misc.php?mod=userstatus');
 }

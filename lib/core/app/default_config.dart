@@ -108,6 +108,35 @@ class DefaultConfig {
     return result;
   }
 
+  // ==================== 缓存过期天数（非关键，缺省/错误默认 1 天） ====================
+
+  /// 缓存过期天数（单位：天），-1 表示永不过期。
+  ///
+  /// 从 `cacheExpire` 段读取；没有该配置或 JSON 错误时，全部默认 1 天。
+  ({int emoji, int avatar, int image, int medal}) get cacheExpireDays {
+    const fallback = 1;
+    int dayOf(Object? v) {
+      if (v is num) return v.toInt();
+      return int.tryParse(v?.toString() ?? '') ?? fallback;
+    }
+
+    final map = _data?['cacheExpire'] as Map<String, dynamic>?;
+    if (map == null) {
+      return (
+        emoji: fallback,
+        avatar: fallback,
+        image: fallback,
+        medal: fallback,
+      );
+    }
+    return (
+      emoji: dayOf(map['emoji']),
+      avatar: dayOf(map['avatar']),
+      image: dayOf(map['image']),
+      medal: dayOf(map['medal']),
+    );
+  }
+
   // ==================== 全局快捷键（非关键，JSON 失败返回空） ====================
 
   Map<String, String> get globalShortcuts {

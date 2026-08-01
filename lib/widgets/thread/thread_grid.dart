@@ -5,6 +5,8 @@ import 'package:mtbbs/controllers/thread_list_controller.dart';
 import 'package:mtbbs/models/thread_item.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/widgets/thread/thread_card.dart';
+import 'package:mtbbs/widgets/dialog/page_jump_dialog.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// 通用帖子列表网格
 ///
@@ -151,7 +153,7 @@ class _ThreadGridState extends State<ThreadGrid>
                   height: constraints.maxHeight > 0
                       ? constraints.maxHeight
                       : null,
-                  child: _buildEmpty(cs),
+                  child: _buildEmpty(),
                 ),
               ),
             ),
@@ -365,56 +367,14 @@ class _ThreadGridState extends State<ThreadGrid>
   }
 
   void _showPagePicker(ThreadListController ctrl) {
-    final tc = TextEditingController();
-    final knownTotal = ctrl.totalPages > 0;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('跳转页'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                knownTotal
-                    ? '共 ${ctrl.totalPages} 页，当前第 ${ctrl.page} 页'
-                    : '当前第 ${ctrl.page} 页',
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: tc,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: '输入页码',
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final p = int.tryParse(tc.text);
-              if (p != null && p >= 1) {
-                Navigator.of(ctx).pop();
-                ctrl.goToPage(p);
-                _handlePageChange();
-              }
-            },
-            child: const Text('跳转'),
-          ),
-        ],
-      ),
+    showPageJumpDialog(
+      context,
+      currentPage: ctrl.page,
+      totalPages: ctrl.totalPages,
+      onGoToPage: (p) {
+        ctrl.goToPage(p);
+        _handlePageChange();
+      },
     );
   }
 
@@ -521,20 +481,8 @@ class _ThreadGridState extends State<ThreadGrid>
 
   // ==================== 空状态 / 错误状态 ====================
 
-  Widget _buildEmpty(ColorScheme cs) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.inbox_outlined, size: 48, color: cs.outlineVariant),
-          const SizedBox(height: 8),
-          Text(
-            '暂无帖子',
-            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
+  Widget _buildEmpty() {
+    return const EmptyView(icon: Icons.inbox_outlined, text: '暂无帖子');
   }
 
   Widget _buildError(ThreadListController ctrl) {

@@ -31,11 +31,9 @@ Future<Response<String>> submitNewThread(
 }) {
   return dio.post<String>(
     '/forum.php?mod=post&action=newthread&fid=$fid&topicsubmit=yes&inajax=1',
+    // Discuz 表单校验依赖 $_POST，必须显式声明 form-urlencoded（Dio 不会自动补 Content-Type）
     options: Options(
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
     ),
     data: {
       'formhash': formhash,
@@ -86,10 +84,7 @@ Future<Response<String>> submitReply(
   return dio.post<String>(
     '/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&replysubmit=yes&inajax=1',
     options: Options(
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
     ),
     data: data,
   );

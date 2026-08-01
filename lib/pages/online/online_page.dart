@@ -4,6 +4,7 @@ import 'package:mtbbs/api/forum/online/export.dart' as online_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 
 /// 在线用户页面
@@ -148,9 +149,7 @@ class _OnlinePageState extends State<OnlinePage> {
 
   Widget _buildBody() {
     final cs = Theme.of(context).colorScheme;
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_isLoading) return const LoadingView();
 
     if (_error != null) {
       return PageErrorWidget(message: _error!, onRetry: _onRefresh);
@@ -159,22 +158,9 @@ class _OnlinePageState extends State<OnlinePage> {
     final shown = _filteredItems;
 
     if (shown.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _searchQuery.isNotEmpty ? Icons.search_off : Icons.people_outline,
-              size: 48,
-              color: cs.outlineVariant,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _searchQuery.isNotEmpty ? '未找到匹配结果' : '暂无数据',
-              style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
+      return EmptyView(
+        icon: _searchQuery.isNotEmpty ? Icons.search_off : Icons.people_outline,
+        text: _searchQuery.isNotEmpty ? '未找到匹配结果' : '暂无数据',
       );
     }
 

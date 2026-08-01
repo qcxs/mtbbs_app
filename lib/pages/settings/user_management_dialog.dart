@@ -8,6 +8,7 @@ import 'package:mtbbs/auth/widgets/login_sheet.dart' show showLoginSheet;
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 用户管理弹窗 — 账号切换、登录、导出
 class UserManagementDialog extends StatelessWidget {
@@ -343,27 +344,16 @@ class UserManagementDialog extends StatelessWidget {
     );
   }
 
-  void _confirmLogout(BuildContext context, AuthProvider auth) {
+  Future<void> _confirmLogout(BuildContext context, AuthProvider auth) async {
     Navigator.of(context).pop();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('退出登录'),
-        content: Text('确定退出 ${auth.username} 吗？\n将清除该账号的登录状态。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              auth.logout();
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('退出'),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      title: '退出登录',
+      message: '确定退出 ${auth.username} 吗？\n将清除该账号的登录状态。',
+      confirmText: '退出',
     );
+    if (ok == true) {
+      auth.logout();
+    }
   }
 }

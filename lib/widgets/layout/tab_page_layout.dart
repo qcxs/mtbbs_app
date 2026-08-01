@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/widgets/layout/state_views.dart';
 
 /// Tab 条 + PageView 布局组件
 ///
@@ -124,7 +125,7 @@ class _TabPageLayoutState extends State<TabPageLayout> {
         // === PageView ===
         Expanded(
           child: tabs.isEmpty
-              ? const Center(child: Text('暂无可用标签'))
+              ? const EmptyView(text: '暂无可用标签')
               : PageView(
                   key: ValueKey(tabs.map((t) => t.key).join(',')),
                   controller: _pageController,

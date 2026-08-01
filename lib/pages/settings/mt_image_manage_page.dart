@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// MT 图床管理页面 — 查看/删除/隐藏历史上传
 class MtImageManagePage extends StatefulWidget {
@@ -32,22 +34,11 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
   }
 
   Future<void> _delete(MtUploadResult item) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定永久删除「${item.originName}」的上传记录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: '确认删除',
+      message: '确定永久删除「${item.originName}」的上传记录吗？',
+      confirmText: '删除',
     );
     if (confirm != true) return;
     await _hosting.deleteHistory(item.url);
@@ -110,7 +101,7 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
                     ),
                   ),
                   subtitle: Text(
-                    '${item.sizeText}  ·  ${_dateText(item.uploadedAt)}'
+                    '${item.sizeText}  ·  ${formatRelativeTimeShort(item.uploadedAt)}'
                     '${item.hidden ? '  ·  已隐藏' : ''}',
                     style: const TextStyle(fontSize: 12),
                   ),
@@ -139,14 +130,5 @@ class _MtImageManagePageState extends State<MtImageManagePage> {
               },
             ),
     );
-  }
-
-  String _dateText(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
-    if (diff.inHours < 24) return '${diff.inHours} 小时前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-    return '${dt.month}/${dt.day}';
   }
 }

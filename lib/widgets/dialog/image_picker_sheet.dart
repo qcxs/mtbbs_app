@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 
 /// 图片管理面板 — 纯 UI 组件
@@ -79,8 +79,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
     if (img == null) return;
     final src = img['src'] as String? ?? '';
     if (src.isEmpty) return;
-    final baseUrl = ApiService().dio.options.baseUrl;
-    final fullSrc = src.startsWith('http') ? src : '$baseUrl/$src';
+    final fullSrc = normalizeUrl(src);
 
     context.push(
       '/image-viewer',
@@ -266,8 +265,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
         final src = img['src'] as String;
         final isSelected = _selectedAid == aid;
         final inserted = _isInserted(aid);
-        final baseUrl = ApiService().dio.options.baseUrl;
-        final fullSrc = src.startsWith('http') ? src : '$baseUrl/$src';
+        final fullSrc = normalizeUrl(src);
         return GestureDetector(
           onTap: () => setState(() {
             _selectedAid = isSelected ? null : aid;

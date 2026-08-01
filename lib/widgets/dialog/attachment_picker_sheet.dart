@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 
 /// 附件管理面板 — 纯 UI 组件
@@ -203,11 +203,8 @@ class _AttachmentPickerSheetState extends State<AttachmentPickerSheet> {
         final filename = att['filename'] as String? ?? '';
         final inserted = _isInserted(aid);
         final isSelected = _selectedAid == aid;
-        final baseUrl = ApiService().dio.options.baseUrl;
         final iconSrc = att['icon'] as String? ?? '';
-        final iconUrl = iconSrc.startsWith('http')
-            ? iconSrc
-            : (iconSrc.isNotEmpty ? '$baseUrl/$iconSrc' : '');
+        final iconUrl = iconSrc.isEmpty ? '' : normalizeUrl(iconSrc);
 
         return InkWell(
           onTap: () => setState(() {

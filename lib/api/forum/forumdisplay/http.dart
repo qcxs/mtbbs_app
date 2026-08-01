@@ -5,7 +5,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 /// 只负责发请求，不做 print 或解析。
 ///
 /// baseUrl 由 Dio 实例的 BaseOptions 提供
-/// UA 由当前站点配置决定（用户可切换移动/桌面）。
+/// UA 使用站点配置（默认移动端，可在设置中切换移动/桌面）。
 
 /// 获取指定版块的帖子列表
 ///

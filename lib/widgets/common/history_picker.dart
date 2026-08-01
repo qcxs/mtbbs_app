@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
@@ -75,20 +76,6 @@ class _PickerList extends StatelessWidget {
 
   const _PickerList({required this.type, required this.onPick});
 
-  String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inHours < 1) return '${diff.inMinutes} 分钟前';
-    if (diff.inDays < 1) return '${diff.inHours} 小时前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    final h = dt.hour.toString().padLeft(2, '0');
-    final min = dt.minute.toString().padLeft(2, '0');
-    return '$m-$d $h:$min';
-  }
-
   IconData _typeIcon(String t) =>
       t == 'thread' ? Icons.article_outlined : Icons.person_outline;
 
@@ -160,7 +147,7 @@ class _PickerList extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                _formatTime(record.timestamp),
+                formatRelativeTime(record.timestamp),
                 style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
