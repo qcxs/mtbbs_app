@@ -55,11 +55,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   final currentPage = pagination['currentPage'] ?? 1;
   final totalPages = pagination['totalPages'] ?? 1;
 
-  AppLogger.i(
-    'PARSE',
-    'mypost: ${items.length} items, page $currentPage/$totalPages',
-  );
-
   return {
     'success': true,
     'items': items,

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
@@ -72,11 +73,8 @@ class _UserAvatarState extends State<UserAvatar> {
   bool _lastShowAvatars = true;
   String? _resolvedUrl;
 
-  /// 301 重定向缓存，映射原始 URL → 最终 URL（null 表示无重定向）
-  static final _redirectCache = <String, String?>{};
-
-  /// 正在解析中的重定向请求
-  static final _pendingRedirects = <String, Future<String?>>{};
+  /// 正在解析中的重定向请求（内存去重，避免同一 URL 并发重复 HEAD）
+  static final _pendingRedirects = <String, Future<String>>{};
 
   String get _urlSize {
     if (widget.radius >= 28) return 'big';
@@ -135,7 +133,18 @@ class _UserAvatarState extends State<UserAvatar> {
     _lastShowAvatars = showAvatars;
   }
 
-  /// 解析 301 重定向 → 检查缓存 → 排队加载（仅执行一次）
+  /// 磁盘缓存是否新鲜（存在且未过期）
+  Future<bool> _isFreshCache(String url) async {
+    final info = await avatarCacheManager.getFileFromCache(url);
+    return info != null &&
+        info.file.existsSync() &&
+        info.validTill.isAfter(DateTime.now());
+  }
+
+  /// 解析重定向 → 检查缓存 → 排队加载（仅执行一次）
+  ///
+  /// 顺序与旧实现相反：**先查缓存，缓存命中不发任何 HEAD 请求**；
+  /// 仅当缓存缺失或过期时才 HEAD 重新解析重定向（结果持久化，供下次免 HEAD）。
   Future<void> _schedule() async {
     if (_scheduledOnce || !mounted) return;
     _scheduledOnce = true;
@@ -143,23 +152,44 @@ class _UserAvatarState extends State<UserAvatar> {
     // 头像已禁用 → 跳过所有网络请求
     if (!context.read<SettingsProvider>().showAvatars) return;
 
+    // 确保重定向映射已从磁盘加载
+    await AvatarRedirectStore.instance.loadIfNeeded();
+    if (!mounted) return;
+
     final originalUrl = _originalUrl;
 
-    // 1. 解析 301 重定向，获取 CDN 直链
-    _resolvedUrl = await _resolveRedirect(originalUrl);
+    // 1. 已有重定向映射 → 不发 HEAD，直接以最终 URL 为 key 查磁盘缓存
+    final known = AvatarRedirectStore.instance.lookup(originalUrl);
+    if (known.known) {
+      if (await _isFreshCache(known.value)) {
+        _resolvedUrl = known.value;
+        setState(() => _ready = true);
+        return;
+      }
+    } else {
+      // 兼容旧版缓存：曾无重定向时以原始 URL 为 key 存储，命中即用并回写映射
+      if (await _isFreshCache(originalUrl)) {
+        AvatarRedirectStore.instance.set(originalUrl, originalUrl);
+        setState(() => _ready = true);
+        return;
+      }
+    }
     if (!mounted) return;
 
-    // 2. 以最终 URL 为 key 检查磁盘缓存
-    final cacheUrl = _imageUrl;
-    final cached = await avatarCacheManager.getFileFromCache(cacheUrl);
+    // 2. 缓存缺失/过期 → HEAD 解析重定向（内存去重 + 持久化结果）
+    final resolved = await _resolveRedirect(originalUrl);
     if (!mounted) return;
 
-    if (cached != null && cached.file.existsSync()) {
+    // 3. 解析出的最终 URL 可能已有缓存（如映射丢失但文件仍在）
+    if (await _isFreshCache(resolved)) {
+      _resolvedUrl = resolved == originalUrl ? null : resolved;
       setState(() => _ready = true);
       return;
     }
+    if (!mounted) return;
 
-    // 3. 未缓存 → 错峰排队
+    // 4. 真正需要下载 → 错峰排队，CachedNetworkImage 负责下载并以最终 URL 缓存
+    _resolvedUrl = resolved == originalUrl ? null : resolved;
     _loadTask = enqueueStagger();
     _loadTask!.ready.then((_) {
       if (mounted) setState(() => _ready = true);
@@ -168,16 +198,18 @@ class _UserAvatarState extends State<UserAvatar> {
 
   /// 解析 301 重定向，返回最终 URL
   ///
-  /// 所有 [UserAvatar] 实例共享内存缓存，相同原始 URL 只发一次 HEAD 请求。
-  Future<String?> _resolveRedirect(String url) async {
-    if (_redirectCache.containsKey(url)) return _redirectCache[url];
-    if (_pendingRedirects.containsKey(url)) return _pendingRedirects[url];
+  /// 所有 [UserAvatar] 实例共享持久化映射，相同原始 URL 只发一次 HEAD 请求，
+  /// 结果写入 [AvatarRedirectStore] 供后续直接查缓存。
+  Future<String> _resolveRedirect(String url) async {
+    final known = AvatarRedirectStore.instance.lookup(url);
+    if (known.known) return known.value;
+    if (_pendingRedirects.containsKey(url)) return _pendingRedirects[url]!;
 
     final future = _doResolve(url);
     _pendingRedirects[url] = future;
     try {
       final result = await future;
-      _redirectCache[url] = result;
+      AvatarRedirectStore.instance.set(url, result);
       return result;
     } finally {
       _pendingRedirects.remove(url);
@@ -185,7 +217,7 @@ class _UserAvatarState extends State<UserAvatar> {
   }
 
   /// 发送 HEAD 请求，不跟随重定向，读取 Location 头
-  Future<String?> _doResolve(String url) async {
+  Future<String> _doResolve(String url) async {
     final client = HttpClient();
     try {
       final request = await client.headUrl(Uri.parse(url));

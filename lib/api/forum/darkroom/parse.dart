@@ -55,16 +55,7 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     }
   }
 
-  AppLogger.i('PARSE', 'darkroom: ${items.length} items, hasMore=$hasMore');
-  if (items.isNotEmpty) {
-    AppLogger.list(
-      'PARSE',
-      items,
-      3,
-      labelFn: (item) => jsonEncode(item),
-      summary: '${items.length} items',
-    );
-  }
+  // 解析日志由 export 层 parseWithLog 统一输出，此处不再重复打印
 
   return {
     'success': true,

@@ -52,8 +52,7 @@ Map<String, dynamic> parsePostFromTable(
       postTime = '',
       ipLocation = '',
       source = '',
-      bbcode = '',
-      rateUrl = '';
+      bbcode = '';
   Map<String, dynamic>? rating;
 
   if (plc != null) {
@@ -203,15 +202,8 @@ Map<String, dynamic> parsePostFromTable(
       }
     }
 
-    // 评分 URL
-    final rateLink = plc.querySelector('.po .pob.cl a[onclick*="action=rate"]');
-    if (rateLink != null) {
-      final onclick = rateLink.attributes['onclick'] ?? '';
-      final m = RegExp(r"'(/[^']+)'").firstMatch(onclick);
-      if (m != null) {
-        rateUrl = resolveUrl(m.group(1)!);
-      }
-    }
+    // 评分 URL 不在此解析：Discuz 评分 API 两站一致，
+    // 由调用方用 tid+pid 直接拼接（forum.php?mod=misc&action=rate&tid=&pid=）。
 
     // 评分记录 dl.rate / dl[id^="ratelog_"]
     final rateDl = plc.querySelector('dl.rate, dl[id^="ratelog_"]');
@@ -290,7 +282,6 @@ Map<String, dynamic> parsePostFromTable(
     'ipLocation': ipLocation,
     'source': source,
     'bbcode': bbcode,
-    'rateUrl': rateUrl,
     'followUrl': followUrl,
     'rating': rating,
   };

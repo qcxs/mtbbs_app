@@ -88,6 +88,24 @@ class DatabaseHelper {
   /// 上次登录账号 — String key (host) → {value: String}
   static final _lastAccountStore = stringMapStoreFactory.store('last_account');
 
+  /// 头像重定向映射 — 固定 key "redirects" → JSON: Map<String, String>
+  static final _avatarRedirectStore = stringMapStoreFactory.store(
+    'avatar_redirects',
+  );
+
+  // =================== 头像重定向映射 ===================
+
+  Future<String?> getAvatarRedirectsRaw() async {
+    final db = await database;
+    final record = await _avatarRedirectStore.record('redirects').get(db);
+    return record?['value'] as String?;
+  }
+
+  Future<void> setAvatarRedirectsRaw(String json) async {
+    final db = await database;
+    await _avatarRedirectStore.record('redirects').put(db, {'value': json});
+  }
+
   // =================== 通用设置（替代 SharedPreferences） ===================
 
   /// 读取字符串设置项
@@ -548,12 +566,6 @@ class DatabaseHelper {
     return records.map((r) => r.value).toList();
   }
 
-  Future<Map<String, dynamic>?> getPreviewCache(String tid, String pid) async {
-    final db = await database;
-    final key = '${tid}_$pid';
-    return _previewStore.record(key).get(db);
-  }
-
   Future<void> upsertPreviewCache(String tid, String pid, String bbcode) async {
     final db = await database;
     final key = '${tid}_$pid';
@@ -564,28 +576,14 @@ class DatabaseHelper {
     });
   }
 
+  /// 按 key 删除单条预览缓存（FIFO 淘汰时与内存同步）
+  Future<void> deletePreviewCache(String key) async {
+    final db = await database;
+    await _previewStore.record(key).delete(db);
+  }
+
   Future<void> clearPreviewCache() async {
     final db = await database;
     await _previewStore.delete(db);
-  }
-
-  Future<int> countPreviewCache() async {
-    final db = await database;
-    return _previewStore.count(db);
-  }
-
-  Future<void> trimPreviewCache(int maxSize) async {
-    final db = await database;
-    final count = await _previewStore.count(db);
-    if (count <= maxSize) return;
-    final toDelete = count - maxSize;
-    if (count <= maxSize) return;
-    // 因 string key 无序，全量排序后删除字典序最小的
-    final allRecords = await _previewStore.find(db);
-    allRecords.sort((a, b) => a.key.compareTo(b.key));
-    final toRemove = allRecords.take(toDelete);
-    for (final r in toRemove) {
-      await _previewStore.record(r.key).delete(db);
-    }
   }
 }

@@ -10,7 +10,7 @@ import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 帖子卡片操作类型（PopupMenu）
-enum PostCardAction { showBbcode, editPost, viewTime }
+enum PostCardAction { showBbcode, editPost, viewTime, rate }
 
 /// 帖子/评论卡片组件
 ///
@@ -229,31 +229,23 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
               style: TextStyle(color: cs.onSurfaceVariant),
             ),
           if (widget.post.rating != null) _buildRating(context),
-          if (_isMainPost) _buildActionButtons(context),
           if (!widget.post.isOp)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: widget.onReply,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 3,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 评分（文字入口，显示在底部而非"更多"菜单）
+                    _textAction(
+                      cs,
+                      '评分',
+                      () => widget.onPopupAction?.call(PostCardAction.rate),
                     ),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '回复',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
+                    const SizedBox(width: 8),
+                    _textAction(cs, '回复', widget.onReply),
+                  ],
                 ),
               ),
             ),
@@ -379,7 +371,8 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           onSelected: (action) {
             if (action == PostCardAction.showBbcode ||
                 action == PostCardAction.editPost ||
-                action == PostCardAction.viewTime) {
+                action == PostCardAction.viewTime ||
+                action == PostCardAction.rate) {
               widget.onPopupAction?.call(action);
             }
           },
@@ -414,45 +407,22 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    if (widget.onRecommend == null) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _actionBtn(
-            icon: widget.isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
-            color: widget.isLiked ? cs.onSurfaceVariant : null,
-            tooltip: '点赞',
-            onTap: widget.onRecommend,
-            cs: cs,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionBtn({
-    required IconData icon,
-    Color? color,
-    required String tooltip,
-    required VoidCallback? onTap,
-    required ColorScheme cs,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Icon(icon, size: 18, color: color ?? cs.onSurfaceVariant),
-          ),
+  /// 底部文字操作按钮（评分/回复等）
+  ///
+  /// 点赞/评分等对帖子的操作统一放到页面底部回复栏（收藏旁），
+  /// 卡片底部只保留"评分"与"回复"两个文字入口。
+  Widget _textAction(ColorScheme cs, String label, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
         ),
       ),
     );

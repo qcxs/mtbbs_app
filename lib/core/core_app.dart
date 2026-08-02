@@ -1,5 +1,6 @@
 export 'app/app_orchestrator.dart';
 export 'app/app_paths.dart';
+export 'app/avatar_redirect_store.dart';
 export 'app/cookie_sync.dart';
 export 'app/emoji_loader.dart';
 export 'app/event_bus.dart';

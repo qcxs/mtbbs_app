@@ -10,9 +10,11 @@ import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/page_jump_dialog.dart';
+import 'package:mtbbs/widgets/dialog/rate_dialog.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
+import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/models/thread_detail.dart';
@@ -76,6 +78,12 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   // ---- 操作状态 ----
   bool _liked = false;
+
+  /// 当前帖子是否已收藏（收藏成功后置 true，仅本次会话有效）
+  bool _favorited = false;
+
+  /// 收藏提交中（禁用按钮）
+  bool _favoriting = false;
 
   /// 顶栏"全局禁用样式"开关（作用于当前帖子页所有帖子）
   bool _globalDisableStyle = false;
@@ -326,6 +334,61 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   }
 
   // ==================== 帖子操作 ====================
+
+  /// 打开评分弹窗（支持帖子或评论）
+  /// 评分 API 两站一致，直接拼接 forum.php?mod=misc&action=rate&tid=&pid=
+  Future<void> _handleRate(PostItem post) async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    if (post.pid.isEmpty) return;
+    final rateUrl =
+        '${SiteStore.instance.baseUrl}/forum.php?mod=misc&action=rate'
+        '&tid=${widget.tid}&pid=${post.pid}';
+    final success = await showRateDialog(context, rateUrl);
+    if (success == true && mounted) {
+      // 评分成功后刷新当前页
+      await _loadInitial();
+    }
+  }
+
+  /// 收藏帖子（带备注）：仿手机端弹窗输入备注后直接 POST API
+  Future<void> _handleFavorite() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    if (_favoriting) return;
+
+    final note = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _FavoriteNoteDialog(tid: widget.tid),
+    );
+    if (note == null || !mounted) return; // 取消
+
+    setState(() => _favoriting = true);
+    try {
+      final result = await favorite_api.addFavorite(
+        ApiService().dio,
+        tid: widget.tid,
+        note: note.isEmpty ? null : note,
+      );
+      if (!mounted) return;
+      setState(() {
+        _favoriting = false;
+        if (result['success'] == true) _favorited = true;
+      });
+      showToast(result['message']?.toString() ?? '收藏成功');
+    } catch (e) {
+      if (!mounted) return;
+      AppLogger.w('PAGE', 'favorite error: $e');
+      setState(() => _favoriting = false);
+      showToast('网络错误: $e');
+    }
+  }
 
   Future<void> _handleRecommend(PostItem post) async {
     if (post.recommendUrl.isEmpty) return;
@@ -716,6 +779,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
             _editPost(post);
           case PostCardAction.viewTime:
             _fetchPostDetailInfo(post);
+          case PostCardAction.rate:
+            _handleRate(post);
         }
       },
     );
@@ -767,6 +832,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
             _editPost(post);
           case PostCardAction.viewTime:
             _fetchPostDetailInfo(post);
+          case PostCardAction.rate:
+            _handleRate(post);
         }
       },
     );
@@ -790,6 +857,63 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       ),
       child: Row(
         children: [
+          IconButton(
+            icon: _favoriting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    _favorited ? Icons.bookmark : Icons.bookmark_border,
+                    size: 20,
+                    color: _favorited ? cs.primary : cs.onSurfaceVariant,
+                  ),
+            tooltip: _favorited ? '已收藏' : '收藏帖子（可备注）',
+            onPressed: _favoriting ? null : _handleFavorite,
+          ),
+          // 点赞（对帖子的操作，移到收藏旁）
+          IconButton(
+            icon: Icon(
+              _liked ? Icons.thumb_up : Icons.thumb_up_outlined,
+              size: 20,
+              color: _liked ? cs.primary : cs.onSurfaceVariant,
+            ),
+            tooltip: _liked ? '已点赞' : '点赞',
+            onPressed: () {
+              final mainPost = _data?.mainPost;
+              if (mainPost != null) _handleRecommend(mainPost);
+            },
+          ),
+          // 评分（文字入口，移到收藏旁）
+          if (_data?.mainPost != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _handleRate(_data!.mainPost!),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '评分',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Icon(Icons.reply_rounded, size: 16, color: cs.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
@@ -832,6 +956,55 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
           height: 1.3,
         ),
       ),
+    );
+  }
+}
+
+/// 收藏备注输入弹窗（仿手机端收藏弹窗，可填备注后提交）
+///
+/// 返回备注文本；用户取消返回 null；空备注返回空字符串（表示收藏但不备注）。
+class _FavoriteNoteDialog extends StatefulWidget {
+  final String tid;
+
+  const _FavoriteNoteDialog({required this.tid});
+
+  @override
+  State<_FavoriteNoteDialog> createState() => _FavoriteNoteDialogState();
+}
+
+class _FavoriteNoteDialogState extends State<_FavoriteNoteDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('收藏帖子 #${widget.tid}'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLines: 3,
+        maxLength: 100,
+        decoration: const InputDecoration(
+          hintText: '备注（可选）',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('收藏'),
+        ),
+      ],
     );
   }
 }

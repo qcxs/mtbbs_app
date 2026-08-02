@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/app/page_helper.dart';
@@ -85,7 +83,6 @@ Map<String, dynamic> parseResponse(
   final comments = <Map<String, dynamic>>[];
 
   if (postTables.isEmpty) {
-    AppLogger.i('PARSE', 'thread detail: empty (tid=$tid, title="$title")');
     return {
       'success': true,
       'tid': tid,
@@ -123,18 +120,6 @@ Map<String, dynamic> parseResponse(
       comments.add(parsePostFromTable(postTables[i], floor: i, isOp: false));
     }
   }
-
-  AppLogger.i(
-    'PARSE',
-    jsonEncode({
-      'type': 'thread_detail',
-      'title': title,
-      'comments': comments.length,
-      'page': currentPage,
-      'totalPages': totalPages,
-      'tid': tid,
-    }),
-  );
 
   return {
     'success': true,

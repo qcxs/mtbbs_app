@@ -107,17 +107,8 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
       if (stats.startsWith('-')) stats = stats.substring(1).trim();
     }
 
-    AppLogger.i('PARSE', 'online: ${items.length} users, stats=$stats');
     if (items.isNotEmpty) {
       AppLogger.d('PARSE', 'typeMap: $typeMap');
-      AppLogger.list(
-        'PARSE',
-        items,
-        3,
-        labelFn: (item) =>
-            '${item['username']}(${item['uid']})[${item['type']}]',
-        summary: '${items.length} users',
-      );
     }
 
     return {

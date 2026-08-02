@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/app/page_helper.dart';
@@ -83,18 +82,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   var items = _parseTable(doc);
   if (items.isEmpty) {
     items = _parseLiList(doc);
-  }
-
-  AppLogger.i('PARSE', 'ranklist: ${items.length} items');
-  if (items.isNotEmpty) {
-    final show = items.length > 3 ? items.take(3).toList() : items;
-    AppLogger.list(
-      'PARSE',
-      show,
-      show.length,
-      labelFn: (RankItem e) => jsonEncode(e.toMap()),
-      summary: items.length > 3 ? 'top 3' : '',
-    );
   }
 
   return {'success': true, 'items': items.map((e) => e.toMap()).toList()};

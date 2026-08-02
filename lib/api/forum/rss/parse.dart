@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:xml/xml.dart';
-import 'package:mtbbs/core/utils/logger.dart';
 
 /// RSS 订阅条目
 class RssItem {
@@ -81,17 +79,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
           el.getElement('dc:creator')?.innerText.trim(),
     );
   }).toList();
-
-  AppLogger.i('PARSE', 'rss: "${channelTitle}" — ${items.length} items');
-  if (items.isNotEmpty) {
-    AppLogger.list(
-      'PARSE',
-      items,
-      3,
-      labelFn: (i) => jsonEncode(i.toJson()),
-      summary: '${items.length} RSS items',
-    );
-  }
 
   return {
     'success': true,

@@ -70,13 +70,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   final currentPage = pagination['currentPage'] ?? 1;
   final totalPages = pagination['totalPages'] ?? 1;
 
-  if (friends.isNotEmpty) {
-    AppLogger.i(
-      'PARSE',
-      'friend: ${friends.length} friends (page $currentPage/$totalPages)',
-    );
-  }
-
   return {
     'success': true,
     'items': friends,

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:mtbbs/core/parser/html2bbcode.dart';
@@ -51,15 +50,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
       return {'success': false, 'message': '页面不可用或用户不存在'};
     }
   }
-
-  AppLogger.i(
-    'PARSE',
-    jsonEncode({
-      'type': 'space',
-      'uid': profile['uid'],
-      'nickname': profile['nickname'],
-    }),
-  );
 
   return {'success': true, 'profile': profile};
 }

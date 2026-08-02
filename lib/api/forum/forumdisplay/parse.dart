@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/parser/thread_parser.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
-import 'package:mtbbs/core/utils/logger.dart';
 
 /// 版块帖子列表响应解析
 ///
@@ -38,9 +36,11 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   final pagination = extractPagination(doc);
 
   // 检测是否包含帖子列表（兼容三种模板）
-  final hasThreadList = doc.querySelector(
-    '[class*="forumlist_li"], #threadlist, [class*="comiis_postlist"]',
-  ) != null;
+  final hasThreadList =
+      doc.querySelector(
+        '[class*="forumlist_li"], #threadlist, [class*="comiis_postlist"]',
+      ) !=
+      null;
 
   if (!hasThreadList) {
     return {
@@ -58,20 +58,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   final cp = pagination['currentPage'] ?? 1;
   final tp = pagination['totalPages'] ?? 1;
   final hasMore = cp < tp;
-
-  AppLogger.i(
-    'PARSE',
-    'forumdisplay: ${threads.length} threads (page $cp/$tp, hasMore=$hasMore)',
-  );
-  if (threads.isNotEmpty) {
-    AppLogger.list(
-      'PARSE',
-      threads,
-      3,
-      labelFn: (t) => jsonEncode(t.toJson()),
-      summary: '${threads.length} threads',
-    );
-  }
 
   return {
     'success': true,

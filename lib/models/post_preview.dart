@@ -49,7 +49,7 @@ class PostPreviewCache {
       _cache.clear();
       final rows = await DatabaseHelper.instance.getAllPreviewCache();
       for (final row in rows) {
-        final key = row['id'] as String;
+        final key = '${row['tid']}_${row['pid']}';
         _cache[key] = PostPreviewData(
           tid: row['tid'] as String,
           pid: row['pid'] as String,
@@ -75,10 +75,11 @@ class PostPreviewCache {
     // 增量写入 SQLite
     await DatabaseHelper.instance.upsertPreviewCache(tid, pid, data.bbcode);
 
-    // FIFO 淘汰：内存中移除最旧条目，DB 中删除超出限制的行
+    // FIFO 淘汰：内存与 DB 同步移除最旧条目，保持双端一致
     if (_cache.length > _maxSize) {
-      _cache.remove(_cache.keys.first);
-      await DatabaseHelper.instance.trimPreviewCache(_maxSize);
+      final removedKey = _cache.keys.first;
+      _cache.remove(removedKey);
+      await DatabaseHelper.instance.deletePreviewCache(removedKey);
     }
   }
 

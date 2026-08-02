@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/parser/thread_parser.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
-import 'package:mtbbs/core/utils/logger.dart';
 
 /// 导读响应解析
 ///
@@ -49,25 +47,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   final cp = pagination['currentPage'] ?? 1;
   final tp = pagination['totalPages'] ?? 1;
   final hasMore = cp < tp;
-
-  AppLogger.i(
-    'PARSE',
-    'guide: ${threads.length} threads (page $cp/$tp, hasMore=$hasMore)',
-  );
-  if (threads.length <= 3) {
-    AppLogger.d(
-      'PARSE',
-      'guide threads: ${threads.map((t) => jsonEncode(t.toJson())).join(", ")}',
-    );
-  } else {
-    AppLogger.list(
-      'PARSE',
-      threads,
-      3,
-      labelFn: (t) => jsonEncode(t.toJson()),
-      summary: '${threads.length} threads',
-    );
-  }
 
   return {
     'success': true,

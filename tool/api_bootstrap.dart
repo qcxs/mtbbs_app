@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
@@ -28,19 +29,41 @@ class WindowsCertOverride extends HttpOverrides {
 ///
 /// [site] 指定站点（索引数字或站点名，空 = 默认第一个站点），
 /// 用于跨站点测试（如吾爱破解与 MT 论坛使用同一套 API 层）。
-Future<void> bootstrap({String account = '', String site = ''}) async {
+///
+/// [baseUrl] 指定任意站点 URL（测试站等不在默认列表中的站点）。
+/// 传入时替换站点列表为单站（name 用 [siteName] 或域名），
+/// Cookie 目录自动跟随 host（`%APPDATA%\qcxs\mtbbs_debug\cookies\{host}`）。
+Future<void> bootstrap({
+  String account = '',
+  String site = '',
+  String baseUrl = '',
+  String siteName = '',
+}) async {
   TestWidgetsFlutterBinding.ensureInitialized();
   // flutter_test 会安装 _MockHttpOverrides（所有请求返回 400），
   // 必须用真实 HttpOverrides 覆盖才能发真实网络请求。
   HttpOverrides.global = WindowsCertOverride();
 
   await DefaultConfig.instance.load();
-  SiteStore.instance.init();
-  if (site.isNotEmpty) {
-    final byIndex = int.tryParse(site);
-    final target =
-        byIndex ?? SiteStore.instance.sites.indexWhere((s) => s.name == site);
-    if (target > 0) SiteStore.instance.switchTo(target);
+  if (baseUrl.isNotEmpty) {
+    // 动态站点：替换为单站列表（测试站不在 defaults.json 中）
+    SiteStore.instance.replaceSites([
+      Site(
+        name: siteName.isNotEmpty ? siteName : Uri.parse(baseUrl).host,
+        baseUrl: baseUrl,
+        loginPagePath: '/member.php?mod=logging&action=login',
+        forums: const {},
+        defaultForumOrder: const [],
+      ),
+    ]);
+  } else {
+    SiteStore.instance.init();
+    if (site.isNotEmpty) {
+      final byIndex = int.tryParse(site);
+      final target =
+          byIndex ?? SiteStore.instance.sites.indexWhere((s) => s.name == site);
+      if (target > 0) SiteStore.instance.switchTo(target);
+    }
   }
   await ApiService().init(baseUrl: SiteStore.instance.baseUrl);
   if (account.isNotEmpty) {

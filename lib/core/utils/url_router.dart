@@ -183,7 +183,7 @@ class UrlRouter {
           final hasUid = uid != null && uid.isNotEmpty;
           final page = _resolvePage(query['page']);
           final params = <String, String>{
-            if (hasUid) 'uid': uid!,
+            if (hasUid) 'uid': uid,
             if (page > 1) 'page': '$page',
           };
           final qs = params.isEmpty

@@ -79,9 +79,18 @@ SubmitResult parseSubmitResponse(String body) {
     }
   }
 
+  // 1.5 Discuz! System Error（重复评分等被系统拒绝）
+  // 已评分场景在 fetchDialog 阶段就被"非表单"检测拦截，不会走到提交；
+  // 这里仅做兜底，返回固定文案而非解析堆栈。
+  if (cdata.contains('System Error')) {
+    return const SubmitResult(success: false, message: '系统错误，请求被拒绝');
+  }
+
   // 2. succeedhandle_ — Discuz 标准成功
+  //    格式1: succeedhandle_('redirect', 'message')
+  //    格式2: succeedhandle_rate('redirect', 'message', {})（带函数后缀）
   final successMatch = RegExp(
-    r"succeedhandle_\('([^']+)',\s*'([^']*)'",
+    r"succeedhandle_(?:\w+)?\('([^']+)',\s*'([^']*)'",
   ).firstMatch(cdata);
   if (successMatch != null) {
     final redirect = successMatch.group(1) ?? '';

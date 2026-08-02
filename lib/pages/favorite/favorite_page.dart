@@ -26,6 +26,67 @@ class _FavoritePageState extends State<FavoritePage> {
   String? _error;
   bool _hasMore = true;
 
+  /// 正在删除的收藏 ID（用于禁用对应删除按钮）
+  String? _deletingFavid;
+
+  /// 二次确认后删除收藏：成功移除条目 + toast，失败 toast 错误
+  Future<void> _confirmDelete(Map<String, dynamic> item) async {
+    final favid = item['favid']?.toString() ?? '';
+    if (favid.isEmpty) return;
+    final title = item['title'] as String? ?? '';
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('取消收藏'),
+        content: Text('确定要取消收藏「$title」吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingFavid = favid);
+    try {
+      final result = await favorite_api.deleteFavorite(
+        ApiService().dio,
+        favid: favid,
+      );
+      if (!mounted) return;
+      if (result['success'] == true) {
+        setState(() {
+          _items.removeWhere((e) => e['favid']?.toString() == favid);
+          _deletingFavid = null;
+        });
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('已取消收藏'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } else {
+        setState(() => _deletingFavid = null);
+        messenger.showSnackBar(
+          SnackBar(content: Text(result['message']?.toString() ?? '删除失败')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppLogger.w('PAGE', 'FavoritePage delete error: $e');
+      setState(() => _deletingFavid = null);
+      messenger.showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -193,7 +254,15 @@ class _FavoritePageState extends State<FavoritePage> {
                     children: [
                       for (int i = index; i < rowEnd; i++) ...[
                         if (i > index) const SizedBox(width: 8),
-                        Expanded(child: _FavoriteCard(item: _items[i])),
+                        Expanded(
+                          child: _FavoriteCard(
+                            item: _items[i],
+                            deleting:
+                                _deletingFavid ==
+                                _items[i]['favid']?.toString(),
+                            onDelete: () => _confirmDelete(_items[i]),
+                          ),
+                        ),
                       ],
                       if (rowEnd - index < crossAxisCount)
                         ...List.generate(
@@ -207,7 +276,12 @@ class _FavoritePageState extends State<FavoritePage> {
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: _FavoriteCard(item: _items[index]),
+                child: _FavoriteCard(
+                  item: _items[index],
+                  deleting:
+                      _deletingFavid == _items[index]['favid']?.toString(),
+                  onDelete: () => _confirmDelete(_items[index]),
+                ),
               );
             },
           ),
@@ -221,7 +295,17 @@ class _FavoritePageState extends State<FavoritePage> {
 class _FavoriteCard extends StatelessWidget {
   final Map<String, dynamic> item;
 
-  const _FavoriteCard({required this.item});
+  /// 点击删除按钮回调（由父级处理二次确认）
+  final VoidCallback? onDelete;
+
+  /// 当前条目是否正在删除（禁用按钮）
+  final bool deleting;
+
+  const _FavoriteCard({
+    required this.item,
+    this.onDelete,
+    this.deleting = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +324,7 @@ class _FavoriteCard extends StatelessWidget {
       child: InkWell(
         onTap: tid.isNotEmpty ? () => context.push('/thread/$tid') : null,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -263,6 +347,19 @@ class _FavoriteCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                  IconButton(
+                    icon: deleting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.bookmark_remove_outlined, size: 20),
+                    color: cs.error,
+                    visualDensity: VisualDensity.compact,
+                    tooltip: '取消收藏',
+                    onPressed: deleting ? null : onDelete,
                   ),
                 ],
               ),

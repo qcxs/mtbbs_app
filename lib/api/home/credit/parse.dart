@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:html/parser.dart' as html_parser;
 import 'package:mtbbs/core/app/page_helper.dart';
-import 'package:mtbbs/core/utils/logger.dart';
 
 /// 积分公式响应解析 — PC 版 DOM
 ///
@@ -110,14 +108,7 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     }
   }
 
-  AppLogger.i(
-    'PARSE',
-    jsonEncode({
-      'type': 'credit',
-      'credits': result['credits'],
-      'formula': result['formula'],
-    }),
-  );
+  // 解析日志由 export 层 parseWithLog 统一输出，此处不再重复打印
 
   return result;
 }

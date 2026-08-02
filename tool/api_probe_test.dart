@@ -38,6 +38,8 @@ void main() {
     );
     final account = const String.fromEnvironment('account', defaultValue: '');
     final site = const String.fromEnvironment('site', defaultValue: '');
+    final baseUrl = const String.fromEnvironment('baseUrl', defaultValue: '');
+    final siteName = const String.fromEnvironment('siteName', defaultValue: '');
     final log = const String.fromEnvironment('log', defaultValue: 'info');
 
     // 日志级别控制
@@ -56,10 +58,19 @@ void main() {
       'orderby': const String.fromEnvironment('orderby'),
       'filter': const String.fromEnvironment('filter'),
       'tid': const String.fromEnvironment('tid'),
+      'pid': const String.fromEnvironment('pid'),
+      'favid': const String.fromEnvironment('favid'),
+      'subject': const String.fromEnvironment('subject'),
       'authorid': const String.fromEnvironment('authorid'),
       'uid': const String.fromEnvironment('uid'),
       'username': const String.fromEnvironment('username'),
       'type': const String.fromEnvironment('type'),
+      'message': const String.fromEnvironment('message'),
+      'reppid': const String.fromEnvironment('reppid'),
+      'note': const String.fromEnvironment('note'),
+      'scores': const String.fromEnvironment('scores'),
+      'notify': const String.fromEnvironment('notify'),
+      'reason': const String.fromEnvironment('reason'),
       // debug.http 专用：path=请求路径；q=额外 query 参数（JSON 字符串）
       'path': const String.fromEnvironment('path'),
       'n': const String.fromEnvironment('n'),
@@ -71,6 +82,8 @@ void main() {
       args: args,
       account: account,
       site: site,
+      baseUrl: baseUrl,
+      siteName: siteName,
     );
 
     print('=== API_PROBE_BEGIN ===');
@@ -87,6 +100,8 @@ Future<Map<String, dynamic>> runProbe({
   required Map<String, String> args,
   required String account,
   String site = '',
+  String baseUrl = '',
+  String siteName = '',
 }) async {
   // 自描述：无上下文的 AI 跑 help 即可掌握全部用法，无需读源码
   if (cmd == 'help' || cmd == '--help' || cmd == 'h') {
@@ -106,7 +121,12 @@ Future<Map<String, dynamic>> runProbe({
   }
 
   try {
-    await bootstrap(account: account, site: site);
+    await bootstrap(
+      account: account,
+      site: site,
+      baseUrl: baseUrl,
+      siteName: siteName,
+    );
   } catch (e) {
     return {'ok': false, 'cmd': cmd, 'error': '初始化失败: $e'};
   }
@@ -176,6 +196,19 @@ Future<Map<String, dynamic>> runProbe({
       'usage': scenario.desc,
     };
   } catch (e) {
+    // FormatException 表示业务层失败（已评分/已收藏等预期拦截），
+    // 转成 result.success=false，而非管线错误。
+    if (e is FormatException) {
+      return {
+        'ok': true,
+        'cmd': cmd,
+        'result': {
+          'success': false,
+          'message': e.message.isNotEmpty ? e.message : '操作失败',
+        },
+        'runtimeMs': sw.elapsedMilliseconds,
+      };
+    }
     return {
       'ok': false,
       'cmd': cmd,
@@ -199,6 +232,8 @@ Map<String, dynamic> _buildHelp() {
       'cmd': '场景命令（默认 session.list），见下方 scenarios',
       'account': '登录账号名（空=游客）；先跑 session.list 查看可用账号',
       'site': '站点（索引或名称，空=第一个站点），如 site=1',
+      'baseUrl': '任意站点 URL（测试站等不在默认列表中的站点），如 baseUrl=http://discuz.qcxs.top',
+      'siteName': 'baseUrl 指定站点的显示名（空=域名）',
       'log': 'off/info/debug（默认 info，off 只输出协议 JSON）',
     },
     'scenarios': {
@@ -253,10 +288,16 @@ Object? _normalize(Object? v) {
 Object? compactJson(Object? v, {int maxList = 3, int maxStr = 160}) {
   v = _normalize(v);
   if (v is Map) {
-    return v.map((k, val) => MapEntry('$k', compactJson(val)));
+    return v.map(
+      (k, val) =>
+          MapEntry('$k', compactJson(val, maxList: maxList, maxStr: maxStr)),
+    );
   }
   if (v is List) {
-    final out = v.take(maxList).map((e) => compactJson(e)).toList();
+    final out = v
+        .take(maxList)
+        .map((e) => compactJson(e, maxList: maxList, maxStr: maxStr))
+        .toList();
     if (v.length > maxList) out.add({'__more__': v.length - maxList});
     return out;
   }

@@ -46,8 +46,8 @@ flutter run -d windows
 # 运行（Android）
 flutter run -d <device_id>
 
-# 测试 API（CLI）
-dart run lib/api/forum/guide/test.dart
+# 测试 API（真实请求探针，docs/10-API探针使用规范.md）
+flutter test tool/api_probe_test.dart --dart-define=cmd=help
 ```
 
 ## 本地打包
@@ -132,6 +132,8 @@ SiteConfig.sites[0] = SiteInfo(
 
 ## 文档
 
+> AI 改代码前必读：见仓库根目录 [AGENTS.md](AGENTS.md)（铁律 + 任务→文档路由表）。
+
 ```
 docs/
 ├── 01-概述与架构.md        项目架构与分层设计
@@ -140,9 +142,14 @@ docs/
 ├── 04-状态管理.md          状态管理、站点切换、持久化策略
 ├── 05-快捷键与撤销.md      快捷键系统与编辑器撤销机制
 ├── 06-编辑器.md            编辑器模式、快照、图床、粘贴
-├── 07-经验教训.md          踩坑记录与最佳实践
+├── 07-经验教训.md          踩坑记录与最佳实践（必读）
 ├── 08-主题与夜间模式.md    颜色规范与深色主题适配指南
-└── 09-依赖清单.md          依赖速查、行为关键点与大忌
+├── 09-依赖清单.md          依赖速查、行为关键点与大忌
+├── 10-API探针使用规范.md   探针命令/参数/踩坑
+├── 11-新增功能开发流程.md  AI 冷启动手册（新增列表/详情类功能）
+├── 12-写操作API文档.md     发帖/评论/回复/修改
+├── 13-修改API文档.md       帖子/评论修改
+└── 14-新增删除收藏功能文档.md  写功能实战参考
 ```
 
 文档聚焦"为什么这样做"，代码细节让 AI 读源码。

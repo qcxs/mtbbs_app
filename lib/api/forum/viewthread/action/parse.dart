@@ -99,7 +99,23 @@ String _extractFormAction(dom.Document doc) {
 
 /// 解析评分弹窗表单
 ///
-/// XML 格式：`<?xml version="1.0" encoding="utf-8"?><root><![CDATA[...]]></root>`
+/// 兼容两种 Discuz 弹窗结构：
+/// - 桌面 inajax XML：`<?xml...?><root><![CDATA[HTML]]></root>`（实际走 GET 完整页面，直接取 HTML）
+/// - 评分项行结构（Chrome 实测，两个站点一致）：
+/// ```html
+/// <tr>
+///   <td>金钱</td>
+///   <td>
+///     <input type="text" name="score2" id="score2" value="0">
+///     <a class="dpbtn" onclick="showselect(this,'score2','scoreoption2')">^</a>
+///     <ul id="scoreoption2"><li>+99</li>...</ul>   ← 可选值（DP 下拉）
+///   </td>
+///   <td>1 ~ 99</td>   ← 评分区间（min ~ max）
+///   <td>999</td>      ← 今日剩余（可能为空）
+/// </tr>
+/// ```
+/// 理由：`<ul id="reasonselect"><li>很给力!</li>...</ul>` + `<input name="reason">`
+/// 通知作者：`<input type="checkbox" name="sendreasonpm">`
 RateFormData parseRateDialog(String body) {
   final html = parseInajaxXml(body)?.cdataHtml ?? body;
   final doc = htmlParser.parse(html);
@@ -110,48 +126,62 @@ RateFormData parseRateDialog(String body) {
   final action = _extractFormAction(doc);
 
   // 解析评分项
-  // 评分项在表格中，通常每个 tr 对应一个评分项
   final items = <RateItem>[];
-  final rows = doc.querySelectorAll('tr');
-  for (final row in rows) {
-    // 检查是否有评分输入控件
-    final select = row.querySelector('select[name^="score"]');
+  for (final row in doc.querySelectorAll('tr')) {
     final textInput = row.querySelector('input[type="text"][name^="score"]');
-    final inputName =
-        select?.attributes['name'] ?? textInput?.attributes['name'] ?? '';
+    final select = row.querySelector('select[name^="score"]');
+    final input = textInput ?? select;
+    if (input == null) continue;
 
-    if (inputName.isEmpty) continue;
+    final inputName = input.attributes['name'] ?? '';
+    final inputId = input.attributes['id'] ?? '';
 
-    // 获取评分项名称（通常是 td 或 th 中的文本）
-    final nameTd = row.querySelector('th, td.label, td:first-child');
+    // 评分项名称：第一个 td
+    final nameTd = row.querySelector('td');
     final name = nameTd?.text.trim() ?? inputName;
 
-    // 解析选项
+    // 可选值：DP 下拉 ul（id=scoreoptionN 关联 input id=scoreN）或 select option
     List<String> options = [];
-    int min = 0, max = 0;
-
     if (select != null) {
       options = select
           .querySelectorAll('option')
           .map((o) => o.attributes['value'] ?? o.text.trim())
           .where((v) => v.isNotEmpty)
           .toList();
+    } else {
+      final optionUl = inputId.isNotEmpty
+          ? doc.querySelector('ul#scoreoption${inputId.replaceFirst('score', '')}')
+          : null;
+      if (optionUl != null) {
+        options = optionUl
+            .querySelectorAll('li')
+            .map((li) => li.text.trim())
+            .where((v) => v.isNotEmpty)
+            .toList();
+      }
     }
 
-    // 解析 min/max（从 select 的 option 值推断）
-    if (options.isNotEmpty) {
+    // 评分区间 / 今日剩余：列位置固定（0=名称, 1=输入, 2=区间, 3=剩余）
+    int min = 0, max = 0, todayRemaining = 0;
+    final tds = row.querySelectorAll('td');
+    if (tds.length >= 3) {
+      final rangeText = tds[2].text;
+      final rangeMatch = RegExp(r'(-?\d+)\s*~\s*(-?\d+)').firstMatch(rangeText);
+      if (rangeMatch != null) {
+        min = int.tryParse(rangeMatch.group(1)!) ?? 0;
+        max = int.tryParse(rangeMatch.group(2)!) ?? 0;
+      }
+    }
+    if (tds.length >= 4) {
+      todayRemaining = int.tryParse(tds[3].text.trim()) ?? 0;
+    }
+    // 兜底：无区间列文本时从可选值推断
+    if (min == 0 && max == 0 && options.isNotEmpty) {
       final values = options.map((v) => int.tryParse(v) ?? 0).toList();
       min = values.where((v) => v < 0).fold(0, (a, b) => a < b ? a : b);
       if (min == 0)
         min = values.where((v) => v > 0).fold(0, (a, b) => a < b ? a : b);
       max = values.fold(0, (a, b) => a > b ? a : b);
-    }
-
-    // 今日剩余
-    int todayRemaining = 0;
-    final remainMatch = RegExp(r'剩余\s*(\d+)').firstMatch(row.text);
-    if (remainMatch != null) {
-      todayRemaining = int.tryParse(remainMatch.group(1)!) ?? 0;
     }
 
     items.add(
@@ -166,18 +196,28 @@ RateFormData parseRateDialog(String body) {
     );
   }
 
-  // 解析可选理由
+  // 解析可选理由（ul#reasonselect li 或 select[name="reason"] option）
   final reasonOptions = <String>[];
-  final reasonSelect = doc.querySelector('select[name="reason"]');
-  if (reasonSelect != null) {
-    for (final o in reasonSelect.querySelectorAll('option')) {
-      final text = o.text.trim();
+  final reasonUl = doc.querySelector('ul#reasonselect');
+  if (reasonUl != null) {
+    for (final li in reasonUl.querySelectorAll('li')) {
+      final text = li.text.trim();
       if (text.isNotEmpty) reasonOptions.add(text);
+    }
+  } else {
+    final reasonSelect = doc.querySelector('select[name="reason"]');
+    if (reasonSelect != null) {
+      for (final o in reasonSelect.querySelectorAll('option')) {
+        final text = o.text.trim();
+        if (text.isNotEmpty) reasonOptions.add(text);
+      }
     }
   }
 
-  // 是否有通知作者 checkbox
-  final notifyCheckbox = doc.querySelector('input[name="noticeauthor"]');
+  // 是否有通知作者 checkbox（sendreasonpm 是标准字段，noticeauthor 是旧模板兼容）
+  final notifyCheckbox = doc.querySelector(
+    'input[name="sendreasonpm"], input[name="noticeauthor"]',
+  );
   final hasNotifyAuthor = notifyCheckbox != null;
 
   return RateFormData(

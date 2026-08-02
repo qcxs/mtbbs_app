@@ -74,7 +74,6 @@ class PostItem {
   final String bbcode;
 
   // 操作 URL
-  final String rateUrl;
   final String followUrl;
   final String recommendUrl;
   final String favoriteUrl;
@@ -96,7 +95,6 @@ class PostItem {
     this.ipLocation = '',
     this.source = '',
     this.bbcode = '',
-    this.rateUrl = '',
     this.followUrl = '',
     this.recommendUrl = '',
     this.favoriteUrl = '',
@@ -120,7 +118,6 @@ class PostItem {
     ipLocation: p['ipLocation']?.toString() ?? '',
     source: p['source']?.toString() ?? '',
     bbcode: p['bbcode']?.toString() ?? '',
-    rateUrl: p['rateUrl']?.toString() ?? '',
     followUrl: p['followUrl']?.toString() ?? '',
     recommendUrl: p['recommendUrl']?.toString() ?? '',
     favoriteUrl: p['favoriteUrl']?.toString() ?? '',
@@ -143,7 +140,6 @@ class PostItem {
     'ipLocation': ipLocation,
     'source': source,
     'bbcode': bbcode,
-    'rateUrl': rateUrl,
     'followUrl': followUrl,
     'recommendUrl': recommendUrl,
     'favoriteUrl': favoriteUrl,

@@ -29,10 +29,13 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
       final input = li.querySelector('input[name="favorite[]"]');
       final favid = input?.attributes['value'] ?? '';
 
-      final a = li.querySelector('a[href*="thread-"]');
+      final a = li.querySelector(
+        'a[href*="thread-"], a[href*="viewthread"], a[href*="tid="]',
+      );
       final href = a?.attributes['href'] ?? '';
-      final tidMatch = RegExp(r'thread-(\d+)').firstMatch(href);
-      final tid = tidMatch?.group(1) ?? '';
+      // 兼容伪静态（thread-4-1-1.html）与动态（viewthread&tid=4）两种链接
+      final tidMatch = RegExp(r'thread-(\d+)|tid=(\d+)').firstMatch(href);
+      final tid = tidMatch?.group(1) ?? tidMatch?.group(2) ?? '';
       final title = a?.text.trim() ?? '';
 
       final timeEl = li.querySelector('span.xg1');
@@ -75,17 +78,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
       hasMore = maxPage > currentPage;
     }
 
-    AppLogger.i('PARSE', 'favorites: ${items.length} items, hasMore=$hasMore');
-    if (items.isNotEmpty) {
-      AppLogger.list(
-        'PARSE',
-        items,
-        3,
-        labelFn: (item) => '${item['title']}(${item['tid']})',
-        summary: '${items.length} items',
-      );
-    }
-
     return {
       'success': true,
       'items': items,
@@ -96,4 +88,52 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     AppLogger.e('PARSE', 'favorites parse error: $e');
     return {'success': false, 'message': '解析失败: $e'};
   }
+}
+
+/// 收藏结果解析
+///
+/// Discuz 收藏成功后返回 301/302 跳转（Location 含 viewthread），
+/// 或 200 提示页。已收藏会提示"抱歉，您已收藏，请勿重复收藏"——
+/// 属于幂等成功，不应视为失败。
+Map<String, dynamic> parseAddResult(String body, int statusCode) {
+  if (statusCode == 301 || statusCode == 302) {
+    return {'success': true, 'message': '收藏成功'};
+  }
+  if (statusCode != 200) {
+    return {'success': false, 'message': 'HTTP $statusCode'};
+  }
+  if (body.contains('已收藏')) {
+    return {'success': true, 'message': '已收藏过该帖子'};
+  }
+  final errorMatch = RegExp(r'(抱歉|错误|失败|无权|权限|非法)').firstMatch(body);
+  if (errorMatch != null) {
+    final start = body.indexOf(errorMatch.group(0)!);
+    final snippet = body.substring(start, start + 60);
+    final cleanMsg = snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+    return {'success': false, 'message': cleanMsg};
+  }
+  final ok = body.contains('收藏成功') || body.contains('已收藏');
+  return {'success': ok, 'message': ok ? '收藏成功' : '未知响应'};
+}
+
+/// 删除收藏结果解析
+///
+/// Discuz 删除成功返回 301/302 跳转回收藏列表，或提示"取消收藏成功"；
+/// 失败时正文含错误文案。
+Map<String, dynamic> parseDeleteResult(String body, int statusCode) {
+  if (statusCode == 301 || statusCode == 302) {
+    return {'success': true, 'message': '取消收藏成功'};
+  }
+  if (statusCode != 200) {
+    return {'success': false, 'message': 'HTTP $statusCode'};
+  }
+  final errorMatch = RegExp(r'(抱歉|错误|失败|无权|权限|非法)').firstMatch(body);
+  if (errorMatch != null) {
+    final start = body.indexOf(errorMatch.group(0)!);
+    final snippet = body.substring(start, start + 60);
+    final cleanMsg = snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+    return {'success': false, 'message': cleanMsg};
+  }
+  final ok = body.contains('取消收藏成功') || body.contains('收藏已取消');
+  return {'success': ok, 'message': ok ? '取消收藏成功' : '未知响应'};
 }

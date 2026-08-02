@@ -12,13 +12,6 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   try {
     final threads = parseThreadList(body);
 
-    AppLogger.i('PARSE', 'mythreads: ${threads.length} items');
-    if (threads.isNotEmpty && threads.length <= 3) {
-      for (final t in threads) {
-        AppLogger.d('PARSE', '  ${t.title}(${t.threadId})');
-      }
-    }
-
     return {
       'success': true,
       'threads': threads.map((t) => t.toJson()).toList(),

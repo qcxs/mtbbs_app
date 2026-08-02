@@ -9,13 +9,9 @@ import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 显示评分对话框
 ///
-/// [rateUrl] 评分弹窗 URL
+/// [rateUrl] 评分弹窗 URL（调用方用 tid+pid 直接拼接）
 /// 返回 true 表示评分成功
-Future<bool?> showRateDialog(
-  BuildContext context,
-  String baseUrl,
-  String rateUrl,
-) {
+Future<bool?> showRateDialog(BuildContext context, String rateUrl) {
   return showDialog<bool>(
     context: context,
     barrierDismissible: true,
@@ -39,11 +35,11 @@ class _RateDialogContentState extends State<_RateDialogContent> {
   String? _submitError;
   bool _submitting = false;
 
-  // 存储各评分项的输入值
+  // 各评分项的自定义输入框（唯一分值来源；选项点击后填充到此输入框）
   final Map<String, TextEditingController> _scoreControllers = {};
-  final Map<String, String?> _scoreSelections = {};
 
-  String? _selectedReason;
+  // 理由（可选、可自定义，预设理由用于快捷填充）
+  final TextEditingController _reasonController = TextEditingController();
   bool _notifyAuthor = true;
 
   @override
@@ -57,6 +53,7 @@ class _RateDialogContentState extends State<_RateDialogContent> {
     for (final c in _scoreControllers.values) {
       c.dispose();
     }
+    _reasonController.dispose();
     super.dispose();
   }
 
@@ -67,18 +64,9 @@ class _RateDialogContentState extends State<_RateDialogContent> {
       setState(() {
         _formData = formData;
         _loading = false;
-        // 初始化评分项控制器
+        // 每个评分项都用一个输入框承载分值（选项/自定义都写入这里）
         for (final item in formData.items) {
-          if (item.options.isEmpty) {
-            _scoreControllers[item.inputName] = TextEditingController();
-          } else {
-            _scoreSelections[item.inputName] = item.options.isNotEmpty
-                ? item.options.first
-                : null;
-          }
-        }
-        if (formData.reasonOptions.isNotEmpty) {
-          _selectedReason = formData.reasonOptions.first;
+          _scoreControllers[item.inputName] = TextEditingController();
         }
       });
     } catch (e) {
@@ -109,27 +97,24 @@ class _RateDialogContentState extends State<_RateDialogContent> {
         'formhash': _formData!.formhash,
         'tid': _formData!.tid,
         'pid': _formData!.pid,
-        'handlesubmit': 'yes',
+        'handlekey': 'rate',
       };
 
-      // 添加评分项
+      // 添加评分项：输入框是唯一分值来源（选项点击后已填充到输入框），空则 0
       for (final item in _formData!.items) {
-        if (item.options.isNotEmpty) {
-          data[item.inputName] = _scoreSelections[item.inputName] ?? '0';
-        } else {
-          final val = _scoreControllers[item.inputName]?.text.trim() ?? '';
-          data[item.inputName] = val.isNotEmpty ? val : '0';
-        }
+        final val = _scoreControllers[item.inputName]?.text.trim() ?? '';
+        data[item.inputName] = val.isNotEmpty ? val : '0';
       }
 
-      // 添加理由
-      if (_selectedReason != null) {
-        data['reason'] = _selectedReason;
+      // 理由（可选、可自定义，空则不上送）
+      final reason = _reasonController.text.trim();
+      if (reason.isNotEmpty) {
+        data['reason'] = reason;
       }
 
-      // 通知作者
+      // 通知作者（Discuz 标准 checkbox，勾选提交 sendreasonpm=on）
       if (_formData!.hasNotifyAuthor) {
-        data['noticeauthor'] = _notifyAuthor ? '1' : '0';
+        data['sendreasonpm'] = _notifyAuthor ? 'on' : '0';
       }
 
       final result = await action_api.doRate(_dio, _formData!.action, data);
@@ -176,23 +161,46 @@ class _RateDialogContentState extends State<_RateDialogContent> {
       );
     }
 
+    // 极端情况：所有评分项均不可用（今日额度用完 / 区间与选项均无正值）
+    final items = _formData!.items;
+    final exhausted = items.isNotEmpty && items.every((i) => !_canRate(i));
+
     return AlertDialog(
       constraints: const BoxConstraints(maxWidth: 420),
-      title: const Text('评分'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: const Text(
+        '评分',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 今日评分已用完提示
+            if (exhausted)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '今日评分额度已用完',
+                  style: TextStyle(fontSize: 12, color: cs.onErrorContainer),
+                ),
+              ),
             // 提交错误提示
             if (_submitError != null)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: cs.errorContainer,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   _submitError!,
@@ -200,29 +208,49 @@ class _RateDialogContentState extends State<_RateDialogContent> {
                 ),
               ),
             // 评分项列表
-            ..._formData!.items.map((item) => _buildRateItem(item, cs)),
-            const SizedBox(height: 12),
-            // 理由下拉
+            ...items.map((item) => _buildRateItem(item, cs)),
+            // 理由（可选、可自定义；有预设理由时可点选快捷填充）
+            const Text(
+              '理由',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _reasonController,
+              enabled: !_submitting,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: '理由（可选）',
+                prefixIcon: const Icon(Icons.chat_bubble_outline, size: 16),
+                prefixIconConstraints: const BoxConstraints(minWidth: 32),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+              ),
+            ),
             if (_formData!.reasonOptions.isNotEmpty) ...[
-              const Text('理由:', style: TextStyle(fontSize: 13)),
-              const SizedBox(height: 4),
-              DropdownButton<String>(
-                value: _selectedReason,
-                isExpanded: true,
-                items: _formData!.reasonOptions
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _formData!.reasonOptions
                     .map(
-                      (r) => DropdownMenuItem(
-                        value: r,
-                        child: Text(r, style: const TextStyle(fontSize: 13)),
+                      (r) => ActionChip(
+                        label: Text(r, style: const TextStyle(fontSize: 11)),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _submitting
+                            ? null
+                            : () => setState(() => _reasonController.text = r),
                       ),
                     )
                     .toList(),
-                onChanged: _submitting
-                    ? null
-                    : (v) => setState(() => _selectedReason = v),
               ),
-              const SizedBox(height: 8),
             ],
+            const SizedBox(height: 8),
             // 通知作者开关
             if (_formData!.hasNotifyAuthor)
               SwitchListTile(
@@ -245,7 +273,9 @@ class _RateDialogContentState extends State<_RateDialogContent> {
           child: const Text('取消'),
         ),
         ElevatedButton(
-          onPressed: _loading || _error != null || _submitting ? null : _submit,
+          onPressed: _loading || _error != null || _submitting || exhausted
+              ? null
+              : _submit,
           child: _submitting
               ? const SizedBox(
                   width: 18,
@@ -258,62 +288,108 @@ class _RateDialogContentState extends State<_RateDialogContent> {
     );
   }
 
+  /// 单项是否可评：今日还有剩余额度，且区间/选项存在可取正值
+  bool _canRate(action_parse.RateItem i) {
+    if (i.todayRemaining <= 0) return false;
+    final hasPositiveOption = i.options.any((o) {
+      final v = int.tryParse(o.replaceAll('+', '')) ?? 0;
+      return v > 0;
+    });
+    return i.max > 0 || hasPositiveOption;
+  }
+
+  /// 单个评分项：名称/剩余/区间 + 填充式选项（ActionChip 点击填充输入框）+ 输入框
   Widget _buildRateItem(action_parse.RateItem item, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
+    final usable = _canRate(item);
+    final controller = _scoreControllers[item.inputName];
+    final remainingColor = item.todayRemaining <= 0
+        ? cs.error
+        : cs.onSurfaceVariant;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 60,
-            child: Text(
-              item.name,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              // 今日剩余总是显示（0 用红色提示额度用完）
+              Text(
+                item.todayRemaining > 0
+                    ? '今日剩余 ${item.todayRemaining}'
+                    : '今日剩余 0',
+                style: TextStyle(fontSize: 11, color: remainingColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '评分区间 ${item.min} ~ ${item.max}',
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+          // 填充式选项：点击后填入输入框（输入框是唯一数据源，不设独立选中态）
+          if (item.options.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: item.options.map((o) {
+                final optVal = int.tryParse(o.replaceAll('+', ''));
+                // 额度用完或 0 值选项禁用
+                final disabled =
+                    _submitting || !usable || (optVal != null && optVal <= 0);
+                return ActionChip(
+                  label: Text(o, style: const TextStyle(fontSize: 12)),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: disabled
+                      ? null
+                      : () => setState(() => controller?.text = o),
+                );
+              }).toList(),
+            ),
+          ],
+          const SizedBox(height: 8),
+          // 分值输入框（今日额度用完时禁用）
+          TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(signed: true),
+            enabled: !_submitting && usable,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: item.options.isNotEmpty
+                  ? '分值（点击选项或手动输入）'
+                  : '${item.min} ~ ${item.max}',
+              prefixIcon: const Icon(Icons.edit_outlined, size: 15),
+              prefixIconConstraints: const BoxConstraints(minWidth: 32),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: item.options.isNotEmpty
-                ? DropdownButton<String>(
-                    value: _scoreSelections[item.inputName],
-                    isExpanded: true,
-                    items: item.options
-                        .map(
-                          (o) => DropdownMenuItem(
-                            value: o,
-                            child: Text(
-                              o,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _submitting
-                        ? null
-                        : (v) => setState(
-                            () => _scoreSelections[item.inputName] = v,
-                          ),
-                  )
-                : TextField(
-                    controller: _scoreControllers[item.inputName],
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: '${item.min}~${item.max}',
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                    ),
-                    enabled: !_submitting,
-                  ),
-          ),
-          if (item.todayRemaining > 0)
+          if (!usable)
             Padding(
-              padding: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.only(top: 4),
               child: Text(
-                '剩余${item.todayRemaining}',
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                '今日额度已用完，不可评分',
+                style: TextStyle(fontSize: 10, color: cs.error),
               ),
             ),
         ],
