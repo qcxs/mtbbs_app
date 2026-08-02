@@ -171,6 +171,35 @@ Future<void> clearCacheByKey(String cacheKey) async {
 /// 清空指定缓存管理器的所有缓存文件。
 Future<void> clearCache(CacheManager manager) => manager.emptyCache();
 
+/// 删除 file_picker 复制的临时缓存文件（Android/iOS 特有）
+///
+/// file_picker 在选取文件时会无条件把文件复制到 App 缓存目录
+/// `{tempDir}/file_picker/{时间戳}/{文件名}`（见插件 FileUtils.openFileStream），
+/// 上传完成后应主动清理，避免缓存无限膨胀。
+/// 仅当路径位于 `{tempDir}/file_picker/` 下才删除，绝不触碰用户原图。
+Future<void> deleteFilePickerTempIfAny(String path) async {
+  try {
+    // 桌面端 file_picker 直接返回原路径、不复制缓存，跳过
+    if (Platform.isWindows || Platform.isLinux) return;
+    final norm = path.replaceAll('\\', '/');
+    final tempRoot =
+        '${(await AppPaths.tempDir).replaceAll('\\', '/')}/file_picker/';
+    if (!norm.startsWith(tempRoot)) return;
+    final f = File(path);
+    if (!await f.exists()) return;
+    await f.delete();
+    // 顺带清理空的时间戳目录
+    final parent = f.parent;
+    if (parent.existsSync() && parent.listSync().isEmpty) {
+      try {
+        await parent.delete();
+      } catch (_) {}
+    }
+  } catch (e) {
+    AppLogger.w('CACHE', 'delete file_picker temp failed: $e');
+  }
+}
+
 // ==================== WebView 浏览器缓存 ====================
 
 /// 清除内置浏览器的所有缓存数据（资源缓存、Web 存储、Cookie）

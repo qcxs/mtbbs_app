@@ -9,6 +9,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/parser/page_fetcher.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/api/forum/post/upload.dart' as upload_api;
 import 'package:mtbbs/services/api_service.dart';
@@ -577,6 +578,8 @@ class _EditorPageState extends State<EditorPage> {
             });
             successCount++;
           }
+          // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
+          await deleteFilePickerTempIfAny(filePath);
         } else {
           failCount++;
         }
@@ -834,6 +837,8 @@ class _EditorPageState extends State<EditorPage> {
             };
           }
           successCount++;
+          // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
+          await deleteFilePickerTempIfAny(filePath);
         } else {
           failCount++;
         }

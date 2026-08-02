@@ -159,7 +159,7 @@ class _MtImageSheetState extends State<MtImageSheet> {
       setState(() => _uploadingIndex = i);
 
       final item = _queue[i];
-      await widget.hosting.upload(
+      final result = await widget.hosting.upload(
         item.path,
         onProgress: (sent, total) {
           if (!mounted) return;
@@ -169,6 +169,8 @@ class _MtImageSheetState extends State<MtImageSheet> {
           if (mounted) showToast(msg);
         },
       );
+      // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
+      if (result != null) await deleteFilePickerTempIfAny(item.path);
       if (!mounted) return;
     }
 

@@ -24,10 +24,12 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   ({int bytes, int files})? _emojiInfo;
   ({int bytes, int files})? _imageInfo;
   ({int bytes, int files})? _medalInfo;
+  ({int bytes, int files})? _filePickerInfo;
   bool _loadingAvatar = true;
   bool _loadingEmoji = true;
   bool _loadingImage = true;
   bool _loadingMedal = true;
+  bool _loadingFilePicker = true;
 
   @override
   void initState() {
@@ -40,6 +42,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     _loadEmojiInfo();
     _loadImageInfo();
     _loadMedalInfo();
+    _loadFilePickerInfo();
   }
 
   Future<void> _loadImageInfo() async {
@@ -79,6 +82,16 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
       setState(() {
         _medalInfo = info;
         _loadingMedal = false;
+      });
+  }
+
+  Future<void> _loadFilePickerInfo() async {
+    setState(() => _loadingFilePicker = true);
+    final info = await getCacheInfo('file_picker');
+    if (mounted)
+      setState(() {
+        _filePickerInfo = info;
+        _loadingFilePicker = false;
       });
   }
 
@@ -129,6 +142,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
 
   Widget _buildCacheTile({
     required String title,
+    String? subtitle,
     required String? sizeText,
     required String? countText,
     required bool loading,
@@ -146,12 +160,27 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 TextButton.icon(
@@ -295,6 +324,21 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
               currentDays: settings.medalCacheDays,
               onSave: (days) => settings.setMedalCacheDays(days),
             ),
+          ),
+
+          // 文件选择器缓存
+          _buildCacheTile(
+            title: '文件选择器缓存',
+            subtitle: 'file_picker 选取文件时复制的临时副本（Android）',
+            sizeText: _filePickerInfo != null
+                ? AppLogger.bytes(_filePickerInfo!.bytes)
+                : null,
+            countText: _filePickerInfo != null
+                ? '${_filePickerInfo!.files} 个'
+                : null,
+            loading: _loadingFilePicker,
+            onClear: () =>
+                _clearAndRefresh('file_picker', '文件选择器缓存', _loadFilePickerInfo),
           ),
 
           // 浏览器缓存

@@ -8,6 +8,7 @@ import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as thread_api;
 import 'package:mtbbs/api/home/friend/export.dart' as friend_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
+import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
 import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
 import 'package:mtbbs/api/home/mythread/export.dart' as mythread_api;
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
@@ -96,6 +97,20 @@ final Map<String, ApiScenario> readScenarios = {
     params: {'uid': '用户 ID（可空=自己）', 'page': '页码（默认 1）'},
     run: (a) => friend_api.getFriendList(
       ApiService().dio,
+      uid: (a['uid'] ?? '').isEmpty ? '' : (a['uid'] ?? ''),
+      page: intArg(a, 'page', 1),
+    ),
+  ),
+  'follow.list': ApiScenario(
+    desc: '关注/粉丝列表（type=following 关注|follower 粉丝，uid 空=自己）',
+    params: {
+      'type': '*following/follower',
+      'uid': '用户 ID（可空=自己）',
+      'page': '页码（默认 1）',
+    },
+    run: (a) => follow_api.getFollowList(
+      ApiService().dio,
+      type: a['type'] ?? 'following',
       uid: (a['uid'] ?? '').isEmpty ? '' : (a['uid'] ?? ''),
       page: intArg(a, 'page', 1),
     ),

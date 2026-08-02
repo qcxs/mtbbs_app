@@ -151,6 +151,21 @@ class _UserProfilePageState extends State<UserProfilePage> {
         surfaceTintColor: _cs.surface,
         elevation: 0.5,
         actions: [
+          // TA 的关注 / 好友入口（仅数值 uid 显示；self 页入口在"我的"页）
+          if (_uidNum != null) ...[
+            IconButton(
+              icon: const Icon(Icons.visibility_outlined),
+              tooltip: 'TA的关注',
+              onPressed: () =>
+                  context.push('/follow?type=following&uid=${widget.uid}'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.people_outline),
+              tooltip: 'TA的粉丝',
+              onPressed: () =>
+                  context.push('/follow?type=follower&uid=${widget.uid}'),
+            ),
+          ],
           PageActions(
             url:
                 '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
@@ -183,19 +198,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       const Icon(Icons.chevron_right, size: 18),
                       const SizedBox(width: 8),
                       const Text('下一个用户'),
-                    ],
-                  ),
-                ),
-              ],
-              if (_profile != null) ...[
-                if (uidNum != null) const PopupMenuDivider(),
-                PopupMenuItem<String>(
-                  value: 'credit_analysis',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.pie_chart_outline, size: 18),
-                      const SizedBox(width: 8),
-                      const Text('积分分析'),
                     ],
                   ),
                 ),

@@ -175,6 +175,40 @@ class UrlRouter {
 
     if (path.endsWith('/home.php') || path.endsWith('home.php')) {
       final mod = query['mod'];
+
+      // 关注/粉丝：home.php?mod=follow&do={following|follower}[&uid=X][&page=N]
+      // uid 为空 = 当前用户自己的列表 → /follow?type=...；指定 uid → /follow?type=...&uid=X
+      if (mod == 'follow') {
+        final String do_ = query['do'] ?? '';
+        if (do_ == 'following' || do_ == 'follower') {
+          final uid = query['uid'];
+          final hasUid = uid != null && uid.isNotEmpty;
+          final page = _resolvePage(query['page']);
+          final params = <String, String>{
+            'type': do_,
+            if (hasUid) 'uid': uid,
+            if (page > 1) 'page': '$page',
+          };
+          final qs = params.isEmpty
+              ? ''
+              : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+          return UrlRouteResult(
+            label: hasUid
+                ? (do_ == 'following' ? 'TA的关注' : 'TA的粉丝')
+                : (do_ == 'following' ? '我的关注' : '我的粉丝'),
+            appPath: '/follow$qs',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
+        // do=view 等（广播 feed）暂未适配，走内置浏览器
+        return UrlRouteResult(
+          label: '广播',
+          appPath: null,
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
       if (mod == 'space') {
         final uid = query['uid'];
         // 好友列表：home.php?mod=space[&uid=X]&do=friend[&view=me][&page=N]
