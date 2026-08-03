@@ -34,10 +34,12 @@ enum AvatarTapAction {
 /// 根据 [tapAction] 控制点击行为，默认为 [AvatarTapAction.openUserSpace]。
 /// uid='0'（游客/未登录）时点击显示「请先登录」提示。
 ///
-/// 根据 [radius] 自动选择头像尺寸：
+/// 根据 [radius] 自动选择头像尺寸（[AvatarSizeMode.auto] 时）：
 /// - radius < 18 → small
 /// - radius 18~27 → middle（默认）
 /// - radius ≥ 28 → big
+///
+/// 可通过设置「头像尺寸」固定为 small / middle / big，提高头像缓存命中率。
 ///
 /// 内部使用全局错峰队列控制加载间隔，大量头像同时出现时自动以设定间隔排队请求。
 class UserAvatar extends StatefulWidget {
@@ -76,20 +78,21 @@ class _UserAvatarState extends State<UserAvatar> {
   /// 正在解析中的重定向请求（内存去重，避免同一 URL 并发重复 HEAD）
   static final _pendingRedirects = <String, Future<String>>{};
 
-  String get _urlSize {
-    if (widget.radius >= 28) return 'big';
-    if (widget.radius >= 18) return 'middle';
-    return 'small';
-  }
+  /// 上一次生效的头像尺寸策略（首次构建时为 null，用于检测策略变化）
+  AvatarSizeMode? _lastSizeMode;
 
-  /// 原始头像 URL：按站点配置的模板解析，未配置时回退默认 API 方案
-  String get _originalUrl => resolveAvatarUrl(
+  /// 按当前尺寸策略生成原始头像 URL：站点配置的模板，未配置时回退默认 API 方案
+  String _originalUrlFor(AvatarSizeMode mode) => resolveAvatarUrl(
     template: SiteStore.instance.current.avatarTemplate ?? '',
     baseUrl: SiteStore.instance.baseUrl,
     cdn: SiteStore.instance.cdnUrl,
     uid: widget.uid,
-    size: _urlSize,
+    size: resolveAvatarSize(mode, widget.radius),
   );
+
+  /// 原始头像 URL：按站点配置的模板解析，未配置时回退默认 API 方案
+  String get _originalUrl =>
+      _originalUrlFor(context.read<SettingsProvider>().avatarSizeMode);
 
   /// 最终使用的图片 URL（已解析重定向，或原始 URL）
   String get _imageUrl => _resolvedUrl ?? _originalUrl;
@@ -125,12 +128,24 @@ class _UserAvatarState extends State<UserAvatar> {
     super.didChangeDependencies();
     // 仅在头像设置从禁用→启用时重新调度，避免父级 rebuild 重复触发磁盘 I/O
     // build 方法已通过 context.select 订阅 showAvatars 变化，此处只需读当前值
-    final showAvatars = context.read<SettingsProvider>().showAvatars;
+    final settings = context.read<SettingsProvider>();
+    final showAvatars = settings.showAvatars;
     if (showAvatars && !_lastShowAvatars) {
       _lastShowAvatars = true;
       if (!_scheduledOnce) _schedule();
     }
     _lastShowAvatars = showAvatars;
+
+    // 头像尺寸策略变化 → 原 URL 尺寸可能失效，重置后按新策略重新调度
+    final sizeMode = settings.avatarSizeMode;
+    if (_lastSizeMode != null && sizeMode != _lastSizeMode) {
+      _loadTask?.cancel();
+      _ready = false;
+      _scheduledOnce = false;
+      _resolvedUrl = null;
+      _schedule();
+    }
+    _lastSizeMode = sizeMode;
   }
 
   /// 磁盘缓存是否新鲜（存在且未过期）
@@ -149,14 +164,15 @@ class _UserAvatarState extends State<UserAvatar> {
     if (_scheduledOnce || !mounted) return;
     _scheduledOnce = true;
 
-    // 头像已禁用 → 跳过所有网络请求
-    if (!context.read<SettingsProvider>().showAvatars) return;
+    // 头像已禁用 → 跳过所有网络请求；同时在此确定本次调度的尺寸策略
+    final settings = context.read<SettingsProvider>();
+    if (!settings.showAvatars) return;
 
     // 确保重定向映射已从磁盘加载
     await AvatarRedirectStore.instance.loadIfNeeded();
     if (!mounted) return;
 
-    final originalUrl = _originalUrl;
+    final originalUrl = _originalUrlFor(settings.avatarSizeMode);
 
     // 1. 已有重定向映射 → 不发 HEAD，直接以最终 URL 为 key 查磁盘缓存
     final known = AvatarRedirectStore.instance.lookup(originalUrl);

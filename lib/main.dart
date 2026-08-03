@@ -13,6 +13,7 @@ import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/app/event_bus.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/api/forum/misc/export.dart' as forum_misc;
@@ -51,6 +52,11 @@ void main() async {
     avatarDays: settings.avatarCacheDays,
     imageDays: settings.imageCacheDays,
     medalDays: settings.medalCacheDays,
+  );
+
+  // 头像重定向映射有效期与头像缓存周期一致（-1 表示永不过期）
+  AvatarRedirectStore.instance.cacheTtl = Duration(
+    days: settings.avatarCacheDays,
   );
 
   // 用 settings 中的站点配置初始化 ApiService

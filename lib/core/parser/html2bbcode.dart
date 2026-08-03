@@ -225,17 +225,12 @@ class Html2BBCode {
           }
           if (name.isEmpty) name = '图片';
 
-          final w = zoomImg.attributes['width'];
-          final h = zoomImg.attributes['height'];
+          // 图片附件布局由渲染层统一控制（占满/封顶），原图 width/height 无布局价值，不再提取
           final aid = zoomImg.attributes['aid'] ?? '';
 
           final data = jsonEncode({
             'type': 'image_attach',
             'url': url,
-            // ignore: use_null_aware_elements
-            if (w != null) 'width': w,
-            // ignore: use_null_aware_elements
-            if (h != null) 'height': h,
             'aid': aid,
             'name': name,
             if (size.isNotEmpty) 'size': size,

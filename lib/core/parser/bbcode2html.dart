@@ -451,14 +451,14 @@ class BBCode2Html {
   }
 
   /// 渲染图片附件类型 appdata
+  ///
+  /// 不输出 width/height：图片布局由渲染层统一控制（窄屏占满、宽屏封顶）。
   String _renderImageAttach(Map<String, dynamic> data) {
     final url = data['url'] as String? ?? '';
     if (url.isEmpty) return '';
-    final width = data['width'] as String? ?? '';
     final resolvedUrl = _resolveUrl(url);
     final escapedUrl = htmlEscape(resolvedUrl);
-    final w = width.isNotEmpty ? ' width="$width"' : '';
-    return '<img src="$escapedUrl"$w style="max-width:100%;" />';
+    return '<img src="$escapedUrl" style="max-width:100%;" />';
   }
 
   /// 将相对 URL 解析为绝对 URL

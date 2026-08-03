@@ -88,22 +88,47 @@ class DatabaseHelper {
   /// 上次登录账号 — String key (host) → {value: String}
   static final _lastAccountStore = stringMapStoreFactory.store('last_account');
 
-  /// 头像重定向映射 — 固定 key "redirects" → JSON: Map<String, String>
+  /// 头像重定向映射 — 每条映射一条记录：key=原始URL → {final: 最终URL|null, updatedAt: ms}
   static final _avatarRedirectStore = stringMapStoreFactory.store(
     'avatar_redirects',
   );
 
   // =================== 头像重定向映射 ===================
 
-  Future<String?> getAvatarRedirectsRaw() async {
+  /// 读取全部映射记录（供启动加载、旧数据迁移、过期清理）
+  Future<Map<String, Map<String, Object?>>> getAllAvatarRedirects() async {
     final db = await database;
-    final record = await _avatarRedirectStore.record('redirects').get(db);
-    return record?['value'] as String?;
+    final records = await _avatarRedirectStore.find(
+      db,
+      finder: Finder(sortOrders: []),
+    );
+    final result = <String, Map<String, Object?>>{};
+    for (final rec in records) {
+      result[rec.key] = Map<String, Object?>.from(rec.value);
+    }
+    return result;
   }
 
-  Future<void> setAvatarRedirectsRaw(String json) async {
+  /// 增量写入/更新一条映射（[finalUrl] 为 null 表示无重定向）
+  Future<void> putAvatarRedirect(
+    String url,
+    String? finalUrl,
+    DateTime updatedAt,
+  ) async {
     final db = await database;
-    await _avatarRedirectStore.record('redirects').put(db, {'value': json});
+    await _avatarRedirectStore.record(url).put(db, {
+      'final': finalUrl,
+      'updatedAt': updatedAt.millisecondsSinceEpoch,
+    });
+  }
+
+  /// 批量删除映射记录
+  Future<void> deleteAvatarRedirects(List<String> urls) async {
+    if (urls.isEmpty) return;
+    final db = await database;
+    for (final url in urls) {
+      await _avatarRedirectStore.record(url).delete(db);
+    }
   }
 
   // =================== 通用设置（替代 SharedPreferences） ===================

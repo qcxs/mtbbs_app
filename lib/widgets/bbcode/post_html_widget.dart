@@ -51,6 +51,21 @@ const bbcodeStyleTags = <String>{
   'qq',
 };
 
+/// 计算帖子图片显示宽度（px）。
+///
+/// - 无显式宽：占满可用宽度，但封顶 [maxImageWidth]（宽屏平衡）
+/// - 显式宽（[img=W,H]）：尊重作者意图，但 clamp 到可用宽度防溢出
+double resolvePostImageWidth({
+  double? explicitWidth,
+  required double availableWidth,
+  required double maxImageWidth,
+}) {
+  if (explicitWidth != null && explicitWidth > 0) {
+    return explicitWidth.clamp(1, availableWidth).toDouble();
+  }
+  return availableWidth.clamp(1, maxImageWidth).toDouble();
+}
+
 /// 基于 flutter_html 的 BBCode 渲染组件
 ///
 /// 将 BBCode 转换为 HTML，由 flutter_html 渲染为 Flutter Widget。
@@ -87,6 +102,10 @@ class PostHtmlWidget extends StatelessWidget {
         context.select<SettingsProvider, Set<String>>(
           (s) => s.disabledBbcodeTags,
         );
+    // 宽屏时帖子图片最大宽度（px）
+    final maxImageWidth = context.select<SettingsProvider, int>(
+      (s) => s.maxImageWidth,
+    );
 
     // 1. 先按 [code] 分割，再对非 code 段按 [table] 分割
     final segments = _buildSegments(bbcode);
@@ -99,6 +118,7 @@ class PostHtmlWidget extends StatelessWidget {
             smilieIdMap,
             effectiveDisabled,
             autoDetectUrls,
+            maxImageWidth,
           )
         : Column(
             mainAxisSize: MainAxisSize.min,
@@ -114,6 +134,7 @@ class PostHtmlWidget extends StatelessWidget {
                     smilieIdMap,
                     effectiveDisabled,
                     autoDetectUrls,
+                    maxImageWidth,
                   ),
                   _TableSegment(:final content) => BbcodeTableWidget(
                     bbcode: content,
@@ -162,6 +183,7 @@ class PostHtmlWidget extends StatelessWidget {
     Map<String, String>? smilieIdMap,
     Set<String> disabledTags,
     bool autoDetectUrls,
+    int maxImageWidth,
   ) {
     final cs = Theme.of(context).colorScheme;
 
@@ -246,55 +268,68 @@ class PostHtmlWidget extends StatelessWidget {
             final cacheManager = isEmoji
                 ? emojiCacheManager
                 : imageCacheManager;
-            final w = ctx.attributes['width'];
-            final width = w != null ? double.tryParse(w) : null;
-            double? height;
-            if (width == null) {
-              final hAttr = ctx.attributes['height'];
-              if (hAttr != null && hAttr.isNotEmpty) {
-                height = double.tryParse(hAttr);
-              }
-              if (height == null) {
-                final style = ctx.attributes['style'] ?? '';
-                final hMatch = RegExp(r'height\s*:\s*(\d+)').firstMatch(style);
-                if (hMatch != null) {
-                  height = double.tryParse(hMatch.group(1)!);
-                }
-              }
-            }
-            return GestureDetector(
-              onLongPress: isEmoji
-                  ? null
-                  : () => showImageActions(
-                      context,
-                      imageUrls: [src],
-                      sourceInfo: '帖子图片',
-                    ),
-              child: CachedNetworkImage(
+
+            // 表情：固定行内尺寸
+            if (isEmoji) {
+              return CachedNetworkImage(
                 imageUrl: src,
                 cacheManager: cacheManager,
-                width: isEmoji ? 20 : width,
-                height: isEmoji ? 20 : height,
-                memCacheWidth: width != null ? (width * 2).toInt() : null,
-                memCacheHeight: height != null ? (height * 2).toInt() : null,
+                width: 20,
+                height: 20,
                 fit: BoxFit.contain,
-                placeholder: (_, __) => SizedBox(
-                  width: width,
-                  height: height ?? 100,
-                  child: const Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                ),
                 errorWidget: (_, __, ___) => Icon(
                   Icons.emoji_emotions_outlined,
-                  size: 48,
+                  size: 18,
                   color: Colors.grey.shade400,
                 ),
-              ),
+              );
+            }
+
+            // 显式宽度（[img=W,H] 或 HTML 自带 width）
+            final explicitW = double.tryParse(ctx.attributes['width'] ?? '');
+            // 普通帖子图片：窄屏占满可用宽度，宽屏封顶 maxImageWidth；
+            // [img=W,H] 尊重作者显式宽度，但 clamp 到可用宽度防溢出。
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final available = constraints.maxWidth.isFinite
+                    ? constraints.maxWidth
+                    : MediaQuery.sizeOf(context).width;
+                final width = resolvePostImageWidth(
+                  explicitWidth: explicitW,
+                  availableWidth: available,
+                  maxImageWidth: maxImageWidth.toDouble(),
+                );
+                return GestureDetector(
+                  onLongPress: () => showImageActions(
+                    context,
+                    imageUrls: [src],
+                    sourceInfo: '帖子图片',
+                  ),
+                  child: CachedNetworkImage(
+                    imageUrl: src,
+                    cacheManager: cacheManager,
+                    width: width,
+                    memCacheWidth: (width * 2).toInt(),
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => SizedBox(
+                      width: width,
+                      height: 100,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (_, __, ___) => Icon(
+                      Icons.broken_image_outlined,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),

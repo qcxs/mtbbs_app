@@ -21,6 +21,48 @@ library;
 const String kDefaultAvatarTemplate =
     '{baseurl}/uc_server/avatar.php?uid={uid}&size={size}';
 
+/// 头像加载尺寸策略。
+///
+/// Discuz 头像 URL 有 small / middle / big 三种尺寸，实际图片差异不大。
+/// 固定某一尺寸可让同一用户在所有场景共用同一 URL，显著提高头像缓存命中率，
+/// 避免因不同场景请求不同尺寸而重复下载、造成加载慢的错觉。
+enum AvatarSizeMode {
+  /// 自适应：根据实际 UI 大小在 small / middle / big 间选择
+  auto('auto', '自适应'),
+
+  /// 固定加载小尺寸
+  small('small', 'small'),
+
+  /// 固定加载中尺寸（默认，缓存命中率与画质折中）
+  middle('middle', 'middle'),
+
+  /// 固定加载大尺寸
+  big('big', 'big');
+
+  const AvatarSizeMode(this.value, this.label);
+
+  /// 持久化值；对固定策略而言即 Discuz 尺寸名
+  final String value;
+
+  /// 设置页展示名
+  final String label;
+
+  /// 按持久化值反查，未知值回退 [AvatarSizeMode.middle]
+  static AvatarSizeMode fromValue(String? v) => AvatarSizeMode.values
+      .firstWhere((m) => m.value == v, orElse: () => AvatarSizeMode.middle);
+}
+
+/// 根据尺寸策略与 UI 半径解析实际请求的 Discuz 头像尺寸名。
+///
+/// [AvatarSizeMode.auto] 时按 [radius] 自适应：radius ≥ 28 → big，
+/// 18~27 → middle，否则 small；固定策略直接返回对应尺寸名。
+String resolveAvatarSize(AvatarSizeMode mode, double radius) {
+  if (mode != AvatarSizeMode.auto) return mode.value;
+  if (radius >= 28) return 'big';
+  if (radius >= 18) return 'middle';
+  return 'small';
+}
+
 /// 解析头像模板，生成指定用户/尺寸的头像 URL。
 ///
 /// [template] 为空时回退到 [kDefaultAvatarTemplate]。

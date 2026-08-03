@@ -7,6 +7,7 @@ import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 
@@ -157,6 +158,14 @@ class SettingsProvider extends ChangeNotifier {
   bool get isPureBlackTheme => _isPureBlackTheme;
   bool _showAvatars = true;
   bool get showAvatars => _showAvatars;
+
+  /// 头像尺寸策略（固定某一尺寸可提高头像缓存命中率），默认 middle
+  AvatarSizeMode _avatarSizeMode = AvatarSizeMode.middle;
+  AvatarSizeMode get avatarSizeMode => _avatarSizeMode;
+
+  /// 宽屏时帖子图片最大宽度（px），窄屏占满不受此限制；默认 600
+  int _maxImageWidth = 600;
+  int get maxImageWidth => _maxImageWidth;
 
   /// 编辑器启动自检（默认开启，关闭后跳过启动报错，无条件进入编辑器）
   bool _editorStartupCheck = true;
@@ -347,6 +356,14 @@ class SettingsProvider extends ChangeNotifier {
     // 头像设置
     _showAvatars = (await _db.getSettingBool('showAvatars')) ?? true;
 
+    // 头像尺寸策略（默认 middle，未知值回退 middle）
+    _avatarSizeMode = AvatarSizeMode.fromValue(
+      await _db.getSetting('avatarSizeMode'),
+    );
+
+    // 宽屏时帖子图片最大宽度（默认 600）
+    _maxImageWidth = (await _db.getSettingInt('maxImageWidth')) ?? 600;
+
     // 编辑器启动自检
     _editorStartupCheck =
         (await _db.getSettingBool('editorStartupCheck')) ?? true;
@@ -425,6 +442,18 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setShowAvatars(bool value) async {
     _showAvatars = value;
     await _db.setSettingBool('showAvatars', value);
+    notifyListeners();
+  }
+
+  Future<void> setAvatarSizeMode(AvatarSizeMode mode) async {
+    _avatarSizeMode = mode;
+    await _db.setSetting('avatarSizeMode', mode.value);
+    notifyListeners();
+  }
+
+  Future<void> setMaxImageWidth(int px) async {
+    _maxImageWidth = px.clamp(100, 2000);
+    await _db.setSettingInt('maxImageWidth', _maxImageWidth);
     notifyListeners();
   }
 

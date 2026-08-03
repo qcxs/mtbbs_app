@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
@@ -180,6 +181,16 @@ class SettingsPage extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/settings/editor'),
             ),
+            ListTile(
+              leading: _iconBox(
+                Icons.photo_size_select_large,
+                const Color(0xFF3F51B5),
+              ),
+              title: const Text('图片最大宽度'),
+              subtitle: Text('${settings.maxImageWidth}px，窄屏占满不受限制'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showMaxImageWidthDialog(context, settings),
+            ),
           ]),
 
           // ==================== 快捷键 ====================
@@ -215,6 +226,16 @@ class SettingsPage extends StatelessWidget {
               subtitle: const Text('关闭后不再请求头像图片，仅显示文字'),
               value: settings.showAvatars,
               onChanged: (v) => settings.setShowAvatars(v),
+            ),
+            ListTile(
+              leading: _iconBox(
+                Icons.photo_size_select_actual,
+                const Color(0xFF9E9E9E),
+              ),
+              title: const Text('头像尺寸'),
+              subtitle: Text(settings.avatarSizeMode.label),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showAvatarSizeDialog(context, settings),
             ),
             SwitchListTile(
               secondary: _iconBox(Icons.auto_fix_high, const Color(0xFF9E9E9E)),
@@ -278,6 +299,51 @@ class SettingsPage extends StatelessWidget {
               final v = int.tryParse(ctl.text.trim()) ?? 200;
               settings.setHistoryMaxCount(v);
               context.read<HistoryProvider>().setMaxCount(v);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMaxImageWidthDialog(
+    BuildContext context,
+    SettingsProvider settings,
+  ) {
+    final ctl = TextEditingController(text: settings.maxImageWidth.toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        constraints: const BoxConstraints(maxWidth: 360),
+        title: const Text('图片最大宽度'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('宽屏下帖子图片的最大宽度（100-2000px）。窄屏（手机）不受限制，自动占满宽度。'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '宽度（px）',
+                border: OutlineInputBorder(),
+                isDense: true,
+                helperText: '默认 600px',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final v = int.tryParse(ctl.text.trim()) ?? 600;
+              settings.setMaxImageWidth(v);
               Navigator.of(ctx).pop();
             },
             child: const Text('确定'),
@@ -443,6 +509,74 @@ class SettingsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _showAvatarSizeDialog(BuildContext context, SettingsProvider settings) {
+    final cs = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        constraints: const BoxConstraints(maxWidth: 360),
+        title: const Text('头像尺寸'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'small / middle / big 三种尺寸图片差异不大。'
+              '固定某一尺寸可让同一用户在所有场景共用同一 URL，'
+              '提高头像缓存命中率，避免重复下载。',
+            ),
+            const SizedBox(height: 16),
+            for (final mode in AvatarSizeMode.values)
+              ListTile(
+                leading: Icon(_avatarSizeIcon(mode), color: cs.primary),
+                title: Text(mode.label),
+                subtitle: Text(_avatarSizeDesc(mode)),
+                trailing: settings.avatarSizeMode == mode
+                    ? Icon(Icons.check, color: cs.primary)
+                    : null,
+                onTap: () async {
+                  await settings.setAvatarSizeMode(mode);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _avatarSizeIcon(AvatarSizeMode mode) {
+    switch (mode) {
+      case AvatarSizeMode.auto:
+        return Icons.auto_awesome;
+      case AvatarSizeMode.small:
+        return Icons.photo_size_select_small;
+      case AvatarSizeMode.middle:
+        return Icons.photo_size_select_actual;
+      case AvatarSizeMode.big:
+        return Icons.photo_size_select_large;
+    }
+  }
+
+  String _avatarSizeDesc(AvatarSizeMode mode) {
+    switch (mode) {
+      case AvatarSizeMode.auto:
+        return '按头像显示大小自动选择 small / middle / big（原行为）';
+      case AvatarSizeMode.small:
+        return '所有头像统一加载小尺寸';
+      case AvatarSizeMode.middle:
+        return '所有头像统一加载中尺寸（默认）';
+      case AvatarSizeMode.big:
+        return '所有头像统一加载大尺寸';
+    }
   }
 
   Widget _iconBox(IconData icon, Color color) {
