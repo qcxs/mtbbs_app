@@ -52,6 +52,8 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=help
 
 ## 本地打包
 
+> 版本号统一由 `scripts/version.ps1` 从 pubspec.yaml（版本名）+ git 提交数（构建号）自动生成，详见 `docs/15-版本发布.md`。不要手动改安装包/关于页里的版本号。
+
 ### Windows x64（安装包）
 
 #### 前置条件
@@ -62,14 +64,20 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=help
 #### 步骤
 
 ```powershell
-# 编译 release 版
-flutter build windows --release
+# 1. 生成版本信息（版本名取自 pubspec.yaml）
+powershell -ExecutionPolicy Bypass -File scripts\version.ps1
 
-# 生成安装包（如需修改版本号，改 installer\setup.iss 中的 MyAppVersion）
+# 2. 编译 release 版
+flutter build windows --release `
+  --dart-define-from-file=mtbbs_release.json `
+  --build-name=$env:MTBBS_VERSION_NAME `
+  --build-number=$env:MTBBS_VERSION_CODE
+
+# 3. 生成安装包（版本号自动取环境变量）
 iscc installer\setup.iss
 ```
 
-**安装包路径**：`build\MTBBS_v{version}_Setup.exe`
+**安装包路径**：`build\MTBBS_v{版本}_Setup.exe`
 
 **注意**：编译前确保没有 mtbbs.exe 进程在运行，否则 MSBuild 因文件锁定会报错。
 
@@ -78,15 +86,20 @@ iscc installer\setup.iss
 Get-Process mtbbs -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
-### Android x64（仅 x86_64）
+### Android（APK）
 
 ```powershell
-flutter build apk --release --target-platform android-x64
+powershell -ExecutionPolicy Bypass -File scripts\version.ps1 android
+flutter build apk --release `
+  --dart-define-from-file=mtbbs_release.json `
+  --build-name=$env:MTBBS_VERSION_NAME `
+  --build-number=$env:MTBBS_VERSION_CODE `
+  --target-platform android-arm64
 ```
 
 输出在 `build\app\outputs\flutter-apk\app-release.apk`。
 
-> 因 App 未上架商店，APK 需手动安装。arm64 设备需自行加 `--target-platform android-arm64` 参数打包。
+> 因 App 未上架商店，APK 需手动安装。多 ABI 全量打包去掉 `--target-platform` 参数即可。本地无 `android/key.properties` 时用 debug 签名（自测用），正式分发请配置签名（见 `docs/15-版本发布.md`）。
 
 ---
 
@@ -149,7 +162,8 @@ docs/
 ├── 11-新增功能开发流程.md  AI 冷启动手册（新增列表/详情类功能）
 ├── 12-写操作API文档.md     发帖/评论/回复/修改
 ├── 13-修改API文档.md       帖子/评论修改
-└── 14-新增删除收藏功能文档.md  写功能实战参考
+├── 14-新增删除收藏功能文档.md  写功能实战参考
+└── 15-版本发布.md          版本号规则 / 本地打包 / GitHub 自动发布
 ```
 
 文档聚焦"为什么这样做"，代码细节让 AI 读源码。

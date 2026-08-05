@@ -1,0 +1,173 @@
+name: Release
+
+# 手动触发发布。填 tag（如 v1.0.0）会把产物发布到对应 GitHub Release；
+# tag 留空则仅构建并上传为 workflow artifact，可在 Actions 页面下载。
+#
+# 版本号规则（对齐 PiliPlus）：
+#   - 版本名：pubspec.yaml `version:`（发布前手动改）
+#   - build 号：git 提交总数（scripts/version.ps1 计算）
+#   - Android 发布包版本名追加 9 位 commit hash
+on:
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: '构建 Android APK（arm64-v8a / armeabi-v7a / x86_64）'
+        required: false
+        default: true
+        type: boolean
+      build_windows:
+        description: '构建 Windows 安装包（exe + 便携 zip）'
+        required: false
+        default: true
+        type: boolean
+      tag:
+        description: 'GitHub Release tag（如 v1.0.0）；留空仅上传构建产物'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  android:
+    name: Android APK
+    if: ${{ github.event.inputs.build_android == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 迁出代码
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 安装 JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: 生成版本信息
+        shell: pwsh
+        run: scripts/version.ps1 android
+
+      - name: 写入签名（可选）
+        shell: pwsh
+        env:
+          SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if ($env:SIGN_KEYSTORE_BASE64) {
+            [IO.File]::WriteAllBytes('android/app/key.jks', [Convert]::FromBase64String($env:SIGN_KEYSTORE_BASE64))
+            @(
+              "storeFile=key.jks",
+              "storePassword=$env:KEYSTORE_PASSWORD",
+              "keyAlias=$env:KEY_ALIAS",
+              "keyPassword=$env:KEY_PASSWORD"
+            ) | Set-Content android/key.properties
+            Write-Host '已写入 key.properties（正式签名）'
+          } else {
+            Write-Host '未配置 SIGN_KEYSTORE_BASE64，使用 debug 签名'
+          }
+
+      - name: 构建 APK
+        run: |
+          flutter build apk --release --split-per-abi \
+            --dart-define-from-file=mtbbs_release.json \
+            --build-name=${{ env.MTBBS_VERSION_NAME }} \
+            --build-number=${{ env.MTBBS_VERSION_CODE }}
+
+      - name: 重命名
+        shell: bash
+        run: |
+          for file in build/app/outputs/flutter-apk/app-*-release.apk; do
+            abi=$(echo "$file" | sed -E 's|.*app-(.*)-release\.apk|\1|')
+            mv "$file" "MTBBS_android_${{ env.MTBBS_VERSION }}_${abi}.apk"
+          done
+
+      - name: 发布到 GitHub Release
+        if: ${{ github.event.inputs.tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }}
+          files: MTBBS_android_*.apk
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          name: Android-APK
+          path: MTBBS_android_*.apk
+
+  windows:
+    name: Windows 安装包
+    if: ${{ github.event.inputs.build_windows == 'true' }}
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 迁出代码
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: 安装 Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: 生成版本信息
+        shell: pwsh
+        run: scripts/version.ps1
+
+      - name: 构建 Windows Release
+        shell: pwsh
+        run: |
+          flutter build windows --release `
+            --dart-define-from-file=mtbbs_release.json `
+            --build-name=$env:MTBBS_VERSION_NAME `
+            --build-number=$env:MTBBS_VERSION_CODE
+
+      - name: 生成安装包（Inno Setup）
+        shell: pwsh
+        run: |
+          iscc installer\setup.iss
+          Move-Item build\MTBBS_*_Setup.exe "MTBBS_windows_$env:MTBBS_VERSION_x64_setup.exe"
+
+      - name: 打包便携版
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "MTBBS_windows_$env:MTBBS_VERSION_x64_portable.zip"
+
+      - name: 发布到 GitHub Release
+        if: ${{ github.event.inputs.tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }}
+          files: |
+            MTBBS_windows_*.exe
+            MTBBS_windows_*.zip
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          name: Windows-x64
+          path: |
+            MTBBS_windows_*.exe
+            MTBBS_windows_*.zip

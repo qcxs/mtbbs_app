@@ -25,6 +25,11 @@ class _MemoryBackend implements AvatarRedirectBackend {
       data.remove(u);
     }
   }
+
+  @override
+  Future<void> clear() async {
+    data.clear();
+  }
 }
 
 void main() {
@@ -99,29 +104,30 @@ void main() {
     expect(backend.deleted, contains(url));
   });
 
-  test('旧格式（整体 JSON）迁移为新格式并删除旧记录', () async {
+  test('历史遗留的整体 JSON 旧记录直接删除，不迁移', () async {
     backend.data['redirects'] = {
       'value':
-          '{"https://a.example/avatar.php?uid=2&size=small":"https://cdn/2.jpg",'
-          '"https://a.example/avatar.php?uid=3&size=big":null}',
+          '{"https://a.example/avatar.php?uid=2&size=small":"https://cdn/2.jpg"}',
     };
     await store.loadIfNeeded();
 
     expect(
-      store.lookup('https://a.example/avatar.php?uid=2&size=small').value,
-      'https://cdn/2.jpg',
-    );
-    // null（历史无重定向）归一为原始 URL
-    expect(
-      store.lookup('https://a.example/avatar.php?uid=3&size=big').value,
-      'https://a.example/avatar.php?uid=3&size=big',
+      store.lookup('https://a.example/avatar.php?uid=2&size=small').known,
+      isFalse,
     );
     await store.debugFlush();
     expect(backend.data.containsKey('redirects'), isFalse); // 旧记录已删
-    expect(
-      backend.data.containsKey('https://a.example/avatar.php?uid=2&size=small'),
-      isTrue,
-    );
+  });
+
+  test('clear 清空内存与后端全部映射', () async {
+    store.set('https://a.example/u1', 'https://cdn/u1');
+    store.set('https://a.example/u2', null);
+    expect(store.lookup('https://a.example/u1').known, isTrue);
+
+    await store.clear();
+    expect(store.lookup('https://a.example/u1').known, isFalse);
+    expect(store.lookup('https://a.example/u2').known, isFalse);
+    expect(backend.data, isEmpty);
   });
 
   test('超容量上限时淘汰最久未更新的记录', () async {

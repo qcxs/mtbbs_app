@@ -44,3 +44,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 发布相关（scripts/version.ps1 生成的构建元数据与签名文件）
+/mtbbs_release.json
+/android/app/key.jks
+/android/key.properties

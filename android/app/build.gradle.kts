@@ -4,6 +4,23 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// 读取 key.properties（存在则正式签名；不存在回退 debug 签名，便于本地跑 release）
+val keyProperties = Properties().also {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) it.load(f.inputStream())
+}
+
+val releaseSigning = keyProperties.getProperty("storeFile")?.let {
+    signingConfigs.create("release") {
+        storeFile = file(it)
+        storePassword = keyProperties.getProperty("storePassword")
+        keyAlias = keyProperties.getProperty("keyAlias")
+        keyPassword = keyProperties.getProperty("keyPassword")
+        enableV1Signing = true
+        enableV2Signing = true
+    }
+}
+
 android {
     namespace = "com.github.qcxs.discuz"
     compileSdk = flutter.compileSdkVersion
@@ -30,9 +47,8 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 有 key.properties（正式签名）用正式签名；否则用 debug 签名
+            signingConfig = releaseSigning ?: signingConfigs.getByName("debug")
         }
     }
 }

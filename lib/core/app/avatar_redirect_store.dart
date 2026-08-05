@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
@@ -18,6 +17,9 @@ abstract class AvatarRedirectBackend {
 
   /// 批量删除记录
   Future<void> delete(List<String> urls);
+
+  /// 清空所有记录
+  Future<void> clear();
 }
 
 class _DbBackend implements AvatarRedirectBackend {
@@ -34,6 +36,9 @@ class _DbBackend implements AvatarRedirectBackend {
   @override
   Future<void> delete(List<String> urls) =>
       DatabaseHelper.instance.deleteAvatarRedirects(urls);
+
+  @override
+  Future<void> clear() => DatabaseHelper.instance.clearAvatarRedirects();
 }
 
 /// 头像 301 重定向映射的持久化存储。
@@ -82,9 +87,8 @@ class AvatarRedirectStore {
       final obsolete = <String>[];
       for (final entry in all.entries) {
         final value = entry.value;
-        // 旧格式迁移：整体 JSON 存于固定 key "redirects"
-        if (entry.key == 'redirects' && value['value'] is String) {
-          await _migrateLegacy(value['value'] as String);
+        // 历史遗留的整体 JSON 旧格式（固定 key "redirects"）：不再迁移，直接删除
+        if (entry.key == 'redirects') {
           obsolete.add(entry.key);
           continue;
         }
@@ -120,22 +124,6 @@ class AvatarRedirectStore {
     }
   }
 
-  /// 旧格式（整体 JSON `Map<String, String>`）迁移为新格式记录
-  Future<void> _migrateLegacy(String raw) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final decoded = jsonDecode(raw);
-    if (decoded is Map) {
-      decoded.forEach((k, v) {
-        final url = k.toString();
-        _map[url] = v is String ? v : null;
-        _updatedAt[url] = now;
-        _dirty.add(url);
-      });
-      // 迁移结果写回新格式
-      await _flushSave();
-    }
-  }
-
   /// 查询映射。
   ///
   /// 返回 `known=false` 表示从未解析过或已过期（需重新 HEAD）；
@@ -151,6 +139,44 @@ class AvatarRedirectStore {
       return (known: false, value: url);
     }
     return (known: true, value: _map[url] ?? url);
+  }
+
+  /// 清理已过期的映射（与头像缓存过期周期一致），返回清理条数。
+  ///
+  /// 过期判定同 [lookup]：超过 [cacheTtl] 未更新的记录视为未知并删除，
+  /// 触发下次 HEAD 重新解析，避免头像 URL 变化后长期显示旧头像。
+  /// 与手动清空（[clear]）不同，这里只清过期项，保留仍有效的映射。
+  int clearExpired() {
+    final now = DateTime.now();
+    final expired = <String>[];
+    for (final e in _updatedAt.entries) {
+      if (_isExpired(now, e.value)) expired.add(e.key);
+    }
+    if (expired.isEmpty) return 0;
+    for (final url in expired) {
+      _map.remove(url);
+      _updatedAt.remove(url);
+      _deleted.add(url);
+    }
+    _saveTimer?.cancel();
+    _saveTimer = Timer(
+      const Duration(seconds: 1),
+      () => unawaited(_flushSave()),
+    );
+    return expired.length;
+  }
+
+  /// 清空所有映射（缓存管理中清除头像缓存时一并调用）。
+  ///
+  /// 清空后所有头像重新走 HEAD 解析；磁盘头像缓存已清除，映射无保留价值。
+  Future<void> clear() async {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    _map.clear();
+    _updatedAt.clear();
+    _dirty.clear();
+    _deleted.clear();
+    await backend.clear();
   }
 
   /// 记录映射并持久化（内存即时生效，磁盘防抖 1 秒批量写入）。

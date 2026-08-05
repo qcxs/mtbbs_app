@@ -1,5 +1,10 @@
 #define MyAppName "MTBBS"
-#define MyAppVersion "1.0.0"
+; 版本号优先读环境变量（scripts/version.ps1 导出），未设置时回退 1.0.0
+#define MyAppVersion GetEnv('MTBBS_VERSION_NAME')
+#if MyAppVersion == ''
+  #undef MyAppVersion
+  #define MyAppVersion '1.0.0'
+#endif
 #define MyAppPublisher "qcxs"
 #define MyAppURL "https://bbs.binmt.cc"
 

@@ -5,6 +5,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/config/nav_config.dart';
+import 'package:mtbbs/config/build_config.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -254,7 +255,9 @@ class SettingsPage extends StatelessWidget {
             child: ListTile(
               leading: Icon(Icons.info_outline, color: cs.onSurfaceVariant),
               title: const Text('关于'),
-              subtitle: const Text('MTBBS v1.0.0'),
+              subtitle: Text(
+                'MTBBS v${BuildConfig.versionName}+${BuildConfig.versionCode}',
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {},
             ),

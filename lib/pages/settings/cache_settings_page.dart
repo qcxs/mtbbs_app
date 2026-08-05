@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -266,8 +267,13 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                 : null,
             countText: _avatarInfo != null ? '${_avatarInfo!.files} 个' : null,
             loading: _loadingAvatar,
-            onClear: () =>
-                _clearAndRefresh('avatar_cache', '头像图片缓存', _loadAvatarInfo),
+            onClear: () => _clearAndRefresh(
+              'avatar_cache',
+              '头像图片缓存',
+              _loadAvatarInfo,
+              // 清除头像缓存时一并清空重定向映射，避免映射指向已清除的旧缓存
+              extraClear: () => AvatarRedirectStore.instance.clear(),
+            ),
             onSettings: () => _showDayPicker(
               title: '头像缓存过期',
               currentDays: settings.avatarCacheDays,
@@ -435,10 +441,12 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   Future<void> _clearAndRefresh(
     String cacheKey,
     String label,
-    Future<void> Function() refreshFn,
-  ) async {
+    Future<void> Function() refreshFn, {
+    Future<void> Function()? extraClear,
+  }) async {
     if (!await _confirmClear(label)) return;
     await clearCacheByKey(cacheKey);
+    await extraClear?.call();
     if (mounted) refreshFn();
   }
 }

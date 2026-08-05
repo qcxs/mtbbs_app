@@ -131,6 +131,12 @@ class DatabaseHelper {
     }
   }
 
+  /// 清空全部映射记录（缓存管理中清除头像缓存时调用）
+  Future<void> clearAvatarRedirects() async {
+    final db = await database;
+    await _avatarRedirectStore.delete(db);
+  }
+
   // =================== 通用设置（替代 SharedPreferences） ===================
 
   /// 读取字符串设置项

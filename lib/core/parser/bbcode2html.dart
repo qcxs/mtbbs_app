@@ -33,6 +33,30 @@ class BBCode2Html {
        _baseUrl = baseUrl,
        _autoDetectUrls = autoDetectUrls;
 
+  /// 归一化短 hex 颜色，避免 flutter_html 解析异常。
+  ///
+  /// flutter_html 对 4 位 hex（如 `#ff00`）解析会产生 alpha=0 的异常色
+  /// （表现为文字透明/发白）。网页中 `<font color="#ff00">` 按 HTML 属性
+  /// legacy 语义解析为 `#ff0000`（红色），这里对齐网页语义：
+  /// - 4 位 `#RRGG` → `#RRGG00`（R2 + G2，B 补 0）
+  /// - 3 位 `#RGB` → `#RRGGBB`（标准 CSS 翻倍）
+  /// 6/8 位 hex、rgb()/rgba()、命名色 flutter_html 均能正确解析，原样返回。
+  static String _normalizeColor(String v) {
+    final s = v.trim();
+    if (s.startsWith('#') &&
+        s.length == 5 &&
+        RegExp(r'^#[0-9a-fA-F]{4}$').hasMatch(s)) {
+      return '#${s.substring(1, 3)}${s.substring(3, 5)}00';
+    }
+    if (s.startsWith('#') &&
+        s.length == 4 &&
+        RegExp(r'^#[0-9a-fA-F]{3}$').hasMatch(s)) {
+      final c = s.substring(1);
+      return '#${c[0]}${c[0]}${c[1]}${c[1]}${c[2]}${c[2]}';
+    }
+    return v;
+  }
+
   /// 转换主入口
   String convert(String input) {
     var html = htmlEscape(input);
@@ -108,7 +132,7 @@ class BBCode2Html {
     html = _replaceTag(
       html,
       'color',
-      (_, v) => '<span style="color:$v">',
+      (_, v) => '<span style="color:${_normalizeColor(v)}">',
       '</span>',
     );
 
@@ -116,7 +140,7 @@ class BBCode2Html {
     html = _replaceTag(
       html,
       'backcolor',
-      (_, v) => '<span style="background-color:$v">',
+      (_, v) => '<span style="background-color:${_normalizeColor(v)}">',
       '</span>',
     );
 
@@ -329,7 +353,7 @@ class BBCode2Html {
     html = _replaceTag(
       html,
       'background',
-      (_, v) => '<span style="background-color:$v">',
+      (_, v) => '<span style="background-color:${_normalizeColor(v)}">',
       '</span>',
     );
 

@@ -59,6 +59,10 @@ void main() async {
     days: settings.avatarCacheDays,
   );
 
+  // 过期缓存自动删除：仅启动时清一次
+  // （flutter_cache_manager 本身不主动删过期文件，见 docs/01 图片缓存规范）
+  cleanupExpiredCaches();
+
   // 用 settings 中的站点配置初始化 ApiService
   await ApiService().init(baseUrl: SiteStore.instance.baseUrl);
 
