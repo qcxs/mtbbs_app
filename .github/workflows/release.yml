@@ -57,7 +57,7 @@ jobs:
         shell: pwsh
         run: scripts/version.ps1 android
 
-      - name: 写入签名（可选）
+      - name: 写入签名（可选，配置无效自动跳过 → debug 签名）
         shell: pwsh
         env:
           SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
@@ -65,17 +65,28 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if ($env:SIGN_KEYSTORE_BASE64) {
-            [IO.File]::WriteAllBytes('android/app/key.jks', [Convert]::FromBase64String($env:SIGN_KEYSTORE_BASE64))
-            @(
+          try {
+            if (-not $env:SIGN_KEYSTORE_BASE64) { throw '未配置 SIGN_KEYSTORE_BASE64' }
+            # 去掉 base64 中的空白/换行，避免粘贴多行内容导致解码失败
+            $bytes = [Convert]::FromBase64String(($env:SIGN_KEYSTORE_BASE64 -replace '\s', ''))
+            if ($bytes.Length -eq 0) { throw 'keystore base64 内容为空' }
+            if (-not $env:KEYSTORE_PASSWORD -or -not $env:KEY_ALIAS -or -not $env:KEY_PASSWORD) {
+              throw '缺少 KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD 之一'
+            }
+            [IO.File]::WriteAllBytes('android/app/key.jks', $bytes)
+            # 用 .NET 无 BOM 写入，避免 Java Properties 读不到 storeFile
+            $lines = @(
               "storeFile=key.jks",
               "storePassword=$env:KEYSTORE_PASSWORD",
               "keyAlias=$env:KEY_ALIAS",
               "keyPassword=$env:KEY_PASSWORD"
-            ) | Set-Content android/key.properties
+            )
+            [IO.File]::WriteAllLines('android/key.properties', $lines, (New-Object System.Text.UTF8Encoding($false)))
             Write-Host '已写入 key.properties（正式签名）'
-          } else {
-            Write-Host '未配置 SIGN_KEYSTORE_BASE64，使用 debug 签名'
+          } catch {
+            Remove-Item android/app/key.jks -ErrorAction SilentlyContinue
+            Remove-Item android/key.properties -ErrorAction SilentlyContinue
+            Write-Host "签名配置无效，跳过并回退 debug 签名: $($_.Exception.Message)"
           }
 
       - name: 构建 APK

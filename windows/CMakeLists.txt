@@ -32,6 +32,12 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# 抑制 MSVC 新版 STL（VS2026 / 14.5+）对 <experimental/coroutine> 的 STL1011 静态断言：
+# flutter_inappwebview_windows 依赖的 C++/WinRT 在 C++17 下会包含该头，
+# 旧工具链（VS2019/14.29）不受影响，新工具链需此宏才能编译。
+# 微软官方文档给出的临时兼容方案（transition 到 C++20 <coroutine> 前使用）。
+add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by
