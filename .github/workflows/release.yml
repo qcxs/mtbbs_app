@@ -115,7 +115,8 @@ jobs:
       - name: 上传构建产物
         uses: actions/upload-artifact@v7
         with:
-          archive: false
+          # archive:false 只允许单文件，3 个 ABI 的 APK 需走默认打包（zip）。
+          # 正式发布仍由 softprops 逐个上传独立 APK，不受影响
           name: Android-APK
           path: MTBBS_android_*.apk
 
@@ -140,6 +141,16 @@ jobs:
 
       - name: 安装 Inno Setup
         run: choco install innosetup --no-progress -y
+
+      - name: 添加中文语言文件（仓库内置，拷贝到 Inno Setup）
+        shell: pwsh
+        run: |
+          # ChineseSimplified.isl 属于非官方翻译，官方安装包/choco 包均不附带，
+          # 故随仓库内置（installer/ChineseSimplified.isl），对齐 PiliPlus 的做法
+          $langDir = Join-Path (Split-Path (Get-Command iscc).Source) 'Languages'
+          New-Item -ItemType Directory -Force -Path $langDir | Out-Null
+          Copy-Item 'installer/ChineseSimplified.isl' (Join-Path $langDir 'ChineseSimplified.isl') -Force
+          Write-Host '已拷贝 ChineseSimplified.isl -> Inno Setup Languages'
 
       - name: 生成版本信息
         shell: pwsh
@@ -177,7 +188,7 @@ jobs:
       - name: 上传构建产物
         uses: actions/upload-artifact@v7
         with:
-          archive: false
+          # 同上：archive:false 只允许单文件，exe+zip 两个产物需走默认打包
           name: Windows-x64
           path: |
             MTBBS_windows_*.exe

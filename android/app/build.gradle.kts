@@ -74,6 +74,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // 应用名走占位符，beta 变体单独命名，与正式版在桌面区分开
+        manifestPlaceholders.put("appName", "MT论坛")
     }
 
     buildTypes {
@@ -82,6 +84,14 @@ android {
         }
         release {
             // 有正式签名用正式签名；否则用 debug 签名（本地自测/CI 未配 Secrets 均不报错）
+            signingConfig = if (keystoreOk) signingConfigs.getByName("release")
+            else signingConfigs.getByName("debug")
+        }
+        // beta：独立 applicationId + 独立应用名，与正式版共存，versionCode 互不影响，
+        // 彻底绕开"Android 不允许降级安装"（本地/预发布测试专用，构建命令见 docs/15）。
+        create("beta") {
+            applicationIdSuffix = ".beta"
+            manifestPlaceholders.put("appName", "MT论坛 beta")
             signingConfig = if (keystoreOk) signingConfigs.getByName("release")
             else signingConfigs.getByName("debug")
         }
