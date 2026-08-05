@@ -123,7 +123,10 @@ jobs:
   windows:
     name: Windows 安装包
     if: ${{ github.event.inputs.build_windows == 'true' }}
-    runs-on: windows-latest
+    # 工具链对齐：插件 flutter_inappwebview 6.x 官方支持基线为 VS2022（MSVC 14.4x）；
+    # windows-2022 镜像 = VS2022 17.14 + SDK 10.0.22621 + 预装 Inno Setup 6.7.1。
+    # 不要用 windows-latest（已切到 VS2026/MSVC 14.51，会触发 STL1011 硬错误）。
+    runs-on: windows-2022
     permissions:
       contents: write
     steps:
@@ -145,12 +148,16 @@ jobs:
       - name: 添加中文语言文件（仓库内置，拷贝到 Inno Setup）
         shell: pwsh
         run: |
-          # ChineseSimplified.isl 属于非官方翻译，官方安装包/choco 包均不附带，
-          # 故随仓库内置（installer/ChineseSimplified.isl），对齐 PiliPlus 的做法
-          $langDir = Join-Path (Split-Path (Get-Command iscc).Source) 'Languages'
+          # ChineseSimplified.isl 属于非官方翻译，官方安装包/choco 包均不附带，随仓库内置。
+          # 注意：choco 的 iscc 是 Chocolatey shim，Get-Command iscc 取不到真实安装目录，
+          # 必须硬编码官方安装路径（iscc 编译时读取 Languages 的目录）
+          $langDir = "${env:ProgramFiles(x86)}\Inno Setup 6\Languages"
           New-Item -ItemType Directory -Force -Path $langDir | Out-Null
           Copy-Item 'installer/ChineseSimplified.isl' (Join-Path $langDir 'ChineseSimplified.isl') -Force
-          Write-Host '已拷贝 ChineseSimplified.isl -> Inno Setup Languages'
+          if (-not (Test-Path (Join-Path $langDir 'ChineseSimplified.isl'))) {
+            throw '中文语言文件拷贝失败'
+          }
+          Write-Host "已拷贝 ChineseSimplified.isl -> $langDir"
 
       - name: 生成版本信息
         shell: pwsh

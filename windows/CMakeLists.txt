@@ -10,6 +10,12 @@ set(BINARY_NAME "mtbbs")
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
 
+# 抑制上游 flutter_inappwebview_windows 插件 CMakeLists 的 CMP0175 dev 警告：
+# 插件对 add_custom_command(TARGET) 误用了 DEPENDS（无效参数），且其 CMakeLists 内部的
+# cmake_policy(VERSION 3.14...3.25) 会重置我方显式设置的 policy，无法从根目录传播生效；
+# 故用官方全局开关关闭 CMake 开发者警告（仅影响 dev 级提示，不影响构建功能与错误）。
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON CACHE BOOL "Suppress CMake developer warnings" FORCE)
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)
@@ -31,12 +37,6 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
-
-# 抑制 MSVC 新版 STL（VS2026 / 14.5+）对 <experimental/coroutine> 的 STL1011 静态断言：
-# flutter_inappwebview_windows 依赖的 C++/WinRT 在 C++17 下会包含该头，
-# 旧工具链（VS2019/14.29）不受影响，新工具链需此宏才能编译。
-# 微软官方文档给出的临时兼容方案（transition 到 C++20 <coroutine> 前使用）。
-add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 
 # Compilation settings that should be applied to most targets.
 #
@@ -62,6 +62,16 @@ add_subdirectory("runner")
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
+
+# 抑制上游 flutter_inappwebview_windows 插件及其依赖（Microsoft WebView2）的编译警告：
+#   C4819 插件源码含非当前代码页字符（中文系统代码页 936）
+#   C4244 int64→int 潜在收窄（上游已知，不影响实际行为）
+#   C4458 WebView2 头中 'value' 隐藏类成员（微软自家头文件）
+# 仅作用于该插件目标；本项目代码仍保持 /W4 /WX 严格编译。
+# if(TARGET) 守卫：该插件从 pubspec 移除后自动失效，避免 CMake 报目标不存在。
+if(TARGET flutter_inappwebview_windows_plugin)
+  target_compile_options(flutter_inappwebview_windows_plugin PRIVATE /wd4819 /wd4244 /wd4458)
+endif()
 
 
 # === Installation ===

@@ -33,8 +33,8 @@
 |------|------|
 | Flutter | 3.44.2+ |
 | Dart | 3.12.2+ |
-| Android SDK | compileSdk 35+ |
-| Windows | Windows 10+ (x64) |
+| Android SDK | compileSdk 跟随 Flutter 默认（当前 36） |
+| Windows | Windows 10+ (x64)，Visual Studio 2022（见下方打包前置） |
 
 ```bash
 # 检查代码
@@ -58,8 +58,8 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=help
 
 #### 前置条件
 
-- Visual Studio 2019/2022（含**使用 C++ 的桌面开发**工作负载）
-- [Inno Setup 7](https://jrsoftware.org/isinfo.php)（Unicode 版），安装后确保 `iscc` 在 PATH 中
+- Visual Studio **2022**（17.13+，含**使用 C++ 的桌面开发**工作负载；工具链对齐说明见 `docs/15-版本发布.md`，勿用 VS2026）
+- [Inno Setup](https://jrsoftware.org/isinfo.php) 6+（Unicode 版），安装后确保 `iscc` 在 PATH 中
 
 #### 步骤
 
@@ -103,9 +103,9 @@ flutter build apk --release `
 
 ---
 
-## Fork & 自建教程
+## Fork 与自建教程
 
-如果你想基于此项目适配**你自己的 Discuz 论坛**，可以 Fork 后自行配置。
+如果你想基于此项目适配**你自己的 Discuz 论坛**，Fork 后按以下注意事项配置。
 
 ### 1. Fork 仓库
 
@@ -116,13 +116,13 @@ git clone https://github.com/你的用户名/mtbbs_app.git
 cd mtbbs_app
 ```
 
-### 2. 遵守许可证
+### 2. 遵守许可证（必须）
 
-**你必须保留以下内容不变：**
+本项目为 **GPLv3**，Fork/修改/分发必须：
 
-- 代码顶部的版权声明（Copyright notice）
-- `LICENSE` 文件（GPLv3 全文）
-- 在 README 或 About 页面中注明原作者及原始仓库链接
+- 保留代码顶部版权声明与 `LICENSE` 文件（GPLv3 全文）
+- 修改后的版本同样以 GPLv3 发布，并提供源代码
+- 在 README 或 About 中注明原作者及原始仓库
 
 建议在 README 中添加：
 
@@ -142,6 +142,33 @@ SiteConfig.sites[0] = SiteInfo(
   ...
 );
 ```
+
+> 本项目针对 MT 论坛的克米模板适配。不同 Discuz 模板/版本的页面结构可能有差异，若解析异常，参考 `docs/03-UA与解析策略.md` 调整。
+
+### 4. 修改 Android 应用标识（推荐）
+
+`android/app/build.gradle.kts` 中 `applicationId = "com.github.qcxs.discuz"` 是原作者的应用 ID——**Fork 后务必改成你自己的**（如 `com.yourname.discuz`），否则与原版应用包名冲突：同一设备无法同时安装，也无法覆盖升级。debug / beta 变体分别带 `.debug` / `.beta` 后缀，可与正式版共存。
+
+### 5. 使用 GitHub Actions 发布
+
+Fork 后 Actions 默认可用，`release.yml` 为**手动触发**（`workflow_dispatch`，不会自动跑）：
+
+1. 进入仓库 **Actions** 页 → 左侧选 **Release** → **Run workflow**
+2. 勾选平台（Android / Windows），填 `tag` 参数：
+   - **留空**：只构建不发布，产物在运行页底部作为 artifact 下载（推荐用于测试流程）
+   - **填 `v1.0.0`**：构建后自动创建/更新 GitHub Release 并上传产物；若 tag 不存在则由发布动作自动创建（指向当前迁出的提交）
+3. 版本号规则与完整发布流程见 `docs/15-版本发布.md`
+
+**Android 签名（可选但正式分发必配）**：CI 默认降级为 debug 签名（仅自测可装）。正式发布需在仓库 **Settings → Secrets and variables → Actions** 配置以下 4 个变量，`release.yml` 会自动检测并正式签名；缺任一变量会静默降级，**不会报错**：
+
+| Secret 名 | 说明 |
+|-----------|------|
+| `SIGN_KEYSTORE_BASE64` | `keytool` 生成的 keystore 文件 base64 编码 |
+| `SIGN_STORE_PASSWORD` | keystore 密码 |
+| `SIGN_KEY_ALIAS` | 密钥别名 |
+| `SIGN_KEY_PASSWORD` | 密钥密码 |
+
+Windows 端无需额外配置：CI 使用 `windows-2022` 镜像（与本地 VS2022 工具链对齐），Inno Setup 中文语言文件已随仓库内置。
 
 ## 文档
 
@@ -203,3 +230,9 @@ lib/
 ├── services/       Dio、MT 图床、剪贴板粘贴等服务
 └── widgets/        通用组件
 ```
+
+## 致谢
+
+- [**PiliPlus**](https://github.com/bggRGjQaUbCoE/PiliPlus)：开源的 B 站客户端标杆，本项目的版本管理、GitHub Actions 发布与打包流程参考了其成熟实践
+- **DeepSeek API**：量大管饱的推理能力，支撑了本项目大量的开发、调试与文档工作
+- **Trae**：可视化编辑器，降低了 Flutter 开发的上手门槛，适合小白快速构建应用
