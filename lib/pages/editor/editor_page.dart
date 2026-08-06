@@ -1971,8 +1971,6 @@ class _EditorPageState extends State<EditorPage> {
                           _showRawBbcodeDialog(context, data.content),
                       child: PostHtmlWidget(
                         bbcode: data.content,
-                        emojiMap: _emojiMap,
-                        smilieIdMap: EmojiService().smilieIdMap,
                         disabledTags: settings.disabledBbcodeTags,
                         autoDetectUrls: settings.autoDetectUrls,
                       ),

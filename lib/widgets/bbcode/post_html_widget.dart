@@ -30,11 +30,6 @@ class _TableSegment extends _Segment {
   _TableSegment(this.content);
 }
 
-class _CodeSegment extends _Segment {
-  final String content;
-  _CodeSegment(this.content);
-}
-
 /// 可被全局/局部禁用的 BBCode 样式标签（从旧 PostAstWidget 迁移）
 const bbcodeStyleTags = <String>{
   'bold',
@@ -80,8 +75,6 @@ double resolvePostImageWidth({
 class PostHtmlWidget extends StatelessWidget {
   final String bbcode;
   final double fontSize;
-  final Map<String, String>? emojiMap;
-  final Map<String, String>? smilieIdMap;
   final Set<String>? disabledTags;
   final bool autoDetectUrls;
 
@@ -89,8 +82,6 @@ class PostHtmlWidget extends StatelessWidget {
     super.key,
     required this.bbcode,
     this.fontSize = 16,
-    this.emojiMap,
-    this.smilieIdMap,
     this.disabledTags,
     this.autoDetectUrls = true,
   });
@@ -107,15 +98,15 @@ class PostHtmlWidget extends StatelessWidget {
       (s) => s.maxImageWidth,
     );
 
-    // 1. 先按 [code] 分割，再对非 code 段按 [table] 分割
+    // 1. 仅按 [table] 分割（code 由 BBCode2Html 还原为占位元素，
+    //    flutter_html extension 原地替换为代码高亮组件，不参与分段，
+    //    避免切分拆散 hide/quote/free/table 等容器标签）
     final segments = _buildSegments(bbcode);
     final content = segments.length == 1 && segments.first is _HtmlSegment
         ? _buildHtmlSegment(
             context,
             bbcode,
             fontSize,
-            emojiMap,
-            smilieIdMap,
             effectiveDisabled,
             autoDetectUrls,
             maxImageWidth,
@@ -130,8 +121,6 @@ class PostHtmlWidget extends StatelessWidget {
                     context,
                     content,
                     fontSize,
-                    emojiMap,
-                    smilieIdMap,
                     effectiveDisabled,
                     autoDetectUrls,
                     maxImageWidth,
@@ -139,14 +128,8 @@ class PostHtmlWidget extends StatelessWidget {
                   _TableSegment(:final content) => BbcodeTableWidget(
                     bbcode: content,
                     fontSize: fontSize,
-                    emojiMap: emojiMap,
-                    smilieIdMap: smilieIdMap ?? EmojiService().smilieIdMap,
                     disabledTags: effectiveDisabled,
                     autoDetectUrls: autoDetectUrls,
-                  ),
-                  _CodeSegment(:final content) => BbcodeCodeBlock(
-                    code: content,
-                    fontSize: fontSize.clamp(11, 16).toDouble(),
                   ),
                 },
             ],
@@ -154,21 +137,14 @@ class PostHtmlWidget extends StatelessWidget {
     return SelectionArea(child: content);
   }
 
-  /// 生成渲染段列表：先按 [code] 分割，再对非 code 段按 [table] 分割
+  /// 生成渲染段列表：按 [table] 分割
   List<_Segment> _buildSegments(String bbcode) {
     final result = <_Segment>[];
-    for (final codeSeg in splitByCode(bbcode)) {
-      if (codeSeg.isCode) {
-        result.add(_CodeSegment(codeSeg.content));
+    for (final tableSeg in splitByTable(bbcode)) {
+      if (tableSeg.isTable) {
+        result.add(_TableSegment(tableSeg.content));
       } else {
-        // 非 code 段，按 [table] 进一步分割
-        for (final tableSeg in splitByTable(codeSeg.content)) {
-          if (tableSeg.isTable) {
-            result.add(_TableSegment(tableSeg.content));
-          } else {
-            result.add(_HtmlSegment(tableSeg.content));
-          }
-        }
+        result.add(_HtmlSegment(tableSeg.content));
       }
     }
     return result;
@@ -179,8 +155,6 @@ class PostHtmlWidget extends StatelessWidget {
     BuildContext context,
     String bbcodeContent,
     double fontSize,
-    Map<String, String>? emojiMap,
-    Map<String, String>? smilieIdMap,
     Set<String> disabledTags,
     bool autoDetectUrls,
     int maxImageWidth,
@@ -188,11 +162,16 @@ class PostHtmlWidget extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final converter = BBCode2Html(
-      emojiMap: emojiMap,
-      smilieIdMap: smilieIdMap,
+      // 表情数据由 EmojiService 按站点维护且几乎不变，渲染层直接获取
+      emojiMap: EmojiService().map,
+      smilieIdMap: EmojiService().smilieIdMap,
       disabledTags: disabledTags,
       baseUrl: SiteStore.instance.baseUrl,
       autoDetectUrls: autoDetectUrls,
+      // code/table 还原为占位元素，由下方 extension 原地替换为
+      // 高亮组件 / Flutter 原生 Table，保证 hide/quote/free 等容器结构完整
+      emitCodePlaceholder: true,
+      emitTablePlaceholder: true,
     );
     final html = converter.convert(bbcodeContent);
     return Html(
@@ -210,7 +189,7 @@ class PostHtmlWidget extends StatelessWidget {
         'blockquote': Style(
           backgroundColor: cs.quoteBg,
           margin: Margins.zero,
-          padding: HtmlPaddings.only(left: 12, top: 8, bottom: 8),
+          padding: HtmlPaddings.only(left: 12, right: 12, top: 8, bottom: 8),
         ),
         'pre': Style(backgroundColor: cs.codeBgColor, margin: Margins.zero),
         'code': Style(color: cs.codeTextColor, fontFamily: 'monospace'),
@@ -227,7 +206,7 @@ class PostHtmlWidget extends StatelessWidget {
         '.bbcode-locked': Style(
           backgroundColor: cs.quoteBg,
           margin: Margins.zero,
-          padding: HtmlPaddings.only(left: 12, top: 8, bottom: 8),
+          padding: HtmlPaddings.only(left: 12, right: 12, top: 8, bottom: 8),
         ),
         '.bbcode-pstatus': Style(
           fontSize: FontSize(12),
@@ -239,7 +218,7 @@ class PostHtmlWidget extends StatelessWidget {
         '.bbcode-reward': Style(
           backgroundColor: cs.quoteBg,
           margin: Margins.zero,
-          padding: HtmlPaddings.only(left: 12, top: 8, bottom: 8),
+          padding: HtmlPaddings.only(left: 12, right: 12, top: 8, bottom: 8),
         ),
         '.bbcode-poll': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
         'ul': Style(margin: Margins.zero, padding: HtmlPaddings.only(left: 24)),
@@ -332,6 +311,16 @@ class PostHtmlWidget extends StatelessWidget {
               },
             );
           },
+        ),
+        BbcodeCodeExtension(
+          codeBlocks: converter.codeBlocks,
+          fontSize: fontSize,
+        ),
+        BbcodeTableExtension(
+          tableBlocks: converter.tableBlocks,
+          fontSize: fontSize,
+          disabledTags: disabledTags,
+          autoDetectUrls: autoDetectUrls,
         ),
       ],
       onLinkTap: (link, attributes, element) {

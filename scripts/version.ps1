@@ -19,9 +19,11 @@ $ErrorActionPreference = 'Stop'
 
 try {
     # 1. 从 pubspec.yaml 读取版本名（唯一事实源）
+    #    支持 semver 预发布后缀（如 version: 1.0.0-pro+1 → 版本名 "1.0.0-pro"）：
+    #    捕获主版本号 + 可选 -prerelease 段，丢弃 +build（build 号由 git 提交数决定）。
     $versionName = $null
     foreach ($line in (Get-Content -Path 'pubspec.yaml' -Encoding UTF8)) {
-        if ($line -match '^\s*version:\s*([\d\.]+)') {
+        if ($line -match '^\s*version:\s*([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)') {
             $versionName = $matches[1]
             break
         }

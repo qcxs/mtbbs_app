@@ -9,6 +9,7 @@ import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
 
 /// 我的帖子/回复页面
 class MyThreadPage extends StatefulWidget {
@@ -124,12 +125,16 @@ class _MyThreadPageState extends State<MyThreadPage> {
                 if (_loadingReplies.contains(tid)) return;
                 // 开始加载
                 setState(() => _loadingReplies.add(tid));
-                detail_api
-                    .getThreadDetail(
-                      ApiService().dio,
-                      tid: tid.toString(),
-                      page: 1,
-                      authorid: uid,
+                // 先确保表情已加载，回复内容里的表情才能还原
+                EmojiService()
+                    .load()
+                    .then(
+                      (_) => detail_api.getThreadDetail(
+                        ApiService().dio,
+                        tid: tid.toString(),
+                        page: 1,
+                        authorid: uid,
+                      ),
                     )
                     .then((result) {
                       if (!mounted) return;

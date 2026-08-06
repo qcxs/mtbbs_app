@@ -3,15 +3,16 @@ import 'dart:convert';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/app/page_helper.dart';
-import 'package:mtbbs/core/app/smilie_map.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 
 /// Html2BBCode — 将 Discuz 帖子 HTML 转换为 BBCode 字符串
 ///
 /// 专注于 PC 模板的 Discuz 帖子内容解析。
 ///
-/// [smilieIdMap] 可选，smilieId → insertText 映射。
-/// 未传入时自动使用 [SmilieMap.idMap]（由 EmojiService 维护的全局映射）。
+/// [smilieIdMap] 可选（测试/特殊场景注入），smilieId → insertText 映射。
+/// 未传入时从 [EmojiService] 直接读取当前站点的表情数据（按站点隔离，
+/// 不依赖加载时序）；站点数据为空时不还原表情，静默跳过。
 class Html2BBCode {
   static final _noRecurseTags = <String>{'code'};
   final List<String> tips = [];
@@ -19,7 +20,8 @@ class Html2BBCode {
 
   Html2BBCode({Map<String, String>? smilieIdMap}) : _customMap = smilieIdMap;
 
-  Map<String, String> get _effectiveMap => _customMap ?? SmilieMap.idMap;
+  Map<String, String> get _effectiveMap =>
+      _customMap ?? EmojiService().smilieIdMap;
 
   void _reset() => tips.clear();
 

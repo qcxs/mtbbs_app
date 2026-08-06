@@ -4,6 +4,7 @@ import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
 
 /// 帖子预览数据
 class PostPreviewData {
@@ -122,6 +123,10 @@ class PostPreviewManager {
     try {
       // 错峰等待放行后再发起 HTTP 请求
       await enqueueStagger().ready;
+
+      // 确保表情已加载：解析层（Html2BBCode）从 EmojiService 读取当前
+      // 站点表情数据，未加载时表情会被静默跳过，渲染层无米下锅
+      await EmojiService().load();
 
       final result = await viewpid_api.getPostByPid(
         ApiService().dio,

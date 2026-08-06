@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:flutter_highlight/themes/github.dart';
@@ -47,25 +48,44 @@ const _languages = [
   ('powershell', 'PowerShell'),
 ];
 
-/// 将 BBCode 字符串按 [code] 分割为片段
-List<({bool isCode, String content})> splitByCode(String bbcode) {
-  final segments = <({bool isCode, String content})>[];
-  final regex = RegExp(r'\[code\]([\s\S]*?)\[/code\]', caseSensitive: false);
-  int lastEnd = 0;
-  for (final match in regex.allMatches(bbcode)) {
-    if (match.start > lastEnd) {
-      segments.add((
-        isCode: false,
-        content: bbcode.substring(lastEnd, match.start),
-      ));
-    }
-    segments.add((isCode: true, content: match.group(1)!));
-    lastEnd = match.end;
+/// flutter_html extension：把 [code] 占位元素原地替换为代码高亮组件
+///
+/// BBCode2Html 在 [BBCode2Html.emitCodePlaceholder] 模式下将 [code] 块还原为
+/// `<div class="bbcode-code" data-code-index="N"></div>`。占位元素保证
+/// hide/quote/free 等容器在 HTML 中结构完整（一次转换），此处在渲染时按
+/// data-code-index 取出原始代码，原地替换为 [BbcodeCodeBlock]
+/// （语法高亮 + 复制 + 语言切换），不参与任何分段。
+///
+/// 若 [codeBlocks] 中没有对应索引（如数据缺失），渲染空代码块而非崩溃。
+class BbcodeCodeExtension extends HtmlExtension {
+  final List<String> codeBlocks;
+  final double fontSize;
+
+  const BbcodeCodeExtension({required this.codeBlocks, required this.fontSize});
+
+  @override
+  Set<String> get supportedTags => const {'div'};
+
+  @override
+  bool matches(ExtensionContext context) {
+    return context.element?.attributes.containsKey('data-code-index') ?? false;
   }
-  if (lastEnd < bbcode.length) {
-    segments.add((isCode: false, content: bbcode.substring(lastEnd)));
+
+  @override
+  InlineSpan build(ExtensionContext context) {
+    final index = int.tryParse(
+      context.element?.attributes['data-code-index'] ?? '',
+    );
+    final code = (index != null && index >= 0 && index < codeBlocks.length)
+        ? codeBlocks[index]
+        : '';
+    return WidgetSpan(
+      child: BbcodeCodeBlock(
+        code: code,
+        fontSize: fontSize.clamp(11, 16).toDouble(),
+      ),
+    );
   }
-  return segments;
 }
 
 /// BBCode [code] 代码块渲染组件

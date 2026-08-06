@@ -6,6 +6,7 @@ import 'package:html/parser.dart' as htmlParser;
 import 'package:dio/dio.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -140,6 +141,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         targetPage = await _resolveRedirectPage();
         pidMode = true;
       }
+      // 确保表情已加载，帖子内容里的表情才能还原为 [呵呵] 文本
+      await EmojiService().load();
       final page1Result = await detail_api.getThreadDetail(
         ApiService().dio,
         tid: widget.tid,
@@ -195,6 +198,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       _pageLoading = true;
     });
     try {
+      await EmojiService().load();
       final raw = await detail_api.getThreadDetail(
         ApiService().dio,
         tid: widget.tid,
@@ -235,12 +239,16 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   void _doPreload(int page) {
     _preloading = true;
-    detail_api
-        .getThreadDetail(
-          ApiService().dio,
-          tid: widget.tid,
-          page: page,
-          authorid: widget.authorid,
+    // 先确保表情已加载，预加载的帖子内容才能还原表情（不会固化坏缓存）
+    EmojiService()
+        .load()
+        .then(
+          (_) => detail_api.getThreadDetail(
+            ApiService().dio,
+            tid: widget.tid,
+            page: page,
+            authorid: widget.authorid,
+          ),
         )
         .then((raw) {
           if (raw['success'] == true && mounted) {
@@ -303,6 +311,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     _commentPages.remove(1);
     _data = null;
     try {
+      await EmojiService().load();
       final raw = await detail_api.getThreadDetail(
         ApiService().dio,
         tid: widget.tid,

@@ -4,7 +4,8 @@ import 'package:mtbbs/core/parser/xml_helper.dart';
 /// 单帖详情（viewpid）响应解析
 ///
 /// 从 inajax XML/CDATA 中提取单条帖子/评论的完整数据。
-/// 内部委托 [parsePostFromTable] 完成 PC 模板解析。
+/// 内部委托 [parsePostFromTable] 完成 PC 模板解析（表情还原由解析层
+/// 自行从 EmojiService 读取当前站点数据）。
 ///
 /// 返回字段名与 getThreadDetail 一致：username / postTime。
 

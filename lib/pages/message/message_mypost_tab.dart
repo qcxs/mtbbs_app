@@ -5,7 +5,6 @@ import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
-import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
@@ -283,8 +282,6 @@ class _MypostTabState extends State<MypostTab> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: PostHtmlWidget(
                   bbcode: preview.bbcode,
-                  emojiMap: EmojiService().map,
-                  smilieIdMap: EmojiService().smilieIdMap,
                   disabledTags: const {},
                   autoDetectUrls: context
                       .read<SettingsProvider>()

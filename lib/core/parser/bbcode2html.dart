@@ -20,6 +20,19 @@ class BBCode2Html {
   final Set<String>? _disabledTags;
   final String? _baseUrl;
   final bool _autoDetectUrls;
+  final bool _emitCodePlaceholder;
+  final bool _emitTablePlaceholder;
+
+  /// [convert] 后填充的 [code] 块内容（索引对应 HTML 中的
+  /// `data-code-index`）。供渲染层在 flutter_html extension 中取出
+  /// 原始代码文本，交给代码高亮组件渲染。
+  final List<String> codeBlocks = [];
+
+  /// [convert] 后填充的 [table] 块内容（索引对应 HTML 中的
+  /// `data-table-index`，值为含 [table]...[/table] 标签的原始 BBCode）。
+  /// flutter_html 核心不支持 `<table>` 渲染，渲染层须将其替换为
+  /// BbcodeTableWidget（Flutter 原生 Table）。
+  final List<String> tableBlocks = [];
 
   BBCode2Html({
     Map<String, String>? emojiMap,
@@ -27,32 +40,44 @@ class BBCode2Html {
     Set<String>? disabledTags,
     String? baseUrl,
     bool autoDetectUrls = true,
+    bool emitCodePlaceholder = false,
+    bool emitTablePlaceholder = false,
   }) : _emojiMap = emojiMap,
        _smilieIdMap = smilieIdMap,
        _disabledTags = disabledTags,
        _baseUrl = baseUrl,
-       _autoDetectUrls = autoDetectUrls;
+       _autoDetectUrls = autoDetectUrls,
+       _emitCodePlaceholder = emitCodePlaceholder,
+       _emitTablePlaceholder = emitTablePlaceholder;
 
-  /// 归一化短 hex 颜色，避免 flutter_html 解析异常。
+  /// 归一化/校验颜色值。
   ///
   /// flutter_html 对 4 位 hex（如 `#ff00`）解析会产生 alpha=0 的异常色
   /// （表现为文字透明/发白）。网页中 `<font color="#ff00">` 按 HTML 属性
   /// legacy 语义解析为 `#ff0000`（红色），这里对齐网页语义：
   /// - 4 位 `#RRGG` → `#RRGG00`（R2 + G2，B 补 0）
   /// - 3 位 `#RGB` → `#RRGGBB`（标准 CSS 翻倍）
-  /// 6/8 位 hex、rgb()/rgba()、命名色 flutter_html 均能正确解析，原样返回。
+  /// - 6/8 位 hex 校验通过后原样返回
+  /// - 非法 hex（如 `#FFYYTT`）返回空串：flutter_html 的 stringToColor
+  ///   会对非法 hex 抛 FormatException 导致整段渲染失败，调用点据此省略样式
+  /// - rgb()/rgba()、命名色 flutter_html 均能正确解析，原样返回
+  static final _hex3 = RegExp(r'^#[0-9a-fA-F]{3}$');
+  static final _hex4 = RegExp(r'^#[0-9a-fA-F]{4}$');
+  static final _hex6 = RegExp(r'^#[0-9a-fA-F]{6}$');
+  static final _hex8 = RegExp(r'^#[0-9a-fA-F]{8}$');
+
   static String _normalizeColor(String v) {
     final s = v.trim();
-    if (s.startsWith('#') &&
-        s.length == 5 &&
-        RegExp(r'^#[0-9a-fA-F]{4}$').hasMatch(s)) {
-      return '#${s.substring(1, 3)}${s.substring(3, 5)}00';
-    }
-    if (s.startsWith('#') &&
-        s.length == 4 &&
-        RegExp(r'^#[0-9a-fA-F]{3}$').hasMatch(s)) {
-      final c = s.substring(1);
-      return '#${c[0]}${c[0]}${c[1]}${c[1]}${c[2]}${c[2]}';
+    if (s.startsWith('#')) {
+      if (_hex4.hasMatch(s)) {
+        return '#${s.substring(1, 3)}${s.substring(3, 5)}00';
+      }
+      if (_hex3.hasMatch(s)) {
+        final c = s.substring(1);
+        return '#${c[0]}${c[0]}${c[1]}${c[1]}${c[2]}${c[2]}';
+      }
+      if (_hex6.hasMatch(s) || _hex8.hasMatch(s)) return s;
+      return '';
     }
     return v;
   }
@@ -60,8 +85,11 @@ class BBCode2Html {
   /// 转换主入口
   String convert(String input) {
     var html = htmlEscape(input);
-    final codes = <String>[];
     final appdataList = <String>[];
+    // codeBlocks/tableBlocks 为公开输出字段，每次转换前清空；
+    // codeBlocks 在保护 [code] 时即填充（_convertTables 需用它还原占位符）
+    codeBlocks.clear();
+    tableBlocks.clear();
 
     // ========== 0. 保护 [appdata] 块（JSON 不应被 HTML 转义） ==========
     html = html.replaceAllMapped(
@@ -95,11 +123,12 @@ class BBCode2Html {
     html = html.replaceAllMapped(
       RegExp(r'\[code\]([\s\S]*?)\[/code\]', caseSensitive: false),
       (m) {
-        final code = m.group(1)!;
-        // code 内容不转义，保持原始文本
-        final escaped = _codeToHtml(code);
-        codes.add(escaped);
-        return '\x00CODE${codes.length - 1}\x00';
+        // 存原始代码文本（codeBlocks 供高亮组件使用，还原时才转 HTML）。
+        // 注意：此处的 m.group(1) 已被开头 htmlEscape 转义，须反转义还原，
+        // 否则渲染模式（高亮组件不经 flutter_html 实体解码）会显示
+        // &gt;/&lt; 等实体原文。
+        codeBlocks.add(_unescapeHtml(m.group(1)!));
+        return '\x00CODE${codeBlocks.length - 1}\x00';
       },
     );
 
@@ -129,20 +158,17 @@ class BBCode2Html {
     // 颜色 [color=...]
     // 使用 <span style="color:..."> 而非 <font color="...">，因为 flutter_html
     // 对 <font color> 属性中的 rgb()/rgba() 格式支持不完整，而 inline style 是 CSS 标准
-    html = _replaceTag(
-      html,
-      'color',
-      (_, v) => '<span style="color:${_normalizeColor(v)}">',
-      '</span>',
-    );
+    // 非法颜色值（_normalizeColor 返回空串）时省略样式，避免 flutter_html 抛异常
+    html = _replaceTag(html, 'color', (_, v) {
+      final c = _normalizeColor(v);
+      return c.isEmpty ? '<span>' : '<span style="color:$c">';
+    }, '</span>');
 
     // 背景色 [backcolor=...]
-    html = _replaceTag(
-      html,
-      'backcolor',
-      (_, v) => '<span style="background-color:${_normalizeColor(v)}">',
-      '</span>',
-    );
+    html = _replaceTag(html, 'backcolor', (_, v) {
+      final c = _normalizeColor(v);
+      return c.isEmpty ? '<span>' : '<span style="background-color:$c">';
+    }, '</span>');
 
     // 对齐 [align=...]
     // 使用 CSS text-align 而非 HTML align 属性，因为 flutter_html 不支持 align 属性
@@ -266,36 +292,8 @@ class BBCode2Html {
           '<a href="http://wpa.qq.com/msgrd?v=3&uin=${m.group(1)}&site=discuz&from=discuz&menu=yes" target="_blank">QQ: ${m.group(1)}</a>',
     );
 
-    // 表格
-    html = html.replaceAllMapped(
-      RegExp(r'\[td\]([\s\S]*?)\[\/td\]', caseSensitive: false),
-      (m) {
-        var content = m.group(1)!;
-        // 检测 td 内容是否被 <div align="XXX">...</div> 包裹
-        // 将 text-align 直接加到 td 样式上，避免 flutter_html 对 td 内块级元素的渲染问题
-        final trimmed = content.trim();
-        if (trimmed.startsWith('<div align="') && trimmed.endsWith('</div>')) {
-          final attrMatch = RegExp(
-            r'^<div\s+align="([^"]+)"\s*>',
-          ).firstMatch(trimmed);
-          if (attrMatch != null) {
-            final align = attrMatch.group(1)!;
-            final inner = trimmed.substring(attrMatch.end, trimmed.length - 6);
-            return '<td style="border:1px solid #E3EDF5;padding:4px 8px;text-align:$align">$inner</td>';
-          }
-        }
-        return '<td style="border:1px solid #E3EDF5;padding:4px 8px;">$content</td>';
-      },
-    );
-    html = html.replaceAllMapped(
-      RegExp(r'\[tr\]([\s\S]*?)\[\/tr\]', caseSensitive: false),
-      (m) => '<tr style="border:1px solid #E3EDF5;">${m.group(1)}</tr>',
-    );
-    html = html.replaceAllMapped(
-      RegExp(r'\[table\]([\s\S]*?)\[\/table\]', caseSensitive: false),
-      (m) =>
-          '<table style="width:100%;border:1px solid #E3EDF5;border-collapse:collapse;">${m.group(1)}</table>',
-    );
+    // 表格（嵌套安全）：栈式匹配最外层 [table]，td 内容递归处理嵌套表格
+    html = _convertTables(html);
 
     // [media] / [audio] / [flash] → 统一占位符 [标签] 内容
     String _placeholder(String label, String content) =>
@@ -350,12 +348,10 @@ class BBCode2Html {
     );
 
     // 背景色 background
-    html = _replaceTag(
-      html,
-      'background',
-      (_, v) => '<span style="background-color:${_normalizeColor(v)}">',
-      '</span>',
-    );
+    html = _replaceTag(html, 'background', (_, v) {
+      final c = _normalizeColor(v);
+      return c.isEmpty ? '<span>' : '<span style="background-color:$c">';
+    }, '</span>');
 
     // ========== 4. 表情替换 ==========
     html = _replaceEmoji(html);
@@ -378,8 +374,15 @@ class BBCode2Html {
     }
 
     // ========== 7. 恢复 [code] 块 ==========
-    for (int i = 0; i < codes.length; i++) {
-      html = html.replaceFirst('\x00CODE$i\x00', codes[i]);
+    for (int i = 0; i < codeBlocks.length; i++) {
+      html = html.replaceFirst(
+        '\x00CODE$i\x00',
+        _emitCodePlaceholder
+            // 占位元素：保持容器结构完整，由 flutter_html extension
+            // 按 data-code-index 原地替换为代码高亮组件
+            ? '<div class="bbcode-code" data-code-index="$i"></div>'
+            : _codeToHtml(codeBlocks[i]),
+      );
     }
 
     // ========== 7. 恢复 [appdata] 块 ==========
@@ -530,13 +533,28 @@ class BBCode2Html {
 
   /// [code] 内容转 HTML（保留缩进和格式）
   String _codeToHtml(String code) {
-    // code 内容：空格保留、换行转 <br>、HTML 标签不转义
+    // code 内容：空格保留、换行转 <br>；HTML 标签须转义（codeBlocks 现为
+    // 原始代码文本），由 flutter_html 解码实体后显示，避免 < > 破坏结构
+    code = htmlEscape(code);
     final lines = code
         .split('\n')
         .map((l) => '<li>${l.isEmpty ? '<br>' : l}<br></li>')
         .join('');
     return '<pre><code><ol>$lines</ol></code></pre>';
   }
+
+  /// 反转义 htmlEscape 的输出（[code] 保护时还原原始代码用）。
+  ///
+  /// 顺序：非 `&amp;` 实体先还原、`&amp;` 最后——保证代码中的字面
+  /// `&lt;`（转义后 `&amp;lt;`）还原为 `&lt;` 而非被二次解码成 `<`。
+  static String _unescapeHtml(String s) => s
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&#x27;', "'")
+      .replaceAll('&#x2F;', '/')
+      .replaceAll('&amp;', '&');
 
   /// 移除被禁用的 BBCode 标签（保留标签内的内容）
   /// 例如禁用 "color" 时，[color=red]text[/color] → text
@@ -711,4 +729,108 @@ class BBCode2Html {
     html = html.replaceAllMapped(_brAfterOpen, (m) => m[1]!);
     return html;
   }
+
+  /// 将 [table] BBCode 转换为 HTML（嵌套安全）。
+  ///
+  /// 按最外层 [table] 块处理，保证 table 套 table、table 内任意标签互套
+  /// 时结构完整。非渲染模式递归解析 tr/td 输出 `<table>` HTML；
+  /// 渲染模式（[BBCode2Html.emitTablePlaceholder]）下每个最外层 table 块
+  /// 转为占位元素并存入 [tableBlocks]（flutter_html 核心不支持 `<table>`，
+  /// 由渲染层 extension 原地替换为 BbcodeTableWidget，含 hide/quote 容器内
+  /// 及嵌套表格，均可正确渲染）。
+  String _convertTables(String html) {
+    final result = StringBuffer();
+    var lastEnd = 0;
+    for (final block in outerBlocks(html, 'table')) {
+      if (block.start > lastEnd) {
+        result.write(html.substring(lastEnd, block.start));
+      }
+      if (_emitTablePlaceholder) {
+        // 还原块内 code 占位符为 [code]...[/code]，使 tableBlocks 为纯
+        // BBCode，供 BbcodeTableWidget 递归转换（占位符无法跨 converter 传递）
+        final blockText = html
+            .substring(block.start, block.end)
+            .replaceAllMapped(
+              RegExp(r'\x00CODE(\d+)\x00'),
+              (m) => '[code]${codeBlocks[int.parse(m.group(1)!)]}[/code]',
+            );
+        tableBlocks.add(blockText);
+        result.write(
+          '<div class="bbcode-table" data-table-index="${tableBlocks.length - 1}"></div>',
+        );
+      } else {
+        result.write(_renderTableBlock(html.substring(block.start, block.end)));
+      }
+      lastEnd = block.end;
+    }
+    result.write(html.substring(lastEnd));
+    return result.toString();
+  }
+
+  /// 渲染单个最外层 [table]...[/table] 块
+  String _renderTableBlock(String block) {
+    final content = block.substring(7, block.length - 8); // 去 [table]/[/table]
+    final rows = <String>[];
+    for (final tr in outerBlocks(content, 'tr')) {
+      final trBlock = content.substring(tr.start, tr.end);
+      final trInner = trBlock.substring(4, trBlock.length - 5); // 去 [tr]/[/tr]
+      final tds = <String>[];
+      for (final td in outerBlocks(trInner, 'td')) {
+        final tdBlock = trInner.substring(td.start, td.end);
+        final tdInner = tdBlock.substring(
+          4,
+          tdBlock.length - 5,
+        ); // 去 [td]/[/td]
+        tds.add(_renderTd(tdInner));
+      }
+      rows.add('<tr style="border:1px solid #E3EDF5;">${tds.join()}</tr>');
+    }
+    return '<table style="width:100%;border:1px solid #E3EDF5;border-collapse:collapse;">${rows.join()}</table>';
+  }
+
+  String _renderTd(String content) {
+    // 递归转换 td 内嵌套的 [table]
+    final inner = _convertTables(content);
+    // 检测 td 内容是否被 <div align="XXX">...</div> 包裹
+    // 将 text-align 直接加到 td 样式上，避免 flutter_html 对 td 内块级元素的渲染问题
+    final trimmed = inner.trim();
+    if (trimmed.startsWith('<div align="') && trimmed.endsWith('</div>')) {
+      final attrMatch = RegExp(
+        r'^<div\s+align="([^"]+)"\s*>',
+      ).firstMatch(trimmed);
+      if (attrMatch != null) {
+        final align = attrMatch.group(1)!;
+        final innermost = trimmed.substring(attrMatch.end, trimmed.length - 6);
+        return '<td style="border:1px solid #E3EDF5;padding:4px 8px;text-align:$align">$innermost</td>';
+      }
+    }
+    return '<td style="border:1px solid #E3EDF5;padding:4px 8px;">$inner</td>';
+  }
+}
+
+/// 栈式匹配所有最外层 `[tag]...[/tag]` 块（含标签本身）。
+///
+/// 返回完整区间列表（start 为开标签位置、end 为闭标签之后）。
+/// 与正则非贪婪匹配不同，这里按栈配对，天然支持嵌套
+/// （如 table 套 table、tr 内嵌 table），不会被内层闭标签截断。
+/// 未配对的残留标签会被忽略。
+List<({int start, int end})> outerBlocks(String input, String tag) {
+  final result = <({int start, int end})>[];
+  // 注意：不能用 r'...' 原始字符串，否则 $tag 不插值
+  final regex = RegExp('\\[/?$tag\\]', caseSensitive: false);
+  var depth = 0;
+  var start = -1;
+  for (final m in regex.allMatches(input)) {
+    if (m.group(0)!.toLowerCase() == '[$tag]') {
+      if (depth == 0) start = m.start;
+      depth++;
+    } else {
+      depth--;
+      if (depth == 0 && start != -1) {
+        result.add((start: start, end: m.end));
+        start = -1;
+      }
+    }
+  }
+  return result;
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/models/thread_detail.dart';
-import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
@@ -216,8 +215,6 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           if (widget.post.bbcode.isNotEmpty)
             PostHtmlWidget(
               bbcode: widget.post.bbcode,
-              emojiMap: EmojiService().map,
-              smilieIdMap: EmojiService().smilieIdMap,
               disabledTags: _effectiveDisabledTags,
               autoDetectUrls: widget.globalDisabledTags != null
                   ? context.read<SettingsProvider>().autoDetectUrls

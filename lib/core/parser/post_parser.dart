@@ -10,6 +10,9 @@ import 'package:mtbbs/core/app/site_store.dart';
 /// - getThreadDetail（detail/parse.dart）：解析帖子详情页的每个帖子
 /// - getPostByPid（viewpid/parse.dart）：解析 inajax 单帖响应
 ///
+/// 表情还原由 [Html2BBCode] 自行从 [EmojiService] 读取当前站点数据
+/// （按站点隔离，无需调用方传递）；站点数据为空时静默跳过表情。
+///
 /// 返回字段名统一使用 detail 约定（username / postTime 等）。
 Map<String, dynamic> parsePostFromTable(
   dom.Element table, {

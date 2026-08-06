@@ -9,6 +9,7 @@ import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/forum/post/export.dart' as post_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/models/editor_snapshot.dart';
+import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 
 /// 编辑器页面加载和提交逻辑
@@ -90,6 +91,8 @@ class EditorSubmitHelper {
   /// 获取被引用的帖子
   Future<Map<String, dynamic>?> fetchQuotedPost() async {
     try {
+      // 确保表情已加载，引用帖内容里的表情才能还原为 [呵呵] 文本
+      await EmojiService().load();
       final result = await viewpid_api.getPostByPid(
         ApiService().dio,
         tid: widgetTid,

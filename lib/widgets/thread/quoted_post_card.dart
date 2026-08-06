@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
-import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 
 /// 引用帖子卡片 — 用于回复评论时展示被引用的内容
@@ -178,8 +177,6 @@ class _QuotedPostCardState extends State<QuotedPostCard> {
                 ),
               PostHtmlWidget(
                 bbcode: bbcode,
-                emojiMap: EmojiService().map,
-                smilieIdMap: EmojiService().smilieIdMap,
                 disabledTags: context
                     .read<SettingsProvider>()
                     .disabledBbcodeTags,

@@ -15,6 +15,8 @@ Future<Map<String, dynamic>> getThreadDetail(
     page: page,
     authorid: authorid,
   );
-  return parseWithLog(resp, (b, s) =>
-      parse.parseResponse(b, s, page: page, authorid: authorid));
+  return parseWithLog(
+    resp,
+    (b, s) => parse.parseResponse(b, s, page: page, authorid: authorid),
+  );
 }

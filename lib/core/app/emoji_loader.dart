@@ -3,7 +3,6 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/home/smiley/export.dart' as smiley_api;
-import 'package:mtbbs/core/app/smilie_map.dart';
 
 /// 按站点隔离的表情服务
 ///
@@ -97,10 +96,7 @@ class EmojiService {
 
   Future<void> _saveUsage() async {
     try {
-      await _db.setMeta(
-        'emoji_usage_$_host',
-        jsonEncode(_current.usageCount),
-      );
+      await _db.setMeta('emoji_usage_$_host', jsonEncode(_current.usageCount));
     } catch (_) {}
   }
 
@@ -134,7 +130,6 @@ class EmojiService {
         data['groups'] as List? ?? [],
       );
       _current.loaded = true;
-      SmilieMap.update(_current.smilieIdMap);
       await _loadUsage();
       return true;
     } catch (_) {
@@ -162,7 +157,6 @@ class EmojiService {
   /// 清空当前站点的表情元数据缓存 + 使用频率记录
   Future<void> clearCache() async {
     _current.reset();
-    SmilieMap.update({});
     try {
       await _db.deleteMeta('smilie_data_$_host');
       await _db.deleteMeta('emoji_usage_$_host');
@@ -183,7 +177,6 @@ class EmojiService {
         );
         _current.map = Map<String, String>.from(result['insertTextMap'] as Map);
         _current.loaded = true;
-        SmilieMap.update(_current.smilieIdMap);
         await _save();
         await _loadUsage();
       }
