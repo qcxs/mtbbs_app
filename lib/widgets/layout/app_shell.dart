@@ -11,6 +11,7 @@ import 'package:mtbbs/pages/guide/guide_page.dart';
 import 'package:mtbbs/pages/message/message_page.dart';
 import 'package:mtbbs/pages/user/my_profile_page.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/core/utils/screen_size_ext.dart';
 
 /// 响应式外壳（底部导航栏 + 侧边栏）
 class AppShell extends StatefulWidget {
@@ -88,14 +89,12 @@ class _AppShellState extends State<AppShell> {
     final auth = context.watch<AuthProvider>();
     final item = navItems[_currentIndex];
 
-    return OrientationBuilder(
-      builder: (context, orientation) {
-        final useBottomNav = orientation == Orientation.portrait;
-        return useBottomNav
-            ? _buildBottomNav(context, auth, item)
-            : _buildSideRail(context, auth, item);
-      },
-    );
+    // 统一按宽度比判断（与页面级 isPortrait 语义一致），
+    // 避免"竖屏平板底部导航 + 宽屏双栏内容"的矛盾组合
+    final useBottomNav = MediaQuery.sizeOf(context).isPortrait;
+    return useBottomNav
+        ? _buildBottomNav(context, auth, item)
+        : _buildSideRail(context, auth, item);
   }
 
   Widget _buildBottomNav(

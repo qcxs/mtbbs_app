@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/config/toolbar_config.dart';
+import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/dialog/key_recorder_dialog.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -133,15 +134,7 @@ class ShortcutSettingsPage extends StatelessWidget {
   }) {
     final tCs = Theme.of(context).colorScheme;
     return ListTile(
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: const Color(0xFF00BCD4).withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.keyboard, color: Color(0xFF00BCD4), size: 22),
-      ),
+      leading: settingIcon(context, Icons.keyboard),
       title: Text(
         label,
         style: visible == false ? TextStyle(color: tCs.onSurfaceVariant) : null,

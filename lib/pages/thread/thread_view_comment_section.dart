@@ -39,6 +39,9 @@ class CommentSection extends StatelessWidget {
   final bool pageLoading;
   final String tid;
 
+  /// 楼主（主题作者）uid，用于评论卡片显示"楼主"标志
+  final String opUid;
+
   // 回调
   final void Function(int page)? onPrevPage;
   final void Function(int page)? onNextPage;
@@ -59,6 +62,7 @@ class CommentSection extends StatelessWidget {
     required this.totalPages,
     required this.pageLoading,
     required this.tid,
+    this.opUid = '',
     this.onPrevPage,
     this.onNextPage,
     this.onShowPagePicker,
@@ -96,6 +100,7 @@ class CommentSection extends StatelessWidget {
               isLiked: false,
               isLoggedIn: isLoggedIn,
               currentUid: currentUid,
+              opUid: opUid,
               globalDisabledTags: disabledTags,
               globalDisableStyle: globalDisableStyle,
               onReply: () => onReply?.call(post),

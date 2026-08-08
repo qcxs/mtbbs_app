@@ -115,7 +115,7 @@ class _TabPageLayoutState extends State<TabPageLayout> {
                     icon: Icon(
                       widget.tabTuneIcon ?? Icons.tune,
                       size: 20,
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     onPressed: widget.onTabTune,
                   ),
@@ -157,7 +157,9 @@ class _TabPageLayoutState extends State<TabPageLayout> {
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
           color: selected
-              ? Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.1)
+              ? Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.1)
               : null,
           borderRadius: BorderRadius.circular(20),
         ),
@@ -166,9 +168,7 @@ class _TabPageLayoutState extends State<TabPageLayout> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            color: selected
-                ? Theme.of(context).colorScheme.onSurfaceVariant
-                : Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
       ),

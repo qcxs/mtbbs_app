@@ -68,7 +68,7 @@ void _pump() {
 
   late final OverlayEntry entry;
   entry = OverlayEntry(
-    builder: (_) {
+    builder: (context) {
       final bottom = (mq?.padding.bottom ?? 0) + 80;
       return Positioned(
         bottom: bottom,
@@ -80,7 +80,7 @@ void _pump() {
               constraints: const BoxConstraints(maxWidth: 400),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xBB000000),
+                color: Theme.of(context).colorScheme.inverseSurface,
                 borderRadius: BorderRadius.circular(100),
               ),
               child: SelectionContainer.disabled(
@@ -90,8 +90,8 @@ void _pump() {
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onInverseSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                     decoration: TextDecoration.none, // 禁用下划线

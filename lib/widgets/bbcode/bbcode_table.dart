@@ -140,7 +140,10 @@ class BbcodeTableWidget extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Table(
-        border: TableBorder.all(color: const Color(0xFFD0D7DE), width: 1),
+        border: TableBorder.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+          width: 1,
+        ),
         defaultColumnWidth: const IntrinsicColumnWidth(),
         defaultVerticalAlignment: TableCellVerticalAlignment.top,
         children: data.rows.map((row) {

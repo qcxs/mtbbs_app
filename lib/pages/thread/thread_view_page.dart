@@ -22,6 +22,7 @@ import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/models/browse_record.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/core/utils/screen_size_ext.dart';
 import 'thread_view_comment_section.dart';
 import 'thread_view_main_post.dart';
 
@@ -571,7 +572,10 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isNarrow = MediaQuery.sizeOf(context).width <= 600;
+    final size = MediaQuery.sizeOf(context);
+    // 双栏布局判定统一走 isWide（横屏且足够宽），与全项目语义一致
+    final isWide = size.isWide;
+    final isNarrow = !isWide;
     return Scaffold(
       appBar: AppBar(
         title: GestureDetector(
@@ -595,14 +599,15 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
               tooltip: '滚动到评论区',
               onPressed: _scrollToComments,
             ),
-          // 全局禁用样式 toggle（刷新按钮左侧）
+          // 全局禁用样式 toggle（刷新按钮左侧）。
+          // 激活态用 primary（切换生效），不用 error（非错误语义）
           IconButton(
             icon: Text(
               _globalDisableStyle ? 'T̶' : 'T',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: _globalDisableStyle ? cs.error : cs.onSurfaceVariant,
+                color: _globalDisableStyle ? cs.primary : cs.onSurfaceVariant,
               ),
             ),
             tooltip: _globalDisableStyle ? '恢复样式渲染（全局）' : '全局禁用样式',
@@ -671,7 +676,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
               onRetry: () => _loadInitial(),
             );
           if (_data == null) return const EmptyView(text: '暂无数据');
-          final isWide = constraints.maxWidth > 600;
           if (isWide) return _buildWideLayout();
           return _buildNarrowLayout();
         },
@@ -775,6 +779,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       totalPages: _totalPages,
       pageLoading: _pageLoading,
       tid: widget.tid,
+      opUid: _data?.mainPost?.uid ?? '',
       globalDisableStyle: _globalDisableStyle,
       onScrollNotification: _handleScrollNotification,
       onReply: (post) =>

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mtbbs/config/brand_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -22,6 +23,9 @@ class ThreadPostCard extends StatefulWidget {
   final bool isLoggedIn;
   final String currentUid;
 
+  /// 楼主（主题作者）uid；评论作者与之相同时显示"楼主"标志
+  final String opUid;
+
   /// 全局禁用的样式标签（从 SettingsProvider 传入）
   final Set<String>? globalDisabledTags;
 
@@ -40,6 +44,7 @@ class ThreadPostCard extends StatefulWidget {
     this.isLiked = false,
     this.isLoggedIn = false,
     this.currentUid = '',
+    this.opUid = '',
     this.globalDisabledTags,
     this.globalDisableStyle = false,
     this.onReply,
@@ -64,8 +69,6 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     combined.addAll(bbcodeStyleTags);
     return combined;
   }
-
-  bool get _isMainPost => widget.index == 0;
 
   Widget _buildRating(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -278,17 +281,17 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                     const SizedBox(width: 4),
                     _badge(
                       widget.post.usergroup,
-                      const Color(0xFFFF9900),
-                      const Color(0xFFFF9900).withOpacity(0.12),
+                      levelColor,
+                      levelColor.withValues(alpha: 0.12),
                     ),
                   ],
-                  if (_isMainPost && widget.post.floorLabel.isNotEmpty) ...[
+                  // 楼主标志（统一样式）：主帖本身（isOp）或评论作者与楼主 uid 相同。
+                  // primary 底 + onPrimary 文字，高对比（PiliPlus badge 范式）
+                  if (widget.post.isOp ||
+                      (widget.post.uid.isNotEmpty &&
+                          widget.post.uid == widget.opUid)) ...[
                     const SizedBox(width: 4),
-                    _badge(
-                      widget.post.floorLabel,
-                      cs.onSurfaceVariant,
-                      cs.surfaceContainerLow,
-                    ),
+                    _badge('楼主', cs.onPrimary, cs.primary),
                   ],
                 ],
               ),

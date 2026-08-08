@@ -113,9 +113,8 @@ class _RanklistSectionState extends State<RanklistSection>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? Theme.of(context).colorScheme.onSurfaceVariant
-                        : cs.surfaceContainerLow,
+                    // 选中态：primary 底 + onPrimary 文字（高对比，PiliPlus badge 范式）
+                    color: isActive ? cs.primary : cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   alignment: Alignment.center,
@@ -126,7 +125,7 @@ class _RanklistSectionState extends State<RanklistSection>
                       fontWeight: isActive
                           ? FontWeight.w600
                           : FontWeight.normal,
-                      color: isActive ? Colors.white : cs.onSurfaceVariant,
+                      color: isActive ? cs.onPrimary : cs.onSurfaceVariant,
                     ),
                   ),
                 ),

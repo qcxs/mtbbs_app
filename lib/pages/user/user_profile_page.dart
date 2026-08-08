@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
@@ -302,15 +303,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50).withOpacity(0.12),
+                          color: onlineColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           '在线',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: const Color(0xFF4CAF50),
-                          ),
+                          style: TextStyle(fontSize: 11, color: onlineColor),
                         ),
                       ),
                   ],
@@ -328,14 +326,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF9900).withOpacity(0.12),
+                      color: levelColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       group,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFFF9900),
+                        color: levelColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

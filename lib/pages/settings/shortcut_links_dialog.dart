@@ -48,8 +48,7 @@ class ShortcutLinksDialog {
       onSubmit: () {
         if (nameCtl.text.trim().isEmpty) return null;
         return ManagedItem(
-          id:
-              'link_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}',
+          id: 'link_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}',
           name: nameCtl.text.trim(),
           data: {
             'url': urlCtl.text.trim(),
@@ -68,10 +67,12 @@ class ShortcutLinksDialog {
     ManagedItem item,
   ) async {
     final nameCtl = TextEditingController(text: item.name);
-    final urlCtl =
-        TextEditingController(text: item.data?['url']?.toString() ?? '');
-    final imgCtl =
-        TextEditingController(text: item.data?['imageUrl']?.toString() ?? '');
+    final urlCtl = TextEditingController(
+      text: item.data?['url']?.toString() ?? '',
+    );
+    final imgCtl = TextEditingController(
+      text: item.data?['imageUrl']?.toString() ?? '',
+    );
     final edited = await _showForm(
       context: context,
       title: '编辑快捷链接',

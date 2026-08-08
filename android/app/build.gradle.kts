@@ -1,5 +1,6 @@
 import java.io.StringReader
 import java.security.KeyStore
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -7,6 +8,27 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// beta 开关：`flutter build apk --release --dart-define=BETA=true` 时构建为 beta 形态。
+// Flutter 会把 --dart-define 逐个 base64 编码后以逗号分隔透传给 gradle（-Pdart-defines），这里解码还原。
+// beta 为独立 applicationId（.beta 后缀）+ 「MT论坛 beta」应用名 + 固定 1.0-beta/1 + debug 签名，
+// 与正式版互不影响，版本号固定 1 反而便于随意覆盖安装（无升降级限制），仅临时测试用。
+val dartDefines: Map<String, String> = run {
+    (project.findProperty("dart-defines") as? String).orEmpty()
+        .split(",")
+        .mapNotNull { seg ->
+            if (seg.isEmpty()) return@mapNotNull null
+            try {
+                val decoded = String(Base64.getDecoder().decode(seg), Charsets.UTF_8)
+                val idx = decoded.indexOf('=')
+                if (idx > 0) decoded.substring(0, idx) to decoded.substring(idx + 1) else null
+            } catch (e: Exception) {
+                null
+            }
+        }
+        .toMap()
+}
+val isBeta = dartDefines["BETA"] == "true"
 
 // 签名配置：key.properties 四项齐全且 key.jks 能成功加载才启用正式签名，
 // 否则（无 key.properties / 文件缺失 / 密码错误）回退 debug 签名，构建不报错。
@@ -72,8 +94,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = if (isBeta) 1 else flutter.versionCode
+        versionName = if (isBeta) "1.0-beta" else flutter.versionName
         // 应用名走占位符，beta 变体单独命名，与正式版在桌面区分开
         manifestPlaceholders.put("appName", "MT论坛")
     }
@@ -83,17 +105,17 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            // 有正式签名用正式签名；否则用 debug 签名（本地自测/CI 未配 Secrets 均不报错）
-            signingConfig = if (keystoreOk) signingConfigs.getByName("release")
-            else signingConfigs.getByName("debug")
-        }
-        // beta：独立 applicationId + 独立应用名，与正式版共存，versionCode 互不影响，
-        // 彻底绕开"Android 不允许降级安装"（本地/预发布测试专用，构建命令见 docs/15）。
-        create("beta") {
-            applicationIdSuffix = ".beta"
-            manifestPlaceholders.put("appName", "MT论坛 beta")
-            signingConfig = if (keystoreOk) signingConfigs.getByName("release")
-            else signingConfigs.getByName("debug")
+            if (isBeta) {
+                // beta 形态：独立 applicationId + 独立应用名，与正式版共存，versionCode 互不影响，
+                // 彻底绕开"Android 不允许降级安装"；固定 debug 签名（独立应用，签名不敏感，仅临时测试）
+                applicationIdSuffix = ".beta"
+                manifestPlaceholders.put("appName", "MT论坛 beta")
+                signingConfig = signingConfigs.getByName("debug")
+            } else {
+                // 有正式签名用正式签名；否则用 debug 签名（本地自测/CI 未配 Secrets 均不报错）
+                signingConfig = if (keystoreOk) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
+            }
         }
     }
 }

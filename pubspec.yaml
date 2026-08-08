@@ -49,6 +49,9 @@ dependencies:
   # 状态管理
   provider: ^6.1.0
 
+  # 桌面窗口管理（Windows/macOS/Linux）
+  window_manager: ^0.5.2
+
   # 配色方案
   flex_seed_scheme: ^4.0.1
 

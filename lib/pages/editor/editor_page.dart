@@ -11,6 +11,7 @@ import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/parser/page_fetcher.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/screen_size_ext.dart';
 import 'package:mtbbs/api/forum/post/upload.dart' as upload_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
@@ -20,7 +21,6 @@ import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
-import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 import 'package:mtbbs/widgets/common/history_picker.dart';
@@ -29,6 +29,7 @@ import 'package:mtbbs/widgets/dialog/image_picker_sheet.dart';
 import 'package:mtbbs/widgets/dialog/attachment_picker_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/quoted_post_card.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
@@ -38,6 +39,13 @@ import 'package:mtbbs/pages/editor/editor_intents.dart';
 import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
+import 'package:mtbbs/widgets/editor/editor_hint_bar.dart';
+import 'package:mtbbs/widgets/editor/editor_preview.dart';
+
+part 'editor_media.dart';
+part 'editor_pickers.dart';
+part 'editor_toolbar_actions.dart';
+part 'editor_hints.dart';
 
 /// 编辑器页面
 ///
@@ -77,14 +85,13 @@ class _AttachmentSheetData {
   const _AttachmentSheetData(this.attachments, this.loading);
 }
 
-/// 预览数据（防抖后更新）
-class _PreviewData {
-  final String title;
-  final String content;
-  const _PreviewData(this.title, this.content);
-}
+class _EditorPageState extends State<EditorPage> with WindowListener {
+  /// 当前活跃的编辑器实例栈（按打开顺序），仅顶层实例响应窗口关闭，
+  /// 防止多开编辑器时底层实例误触发窗口关闭。
+  static final List<_EditorPageState> _activeEditors = [];
 
-class _EditorPageState extends State<EditorPage> {
+  /// 窗口关闭处理进行中（防重复弹确认框/重复 close）
+  bool _windowCloseInProgress = false;
   // ==================== 核心控制器 ====================
   final _titleCtl = TextEditingController();
   final _contentCtl = BBCodeController();
@@ -93,8 +100,8 @@ class _EditorPageState extends State<EditorPage> {
   Map<String, String> _emojiMap = {};
   bool _showPreview = false;
   Timer? _previewDebounce;
-  final ValueNotifier<_PreviewData> _previewData = ValueNotifier(
-    const _PreviewData('', ''),
+  final ValueNotifier<EditorPreviewData> _previewData = ValueNotifier(
+    const EditorPreviewData('', ''),
   );
   bool _isSubmitting = false;
   bool _loadingPage = false;
@@ -207,6 +214,13 @@ class _EditorPageState extends State<EditorPage> {
 
     if (_isReply && widget.tid.isNotEmpty && widget.pid.isNotEmpty) {
       _doFetchQuotedPost();
+    }
+
+    // Windows：拦截窗口关闭（标题栏 X / Alt+F4），复用返回确认逻辑
+    if (Platform.isWindows) {
+      _activeEditors.add(this);
+      windowManager.addListener(this);
+      windowManager.setPreventClose(true);
     }
 
     // 快照：检查未清理的会话 → 添加到顶栏提示
@@ -372,7 +386,7 @@ class _EditorPageState extends State<EditorPage> {
       final title = _titleCtl.text.trim();
       final content = _contentCtl.text.trim();
       final processed = _preparePreviewBbcode(content);
-      final newData = _PreviewData(title, processed);
+      final newData = EditorPreviewData(title, processed);
       if (_previewData.value.title != newData.title ||
           _previewData.value.content != newData.content) {
         _previewData.value = newData;
@@ -457,636 +471,13 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  // ==================== BBCode 预处理（预览用） ====================
-
-  // ==================== 图片管理 ====================
-
-  /// 同步图片数据到 notifier（让图片管理面板重建）
-  void _syncImagesNotifier() {
-    _imageSheetDataNotifier.value = _ImageSheetData(
-      _imageList.where((i) => !_ignoredAids.contains(i['aid'])).toList(),
-      _loadingImages,
-    );
-  }
-
-  /// 刷新图片列表（合并页面已有 + 已上传未绑定的图片）
-  Future<void> _refreshImageList() async {
-    try {
-      final fid = _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid;
-      final tid = _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid;
-
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({'action': 'refreshImageList', 'fid': fid, 'tid': tid}),
-      );
-      setState(() => _loadingImages = true);
-      _syncImagesNotifier();
-      final images = await upload_api.fetchUnusedImages(
-        ApiService().dio,
-        fid: fid,
-        tid: tid.isNotEmpty ? tid : null,
-      );
-      if (!mounted) return;
-      int newCount = 0;
-      setState(() {
-        for (final img in images) {
-          final aid = img['aid']?.toString() ?? '';
-          final src = img['src']?.toString() ?? '';
-          if (aid.isEmpty || src.isEmpty) continue;
-          // 合并到 _imageList（去重）
-          if (!_imageList.any((i) => i['aid'] == aid)) {
-            _imageList.add({
-              'aid': aid,
-              'src': src,
-              'title': img['title']?.toString() ?? '',
-              'type': 'uploaded',
-            });
-            newCount++;
-          }
-          // 同时更新 _aidToSrc（供预览用）
-          if (!_aidToSrc.containsKey(aid)) {
-            _aidToSrc[aid] = src;
-          }
-        }
-        _loadingImages = false;
-      });
-      _syncImagesNotifier();
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({
-          'action': 'refreshImageList_done',
-          'total': _imageList.length,
-          'new': newCount,
-        }),
-      );
-    } catch (_) {
-      AppLogger.w('EDITOR', 'refreshImageList failed');
-      if (mounted) {
-        setState(() => _loadingImages = false);
-        _syncImagesNotifier();
-      }
-    }
-  }
-
-  /// 处理图片上传（选择文件 → 上传 → 加入列表）
-  Future<void> _handleImageUpload() async {
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) return;
-    if (_pageData.uploadHash.isEmpty) return;
-
-    final imgExts = _pageData.imageExtensions;
-    final result = await FilePicker.platform.pickFiles(
-      type: imgExts.isNotEmpty ? FileType.custom : FileType.image,
-      allowedExtensions: imgExts.isNotEmpty ? imgExts : null,
-      allowMultiple: true,
-      withReadStream: true,
-      allowCompression: false,
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    int successCount = 0;
-    int failCount = 0;
-    for (final f in result.files) {
-      final filePath = f.path;
-      if (filePath == null) {
-        failCount++;
-        continue;
-      }
-
-      final file = File(filePath);
-      try {
-        final uploadResult = await upload_api.uploadImage(
-          ApiService().dio,
-          file: file,
-          uid: auth.uid,
-          uploadHash: _pageData.uploadHash,
-        );
-        if (!mounted) return;
-        if (uploadResult['success'] == true) {
-          final aid = uploadResult['aid']?.toString() ?? '';
-          final src = uploadResult['src']?.toString() ?? '';
-          final title = uploadResult['title']?.toString() ?? '';
-          if (aid.isNotEmpty && src.isNotEmpty) {
-            setState(() {
-              _imageList.add({
-                'aid': aid,
-                'src': src,
-                'title': title,
-                'type': 'uploaded',
-              });
-              _aidToSrc[aid] = src;
-            });
-            successCount++;
-          }
-          // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
-          await deleteFilePickerTempIfAny(filePath);
-        } else {
-          failCount++;
-        }
-      } finally {}
-    }
-    _syncImagesNotifier();
-
-    AppLogger.i(
-      'EDITOR',
-      jsonEncode({
-        'action': 'handleImageUpload',
-        'success': successCount,
-        'fail': failCount,
-        'totalFiles': result.files.length,
-        'imageListSize': _imageList.length,
-      }),
-    );
-
-    if (!mounted) return;
-    if (successCount > 0 && failCount == 0) {
-      showToast('上传成功 $successCount 张图片');
-    } else if (successCount > 0 && failCount > 0) {
-      showToast('上传完成：成功 $successCount 张，失败 $failCount 张');
-    } else {
-      showToast('上传失败');
-    }
-  }
-
-  /// 删除图片（调用 API 删除 + 从本地列表移除）
-  Future<void> _handleImageDelete(String aid) async {
-    final ok = await upload_api.deleteUnusedImage(
-      ApiService().dio,
-      formhash: _pageData.formhash,
-      tid: _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid,
-      pid: _pageData.pid.isNotEmpty ? _pageData.pid : widget.pid,
-      aid: aid,
-    );
-    if (!mounted) return;
-    if (ok) {
-      setState(() {
-        _imageList.removeWhere((i) => i['aid'] == aid);
-        _aidToSrc.remove(aid);
-      });
-      _syncImagesNotifier();
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': true}),
-      );
-      showToast('已删除');
-    } else {
-      AppLogger.w(
-        'EDITOR',
-        jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': false}),
-      );
-      showToast('删除失败');
-    }
-  }
-
-  /// 忽略图片（从显示列表中隐藏）
-  void _handleImageIgnore(String aid) {
-    setState(() {
-      _ignoredAids.add(aid);
-      _imageList.removeWhere((i) => i['aid'] == aid);
-      _aidToSrc.remove(aid);
-    });
-    _syncImagesNotifier();
-  }
-
-  /// 获取当前活跃的 AID 集合（未忽略的图片）
-  Set<String> get _activeAids {
-    return _imageList
-        .map((i) => i['aid'] as String)
-        .where((aid) => !_ignoredAids.contains(aid))
-        .toSet();
-  }
-
-  /// 同步活跃 AID 到 BBCodeController
-  void _syncPendingAids() {
-    _contentCtl.pendingAids
-      ..clear()
-      ..addAll(_activeAids);
-  }
-
-  /// 预览前处理：将 [attachimg] 替换为 [img]，将 [attach] 替换为卡片
-  String _preparePreviewBbcode(String bbcode) {
-    // 处理图片附件 [attachimg]
-    bbcode = bbcode.replaceAllMapped(
-      RegExp(r'\[attachimg\](\d+)\[/attachimg\]'),
-      (m) {
-        final aid = m.group(1) ?? '';
-        final src = _aidToSrc[aid] ?? '';
-        if (src.isNotEmpty) {
-          final data = jsonEncode({
-            'type': 'image_attach',
-            'url': src,
-            'aid': aid,
-          });
-          return '[appdata]$data[/appdata]';
-        }
-        return m.group(0)!;
-      },
-    );
-    // 处理文件附件 [attach]
-    bbcode = bbcode.replaceAllMapped(RegExp(r'\[attach\](\d+)\[/attach\]'), (
-      m,
-    ) {
-      final aid = m.group(1) ?? '';
-      final att = _aidToAttachment[aid];
-      if (att != null) {
-        final data = jsonEncode({
-          'type': 'attach',
-          'name': att['name'],
-          'size': att['size'],
-          'url': att['url'],
-        });
-        return '[appdata]$data[/appdata]';
-      }
-      return m.group(0)!;
-    });
-    return bbcode;
-  }
-
-  // ==================== 附件管理 ====================
-
-  /// 同步附件数据到 notifier
-  void _syncAttachmentsNotifier() {
-    _attachmentSheetDataNotifier.value = _AttachmentSheetData(
-      List.from(_attachmentList),
-      _loadingAttachments,
-    );
-  }
-
-  /// 从附件条目构建预览信息
-  Map<String, String> _buildAttachInfo(Map<String, dynamic> att) {
-    final aid = att['aid'] as String? ?? '';
-    final title = att['title'] as String? ?? '';
-    final sizeMatch = RegExp(r'文件大小:\s*([^ ]+)').firstMatch(title);
-    return {
-      'name': att['filename'] as String? ?? '附件 #$aid',
-      'size': sizeMatch?.group(1) ?? '',
-      'url': 'forum.php?mod=attachment&aid=$aid',
-    };
-  }
-
-  /// 刷新附件列表
-  Future<void> _refreshAttachmentList() async {
-    try {
-      final fid = _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid;
-      final tid = _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid;
-
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({'action': 'refreshAttachmentList', 'fid': fid, 'tid': tid}),
-      );
-      setState(() => _loadingAttachments = true);
-      _syncAttachmentsNotifier();
-      final attachments = await upload_api.fetchUnusedAttachments(
-        ApiService().dio,
-        fid: fid,
-        tid: tid.isNotEmpty ? tid : null,
-      );
-      if (!mounted) return;
-      int mergeCount = 0;
-      setState(() {
-        // 合并已绑定附件 + 未使用附件
-        final merged = <Map<String, dynamic>>[];
-        // 先添加已绑定的（从 _aidToAttachment 重建条目）
-        for (final entry in _aidToAttachment.entries) {
-          merged.add({
-            'aid': entry.key,
-            'filename': entry.value['name'] ?? '',
-            'title': '',
-            'isimage': '0',
-            'icon': '',
-            'bound': true,
-          });
-        }
-        // 再添加未使用的（去重）
-        for (final att in attachments) {
-          final aid = att['aid'] as String? ?? '';
-          if (aid.isNotEmpty && !merged.any((m) => m['aid'] == aid)) {
-            merged.add(att);
-          }
-          // 补充 _aidToAttachment 映射
-          if (aid.isNotEmpty && !_aidToAttachment.containsKey(aid)) {
-            _aidToAttachment[aid] = _buildAttachInfo(att);
-            mergeCount++;
-          }
-        }
-        _attachmentList = merged;
-        _loadingAttachments = false;
-      });
-      _syncAttachmentsNotifier();
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({
-          'action': 'refreshAttachmentList_done',
-          'count': _attachmentList.length,
-          'merged': mergeCount,
-          'boundTotal': _aidToAttachment.length,
-        }),
-      );
-    } catch (_) {
-      AppLogger.w('EDITOR', 'refreshAttachmentList failed');
-      if (mounted) {
-        setState(() => _loadingAttachments = false);
-        _syncAttachmentsNotifier();
-      }
-    }
-  }
-
-  /// 处理附件上传
-  Future<void> _handleAttachmentUpload() async {
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) return;
-    if (_pageData.uploadHash.isEmpty) return;
-
-    final attExts = _pageData.attachmentExtensions;
-    final result = await FilePicker.platform.pickFiles(
-      type: attExts.isNotEmpty ? FileType.custom : FileType.any,
-      allowedExtensions: attExts.isNotEmpty ? attExts : null,
-      allowMultiple: true,
-      withReadStream: true,
-      allowCompression: false,
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    int successCount = 0;
-    int failCount = 0;
-    for (final f in result.files) {
-      final filePath = f.path;
-      if (filePath == null) {
-        failCount++;
-        continue;
-      }
-
-      final file = File(filePath);
-      try {
-        final uploadResult = await upload_api.uploadAttachment(
-          ApiService().dio,
-          file: file,
-          uid: auth.uid,
-          uploadHash: _pageData.uploadHash,
-          fid: _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid,
-        );
-        if (!mounted) return;
-        if (uploadResult['success'] == true) {
-          final aid = uploadResult['aid']?.toString() ?? '';
-          if (aid.isNotEmpty) {
-            final name = uploadResult['filename']?.toString() ?? '';
-            _aidToAttachment[aid] = {
-              'name': name,
-              'size': '',
-              'url': 'forum.php?mod=attachment&aid=$aid',
-            };
-          }
-          successCount++;
-          // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
-          await deleteFilePickerTempIfAny(filePath);
-        } else {
-          failCount++;
-        }
-      } finally {}
-    }
-    _syncAttachmentsNotifier();
-
-    AppLogger.i(
-      'EDITOR',
-      jsonEncode({
-        'action': 'handleAttachmentUpload',
-        'success': successCount,
-        'fail': failCount,
-        'totalFiles': result.files.length,
-        'boundTotal': _aidToAttachment.length,
-      }),
-    );
-
-    if (!mounted) return;
-    if (successCount > 0 && failCount == 0) {
-      showToast('上传成功 $successCount 个附件');
-    } else if (successCount > 0 && failCount > 0) {
-      showToast('上传完成：成功 $successCount 个，失败 $failCount 个');
-    } else {
-      showToast('上传失败');
-    }
-  }
-
-  /// 删除附件
-  Future<void> _handleAttachmentDelete(String aid) async {
-    final ok = await upload_api.deleteUnusedImage(
-      ApiService().dio,
-      formhash: _pageData.formhash,
-      tid: _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid,
-      pid: _pageData.pid.isNotEmpty ? _pageData.pid : widget.pid,
-      aid: aid,
-    );
-    if (!mounted) return;
-    if (ok) {
-      setState(() {
-        _attachmentList.removeWhere((i) => i['aid'] == aid);
-        _aidToAttachment.remove(aid);
-      });
-      _syncAttachmentsNotifier();
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({'action': 'deleteAttachment', 'aid': aid, 'success': true}),
-      );
-      showToast('已删除');
-    } else {
-      AppLogger.w(
-        'EDITOR',
-        jsonEncode({
-          'action': 'deleteAttachment',
-          'aid': aid,
-          'success': false,
-        }),
-      );
-      showToast('删除失败');
-    }
-  }
-
-  // ==================== 工具栏操作 ====================
-
-  void _handleToolbarAction(ToolbarAction action) {
-    switch (action) {
-      case ToolbarAction.undo:
-        _undoController.undo();
-        _focusContent();
-      case ToolbarAction.redo:
-        _undoController.redo();
-        _focusContent();
-      case ToolbarAction.bold:
-        if (!_contentCtl.wrapSelection('[b]', '[/b]')) {
-          showInlineInputDialog(
-            context,
-            '[b]',
-            '[/b]',
-            '加粗',
-            '输入要加粗的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.italic:
-        if (!_contentCtl.wrapSelection('[i]', '[/i]')) {
-          showInlineInputDialog(
-            context,
-            '[i]',
-            '[/i]',
-            '斜体',
-            '输入要设置为斜体的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.underline:
-        if (!_contentCtl.wrapSelection('[u]', '[/u]')) {
-          showInlineInputDialog(
-            context,
-            '[u]',
-            '[/u]',
-            '下划线',
-            '输入要添加下划线的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.strikethrough:
-        if (!_contentCtl.wrapSelection('[s]', '[/s]')) {
-          showInlineInputDialog(
-            context,
-            '[s]',
-            '[/s]',
-            '删除线',
-            '输入要添加删除线的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.quote:
-        _contentCtl.wrapBlock('[quote]', '[/quote]');
-        _focusContent();
-      case ToolbarAction.hide:
-        _contentCtl.wrapBlock('[hide]', '[/hide]');
-        _focusContent();
-      case ToolbarAction.free:
-        _contentCtl.wrapBlock('[free]', '[/free]');
-        _focusContent();
-      case ToolbarAction.code:
-        _contentCtl.wrapBlock('[code]', '[/code]');
-        _focusContent();
-      case ToolbarAction.hr:
-        _contentCtl.insertBlockTag('[hr]');
-        _focusContent();
-      case ToolbarAction.link:
-        final sel = _contentCtl.selection;
-        final selectedText = sel.isValid && !sel.isCollapsed
-            ? _contentCtl.text.substring(sel.start, sel.end).trim()
-            : '';
-        if (selectedText.isNotEmpty) {
-          final isUrl =
-              selectedText.startsWith('http://') ||
-              selectedText.startsWith('https://');
-          if (isUrl) {
-            _contentCtl.wrapSelection('[url]', '[/url]');
-          } else {
-            _contentCtl.wrapBlock('[url=]', '[/url]');
-          }
-          _focusContent();
-        } else {
-          showTextInputDialog(
-            context,
-            title: '插入链接',
-            label: 'URL',
-            hint: 'https://...',
-            value: '',
-            secondLabel: '显示文字',
-            secondHint: '可选',
-            secondValue: '',
-            onSubmit: (url, text) {
-              final hasUrl = url.isNotEmpty;
-              final hasText = text.isNotEmpty;
-              if (hasUrl && hasText) {
-                _contentCtl.wrapInline('[url=$url]', '[/url]', text);
-              } else if (hasUrl) {
-                _contentCtl.wrapInline('[url]', '[/url]', url);
-              } else if (hasText) {
-                _contentCtl.wrapInline('[url=]', '[/url]', text);
-              }
-              if (hasUrl || hasText) _focusContent();
-            },
-          );
-        }
-      case ToolbarAction.image:
-        _showImagePickerSheet();
-      case ToolbarAction.attach:
-        _showAttachmentPickerSheet();
-      case ToolbarAction.imageLongPress:
-        showTextInputDialog(
-          context,
-          title: '插入图片',
-          label: '图片 URL',
-          hint: 'https://...',
-          value: '',
-          onSubmit: (url, _) {
-            if (url.isNotEmpty) {
-              _contentCtl.insertImage(url);
-              _focusContent();
-            }
-          },
-        );
-      case ToolbarAction.emoji:
-        final emojiService = EmojiService();
-        if (!emojiService.isLoaded) {
-          showToast('暂无表情数据，请在设置中加载');
-          return;
-        }
-        _showEmojiPickerSheet(emojiService.groups);
-      case ToolbarAction.color:
-        showColorPickerDialog(
-          context,
-          _contentCtl,
-          _focusContent,
-          isBackcolor: false,
-        );
-      case ToolbarAction.backcolor:
-        showColorPickerDialog(
-          context,
-          _contentCtl,
-          _focusContent,
-          isBackcolor: true,
-        );
-      case ToolbarAction.alignLeft:
-        _contentCtl.wrapParam('align', 'left', '[/align]');
-        _focusContent();
-      case ToolbarAction.alignCenter:
-        _contentCtl.wrapParam('align', 'center', '[/align]');
-        _focusContent();
-      case ToolbarAction.alignRight:
-        _contentCtl.wrapParam('align', 'right', '[/align]');
-        _focusContent();
-      case ToolbarAction.listUl:
-        _contentCtl.wrapParam('list', '', '[/list]');
-        _focusContent();
-      case ToolbarAction.listOl:
-        _contentCtl.wrapParam('list', '1', '[/list]');
-        _focusContent();
-      case ToolbarAction.select:
-        _contentCtl.selectTag();
-        _focusContent();
-      case ToolbarAction.fontSize:
-        showFontSizePicker(context, _contentCtl, _focusContent);
-      case ToolbarAction.history:
-        _showHistoryDialog();
-      case ToolbarAction.mtImage:
-        _showMtImageDialog();
-      case ToolbarAction.clearStyles:
-        _contentCtl.clearStyles();
-        _focusContent();
-    }
-  }
-
   void _focusContent() => _contentFocusNode.requestFocus();
+
+  /// setState 安全包装：part 文件中的扩展方法无法访问 @protected 的 setState，
+  /// 统一通过本方法触发重建（自带 mounted 判断）。
+  void _setState(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
 
   /// 请求退出编辑器，处理未保存内容。
   /// 返回 true 确认退出，false 取消。
@@ -1102,241 +493,6 @@ class _EditorPageState extends State<EditorPage> {
       return true;
     }
     return shouldPop == 'discard';
-  }
-
-  /// 处理 Ctrl+V 粘贴：剪贴板图片 → 默认上传，文本 → 插入编辑器
-  Future<void> _handlePaste() async {
-    // 尝试剪贴板图片
-    final imgFile = await ClipboardPasteService.pasteImage();
-    if (imgFile != null && mounted) {
-      showToast('正在上传剪贴板图片…');
-      await _uploadDefaultImage(imgFile);
-      await imgFile.delete();
-      return;
-    }
-
-    // 回退到文本粘贴
-    final text = await ClipboardPasteService.pasteText();
-    if (text != null && mounted) {
-      final sel = _contentCtl.selection;
-      final pos = sel.isValid ? sel.start : _contentCtl.text.length;
-      _contentCtl.value = TextEditingValue(
-        text: _contentCtl.text.replaceRange(pos, pos, text),
-        selection: TextSelection.collapsed(offset: pos + text.length),
-      );
-    }
-  }
-
-  /// 上传图片到论坛（默认上传），成功后插入 [attachimg]
-  Future<void> _uploadDefaultImage(File file) async {
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn || _pageData.uploadHash.isEmpty) {
-      if (mounted) showToast('未登录或无上传权限');
-      return;
-    }
-
-    try {
-      final uploadResult = await upload_api.uploadImage(
-        ApiService().dio,
-        file: file,
-        uid: auth.uid,
-        uploadHash: _pageData.uploadHash,
-      );
-      if (!mounted) return;
-      if (uploadResult['success'] == true) {
-        final aid = uploadResult['aid']?.toString() ?? '';
-        final src = uploadResult['src']?.toString() ?? '';
-        final title = uploadResult['title']?.toString() ?? '';
-        if (aid.isNotEmpty && src.isNotEmpty) {
-          setState(() {
-            _imageList.add({
-              'aid': aid,
-              'src': src,
-              'title': title,
-              'type': 'uploaded',
-            });
-            _aidToSrc[aid] = src;
-          });
-          _syncImagesNotifier();
-          _contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
-          _focusContent();
-        }
-        if (mounted) showToast('剪贴板图片已上传');
-      } else {
-        if (mounted) showToast('上传失败: ${uploadResult['error'] ?? '未知错误'}');
-      }
-    } catch (e) {
-      if (mounted) showToast('上传失败: $e');
-    }
-  }
-
-  void _showHistoryDialog() {
-    final history = context.read<HistoryProvider>();
-    if (history.totalCount == 0) {
-      showToast('暂无浏览记录');
-      return;
-    }
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 480),
-        titlePadding: const EdgeInsets.fromLTRB(20, 12, 8, 0),
-        contentPadding: EdgeInsets.zero,
-        title: Row(
-          children: [
-            const Expanded(
-              child: Text(
-                '插入历史记录',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: () => Navigator.of(ctx).pop(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: 420,
-          height: 400,
-          child: HistoryPicker(
-            onPick: (record) {
-              Navigator.of(ctx).pop();
-              _insertHistoryRecord(record);
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// MT 图床上传 + 历史弹窗
-  void _showMtImageDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      builder: (_) => MtImageSheet(
-        hosting: _mtImageHosting,
-        onInsert: (bbcode) {
-          _contentCtl.wrapInline('', '', ' $bbcode ');
-          _focusContent();
-        },
-      ),
-    );
-  }
-
-  void _insertHistoryRecord(BrowseRecord record) {
-    final settings = context.read<SettingsProvider>();
-    final format = record.type == 'thread'
-        ? settings.historyFormatThread
-        : settings.historyFormatUser;
-    final url = record.info['url']?.toString() ?? '';
-    final text = format.replaceAllMapped(RegExp(r'\{(\w+)\}'), (m) {
-      final key = m.group(1)!;
-      return record.info[key]?.toString() ?? m.group(0)!;
-    });
-    _contentCtl.insertLink(url, text: text);
-    _focusContent();
-  }
-
-  void _showEmojiPickerSheet(List<Map<String, dynamic>> groups) {
-    final frequentEmojis = EmojiService().frequentlyUsed;
-    showModalBottomSheet(
-      context: context,
-      constraints: const BoxConstraints(maxWidth: 500, maxHeight: 420),
-      builder: (ctx) => EmojiPickerSheet(
-        groups: groups,
-        frequentEmojis: frequentEmojis,
-        onEmojiPicked: (emoji) {
-          final insertText = emoji['insertText'] as String;
-          final smilieId = emoji['smilieId'] as String;
-          _contentCtl.wrapInline('', '', insertText);
-          EmojiService().recordUsage(smilieId);
-          _focusContent();
-        },
-      ),
-    );
-  }
-
-  void _showImagePickerSheet() {
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) {
-      showToast('请先登录');
-      return;
-    }
-    if (_pageData.uploadHash.isEmpty) {
-      showToast('页面数据未加载，无法上传');
-      return;
-    }
-    // 同步活跃 AID
-    _syncPendingAids();
-
-    showModalBottomSheet(
-      context: context,
-      constraints: const BoxConstraints(maxWidth: 500, maxHeight: 450),
-      builder: (_) => ValueListenableBuilder<_ImageSheetData>(
-        valueListenable: _imageSheetDataNotifier,
-        builder: (_, data, __) => ImagePickerSheet(
-          images: data.images,
-          loading: data.loading,
-          ignoredAids: _ignoredAids,
-          contentText: _contentCtl.text,
-          controller: _contentCtl,
-          onUpload: _handleImageUpload,
-          onDelete: _handleImageDelete,
-          onIgnore: _handleImageIgnore,
-          onRefresh: _refreshImageList,
-          onInsert: (aid) {
-            _contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
-            _syncPendingAids();
-          },
-          allowedExtensions: _pageData.imageExtensions.isNotEmpty
-              ? _pageData.imageExtensions
-              : null,
-        ),
-      ),
-    );
-  }
-
-  void _showAttachmentPickerSheet() {
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) {
-      showToast('请先登录');
-      return;
-    }
-    if (_pageData.uploadHash.isEmpty) {
-      showToast('页面数据未加载，无法上传');
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      constraints: const BoxConstraints(maxWidth: 500, maxHeight: 450),
-      builder: (ctx) => ValueListenableBuilder<_AttachmentSheetData>(
-        valueListenable: _attachmentSheetDataNotifier,
-        builder: (_, data, __) => AttachmentPickerSheet(
-          attachments: data.attachments,
-          loading: data.loading,
-          contentText: _contentCtl.text,
-          controller: _contentCtl,
-          onUpload: _handleAttachmentUpload,
-          onDelete: _handleAttachmentDelete,
-          onRefresh: _refreshAttachmentList,
-          onInsert: (aid) {
-            _contentCtl.wrapInline('', '', '[attach]$aid[/attach]');
-          },
-          allowedExtensions: _pageData.attachmentExtensions.isNotEmpty
-              ? _pageData.attachmentExtensions
-              : null,
-        ),
-      ),
-    );
   }
 
   // ==================== 提交 ====================
@@ -1506,115 +662,6 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
-  // ==================== 提示系统 ====================
-
-  /// 添加顶栏提示（自动去重）
-  void _addHint(String id, String message) {
-    if (_dismissedHints.contains(id)) return;
-    // 通过 key 强制重建 HintBar widget
-    setState(() {});
-  }
-
-  /// 关闭指定提示
-  void _dismissHint(String id) {
-    _dismissedHints.add(id);
-    setState(() {});
-  }
-
-  /// 检测内容是否包含不兼容的 Emoji（4 字节 UTF-8 字符）
-  bool _checkIncompatibleEmoji(String text) {
-    for (final rune in text.runes) {
-      if (rune > 0xFFFF) return true;
-    }
-    return false;
-  }
-
-  /// 更新 Emoji 警告提示状态
-  void _updateEmojiWarning() {
-    final hasEmoji =
-        _checkIncompatibleEmoji(_titleCtl.text) ||
-        _checkIncompatibleEmoji(_contentCtl.text);
-    if (hasEmoji != _hasEmojiWarning) {
-      setState(() => _hasEmojiWarning = hasEmoji);
-      if (hasEmoji) {
-        _dismissedHints.remove('emoji'); // 重新出现时重新显示
-      }
-    }
-  }
-
-  /// 构建顶栏提示条
-  Widget _buildHintBar() {
-    final cs = Theme.of(context).colorScheme;
-    final hints = <Widget>[];
-
-    // Emoji 警告
-    if (_hasEmojiWarning && !_dismissedHints.contains('emoji')) {
-      hints.add(
-        _hintItem(
-          id: 'emoji',
-          icon: Icons.warning_amber_rounded,
-          color: cs.onSurfaceVariant,
-          message: '输入内容包含不兼容的 Emoji，提交后可能被截断',
-        ),
-      );
-    }
-
-    // 意外关闭
-    if (!_dismissedHints.contains('unexpected_close')) {
-      final historyProv = context.read<EditorHistoryProvider>();
-      if (historyProv.hasSession(_sessionKey)) {
-        hints.add(
-          _hintItem(
-            id: 'unexpected_close',
-            icon: Icons.info_outline,
-            color: cs.onSurfaceVariant,
-            message: '上次编辑器意外关闭，可在编辑历史中恢复',
-          ),
-        );
-      }
-    }
-
-    if (hints.isEmpty) return const SizedBox.shrink();
-    return Container(
-      color: cs.surfaceContainerLow,
-      child: Column(mainAxisSize: MainAxisSize.min, children: hints),
-    );
-  }
-
-  Widget _hintItem({
-    required String id,
-    required IconData icon,
-    required Color color,
-    required String message,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: cs.surfaceContainerLow)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 12, color: cs.onSurface),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _dismissHint(id),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              child: Icon(Icons.close, size: 14, color: cs.onSurfaceVariant),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _titleCtl.removeListener(_onContentChanged);
@@ -1631,7 +678,32 @@ class _EditorPageState extends State<EditorPage> {
         _saveAutoSnapshot();
       } catch (_) {}
     }
+    if (Platform.isWindows) {
+      windowManager.removeListener(this);
+      _activeEditors.remove(this);
+      if (_activeEditors.isEmpty) {
+        windowManager.setPreventClose(false);
+      }
+    }
     super.dispose();
+  }
+
+  /// Windows 窗口关闭事件（标题栏 X / Alt+F4 / taskbar close）。
+  /// 仅顶层编辑器实例响应：弹确认框 → 通过则放行关闭，否则维持拦截。
+  @override
+  void onWindowClose() async {
+    if (_windowCloseInProgress) return;
+    if (_activeEditors.isEmpty || !identical(_activeEditors.last, this)) {
+      return;
+    }
+    _windowCloseInProgress = true;
+    final ok = await _requestExit();
+    if (!ok) {
+      _windowCloseInProgress = false; // 用户取消，恢复拦截
+      return;
+    }
+    await windowManager.setPreventClose(false);
+    await windowManager.close();
   }
 
   // ==================== Build ====================
@@ -1639,7 +711,7 @@ class _EditorPageState extends State<EditorPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isWide = MediaQuery.of(context).size.width > 600;
+    final isWide = MediaQuery.sizeOf(context).isWide;
     final settings = context.watch<SettingsProvider>();
 
     // 动态生成快捷键绑定：仅对可见且有关联快捷键的工具栏项注册
@@ -1935,98 +1007,9 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildPreview() {
-    final cs = Theme.of(context).colorScheme;
-    return ValueListenableBuilder<_PreviewData>(
-      valueListenable: _previewData,
-      builder: (context, data, _) {
-        final settings = context.read<SettingsProvider>();
-        if (data.title.isEmpty && data.content.isEmpty) {
-          return Center(
-            child: Text(
-              '输入内容后即可预览',
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-          );
-        }
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (data.title.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    data.title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              data.content.isNotEmpty
-                  ? GestureDetector(
-                      onLongPress: () =>
-                          _showRawBbcodeDialog(context, data.content),
-                      child: PostHtmlWidget(
-                        bbcode: data.content,
-                        disabledTags: settings.disabledBbcodeTags,
-                        autoDetectUrls: settings.autoDetectUrls,
-                      ),
-                    )
-                  : Text('暂无内容', style: TextStyle(color: cs.onSurfaceVariant)),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showRawBbcodeDialog(BuildContext context, String bbcode) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.code, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text('预览 BBCode', style: TextStyle(fontSize: 16)),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: () => Navigator.of(ctx).pop(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: SelectableText(
-            bbcode,
-            style: const TextStyle(
-              fontSize: 12,
-              fontFamily: 'monospace',
-              height: 1.5,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: bbcode));
-              showToast('已复制');
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('复制'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
+    return EditorPreview(
+      data: _previewData,
+      onShowRaw: (bbcode) => showRawBbcodeDialog(context, bbcode),
     );
   }
 }

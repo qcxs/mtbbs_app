@@ -187,9 +187,8 @@ class _OnlinePageState extends State<OnlinePage> {
             final time = item['time'] as String? ?? '';
 
             final typeColor = switch (type) {
-              '管理员' => cs.error,
-              '超级版主' => cs.onSurfaceVariant,
-              '版主' => cs.onSurfaceVariant,
+              // 管理员是身份标识，用 primary；不用 error（非错误语义）
+              '管理员' => cs.primary,
               _ => cs.onSurfaceVariant,
             };
 

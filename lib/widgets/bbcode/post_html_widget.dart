@@ -231,7 +231,7 @@ class PostHtmlWidget extends StatelessWidget {
         'li': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
         'hr': Style(
           height: Height(1),
-          backgroundColor: Colors.grey.shade300,
+          backgroundColor: cs.outlineVariant,
           border: Border(),
           margin: Margins.symmetric(vertical: 8),
           padding: HtmlPaddings.zero,
@@ -259,7 +259,7 @@ class PostHtmlWidget extends StatelessWidget {
                 errorWidget: (_, __, ___) => Icon(
                   Icons.emoji_emotions_outlined,
                   size: 18,
-                  color: Colors.grey.shade400,
+                  color: cs.outline,
                 ),
               );
             }
@@ -304,7 +304,7 @@ class PostHtmlWidget extends StatelessWidget {
                     errorWidget: (_, __, ___) => Icon(
                       Icons.broken_image_outlined,
                       size: 48,
-                      color: Colors.grey.shade400,
+                      color: cs.outline,
                     ),
                   ),
                 );

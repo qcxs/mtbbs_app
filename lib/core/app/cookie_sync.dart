@@ -6,7 +6,10 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 /// cookieStr 格式：`name1=value1; name2=value2`
 ///
 /// 注意：重复调用会覆盖同名 Cookie（domain/path/name 相同），不会产生重复条目。
-Future<void> syncCookieStringToWebView(String? cookieStr, String baseUrl) async {
+Future<void> syncCookieStringToWebView(
+  String? cookieStr,
+  String baseUrl,
+) async {
   final url = WebUri(baseUrl);
   if (cookieStr == null || cookieStr.isEmpty) {
     await CookieManager.instance().deleteAllCookies();

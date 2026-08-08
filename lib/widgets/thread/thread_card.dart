@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/models/thread_item.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
@@ -287,15 +288,12 @@ class ThreadCard extends StatelessWidget {
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF9900).withOpacity(0.12),
+                    color: levelColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(3),
                   ),
                   child: Text(
                     item.level!,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFFFF9900),
-                    ),
+                    style: const TextStyle(fontSize: 11, color: levelColor),
                   ),
                 ),
               ],
@@ -445,15 +443,12 @@ class ThreadCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF53BCF5).withOpacity(0.12),
+                  color: forumColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   name ?? '未知板块（$fid）',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF53BCF5),
-                  ),
+                  style: const TextStyle(fontSize: 11, color: forumColor),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

@@ -36,9 +36,13 @@ class Account {
   int goldCoins;
   int credit;
 
+  /// 登录是否已过期（服务器返回未登录但保留账号数据，供重新登录合并）
+  bool expired;
+
   Account({
     required this.username,
     this.uid = '',
+    this.expired = false,
     this.avatarUrl = '',
     this.credits = '',
     this.userGroup = '',
@@ -64,6 +68,7 @@ class Account {
   Map<String, dynamic> toJson() => {
     'username': username,
     'uid': uid,
+    'expired': expired,
     'avatarUrl': avatarUrl,
     'credits': credits,
     'userGroup': userGroup,
@@ -73,6 +78,7 @@ class Account {
   factory Account.fromJson(Map<String, dynamic> json) => Account(
     username: json['username']?.toString() ?? '',
     uid: json['uid']?.toString() ?? '',
+    expired: json['expired'] == true,
     avatarUrl: json['avatarUrl']?.toString() ?? '',
     credits: json['credits']?.toString() ?? '',
     userGroup: json['userGroup']?.toString() ?? '',
@@ -110,7 +116,14 @@ class AuthProvider extends ChangeNotifier {
   // ==================== 公开 API ====================
 
   bool get isLoggedIn =>
-      _currentActiveIndex >= 0 && uid != '0' && uid.isNotEmpty;
+      _currentActiveIndex >= 0 &&
+      uid != '0' &&
+      uid.isNotEmpty &&
+      !_currentAccounts[_currentActiveIndex].expired;
+
+  /// 当前活跃账号是否处于登录过期状态
+  bool get isExpired =>
+      _currentActiveIndex >= 0 && _currentAccounts[_currentActiveIndex].expired;
 
   String get username => _currentActiveIndex >= 0
       ? _currentAccounts[_currentActiveIndex].username
@@ -194,35 +207,85 @@ class AuthProvider extends ChangeNotifier {
 
   /// 刷新当前登录用户的信息
   ///
-  /// 调用 userstatus API 获取用户名、uid、用户组、积分，
-  /// 若返回 uid=0 则标记为登出。
+  /// 调用 userstatus API 获取用户名、uid、用户组、积分。
+  /// - 服务器明确返回未登录（uid='0'）→ 标记登录过期（保留账号数据）
+  /// - 请求/解析失败（网络错误、反爬挑战拦截等）→ 不视为过期，避免误伤登录态
   Future<void> refreshCurrentUserInfo() async {
-    try {
-      final result = await userstatus_api.fetch(ApiService().dio);
-      if (result['success'] != true || result['uid'] == '0') {
-        // 登录已过期
-        if (_currentActiveIndex >= 0 &&
-            _currentAccounts[_currentActiveIndex].uid != '0') {
-          _currentAccounts[_currentActiveIndex].uid = '0';
-          _currentAccounts[_currentActiveIndex].username = '游客(登录过期)';
-          _saveState();
-          notifyListeners();
-        }
-        return;
-      }
+    final idx = _currentActiveIndex;
+    if (idx < 0 || idx >= _currentAccounts.length) return;
+    final account = _currentAccounts[idx];
+    if (account.uid == '0') return; // 游客无需刷新
 
+    final result = await _fetchUserStatusWithRetry();
+
+    if (result['success'] == true && result['uid'] != '0') {
       // 更新当前账号信息
-      if (_currentActiveIndex >= 0) {
-        final a = _currentAccounts[_currentActiveIndex];
-        a.username = result['username']?.toString() ?? a.username;
-        a.userGroup = result['userGroup']?.toString() ?? a.userGroup;
-        a.credits = result['credits']?.toString() ?? a.credits;
+      final a = _currentAccounts[_currentActiveIndex];
+      a.username = result['username']?.toString() ?? a.username;
+      a.userGroup = result['userGroup']?.toString() ?? a.userGroup;
+      a.credits = result['credits']?.toString() ?? a.credits;
+      final avatar = result['avatarUrl']?.toString() ?? '';
+      if (avatar.isNotEmpty) {
+        a.avatarUrl = avatar;
       }
+      a.expired = false;
       _saveState();
       notifyListeners();
-    } catch (e) {
-      debugPrint('[AuthProvider] refreshUserInfo error: $e');
+      return;
     }
+
+    // 仅当服务器明确返回未登录时才标记过期；解析失败（如反爬拦截）不标记
+    if (result['uid'] == '0' && !account.expired) {
+      _currentAccounts[idx].expired = true;
+      _saveState();
+      notifyListeners();
+    }
+  }
+
+  /// 获取 userstatus：优先走 Dio CookieJar（普通站点正常路径，Cookie 可被服务器更新）；
+  /// jar 失败（如被反爬挑战拦截导致解析异常）时用账号原始 Cookie 串直注重试。
+  Future<Map<String, dynamic>> _fetchUserStatusWithRetry() async {
+    final result = await _tryFetchUserStatus(ApiService().dio);
+    if (result['success'] == true) return result;
+
+    final idx = _currentActiveIndex;
+    final cookie = idx >= 0 ? _currentAccounts[idx].cookieString : '';
+    if (cookie.isEmpty) return result;
+    try {
+      final tempDio = Dio(
+        BaseOptions(
+          baseUrl: SiteStore.instance.baseUrl,
+          headers: {'User-Agent': Site.uaPc, 'Cookie': cookie},
+        ),
+      );
+      final retry = await _tryFetchUserStatus(tempDio);
+      if (retry['success'] == true) return retry;
+    } catch (e) {
+      debugPrint('[AuthProvider] userstatus retry error: $e');
+    }
+    return result;
+  }
+
+  Future<Map<String, dynamic>> _tryFetchUserStatus(Dio dio) async {
+    try {
+      return await userstatus_api.fetch(dio);
+    } catch (e) {
+      debugPrint('[AuthProvider] userstatus fetch error: $e');
+      return {'success': false, 'message': '$e'};
+    }
+  }
+
+  /// 标记当前账号登录过期（由登录过期事件触发）
+  ///
+  /// 幂等：仅当存在已登录账号且未标记时处理，并发事件只生效一次。
+  void markSessionExpired() {
+    final idx = _currentActiveIndex;
+    if (idx < 0 || idx >= _currentAccounts.length) return;
+    final a = _currentAccounts[idx];
+    if (a.uid == '0' || a.expired) return;
+    a.expired = true;
+    _saveState();
+    notifyListeners();
   }
 
   // ==================== 游客模式 ====================
@@ -239,6 +302,21 @@ class AuthProvider extends ChangeNotifier {
     }
     if (_currentActiveIndex < 0) {
       _currentActiveIndex = 0;
+    }
+  }
+
+  /// 清理历史遗留的“游客(登录过期)”占位账号
+  ///
+  /// 旧版本过期逻辑把账号 uid 篡改为 '0' 且保留在列表，污染账号列表；
+  /// 这类占位账号已无登录价值，加载/保存账号数据时直接移除。
+  void _cleanupLegacyPlaceholders() {
+    _currentAccounts.removeWhere(
+      (a) => a.uid == '0' && a.username == '游客(登录过期)',
+    );
+    if (_currentAccounts.isEmpty) {
+      _currentActiveIndex = -1;
+    } else if (_currentActiveIndex >= _currentAccounts.length) {
+      _currentActiveIndex = _currentAccounts.length - 1;
     }
   }
 
@@ -326,13 +404,21 @@ class AuthProvider extends ChangeNotifier {
       cookies,
     );
 
-    final idx = uid.isNotEmpty
+    // 优先按 uid 匹配；旧版本过期逻辑曾篡改 uid，按 username 回退合并
+    var idx = uid.isNotEmpty
         ? _currentAccounts.indexWhere((a) => a.uid == uid)
-        : _currentAccounts.indexWhere((a) => a.username == name);
+        : -1;
+    if (idx < 0 && username.isNotEmpty) {
+      idx = _currentAccounts.indexWhere(
+        (a) => a.uid != '0' && a.username == username,
+      );
+    }
 
     if (idx >= 0) {
       _currentAccounts[idx].uid = uid;
+      _currentAccounts[idx].username = name;
       _currentAccounts[idx].cookieString = cookieStr;
+      _currentAccounts[idx].expired = false;
       _currentActiveIndex = idx;
     } else {
       _currentAccounts.add(
@@ -341,6 +427,7 @@ class AuthProvider extends ChangeNotifier {
       _currentActiveIndex = _currentAccounts.length - 1;
     }
 
+    _cleanupLegacyPlaceholders();
     _saveState();
     _ensureGuestAccount();
     notifyListeners();
@@ -404,6 +491,7 @@ class AuthProvider extends ChangeNotifier {
           .map((j) => Account.fromJson(j as Map<String, dynamic>))
           .toList();
     }
+    _cleanupLegacyPlaceholders();
     _ensureGuestAccount();
 
     // 恢复活跃索引
@@ -456,6 +544,7 @@ class AuthProvider extends ChangeNotifier {
     } else {
       _siteAccounts[_host] = [];
     }
+    _cleanupLegacyPlaceholders();
     _ensureGuestAccount();
 
     final lastAccount = await db.getLastAccount(_host);

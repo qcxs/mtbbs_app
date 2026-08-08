@@ -374,7 +374,7 @@ class _SearchPageState extends State<SearchPage> {
       child: ListTile(
         leading: CircleAvatar(
           radius: 18,
-          backgroundColor: iconColor.withOpacity(0.1),
+          backgroundColor: iconColor.withValues(alpha: 0.1),
           child: Icon(icon, size: 20, color: iconColor),
         ),
         title: Text(label, style: const TextStyle(fontSize: 14)),

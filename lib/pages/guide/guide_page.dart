@@ -230,7 +230,7 @@ class _GuidePageState extends State<GuidePage> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
-          color: selected ? cs.onSurfaceVariant.withOpacity(0.1) : null,
+          color: selected ? cs.onSurfaceVariant.withValues(alpha: 0.1) : null,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(

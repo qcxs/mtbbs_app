@@ -163,12 +163,17 @@ class _WebLoginPageState extends State<WebLoginPage> {
         final auth = context.read<AuthProvider>();
         final uid = result['uid']?.toString() ?? '';
         final username = result['username']?.toString() ?? '';
-        await auth.saveWebLogin(
+        final saved = await auth.saveWebLogin(
           username.isNotEmpty ? username : uid,
           uid,
           allCookies,
         );
         if (!mounted) return;
+        if (!saved) {
+          _loginDone = false;
+          showToast('账号保存失败，请重试');
+          return;
+        }
         Navigator.of(context).pop(true);
         showToast('登录成功');
       } else {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 显示字体大小选择对话框
 void showFontSizePicker(
@@ -369,6 +371,54 @@ Future<String?> showExitConfirmDialog(BuildContext context) async {
             Navigator.of(ctx).pop('save');
           },
           child: const Text('保存'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// 显示原始 BBCode 预览对话框（长按预览内容触发）
+void showRawBbcodeDialog(BuildContext context, String bbcode) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.code, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text('预览 BBCode', style: TextStyle(fontSize: 16)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            onPressed: () => Navigator.of(ctx).pop(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: SelectableText(
+          bbcode,
+          style: const TextStyle(
+            fontSize: 12,
+            fontFamily: 'monospace',
+            height: 1.5,
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: bbcode));
+            showToast('已复制');
+            Navigator.of(ctx).pop();
+          },
+          child: const Text('复制'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('关闭'),
         ),
       ],
     ),

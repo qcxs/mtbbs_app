@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:mtbbs/core/app/event_bus.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
 /// 从 Dio Response 中安全解码响应体
@@ -23,7 +24,13 @@ T parseWithLog<T>(
   final result = parseFn(body, resp.statusCode ?? 0);
   // 仅在 result 是 Map<String, dynamic> 时自动输出日志
   if (result is Map<String, dynamic>) {
-    _logParseResult(result as Map<String, dynamic>, resp.requestOptions.path);
+    final map = result as Map<String, dynamic>;
+    // 服务器明确返回“需要登录”的页面（登录过期/未登录被拦截）→ 广播登录过期事件
+    // 幂等性由订阅端保证（AuthProvider.markSessionExpired + UI 节流）
+    if (map['loginRequired'] == true) {
+      EventBus.fire(LoginExpiredEvent());
+    }
+    _logParseResult(map, resp.requestOptions.path);
   }
   return result;
 }

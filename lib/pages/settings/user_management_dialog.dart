@@ -78,6 +78,7 @@ class UserManagementDialog extends StatelessWidget {
                 final displayUid = auth.uid.isNotEmpty
                     ? 'UID: ${auth.uid}'
                     : '未登录';
+                final expiredTag = auth.isExpired ? '（已过期）' : '';
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -96,7 +97,7 @@ class UserManagementDialog extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              displayName,
+                              '$displayName$expiredTag',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
@@ -191,10 +192,14 @@ class UserManagementDialog extends StatelessWidget {
                                   title: Text(
                                     auth.accounts[i].uid == '0'
                                         ? '游客'
+                                        : auth.accounts[i].expired
+                                        ? '${auth.accounts[i].username}（已过期）'
                                         : auth.accounts[i].username,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: auth.accounts[i].uid == '0'
+                                      color:
+                                          auth.accounts[i].uid == '0' ||
+                                              auth.accounts[i].expired
                                           ? cs.onSurfaceVariant
                                           : null,
                                     ),
