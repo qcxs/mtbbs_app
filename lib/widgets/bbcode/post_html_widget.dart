@@ -1,36 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:go_router/go_router.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter_html/flutter_html.dart';
-import 'package:mtbbs/core/parser/bbcode2html.dart';
-import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/parser/bbcode2html.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
-import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
-import 'package:mtbbs/widgets/bbcode/bbcode_table.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_code_block.dart';
-import 'package:mtbbs/widgets/image_preview/image_preview.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/image_preview/image_preview.dart';
 
-/// 渲染段类型
-sealed class _Segment {}
-
-class _HtmlSegment extends _Segment {
-  final String content;
-  _HtmlSegment(this.content);
-}
-
-class _TableSegment extends _Segment {
-  final String content;
-  _TableSegment(this.content);
-}
-
-/// 可被全局/局部禁用的 BBCode 样式标签（从旧 PostAstWidget 迁移）
+/// 可被全局/局部禁用的 BBCode 样式标签
 const bbcodeStyleTags = <String>{
   'bold',
   'italic',
@@ -61,17 +48,19 @@ double resolvePostImageWidth({
   return availableWidth.clamp(1, maxImageWidth).toDouble();
 }
 
-/// 基于 flutter_html 的 BBCode 渲染组件
+/// 基于 flutter_widget_from_html 的 BBCode 渲染组件
 ///
-/// 将 BBCode 转换为 HTML，由 flutter_html 渲染为 Flutter Widget。
-/// 替代旧的 PostAstWidget（AST → Widget 方案）。
+/// 链路：`BBCode → BBCode2Html → HTML → HtmlWidget`
 ///
-/// 支持：
-/// - 所有标准 BBCode 格式
-/// - [url] 链接（点击弹出确认对话框）
-/// - 表情渲染
-/// - 标签禁用
-/// - 图片长按查看（点击穿透给父级链接）
+/// 依赖 flutter_widget_from_html 的两项能力（flutter_html 均缺失）：
+/// 1. **原生 `<table>`** — 用其自研 [HtmlTable] 渲染，支持 colspan/rowspan、
+///    列超宽可滚动，不再需要「占位元素 + 按 table 分段」那套绕行方案
+/// 2. **内联 / 块级注入分离** — [customWidgetBuilder] 返回 [InlineCustomWidget]
+///    即内联，返回普通 Widget 即块级。因此表情内联、帖子图片块级可以
+///    在同一段落流里共存，且链接手势会下沉包裹内部块级元素，
+///    点击图片能正常冒泡到 `[url]` 的点击事件
+///
+/// 支持：所有标准 BBCode 格式、链接点击弹窗、表情、标签禁用、图片长按菜单。
 class PostHtmlWidget extends StatelessWidget {
   final String bbcode;
   final double fontSize;
@@ -88,367 +77,350 @@ class PostHtmlWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final effectiveDisabled =
         disabledTags ??
         context.select<SettingsProvider, Set<String>>(
           (s) => s.disabledBbcodeTags,
         );
-    // 宽屏时帖子图片最大宽度（px）
     final maxImageWidth = context.select<SettingsProvider, int>(
       (s) => s.maxImageWidth,
     );
-
-    // 1. 仅按 [table] 分割（code 由 BBCode2Html 还原为占位元素，
-    //    flutter_html extension 原地替换为代码高亮组件，不参与分段，
-    //    避免切分拆散 hide/quote/free/table 等容器标签）
-    final segments = _buildSegments(bbcode);
-    final content = segments.length == 1 && segments.first is _HtmlSegment
-        ? _buildHtmlSegment(
-            context,
-            bbcode,
-            fontSize,
-            effectiveDisabled,
-            autoDetectUrls,
-            maxImageWidth,
-          )
-        : Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final segment in segments)
-                switch (segment) {
-                  _HtmlSegment(:final content) => _buildHtmlSegment(
-                    context,
-                    content,
-                    fontSize,
-                    effectiveDisabled,
-                    autoDetectUrls,
-                    maxImageWidth,
-                  ),
-                  _TableSegment(:final content) => BbcodeTableWidget(
-                    bbcode: content,
-                    fontSize: fontSize,
-                    disabledTags: effectiveDisabled,
-                    autoDetectUrls: autoDetectUrls,
-                  ),
-                },
-            ],
-          );
-    return SelectionArea(child: content);
-  }
-
-  /// 生成渲染段列表：按 [table] 分割
-  List<_Segment> _buildSegments(String bbcode) {
-    final result = <_Segment>[];
-    for (final tableSeg in splitByTable(bbcode)) {
-      if (tableSeg.isTable) {
-        result.add(_TableSegment(tableSeg.content));
-      } else {
-        result.add(_HtmlSegment(tableSeg.content));
-      }
-    }
-    return result;
-  }
-
-  /// 构建一段纯 HTML/BBCode 渲染（不含表格）
-  static Widget _buildHtmlSegment(
-    BuildContext context,
-    String bbcodeContent,
-    double fontSize,
-    Set<String> disabledTags,
-    bool autoDetectUrls,
-    int maxImageWidth,
-  ) {
-    final cs = Theme.of(context).colorScheme;
 
     final converter = BBCode2Html(
       // 表情数据由 EmojiService 按站点维护且几乎不变，渲染层直接获取
       emojiMap: EmojiService().map,
       smilieIdMap: EmojiService().smilieIdMap,
-      disabledTags: disabledTags,
+      disabledTags: effectiveDisabled,
       baseUrl: SiteStore.instance.baseUrl,
       autoDetectUrls: autoDetectUrls,
-      // code/table 还原为占位元素，由下方 extension 原地替换为
-      // 高亮组件 / Flutter 原生 Table，保证 hide/quote/free 等容器结构完整
+      // [code] 还原为占位元素，由 customWidgetBuilder 原地替换为高亮组件
       emitCodePlaceholder: true,
-      emitTablePlaceholder: true,
     );
-    final html = converter.convert(bbcodeContent);
-    return Html(
-      data: html,
-      style: {
-        'body': Style(
-          fontSize: FontSize(fontSize),
-          margin: Margins.zero,
-          padding: HtmlPaddings.zero,
-        ),
-        'a': Style(
-          color: cs.linkColor,
-          textDecoration: TextDecoration.underline,
-        ),
-        'blockquote': Style(
-          backgroundColor: cs.quoteBg,
-          margin: Margins.zero,
-          padding: HtmlPaddings.only(left: 12, right: 12, top: 8, bottom: 8),
-        ),
-        'pre': Style(backgroundColor: cs.codeBgColor, margin: Margins.zero),
-        'code': Style(color: cs.codeTextColor, fontFamily: 'monospace'),
-        '.bbcode-free': Style(
-          backgroundColor: cs.quoteBg,
-          margin: Margins.zero,
-          padding: HtmlPaddings.all(8),
-        ),
-        '.bbcode-attach': Style(
-          backgroundColor: cs.attachBgColor,
-          margin: Margins.zero,
-          padding: HtmlPaddings.all(8),
-        ),
-        '.bbcode-locked': Style(
-          backgroundColor: cs.quoteBg,
-          margin: Margins.zero,
-          padding: HtmlPaddings.only(left: 12, right: 12, top: 8, bottom: 8),
-        ),
-        '.bbcode-pstatus': Style(
-          fontSize: FontSize(12),
-          margin: Margins.zero,
-          // 居中
-          textAlign: TextAlign.center,
-          padding: HtmlPaddings.zero,
-        ),
-        '.bbcode-reward': Style(
-          backgroundColor: cs.quoteBg,
-          margin: Margins.zero,
-          padding: HtmlPaddings.only(left: 12, right: 12, top: 8, bottom: 8),
-        ),
-        '.bbcode-poll': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
-        'ul': Style(margin: Margins.zero, padding: HtmlPaddings.only(left: 24)),
-        'ol': Style(margin: Margins.zero, padding: HtmlPaddings.only(left: 24)),
-        // 让嵌套的list不缩进
-        'ul ul': Style(padding: HtmlPaddings.zero),
-        'ol ol': Style(padding: HtmlPaddings.zero),
-        'ul ol': Style(padding: HtmlPaddings.zero),
-        'ol ul': Style(padding: HtmlPaddings.zero),
-        'li': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
-        'hr': Style(
-          height: Height(1),
-          backgroundColor: cs.outlineVariant,
-          border: Border(),
-          margin: Margins.symmetric(vertical: 8),
-          padding: HtmlPaddings.zero,
-        ),
-      },
-      extensions: [
-        ImageExtension(
-          builder: (ctx) {
-            final src = ctx.attributes['src'] ?? '';
-            if (src.isEmpty) return const SizedBox.shrink();
-            // 通过 data-type="emoji" 区分表情图片和普通帖子图片
-            final isEmoji = ctx.attributes['data-type'] == 'emoji';
-            final cacheManager = isEmoji
-                ? emojiCacheManager
-                : imageCacheManager;
+    final html = converter.convert(bbcode);
+    final codeBlocks = converter.codeBlocks;
 
-            // 表情：固定行内尺寸
-            if (isEmoji) {
-              return CachedNetworkImage(
-                imageUrl: src,
-                cacheManager: cacheManager,
-                width: 20,
-                height: 20,
-                fit: BoxFit.contain,
-                errorWidget: (_, __, ___) => Icon(
-                  Icons.emoji_emotions_outlined,
-                  size: 18,
-                  color: cs.outline,
-                ),
+    return SelectionArea(
+      child: HtmlWidget(
+        html,
+        // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
+        buildAsync: false,
+        textStyle: TextStyle(fontSize: fontSize, color: cs.onSurface),
+        customStylesBuilder: (element) => _stylesFor(element, cs),
+        customWidgetBuilder: (element) {
+          // [code] 占位 div → 代码高亮组件（块级）
+          final codeIndex = element.attributes['data-code-index'];
+          if (codeIndex != null) {
+            final i = int.tryParse(codeIndex) ?? -1;
+            if (i < 0 || i >= codeBlocks.length) return const SizedBox.shrink();
+            return BbcodeCodeBlock(
+              code: codeBlocks[i],
+              fontSize: fontSize.clamp(11, 16).toDouble(),
+            );
+          }
+          // img → 表情内联 / 帖子图片块级
+          if (element.localName == 'img') {
+            final src = element.attributes['src'] ?? '';
+            if (src.isEmpty) return const SizedBox.shrink();
+            if (element.attributes['data-type'] == 'emoji') {
+              return InlineCustomWidget(
+                alignment: PlaceholderAlignment.middle,
+                child: _EmojiImage(url: src),
               );
             }
-
-            // 显式宽度（[img=W,H] 或 HTML 自带 width）
-            final explicitW = double.tryParse(ctx.attributes['width'] ?? '');
-            // 普通帖子图片：窄屏占满可用宽度，宽屏封顶 maxImageWidth；
-            // [img=W,H] 尊重作者显式宽度，但 clamp 到可用宽度防溢出。
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final available = constraints.maxWidth.isFinite
-                    ? constraints.maxWidth
-                    : MediaQuery.sizeOf(context).width;
-                final width = resolvePostImageWidth(
-                  explicitWidth: explicitW,
-                  availableWidth: available,
-                  maxImageWidth: maxImageWidth.toDouble(),
-                );
-                return GestureDetector(
-                  onLongPress: () => showImageActions(
-                    context,
-                    imageUrls: [src],
-                    sourceInfo: '帖子图片',
-                  ),
-                  child: CachedNetworkImage(
-                    imageUrl: src,
-                    cacheManager: cacheManager,
-                    width: width,
-                    memCacheWidth: (width * 2).toInt(),
-                    fit: BoxFit.contain,
-                    placeholder: (_, __) => SizedBox(
-                      width: width,
-                      height: 100,
-                      child: const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    ),
-                    errorWidget: (_, __, ___) => Icon(
-                      Icons.broken_image_outlined,
-                      size: 48,
-                      color: cs.outline,
-                    ),
-                  ),
-                );
-              },
+            return BbcodeImage(
+              url: src,
+              explicitWidth: double.tryParse(element.attributes['width'] ?? ''),
+              maxImageWidth: maxImageWidth.toDouble(),
             );
-          },
-        ),
-        BbcodeCodeExtension(
-          codeBlocks: converter.codeBlocks,
-          fontSize: fontSize,
-        ),
-        BbcodeTableExtension(
-          tableBlocks: converter.tableBlocks,
-          fontSize: fontSize,
-          disabledTags: disabledTags,
-          autoDetectUrls: autoDetectUrls,
-        ),
-      ],
-      onLinkTap: (link, attributes, element) {
-        if (link != null && link.isNotEmpty) {
-          _handleLinkTap(context, link);
-        }
+          }
+          return null;
+        },
+        onTapUrl: (url) {
+          _handleLinkTap(context, url);
+          return true;
+        },
+      ),
+    );
+  }
+}
+
+/// Color → CSS 颜色串（`#rrggbbaa`，flutter_widget_from_html 按 CSS 规范解析）
+String _cssColor(Color c) {
+  final argb = c.toARGB32();
+  final rgb = (argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
+  final alpha = ((argb >> 24) & 0xFF).toRadixString(16).padLeft(2, '0');
+  return '#$rgb$alpha';
+}
+
+/// BBCode 各容器/元素的主题样式（对应 flutter_html 时代的 `style` map）
+///
+/// 列表（`[list]`）在转换层已展开为带前缀的普通段落，不产生 `ul/ol/li`。
+Map<String, String>? _stylesFor(dom.Element element, ColorScheme cs) {
+  final classes = element.classes;
+
+  // 容器类（由 BBCode2Html 输出的 class 决定）
+  if (classes.contains('bbcode-free')) {
+    return {'background-color': _cssColor(cs.quoteBg), 'padding': '8px'};
+  }
+  if (classes.contains('bbcode-attach')) {
+    return {
+      'background-color': _cssColor(cs.attachBgColor),
+      'padding': '8px 12px',
+      'border-radius': '6px',
+    };
+  }
+  if (classes.contains('bbcode-locked')) {
+    return {
+      'background-color': _cssColor(cs.lockedBgColor),
+      'padding': '8px 12px',
+    };
+  }
+  if (classes.contains('bbcode-reward')) {
+    return {'background-color': _cssColor(cs.quoteBg), 'padding': '8px 12px'};
+  }
+  if (classes.contains('bbcode-pstatus')) {
+    return {
+      'font-size': '12px',
+      'text-align': 'center',
+      'color': _cssColor(cs.pstatusTextColor),
+    };
+  }
+
+  switch (element.localName) {
+    case 'a':
+      return {'color': _cssColor(cs.linkColor), 'text-decoration': 'underline'};
+    case 'blockquote':
+      return {
+        'background-color': _cssColor(cs.quoteBg),
+        'padding': '8px 12px',
+        'margin': '0',
+      };
+    case 'table':
+      return {
+        'border': '1px solid ${_cssColor(cs.outlineVariant)}',
+        'margin': '0',
+        'padding': '0',
+      };
+    case 'td':
+      // 不设 text-align：单元格内 [align] 已被 BBCode2Html 转成
+      // `<div style="text-align:...">`，由内层元素自行对齐
+      return {
+        'border': '1px solid ${_cssColor(cs.outlineVariant)}',
+        'padding': '4px 8px',
+      };
+    case 'hr':
+      return {
+        'height': '1px',
+        'background-color': _cssColor(cs.outlineVariant),
+        'margin': '8px 0',
+      };
+  }
+  return null;
+}
+
+/// 内联表情图片（跟随文字基线行走）
+class _EmojiImage extends StatelessWidget {
+  final String url;
+  const _EmojiImage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return CachedNetworkImage(
+      imageUrl: url,
+      cacheManager: emojiCacheManager,
+      width: 20,
+      height: 20,
+      fit: BoxFit.contain,
+      errorWidget: (_, __, ___) => Icon(
+        Icons.emoji_emotions_outlined,
+        size: 18,
+        color: Theme.of(context).colorScheme.outline,
+      ),
+    );
+  }
+}
+
+/// 帖子正文图片（块级，独占一行）
+///
+/// 不挂 `onTap`：点击需冒泡给外层 `[url]` 链接，挂 tap 会消费掉。
+/// 只提供长按菜单（查看大图 / 保存）。
+class BbcodeImage extends StatelessWidget {
+  final String url;
+  final double? explicitWidth;
+  final double maxImageWidth;
+
+  const BbcodeImage({
+    super.key,
+    required this.url,
+    this.explicitWidth,
+    this.maxImageWidth = 600,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final width = resolvePostImageWidth(
+          explicitWidth: explicitWidth,
+          availableWidth: available,
+          maxImageWidth: maxImageWidth,
+        );
+        return GestureDetector(
+          onLongPress: () =>
+              showImageActions(context, imageUrls: [url], sourceInfo: '帖子图片'),
+          // 外层固定解析出的宽度：加载中/加载失败时也保持占位宽度，
+          // 避免图片状态切换引起布局跳动
+          child: SizedBox(
+            width: width,
+            child: CachedNetworkImage(
+              imageUrl: url,
+              cacheManager: imageCacheManager,
+              width: width,
+              memCacheWidth: (width * 2).toInt(),
+              fit: BoxFit.contain,
+              placeholder: (_, __) => const SizedBox(
+                height: 100,
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+              errorWidget: (_, __, ___) => Icon(
+                Icons.broken_image_outlined,
+                size: 48,
+                color: cs.outline,
+              ),
+            ),
+          ),
+        );
       },
     );
   }
+}
 
-  static void _handleLinkTap(BuildContext context, String url) {
-    // QQ 链接特殊处理
-    if (url.contains('wpa.qq.com')) {
-      final qqMatch = RegExp(r'uin=(\d+)').firstMatch(url);
-      if (qqMatch != null) {
-        _showActionDialog(
-          context,
-          title: 'QQ',
-          message: 'QQ号:\n${qqMatch.group(1)}',
-          actionLabel: '复制',
-          copyValue: qqMatch.group(1)!,
-          onAction: () {
-            Clipboard.setData(ClipboardData(text: qqMatch.group(1)!));
-            showToast('已复制', duration: const Duration(seconds: 1));
-          },
-        );
-        return;
-      }
-    }
-
-    // mailto 链接
-    if (url.startsWith('mailto:')) {
+/// 链接点击处理 — QQ / 邮件 / 普通链接
+void _handleLinkTap(BuildContext context, String url) {
+  // QQ 链接特殊处理
+  if (url.contains('wpa.qq.com')) {
+    final qqMatch = RegExp(r'uin=(\d+)').firstMatch(url);
+    if (qqMatch != null) {
       _showActionDialog(
         context,
-        title: '发送邮件',
-        message: '发送至:\n${url.substring(7)}',
-        actionLabel: '发送',
-        copyValue: url.substring(7),
+        title: 'QQ',
+        message: 'QQ号:\n${qqMatch.group(1)}',
+        actionLabel: '复制',
+        copyValue: qqMatch.group(1)!,
         onAction: () {
-          final uri = Uri.tryParse(url);
-          if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+          Clipboard.setData(ClipboardData(text: qqMatch.group(1)!));
+          showToast('已复制', duration: const Duration(seconds: 1));
         },
       );
       return;
     }
-
-    // 普通链接 — 可编辑弹窗
-    _showUrlEditDialog(context, url);
   }
 
-  static Future<void> _showActionDialog(
-    BuildContext context, {
-    required String title,
-    required String message,
-    required String actionLabel,
-    required VoidCallback onAction,
-    required String copyValue,
-  }) async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 360),
-        title: Row(
-          children: [
-            Expanded(child: Text(title, style: const TextStyle(fontSize: 16))),
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: () => Navigator.of(ctx).pop(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-        content: SelectableText(message, style: const TextStyle(fontSize: 14)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop('copy'),
-            child: const Text('复制'),
-          ),
-          TextButton(
+  // mailto 链接
+  if (url.startsWith('mailto:')) {
+    _showActionDialog(
+      context,
+      title: '发送邮件',
+      message: '发送至:\n${url.substring(7)}',
+      actionLabel: '发送',
+      copyValue: url.substring(7),
+      onAction: () {
+        final uri = Uri.tryParse(url);
+        if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+      },
+    );
+    return;
+  }
+
+  // 普通链接 — 可编辑弹窗
+  _showUrlEditDialog(context, url);
+}
+
+Future<void> _showActionDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String actionLabel,
+  required VoidCallback onAction,
+  required String copyValue,
+}) async {
+  final result = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      constraints: const BoxConstraints(maxWidth: 360),
+      title: Row(
+        children: [
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 16))),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop('action'),
-            child: Text(actionLabel),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
-    );
-    switch (result) {
-      case 'action':
-        onAction();
-      case 'copy':
-        await Clipboard.setData(ClipboardData(text: copyValue));
-        if (context.mounted) {
-          showToast('已复制', duration: const Duration(seconds: 1));
-        }
-    }
+      content: SelectableText(message, style: const TextStyle(fontSize: 14)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop('copy'),
+          child: const Text('复制'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop('action'),
+          child: Text(actionLabel),
+        ),
+      ],
+    ),
+  );
+  switch (result) {
+    case 'action':
+      onAction();
+    case 'copy':
+      await Clipboard.setData(ClipboardData(text: copyValue));
+      if (context.mounted) {
+        showToast('已复制', duration: const Duration(seconds: 1));
+      }
   }
+}
 
-  /// 链接确认弹窗 — App打开（路由匹配）/ 外部浏览器 / 取消
-  static Future<void> _showUrlEditDialog(
-    BuildContext context,
-    String url,
-  ) async {
-    final action = await showDialog<String>(
-      context: context,
-      builder: (_) => _UrlActionDialog(url: url),
-    );
-    if (action == null || context.mounted == false) return;
+/// 链接确认弹窗 — App打开（路由匹配）/ 外部浏览器 / 取消
+Future<void> _showUrlEditDialog(BuildContext context, String url) async {
+  final action = await showDialog<String>(
+    context: context,
+    builder: (_) => _UrlActionDialog(url: url),
+  );
+  if (action == null || context.mounted == false) return;
 
-    final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasScheme) return;
+  final uri = Uri.tryParse(url);
+  if (uri == null || !uri.hasScheme) return;
 
-    switch (action) {
-      case '__app__':
-        final routeResult = UrlRouter.parse(url);
-        if (routeResult.appPath != null) {
-          context.push(routeResult.appPath!);
-        } else {
-          context.push(
-            '/browser?url=${Uri.encodeComponent(url)}&intercept=false',
-          );
-        }
-      case '__external__':
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  switch (action) {
+    case '__app__':
+      final routeResult = UrlRouter.parse(url);
+      if (routeResult.appPath != null) {
+        context.push(routeResult.appPath!);
+      } else {
+        context.push(
+          '/browser?url=${Uri.encodeComponent(url)}&intercept=false',
+        );
+      }
+    case '__external__':
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
 

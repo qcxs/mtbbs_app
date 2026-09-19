@@ -117,7 +117,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('[呵呵]'), findsOneWidget);
+      // flutter_widget_from_html 的文本由 RichText 承载，查找需 findRichText
+      expect(
+        find.textContaining('[呵呵]', findRichText: true),
+        findsOneWidget,
+      );
     });
   });
 }

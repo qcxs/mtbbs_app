@@ -222,14 +222,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.7.0"
-  flutter_html:
-    dependency: "direct main"
-    description:
-      name: flutter_html
-      sha256: "38a2fd702ffdf3243fb7441ab58aa1bc7e6922d95a50db76534de8260638558d"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "3.0.0"
   flutter_inappwebview:
     dependency: "direct main"
     description:
@@ -328,6 +320,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_widget_from_html_core:
+    dependency: "direct main"
+    description:
+      name: flutter_widget_from_html_core
+      sha256: "530f2e3cc57be1a00f8bfae1b0000064e8a6df0cf1fb4d48a80f85afde9b39b7"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.17.4"
   go_router:
     dependency: "direct main"
     description:
@@ -432,14 +432,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "6.1.0"
-  list_counter:
-    dependency: transitive
-    description:
-      name: list_counter
-      sha256: c447ae3dfcd1c55f0152867090e67e219d42fe6d4f2807db4bbe8b8d69912237
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "1.0.2"
   logging:
     dependency: transitive
     description:

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 
 /// 回归测试：list 末尾附件图片后不应出现空白。
 ///
-/// 根因：[/appdata] 后的换行在 `\n` → `<br>` 阶段变成 `<br>` 紧贴 `</ul>`，
-/// flutter_html 将其渲染为段落末尾的空行（图片下方空白）。
+/// 根因：[/appdata] 后的换行在 `\n` → `<br>` 阶段变成 `<br>` 紧贴块级容器
+/// 边界，渲染器将其渲染为段落末尾的空行（图片下方空白）。
 const bbcode =
     ''
     '[list] \n'
@@ -19,11 +19,11 @@ const bbcode =
     '[/list]';
 
 void main() {
-  test('list 末尾图片后不产生 <br> 紧贴 </ul>', () {
+  test('list 末尾图片后不产生 <br> 紧贴块级容器', () {
     final html = BBCode2Html().convert(bbcode);
-    // 图片后直接是 </ul>，中间不允许再出现 <br>
-    expect(html, matches(RegExp(r'<img[^>]*/>\s*</ul>')));
-    expect(html, isNot(contains('<br></ul>')));
+    // 列表在转换层已展开为 <div>，图片后直接是 </div>，中间不允许再出现 <br>
+    expect(html, matches(RegExp(r'<img[^>]*/>\s*</div>')));
+    expect(html, isNot(contains('<br></div>')));
   });
 
   test('通用规则：任何块级标签四周不残留紧邻 <br>', () {
@@ -85,7 +85,7 @@ void main() {
     }
   });
 
-  testWidgets('渲染树：含图片的段落以图片结尾，无末尾空行', (tester) async {
+  testWidgets('渲染树：列表与图片渲染完整，且无多余空白段落', (tester) async {
     final html = BBCode2Html().convert(bbcode);
 
     tester.view.physicalSize = const Size(800, 2000);
@@ -96,29 +96,25 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
-            child: Html(
-              data: html,
-              style: {
-                'body': Style(
-                  fontSize: FontSize(16),
-                  margin: Margins.zero,
-                  padding: HtmlPaddings.zero,
-                ),
-                'ul': Style(
-                  margin: Margins.zero,
-                  padding: HtmlPaddings.only(left: 24),
-                ),
-                'li': Style(margin: Margins.zero, padding: HtmlPaddings.zero),
+            child: HtmlWidget(
+              html,
+              buildAsync: false,
+              textStyle: const TextStyle(fontSize: 16),
+              customStylesBuilder: (e) {
+                if (e.localName == 'ul') {
+                  return {'padding-left': '24px', 'margin': '0'};
+                }
+                if (e.localName == 'li') return {'margin': '0', 'padding': '0'};
+                return null;
               },
-              extensions: [
-                ImageExtension(
-                  builder: (ctx) => Container(
-                    width: double.tryParse(ctx.attributes['width'] ?? ''),
-                    height: 100,
-                    color: Colors.blueGrey,
-                  ),
-                ),
-              ],
+              customWidgetBuilder: (e) => e.localName == 'img'
+                  ? Container(
+                      key: const ValueKey('diag-img'),
+                      width: double.tryParse(e.attributes['width'] ?? ''),
+                      height: 100,
+                      color: Colors.blueGrey,
+                    )
+                  : null,
             ),
           ),
         ),
@@ -126,12 +122,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 含图片的段落纯文本必须"以图片结尾"，末尾不能有换行（空行）
-    final imgParagraph = tester
-        .elementList(find.byType(RichText))
-        .map((e) => (e.widget as RichText).text.toPlainText())
-        .firstWhere((t) => t.contains('￼') && t.contains('AI 会帮你'));
-    expect(imgParagraph, isNot(endsWith('\n')));
-    expect(imgParagraph, endsWith('￼'));
+    // 列表项与图片都渲染出来
+    expect(
+      find.textContaining('让 AI 在 Smali', findRichText: true),
+      findsWidgets,
+    );
+    expect(find.byKey(const ValueKey('diag-img')), findsOneWidget);
+
+    // 关键回归：不存在「只含空白/换行」的可见段落 —— 即没有多余空行
+    final blanks = <String>[];
+    for (final el in find.byType(RichText).evaluate()) {
+      final rich = el.widget as RichText;
+      final ro = el.renderObject as RenderParagraph?;
+      final plain = rich.text.toPlainText();
+      if (plain.trim().isEmpty && (ro?.size.height ?? 0) > 0) {
+        blanks.add('${ro?.size} "$plain"');
+      }
+    }
+    // ignore: avoid_print
+    print('空白段落: $blanks');
+    expect(blanks, isEmpty, reason: '不应存在多余空行');
   });
 }

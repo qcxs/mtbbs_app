@@ -45,9 +45,9 @@ void main() {
           '[/table]';
       final converter = BBCode2Html();
       final html = converter.convert(bbcode);
-      // 表头：text-align 在 td 上
-      expect(html, contains('<td style='));
-      // 两个 td 应有 text-align:center
+      // 表头：text-align 由 [align] 转为内层 div，td 本身只承载结构
+      expect(html, contains('<td>'));
+      // 两个 td 内都应有 text-align:center
       expect(html, contains('text-align:center'));
       // 链接正常
       expect(html, contains('<a href="https://www.feejii.com/'));

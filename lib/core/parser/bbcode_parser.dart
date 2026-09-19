@@ -69,7 +69,9 @@ class BBCodeParser {
        _smilieIdMap = smilieIdMap;
 
   /// 经过预处理的增强 emojiMap，包含 [emoji_N] → imageUrl 映射。
-  /// 调用 [parse] 后生效，用于传给 PostAstWidget 正确渲染所有表情。
+  /// 调用 [parse] 后生效。当前渲染链路已改走
+  /// `BBCode2Html → flutter_widget_from_html`，本解析器仅保留给
+  /// 三层渲染诊断（docs/07）取 AST 层输出使用。
   Map<String, String>? get enhancedMap => _enhancedMap;
 
   static final _selfClosing = <String>{

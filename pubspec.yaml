@@ -74,13 +74,12 @@ dependencies:
   photo_view: ^0.15.0
 
   # HTML 渲染（BBCode → HTML → Widget）
-  flutter_html: ^3.0.0
-
   # 代码语法高亮
   highlight: ^0.7.0
   flutter_highlight: ^0.7.0
   re_highlight: ^0.0.3
   charset: ^2.0.1
+  flutter_widget_from_html_core: ^0.17.4
 
 dev_dependencies:
   flutter_test:

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 
 /// 回归测试：图片后紧跟 [code] 块时不应出现空白。
 ///
 /// 根因：[/appdata] 后的换行变成 `<br>`，但 block-adjacency 清理发生在
 /// [code] 占位符还原之前（清理时还是 \x00CODE0\x00，不是 <pre>），
-/// 导致 `<br>` 幸存并紧贴还原后的 <pre>，渲染成图片下方空行。
+/// 导致 `<br>` 幸存并紧贴还原后的块级元素，渲染成图片下方空行。
 const bbcode =
     ''
     '[appdata]{"type":"image_attach","url":"https://attach.52pojie.cn/forum/202607/31/155713n4p54574poyws4op.jpg","width":"1080","aid":"2868499","name":"Snipaste_2026-07-31_15-51-46.jpg","size":"169.75 KB","downloads":"0","uploadTime":"2026-7-31 15:57"}[/appdata] \n'
@@ -25,8 +26,8 @@ void main() {
     expect(html, contains('index.html<br></li>'));
   });
 
-  testWidgets('渲染树：图片与 code 块同一段落且中间无换行', (tester) async {
-    final html = BBCode2Html().convert(bbcode);
+  testWidgets('渲染树：图片与 code 块之间无空白段落', (tester) async {
+    final html = BBCode2Html(emitCodePlaceholder: true).convert(bbcode);
 
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
@@ -36,24 +37,28 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
-            child: Html(
-              data: html,
-              style: {
-                'body': Style(
-                  fontSize: FontSize(16),
-                  margin: Margins.zero,
-                  padding: HtmlPaddings.zero,
-                ),
-              },
-              extensions: [
-                ImageExtension(
-                  builder: (ctx) => Container(
-                    width: double.tryParse(ctx.attributes['width'] ?? ''),
+            child: HtmlWidget(
+              html,
+              buildAsync: false,
+              textStyle: const TextStyle(fontSize: 16),
+              customWidgetBuilder: (e) {
+                if (e.localName == 'img') {
+                  return Container(
+                    key: const ValueKey('diag-img'),
                     height: 100,
                     color: Colors.blueGrey,
-                  ),
-                ),
-              ],
+                  );
+                }
+                if (e.attributes.containsKey('data-code-index')) {
+                  return Container(
+                    key: const ValueKey('diag-code'),
+                    height: 40,
+                    color: Colors.black12,
+                    child: Text(e.outerHtml),
+                  );
+                }
+                return null;
+              },
             ),
           ),
         ),
@@ -61,12 +66,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 任何段落都不允许"图片后紧跟换行"（修复前是 "￼\n￼"）
-    final texts = tester
-        .elementList(find.byType(RichText))
-        .map((e) => (e.widget as RichText).text.toPlainText());
-    expect(texts.where((t) => t.contains('￼\n')), isEmpty);
-    // 图片与 code 块应位于同一段落（内联相接）
-    expect(texts.any((t) => t.contains('￼￼')), isTrue);
+    // 图片与 code 块都渲染出来
+    expect(find.byKey(const ValueKey('diag-img')), findsOneWidget);
+    expect(find.byKey(const ValueKey('diag-code')), findsOneWidget);
+
+    // 关键回归：不存在「只含空白/换行」的可见段落 —— 即图片与 code 之间没有空行
+    final blanks = <String>[];
+    for (final el in find.byType(RichText).evaluate()) {
+      final rich = el.widget as RichText;
+      final ro = el.renderObject as RenderParagraph?;
+      final plain = rich.text.toPlainText();
+      if (plain.trim().isEmpty && (ro?.size.height ?? 0) > 0) {
+        blanks.add('${ro?.size} "$plain"');
+      }
+      // 图片后紧跟换行的旧症状（"￼\n"）不应再出现
+      expect(plain.contains('￼\n'), isFalse);
+    }
+    // ignore: avoid_print
+    print('空白段落: $blanks');
+    expect(blanks, isEmpty, reason: '图片与 code 之间不应有空行');
   });
 }

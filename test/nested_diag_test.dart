@@ -1,125 +1,91 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_code_block.dart';
-import 'package:mtbbs/widgets/bbcode/bbcode_table.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:provider/provider.dart';
 
 /// 回归测试：嵌套场景（table 套 table / table 套标签 / 标签套 table）
 ///
-/// 根因：原 splitByTable / BBCode2Html 的 table 处理用非贪婪正则，
-/// 嵌套时内层 [/table] 截断外层块；splitByTable 还会拆散 hide/quote 容器。
-/// 修复：outerBlocks 栈式匹配 + splitByTable 跳过容器内 table。
+/// 根因：原 table 处理用非贪婪正则，嵌套时内层 `[/table]` 会截断外层块。
+/// 修复：`outerBlocks` 栈式匹配最外层块；渲染侧由 flutter_widget_from_html
+/// 原生渲染 `<table>`，不再需要「占位元素 + 按 table 分段」。
+///
+/// 注意：flutter_widget_from_html 的文本由 RichText 承载（不是 Text widget），
+/// 文本查找必须 `findRichText: true`。
+Finder _text(String s) => find.textContaining(s, findRichText: true);
+
 void main() {
   setUp(() {
     SiteStore.instance.init();
   });
 
-  group('splitByTable', () {
-    test('嵌套表格按最外层切分为一个完整 table 段', () {
+  group('BBCode2Html 表格转换', () {
+    test('嵌套表格：结构完整，无残留标签', () {
       const bbcode =
           '[table][tr][td]a[table][tr][td]b[/td][/tr][/table]c[/td][/tr][/table]';
-      final segments = splitByTable(bbcode);
-      expect(segments.length, 1);
-      expect(segments.first.isTable, isTrue);
-      expect(segments.first.content, bbcode);
-    });
-
-    test('hide 套 table：整体留在普通段，不拆散 hide 容器', () {
-      const bbcode = '[hide][table][tr][td]x[/td][/tr][/table][/hide]';
-      final segments = splitByTable(bbcode);
-      expect(segments.length, 1);
-      expect(segments.first.isTable, isFalse);
-      expect(segments.first.content, bbcode);
-    });
-
-    test('quote 套 table：整体留在普通段', () {
-      const bbcode = '[quote][table][tr][td]x[/td][/tr][/table][/quote]';
-      final segments = splitByTable(bbcode);
-      expect(segments.length, 1);
-      expect(segments.first.isTable, isFalse);
-      expect(segments.first.content, bbcode);
-    });
-
-    test('table 内 hide：仍是 table 段', () {
-      const bbcode = '[table][tr][td][hide]x[/hide][/td][/tr][/table]';
-      final segments = splitByTable(bbcode);
-      expect(segments.length, 1);
-      expect(segments.first.isTable, isTrue);
-    });
-
-    test('顶层普通 table 仍被切出', () {
-      const bbcode = '前文[table][tr][td]x[/td][/tr][/table]后文';
-      final segments = splitByTable(bbcode);
-      expect(segments.length, 3);
-      expect(segments[1].isTable, isTrue);
-    });
-  });
-
-  group('BBCode2Html', () {
-    test('嵌套表格（渲染模式）：占位元素 + tableBlocks 保留完整嵌套块', () {
-      const bbcode =
-          '[table][tr][td]a[table][tr][td]b[/td][/tr][/table]c[/td][/tr][/table]';
-      final converter = BBCode2Html(emitTablePlaceholder: true);
-      final html = converter.convert(bbcode);
-      expect(html, contains('data-table-index="0"'));
-      expect(converter.tableBlocks, [bbcode]);
+      final html = BBCode2Html().convert(bbcode);
+      // ignore: avoid_print
+      print(html);
+      expect(html, contains('<table'));
+      expect(html, contains('a'));
+      expect(html, contains('b'));
+      expect(html, contains('c'));
       expect(html, isNot(contains('[table]')));
       expect(html, isNot(contains('[/table]')));
+      // 内层表格同样转成 <table>
+      expect(RegExp(r'<table').allMatches(html).length, 2);
     });
 
-    test('hide 套 table（渲染模式）：blockquote 内占位元素', () {
+    test('hide 套 table：blockquote 包住 table，容器标签不残留', () {
       const bbcode = '[hide][table][tr][td]x[/td][/tr][/table][/hide]';
-      final converter = BBCode2Html(emitTablePlaceholder: true);
-      final html = converter.convert(bbcode);
+      final html = BBCode2Html().convert(bbcode);
       expect(html, contains('<blockquote>'));
-      expect(html, contains('data-table-index="0"'));
-      expect(converter.tableBlocks, ['[table][tr][td]x[/td][/tr][/table]']);
+      expect(html, contains('<table'));
+      expect(html, contains('隐藏内容'));
       expect(html, isNot(contains('[hide]')));
       expect(html, isNot(contains('[/hide]')));
     });
 
-    test('quote 套 table（渲染模式）：blockquote 内占位元素', () {
+    test('quote 套 table：blockquote 包住 table', () {
       const bbcode = '[quote][table][tr][td]x[/td][/tr][/table][/quote]';
-      final converter = BBCode2Html(emitTablePlaceholder: true);
-      final html = converter.convert(bbcode);
+      final html = BBCode2Html().convert(bbcode);
       expect(html, contains('<blockquote>'));
-      expect(html, contains('data-table-index="0"'));
+      expect(html, contains('<table'));
       expect(html, isNot(contains('[quote]')));
       expect(html, isNot(contains('[/quote]')));
     });
 
-    test('table 内 hide/quote（渲染模式）：无残留标签', () {
-      final converter = BBCode2Html(emitTablePlaceholder: true);
-      final html = converter.convert(
+    test('table 内 hide/quote：无残留标签', () {
+      final html = BBCode2Html().convert(
         '[table][tr][td][hide]x[/hide][quote]y[/quote][/td][/tr][/table]',
       );
-      expect(html, contains('data-table-index="0"'));
+      expect(html, contains('<table'));
       expect(html, isNot(contains('[hide]')));
       expect(html, isNot(contains('[quote]')));
     });
 
-    test('table 内 code（渲染模式）：tableBlocks 还原纯 BBCode，codeBlocks 完整', () {
-      final converter = BBCode2Html(
-        emitCodePlaceholder: true,
-        emitTablePlaceholder: true,
-      );
+    test('table 内 code：占位元素落在 cell 内，codeBlocks 完整', () {
+      final converter = BBCode2Html(emitCodePlaceholder: true);
       final html = converter.convert(
         '[table][tr][td][code]x[/code][/td][/tr][/table]',
       );
-      expect(html, contains('data-table-index="0"'));
-      expect(converter.tableBlocks, [
-        '[table][tr][td][code]x[/code][/td][/tr][/table]',
-      ]);
+      expect(html, contains('<table'));
+      expect(html, contains('<td>'));
+      expect(html, contains('data-code-index="0"'));
       expect(converter.codeBlocks, ['x']);
     });
 
-    test('默认模式（非渲染）：table 转 <table> HTML（兼容旧行为）', () {
-      final html = BBCode2Html().convert('[table][tr][td]x[/td][/tr][/table]');
-      expect(html, contains('<table'));
+    test('td 内 [align] 转成 div text-align，不残留 align 标签', () {
+      final html = BBCode2Html().convert(
+        '[table][tr][td][align=center][b]标题[/b][/align][/td][/tr][/table]',
+      );
+      expect(html, contains('text-align:center'));
+      expect(html, contains('<strong>标题</strong>'));
+      expect(html, isNot(contains('[align')));
     });
   });
 
@@ -142,11 +108,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       // a/c 文字保留，b 在内层表格
-      expect(find.textContaining('a'), findsOneWidget);
-      expect(find.textContaining('b'), findsOneWidget);
-      expect(find.textContaining('c'), findsOneWidget);
-      expect(find.textContaining('[table]'), findsNothing);
-      expect(find.textContaining('[/table]'), findsNothing);
+      expect(_text('a'), findsWidgets);
+      expect(_text('b'), findsWidgets);
+      expect(_text('c'), findsWidgets);
+      expect(_text('[table]'), findsNothing);
+      expect(_text('[/table]'), findsNothing);
+      expect(find.byType(HtmlTable), findsNWidgets(2));
     });
 
     testWidgets('hide 套 table：hide 容器渲染、内容可见', (tester) async {
@@ -154,9 +121,10 @@ void main() {
       await tester.pumpWidget(wrap(const PostHtmlWidget(bbcode: bbcode)));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('隐藏内容'), findsOneWidget);
-      expect(find.textContaining('x'), findsOneWidget);
-      expect(find.textContaining('[hide]'), findsNothing);
+      expect(_text('隐藏内容'), findsWidgets);
+      expect(_text('x'), findsWidgets);
+      expect(_text('[hide]'), findsNothing);
+      expect(find.byType(HtmlTable), findsOneWidget);
     });
 
     testWidgets('quote 套 table：引用容器渲染', (tester) async {
@@ -164,8 +132,8 @@ void main() {
       await tester.pumpWidget(wrap(const PostHtmlWidget(bbcode: bbcode)));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('x'), findsOneWidget);
-      expect(find.textContaining('[quote]'), findsNothing);
+      expect(_text('x'), findsWidgets);
+      expect(_text('[quote]'), findsNothing);
     });
 
     testWidgets('table 内 hide/quote/code 混合', (tester) async {
@@ -174,7 +142,7 @@ void main() {
       await tester.pumpWidget(wrap(const PostHtmlWidget(bbcode: bbcode)));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('隐藏内容'), findsOneWidget);
+      expect(_text('隐藏内容'), findsWidgets);
       expect(find.byType(BbcodeCodeBlock), findsOneWidget);
     });
   });

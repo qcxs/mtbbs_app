@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 
 /// 回归测试：quote 引文渲染。
@@ -41,15 +41,10 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
-            child: Html(
-              data: html,
-              style: {
-                'body': Style(
-                  fontSize: FontSize(16),
-                  margin: Margins.zero,
-                  padding: HtmlPaddings.zero,
-                ),
-              },
+            child: HtmlWidget(
+              html,
+              buildAsync: false,
+              textStyle: const TextStyle(fontSize: 16),
             ),
           ),
         ),
@@ -57,8 +52,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final text = tester
-        .elementList(find.byType(RichText))
+    final text = find
+        .byType(RichText)
+        .evaluate()
         .map((e) => (e.widget as RichText).text.toPlainText())
         .join('|');
     // ignore: avoid_print

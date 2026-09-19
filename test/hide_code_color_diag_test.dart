@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -9,9 +9,14 @@ import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:provider/provider.dart';
 
 /// 回归测试：
-/// 1. code 不再参与分段：BBCode2Html 还原为占位元素，flutter_html
-///    extension 原地替换为代码高亮组件，hide/quote/table 等容器结构完整
-/// 2. 非法 hex 颜色（如 [color=#FFYYTT]）不导致 flutter_html 抛异常
+/// 1. code 由 BBCode2Html 还原为占位元素，渲染层按 data-code-index
+///    原地替换为代码高亮组件，hide/quote/table 等容器结构完整
+/// 2. 非法 hex 颜色（如 [color=#FFYYTT]）不导致渲染器抛异常
+///
+/// 注意：flutter_widget_from_html 的文本由 RichText 承载（不是 Text widget），
+/// 文本查找必须 `findRichText: true`。
+Finder _text(String s) => find.textContaining(s, findRichText: true);
+
 void main() {
   setUp(() {
     // PostHtmlWidget 依赖 SiteStore 当前站点（baseUrl），测试环境需初始化
@@ -43,7 +48,7 @@ void main() {
       final converter = BBCode2Html(emitCodePlaceholder: true);
       converter.convert(bbcode);
       expect(converter.codeBlocks, ['if (a < b && c > d) & e']);
-      // 非渲染模式：<pre> 内实体转义，flutter_html 解码后显示原始代码
+      // 非渲染模式：<pre> 内实体转义，由渲染器解码后显示原始代码
       final plain = BBCode2Html().convert(bbcode);
       expect(plain, contains('&lt;'));
       expect(plain, contains('&amp;'));
@@ -67,7 +72,7 @@ void main() {
       final converter = BBCode2Html(emitCodePlaceholder: true);
       final html = converter.convert(bbcode);
       expect(html, contains('<table'));
-      expect(html, contains('<td style='));
+      expect(html, contains('<td>'));
       expect(html, contains('data-code-index="0"'));
     });
 
@@ -104,7 +109,7 @@ void main() {
     });
   });
 
-  group('PostHtmlWidget 渲染（extension 原地替换）', () {
+  group('PostHtmlWidget 渲染（占位元素原地替换）', () {
     Widget wrap(Widget child) {
       return MaterialApp(
         home: Scaffold(
@@ -122,9 +127,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.byType(BbcodeCodeBlock), findsOneWidget);
-      expect(find.textContaining('隐藏内容'), findsOneWidget);
+      expect(_text('隐藏内容'), findsWidgets);
       // hide 标签不原样残留
-      expect(find.textContaining('[hide]'), findsNothing);
+      expect(_text('[hide]'), findsNothing);
     });
 
     testWidgets('quote 内 code：容器渲染 + 高亮组件', (tester) async {
@@ -141,8 +146,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.byType(BbcodeCodeBlock), findsOneWidget);
-      // 前后文字在同一个 Text 内（块级占位元素嵌入文本流）
-      expect(find.textContaining('文字'), findsOneWidget);
+      // 前后文字均被渲染（code 为块级，文字被拆到 code 两侧）
+      expect(_text('文字'), findsWidgets);
     });
 
     testWidgets('table 内 code：code 保留在表格 cell 内渲染', (tester) async {
@@ -152,6 +157,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.byType(BbcodeCodeBlock), findsOneWidget);
+      expect(find.byType(HtmlTable), findsOneWidget);
+      expect(_text('表头'), findsWidgets);
     });
 
     testWidgets('非法 hex 颜色不抛异常', (tester) async {
@@ -159,6 +166,7 @@ void main() {
       await tester.pumpWidget(wrap(const PostHtmlWidget(bbcode: bbcode)));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      expect(_text('内容'), findsWidgets);
     });
   });
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:flutter_highlight/themes/github.dart';
@@ -48,48 +47,10 @@ const _languages = [
   ('powershell', 'PowerShell'),
 ];
 
-/// flutter_html extension：把 [code] 占位元素原地替换为代码高亮组件
-///
-/// BBCode2Html 在 [BBCode2Html.emitCodePlaceholder] 模式下将 [code] 块还原为
-/// `<div class="bbcode-code" data-code-index="N"></div>`。占位元素保证
-/// hide/quote/free 等容器在 HTML 中结构完整（一次转换），此处在渲染时按
-/// data-code-index 取出原始代码，原地替换为 [BbcodeCodeBlock]
-/// （语法高亮 + 复制 + 语言切换），不参与任何分段。
-///
-/// 若 [codeBlocks] 中没有对应索引（如数据缺失），渲染空代码块而非崩溃。
-class BbcodeCodeExtension extends HtmlExtension {
-  final List<String> codeBlocks;
-  final double fontSize;
-
-  const BbcodeCodeExtension({required this.codeBlocks, required this.fontSize});
-
-  @override
-  Set<String> get supportedTags => const {'div'};
-
-  @override
-  bool matches(ExtensionContext context) {
-    return context.element?.attributes.containsKey('data-code-index') ?? false;
-  }
-
-  @override
-  InlineSpan build(ExtensionContext context) {
-    final index = int.tryParse(
-      context.element?.attributes['data-code-index'] ?? '',
-    );
-    final code = (index != null && index >= 0 && index < codeBlocks.length)
-        ? codeBlocks[index]
-        : '';
-    return WidgetSpan(
-      child: BbcodeCodeBlock(
-        code: code,
-        fontSize: fontSize.clamp(11, 16).toDouble(),
-      ),
-    );
-  }
-}
-
 /// BBCode [code] 代码块渲染组件
 ///
+/// 由 [PostHtmlWidget] 的 `customWidgetBuilder` 按
+/// `div[data-code-index]` 占位元素注入（块级）。
 /// 使用 flutter_highlight 提供语法高亮，附带一键复制按钮。
 /// 使用 re_highlight 的 highlightAuto 检测代码语言。
 class BbcodeCodeBlock extends StatefulWidget {
@@ -296,11 +257,24 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // flutter_widget_from_html 为超宽表格套了横向滚动，测量单元格时会
+        // 给出**无限宽**约束。此时必须退化为「内容宽度」布局（不撑满、
+        // 不用 Spacer），否则 double.infinity + Spacer 会触发
+        // "BoxConstraints forces an infinite width" 并中断整表渲染。
+        return _buildShell(cs, fill: constraints.maxWidth.isFinite);
+      },
+    );
+  }
+
+  /// [fill] 为 true 时撑满可用宽度（常规块级场景）；false 时按内容宽度布局
+  Widget _buildShell(ColorScheme cs, {required bool fill}) {
     final isDark = cs.brightness == Brightness.dark;
     final codeTheme = isDark ? monokaiSublimeTheme : githubTheme;
 
     return Container(
-      width: double.infinity,
+      width: fill ? double.infinity : null,
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: cs.codeBlockBg,
@@ -308,9 +282,11 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: fill
+            ? CrossAxisAlignment.stretch
+            : CrossAxisAlignment.start,
         children: [
-          _buildTopBar(cs),
+          _buildTopBar(cs, fill: fill),
           ClipRRect(
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(6),
@@ -350,7 +326,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
     );
   }
 
-  Widget _buildTopBar(ColorScheme cs) {
+  Widget _buildTopBar(ColorScheme cs, {required bool fill}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -358,6 +334,8 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
       ),
       child: Row(
+        // 无限宽约束下不能用 MainAxisSize.max / Spacer（会要求无限宽）
+        mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
         children: [
           // 语言标签（可点击切换）
           GestureDetector(
@@ -385,7 +363,7 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
               ),
             ),
           ),
-          const Spacer(),
+          if (fill) const Spacer() else const SizedBox(width: 6),
           // 自动换行切换
           GestureDetector(
             onTap: () => setState(() => _wordWrap = !_wordWrap),

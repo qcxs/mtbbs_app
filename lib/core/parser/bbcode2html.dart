@@ -4,7 +4,7 @@ import 'package:mtbbs/core/utils/string_utils.dart';
 
 /// BBCode → HTML 转换器
 ///
-/// 将 BBCode 字符串转换为 HTML，由 [flutter_html] 渲染为 Flutter Widget。
+/// 将 BBCode 字符串转换为 HTML，由 flutter_widget_from_html 渲染为 Widget。
 /// 参考 docs/BBCode2Html.js 的转换逻辑实现。
 ///
 /// 转换策略：
@@ -21,18 +21,11 @@ class BBCode2Html {
   final String? _baseUrl;
   final bool _autoDetectUrls;
   final bool _emitCodePlaceholder;
-  final bool _emitTablePlaceholder;
 
   /// [convert] 后填充的 [code] 块内容（索引对应 HTML 中的
-  /// `data-code-index`）。供渲染层在 flutter_html extension 中取出
-  /// 原始代码文本，交给代码高亮组件渲染。
+  /// `data-code-index`）。渲染层按索引取出原始代码文本，
+  /// 交给代码高亮组件（[BbcodeCodeBlock]）渲染。
   final List<String> codeBlocks = [];
-
-  /// [convert] 后填充的 [table] 块内容（索引对应 HTML 中的
-  /// `data-table-index`，值为含 [table]...[/table] 标签的原始 BBCode）。
-  /// flutter_html 核心不支持 `<table>` 渲染，渲染层须将其替换为
-  /// BbcodeTableWidget（Flutter 原生 Table）。
-  final List<String> tableBlocks = [];
 
   BBCode2Html({
     Map<String, String>? emojiMap,
@@ -41,26 +34,24 @@ class BBCode2Html {
     String? baseUrl,
     bool autoDetectUrls = true,
     bool emitCodePlaceholder = false,
-    bool emitTablePlaceholder = false,
   }) : _emojiMap = emojiMap,
        _smilieIdMap = smilieIdMap,
        _disabledTags = disabledTags,
        _baseUrl = baseUrl,
        _autoDetectUrls = autoDetectUrls,
-       _emitCodePlaceholder = emitCodePlaceholder,
-       _emitTablePlaceholder = emitTablePlaceholder;
+       _emitCodePlaceholder = emitCodePlaceholder;
 
   /// 归一化/校验颜色值。
   ///
-  /// flutter_html 对 4 位 hex（如 `#ff00`）解析会产生 alpha=0 的异常色
-  /// （表现为文字透明/发白）。网页中 `<font color="#ff00">` 按 HTML 属性
-  /// legacy 语义解析为 `#ff0000`（红色），这里对齐网页语义：
+  /// 网页中 `<font color="#ff00">` 按 HTML color 属性的 legacy 语义解析为
+  /// `#ff0000`（红色），CSS 规范则把 4 位 hex `#RGBA` 解读为带 alpha，
+  /// 两者语义不同。这里对齐**网页 legacy 语义**：
   /// - 4 位 `#RRGG` → `#RRGG00`（R2 + G2，B 补 0）
   /// - 3 位 `#RGB` → `#RRGGBB`（标准 CSS 翻倍）
   /// - 6/8 位 hex 校验通过后原样返回
-  /// - 非法 hex（如 `#FFYYTT`）返回空串：flutter_html 的 stringToColor
-  ///   会对非法 hex 抛 FormatException 导致整段渲染失败，调用点据此省略样式
-  /// - rgb()/rgba()、命名色 flutter_html 均能正确解析，原样返回
+  /// - 非法 hex（如 `#FFYYTT`）返回空串，调用点据此省略样式
+  ///   （渲染器的 CSS 颜色解析对非法值行为不定，省略最安全）
+  /// - rgb()/rgba()、命名色原样返回
   static final _hex3 = RegExp(r'^#[0-9a-fA-F]{3}$');
   static final _hex4 = RegExp(r'^#[0-9a-fA-F]{4}$');
   static final _hex6 = RegExp(r'^#[0-9a-fA-F]{6}$');
@@ -86,10 +77,8 @@ class BBCode2Html {
   String convert(String input) {
     var html = htmlEscape(input);
     final appdataList = <String>[];
-    // codeBlocks/tableBlocks 为公开输出字段，每次转换前清空；
-    // codeBlocks 在保护 [code] 时即填充（_convertTables 需用它还原占位符）
+    // codeBlocks 为公开输出字段，每次转换前清空
     codeBlocks.clear();
-    tableBlocks.clear();
 
     // ========== 0. 保护 [appdata] 块（JSON 不应被 HTML 转义） ==========
     html = html.replaceAllMapped(
@@ -110,11 +99,7 @@ class BBCode2Html {
       },
     );
 
-    // ========== 1. 预处理器：闭合列表标签 ==========
-    // 将 [*]item\n 转换为 <li>item</li>，避免 \n→<br> 后 <li> 内残留 <br>
-    html = _preprocessListItems(html);
-
-    // ========== 2. 移除被禁用的标签（保留内容） ==========
+    // ========== 1. 移除被禁用的标签（保留内容） ==========
     if (_disabledTags != null && _disabledTags.isNotEmpty) {
       html = _stripDisabledTags(html);
     }
@@ -125,7 +110,7 @@ class BBCode2Html {
       (m) {
         // 存原始代码文本（codeBlocks 供高亮组件使用，还原时才转 HTML）。
         // 注意：此处的 m.group(1) 已被开头 htmlEscape 转义，须反转义还原，
-        // 否则渲染模式（高亮组件不经 flutter_html 实体解码）会显示
+        // 否则占位元素分支（高亮组件不经 HTML 实体解码）会显示
         // &gt;/&lt; 等实体原文。
         codeBlocks.add(_unescapeHtml(m.group(1)!));
         return '\x00CODE${codeBlocks.length - 1}\x00';
@@ -156,9 +141,9 @@ class BBCode2Html {
     }, '</span>');
 
     // 颜色 [color=...]
-    // 使用 <span style="color:..."> 而非 <font color="...">，因为 flutter_html
-    // 对 <font color> 属性中的 rgb()/rgba() 格式支持不完整，而 inline style 是 CSS 标准
-    // 非法颜色值（_normalizeColor 返回空串）时省略样式，避免 flutter_html 抛异常
+    // 使用 <span style="color:..."> 而非 <font color="...">：
+    // inline style 是 CSS 标准，且能统一承载 _normalizeColor 的归一化结果
+    // 非法颜色值（_normalizeColor 返回空串）时省略样式，避免渲染器解析异常
     html = _replaceTag(html, 'color', (_, v) {
       final c = _normalizeColor(v);
       return c.isEmpty ? '<span>' : '<span style="color:$c">';
@@ -171,7 +156,7 @@ class BBCode2Html {
     }, '</span>');
 
     // 对齐 [align=...]
-    // 使用 CSS text-align 而非 HTML align 属性，因为 flutter_html 不支持 align 属性
+    // 使用 CSS text-align 而非已废弃的 HTML align 属性
     html = _replaceTag(
       html,
       'align',
@@ -253,27 +238,8 @@ class BBCode2Html {
           '<blockquote>${_labelBlock('隐藏内容', m.group(1)!.trim())}</blockquote>',
     );
 
-    // 列表 [list] / [list=1] / [list=a]
-    html = html.replaceAllMapped(
-      RegExp(r'\[list=1\]', caseSensitive: false),
-      (_) => '<ol type="1">',
-    );
-    html = html.replaceAllMapped(
-      RegExp(r'\[list=a\]', caseSensitive: false),
-      (_) => '<ol type="a">',
-    );
-    html = html.replaceAllMapped(
-      RegExp(r'\[list\]', caseSensitive: false),
-      (_) => '<ul>',
-    );
-    html = html.replaceAllMapped(
-      RegExp(r'\[\/list\]', caseSensitive: false),
-      (_) => '</ul>',
-    );
-    html = html.replaceAllMapped(
-      RegExp(r'\[\*\]', caseSensitive: false),
-      (_) => '<li>',
-    );
+    // 列表 [list] / [list=1] / [list=a] → 带内联前缀的段落（见 _convertLists）
+    html = _convertLists(html);
 
     // email
     html = html.replaceAllMapped(
@@ -378,7 +344,7 @@ class BBCode2Html {
       html = html.replaceFirst(
         '\x00CODE$i\x00',
         _emitCodePlaceholder
-            // 占位元素：保持容器结构完整，由 flutter_html extension
+            // 占位元素：保持容器结构完整，由渲染层
             // 按 data-code-index 原地替换为代码高亮组件
             ? '<div class="bbcode-code" data-code-index="$i"></div>'
             : _codeToHtml(codeBlocks[i]),
@@ -444,34 +410,38 @@ class BBCode2Html {
   }
 
   /// 渲染附件类型 appdata
+  ///
+  /// 用**纯块级布局**，不用 `display:flex`：渲染器的 flex 不支持 `flex:1`
+  /// 收缩（`min-width:0` 同样无效），而文件名是不可断行的长串，一旦横向
+  /// 排布就会撑破容器，报 `RenderHtmlFlex overflowed`。
+  /// 卡片外观（底色 / 圆角 / 内边距）由渲染层 `.bbcode-attach` 样式按主题提供。
   String _renderAttach(Map<String, dynamic> data) {
     final name = htmlEscape(data['name'] as String? ?? '附件');
     final size = data['size'] as String? ?? '';
     final downloads = data['downloads'] as String? ?? '';
     final url = data['url'] as String? ?? '';
 
+    final meta = <String>[
+      if (size.isNotEmpty) '大小: $size',
+      if (downloads.isNotEmpty) '下载 $downloads 次',
+    ].join(' · ');
+
     final buf = StringBuffer();
-    // 使用与 bbcode-attach 相同 class 的卡片样式
-    buf.write(
-      '<div class="bbcode-attach" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#E3F2FD;border-radius:6px;border:1px solid #BBDEFB;">',
-    );
-    buf.write('<span style="font-size:18px;">📎</span>');
-    buf.write('<div style="flex:1;min-width:0;">');
-    buf.write(
-      '<div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">$name</div>',
-    );
-    if (size.isNotEmpty || downloads.isNotEmpty) {
-      buf.write('<div style="font-size:12px;color:#666;">');
-      if (size.isNotEmpty) buf.write('大小: $size');
-      if (downloads.isNotEmpty) buf.write(' · 下载 $downloads 次');
+    buf.write('<div class="bbcode-attach">');
+    // 第一行：图标 + 文件名（允许换行，长文件名不会溢出）
+    buf.write('<div>📎 $name</div>');
+    // 第二行：大小 / 下载次数 + 下载链接
+    if (meta.isNotEmpty || url.isNotEmpty) {
+      buf.write('<div>');
+      if (meta.isNotEmpty) {
+        buf.write('<span style="font-size:12px;color:#666666;">$meta</span>');
+      }
+      if (url.isNotEmpty) {
+        final resolvedUrl = _resolveUrl(url);
+        if (meta.isNotEmpty) buf.write(' &nbsp; ');
+        buf.write('<a href="$resolvedUrl" target="_blank">下载</a>');
+      }
       buf.write('</div>');
-    }
-    buf.write('</div>');
-    if (url.isNotEmpty) {
-      final resolvedUrl = _resolveUrl(url);
-      buf.write(
-        '<a href="$resolvedUrl" target="_blank" style="color:#1565C0;text-decoration:none;font-size:13px;white-space:nowrap;">下载</a>',
-      );
     }
     buf.write('</div>');
     return buf.toString();
@@ -534,7 +504,7 @@ class BBCode2Html {
   /// [code] 内容转 HTML（保留缩进和格式）
   String _codeToHtml(String code) {
     // code 内容：空格保留、换行转 <br>；HTML 标签须转义（codeBlocks 现为
-    // 原始代码文本），由 flutter_html 解码实体后显示，避免 < > 破坏结构
+    // 原始代码文本），由渲染器解码实体后显示，避免 < > 破坏结构
     code = htmlEscape(code);
     final lines = code
         .split('\n')
@@ -655,18 +625,158 @@ class BBCode2Html {
     return html;
   }
 
-  /// 预处理器：将 `[*]item\n` 转换为闭合的 `<li>item</li>`。
+  /// 将 `[list]` / `[list=1]` / `[list=a]` 等块转换为**带内联前缀的段落**。
   ///
-  /// BBCode 中列表项没有 `[/li]` 关闭标签，原有的 `[*]`→`<li>` 转换
-  /// 产生未闭合的 `<li>`，后续 `\n`→`<br>` 会在 `<li>` 内生成多余空行。
+  /// 刻意**不使用 `<ul>/<ol>/<li>`**：渲染器的列表标记是悬挂在文字左侧的，
+  /// 每层嵌套都要额外吃掉一段水平空间（gutter），嵌套几层后正文会被挤到没有
+  /// 宽度；而把编号直接拼进文字里，嵌套多少层都不占额外宽度、也不产生左侧留白。
   ///
-  /// 预处理在 `\n`→`<br>` 之前执行，捕获 `[*]` 后的内容并闭合 `<li>`。
-  /// 之后主流程中的 `[*]`→`<li>` 因 `[*]` 已被替换而自动失效。
-  String _preprocessListItems(String html) {
-    return html.replaceAllMapped(
-      RegExp(r'\[\*\]\s*([^\n]*?)\s*\n', caseSensitive: false),
-      (m) => '<li>${m.group(1)}</li>',
+  /// - 无序列表：默认不加前缀（见 [_kUnorderedMarkers]），项即普通段落
+  /// - 有序列表：按 `[list=N]` 类型拼 `1.` / `a.` / `A.`
+  ///
+  /// 嵌套列表在项内容里递归处理，层级只影响无序前缀的符号（可选）。
+  String _convertLists(String html, {int depth = 1}) {
+    final blocks = _outerListBlocks(html);
+    if (blocks.isEmpty) return html;
+    final result = StringBuffer();
+    var lastEnd = 0;
+    for (final block in blocks) {
+      if (block.start > lastEnd) {
+        result.write(html.substring(lastEnd, block.start));
+      }
+      result.write(
+        _renderListBlock(
+          html.substring(block.start, block.end),
+          block.type,
+          depth,
+        ),
+      );
+      lastEnd = block.end;
+    }
+    result.write(html.substring(lastEnd));
+    return result.toString();
+  }
+
+  /// 渲染单个最外层 `[list...]...[/list]` 块为若干 `<div>`
+  String _renderListBlock(String block, String type, int depth) {
+    final openEnd = block.indexOf(']');
+    if (openEnd < 0) return block;
+    // 去 [list...] 与 [/list]
+    final inner = block.substring(
+      openEnd + 1,
+      block.length - _kListClose.length,
     );
+    final marker = _kUnorderedMarkers.isEmpty
+        ? ''
+        : '${_kUnorderedMarkers[(depth - 1) % _kUnorderedMarkers.length]} ';
+    final buf = StringBuffer();
+    var index = 0;
+    for (final part in _splitListItems(inner)) {
+      final body = _convertLists(part.content.trim(), depth: depth + 1);
+      if (!part.isItem) {
+        // [list] 与首个 [*] 之间的散落文本，按普通段落保留
+        if (body.isNotEmpty) buf.write('<div>$body</div>');
+        continue;
+      }
+      index++;
+      final prefix = type.isEmpty ? marker : '${_orderedLabel(type, index)}. ';
+      buf.write('<div>$prefix$body</div>');
+    }
+    return buf.toString();
+  }
+
+  /// 匹配最外层 `[list...]...[/list]` 块（栈式配对，支持列表套列表）
+  List<({int start, int end, String type})> _outerListBlocks(String input) {
+    // 注意：不能用 outerBlocks()，它只认裸标签，匹配不到 [list=1]
+    final re = RegExp(
+      r'\[list(?:=([^\]]*))?\]|\[/list\]',
+      caseSensitive: false,
+    );
+    final blocks = <({int start, int end, String type})>[];
+    var depth = 0;
+    var start = -1;
+    var type = '';
+    for (final m in re.allMatches(input)) {
+      if (m.group(0)!.startsWith('[/')) {
+        depth--;
+        if (depth <= 0) {
+          if (start >= 0) {
+            blocks.add((start: start, end: m.end, type: type));
+          }
+          depth = 0;
+          start = -1;
+        }
+      } else {
+        if (depth == 0) {
+          start = m.start;
+          type = (m.group(1) ?? '').trim();
+        }
+        depth++;
+      }
+    }
+    return blocks;
+  }
+
+  /// 按最外层 `[*]` 切分列表项（跳过嵌套列表内部的 `[*]` 与 `[/*]`）
+  ///
+  /// `[/*]`（部分编辑器输出的项结束标记）只作分隔，不产生新项。
+  List<({bool isItem, String content})> _splitListItems(String content) {
+    final re = RegExp(
+      r'\[list(?:=[^\]]*)?\]|\[/list\]|\[\*\]|\[/\*\]',
+      caseSensitive: false,
+    );
+    final parts = <({bool isItem, String content})>[];
+    var depth = 0;
+    var itemStart = -1;
+    var sawItem = false;
+    for (final m in re.allMatches(content)) {
+      final token = m.group(0)!.toLowerCase();
+      if (token == '[*]') {
+        if (depth == 0) {
+          if (itemStart >= 0) {
+            parts.add((
+              isItem: true,
+              content: content.substring(itemStart, m.start),
+            ));
+          } else if (!sawItem && m.start > 0) {
+            // 仅首个 [*] 之前的文本算「散落文本」；
+            // 若不加 sawItem 判断，[/*] 结束项后的下一个 [*] 会把
+            // 已处理过的内容再当一次散落文本，产生重复段落。
+            parts.add((isItem: false, content: content.substring(0, m.start)));
+          }
+          itemStart = m.end;
+          sawItem = true;
+        }
+      } else if (token == '[/*]') {
+        if (depth == 0 && itemStart >= 0) {
+          parts.add((
+            isItem: true,
+            content: content.substring(itemStart, m.start),
+          ));
+          itemStart = -1;
+        }
+      } else if (token.startsWith('[list')) {
+        depth++;
+      } else {
+        depth--;
+      }
+    }
+    if (itemStart >= 0) {
+      parts.add((isItem: true, content: content.substring(itemStart)));
+    }
+    return parts;
+  }
+
+  /// 有序列表前缀：`1.` / `a.` / `A.`；其它类型（如 `i`/`I`）回退为十进制
+  String _orderedLabel(String type, int index) {
+    switch (type) {
+      case 'a':
+        return _letters(index).toLowerCase();
+      case 'A':
+        return _letters(index);
+      default:
+        return '$index';
+    }
   }
 
   /// 内容块标识 — 橙色标签 + 换行 + 内容
@@ -730,14 +840,12 @@ class BBCode2Html {
     return html;
   }
 
-  /// 将 [table] BBCode 转换为 HTML（嵌套安全）。
+  /// 将 [table] BBCode 转换为 `<table>` HTML（嵌套安全）。
   ///
   /// 按最外层 [table] 块处理，保证 table 套 table、table 内任意标签互套
-  /// 时结构完整。非渲染模式递归解析 tr/td 输出 `<table>` HTML；
-  /// 渲染模式（[BBCode2Html.emitTablePlaceholder]）下每个最外层 table 块
-  /// 转为占位元素并存入 [tableBlocks]（flutter_html 核心不支持 `<table>`，
-  /// 由渲染层 extension 原地替换为 BbcodeTableWidget，含 hide/quote 容器内
-  /// 及嵌套表格，均可正确渲染）。
+  /// 时结构完整（用 [outerBlocks] 栈式配对，非贪婪正则会被内层
+  /// `[/td]`/`[/tr]` 截断）。表格外观（边框/内边距/列宽）由渲染层
+  /// 按主题提供，这里只输出结构 + 从 [align] 提取的 text-align。
   String _convertTables(String html) {
     final result = StringBuffer();
     var lastEnd = 0;
@@ -745,22 +853,7 @@ class BBCode2Html {
       if (block.start > lastEnd) {
         result.write(html.substring(lastEnd, block.start));
       }
-      if (_emitTablePlaceholder) {
-        // 还原块内 code 占位符为 [code]...[/code]，使 tableBlocks 为纯
-        // BBCode，供 BbcodeTableWidget 递归转换（占位符无法跨 converter 传递）
-        final blockText = html
-            .substring(block.start, block.end)
-            .replaceAllMapped(
-              RegExp(r'\x00CODE(\d+)\x00'),
-              (m) => '[code]${codeBlocks[int.parse(m.group(1)!)]}[/code]',
-            );
-        tableBlocks.add(blockText);
-        result.write(
-          '<div class="bbcode-table" data-table-index="${tableBlocks.length - 1}"></div>',
-        );
-      } else {
-        result.write(_renderTableBlock(html.substring(block.start, block.end)));
-      }
+      result.write(_renderTableBlock(html.substring(block.start, block.end)));
       lastEnd = block.end;
     }
     result.write(html.substring(lastEnd));
@@ -783,16 +876,17 @@ class BBCode2Html {
         ); // 去 [td]/[/td]
         tds.add(_renderTd(tdInner));
       }
-      rows.add('<tr style="border:1px solid #E3EDF5;">${tds.join()}</tr>');
+      rows.add('<tr>${tds.join()}</tr>');
     }
-    return '<table style="width:100%;border:1px solid #E3EDF5;border-collapse:collapse;">${rows.join()}</table>';
+    return '<table>${rows.join()}</table>';
   }
 
   String _renderTd(String content) {
     // 递归转换 td 内嵌套的 [table]
     final inner = _convertTables(content);
-    // 检测 td 内容是否被 <div align="XXX">...</div> 包裹
-    // 将 text-align 直接加到 td 样式上，避免 flutter_html 对 td 内块级元素的渲染问题
+    // 检测 td 内容是否被 <div align="XXX">...</div> 包裹，
+    // 将 text-align 直接挂到 td 上（td 是表格单元格，块级元素在其中的
+    // 对齐交给单元格自身的 text-align 处理更可靠）
     final trimmed = inner.trim();
     if (trimmed.startsWith('<div align="') && trimmed.endsWith('</div>')) {
       final attrMatch = RegExp(
@@ -801,10 +895,10 @@ class BBCode2Html {
       if (attrMatch != null) {
         final align = attrMatch.group(1)!;
         final innermost = trimmed.substring(attrMatch.end, trimmed.length - 6);
-        return '<td style="border:1px solid #E3EDF5;padding:4px 8px;text-align:$align">$innermost</td>';
+        return '<td style="text-align:$align">$innermost</td>';
       }
     }
-    return '<td style="border:1px solid #E3EDF5;padding:4px 8px;">$inner</td>';
+    return '<td>$inner</td>';
   }
 }
 
@@ -833,4 +927,25 @@ List<({int start, int end})> outerBlocks(String input, String tag) {
     }
   }
   return result;
+}
+
+/// 列表闭合标签（长度用于切出块内容）
+const _kListClose = '[/list]';
+
+/// 无序列表各层级的前缀符号（按嵌套深度轮换）。
+///
+/// 置为空列表即完全不加前缀（列表项退化为普通段落）；
+/// 如需保留符号提示，改为 `['•', '◦', '▪']` 即可。
+const _kUnorderedMarkers = <String>[];
+
+/// 1 → A，2 → B … 27 → AA（表格列名式递增）
+String _letters(int index) {
+  var n = index;
+  final codes = <int>[];
+  while (n > 0) {
+    n--;
+    codes.add(0x41 + n % 26);
+    n ~/= 26;
+  }
+  return String.fromCharCodes(codes.reversed);
 }

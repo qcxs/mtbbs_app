@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/parser/bbcode_parser.dart';
 
@@ -9,6 +10,11 @@ import 'package:mtbbs/core/parser/bbcode_parser.dart';
 /// 在 app 中渲染成白色的根因定位。
 ///
 /// 复现素材来自 bbs.binmt.cc/thread-170525 楼主正文解析出的真实 BBCode。
+///
+/// 结论链：渲染器按 **CSS 规范**把 4 位 hex 解读为 `#RGBA`（第 4 位是 alpha），
+/// 而网页 `<font color="#ff00">` 走的是 **HTML color 属性 legacy 语义**（红色）。
+/// 两者语义不同，故转换层 `_normalizeColor` 必须先把 `#ff00` 归一化为
+/// `#ff0000` 再交给渲染器——这是本条存在的意义。
 const bbcode =
     ''
     '[color=#ff00][font=-apple-system, BlinkMacSystemFont, &quot][size=4]链接: [/size][/font][/color]'
@@ -19,6 +25,12 @@ const bbcode =
     '[color=#ff00][font=-apple-system, BlinkMacSystemFont, &quot][size=4]'
     '    提取码: j8m6'
     '[/size][/font][/color]';
+
+/// 是否「不透明且偏红」——本条的真实回归意图是防 alpha=0 透明（docs/07 #30）
+bool _isOpaqueRed(Color? c) {
+  if (c == null) return false;
+  return c.a == 1.0 && c.r > 0.5 && c.g < 0.5 && c.b < 0.5;
+}
 
 void main() {
   test('AST 层：color 节点的 value 是否正确保留', () {
@@ -64,14 +76,15 @@ void main() {
       MaterialApp(
         theme: ThemeData(brightness: Brightness.dark),
         home: Scaffold(
-          body: SingleChildScrollView(child: Html(data: html)),
+          body: SingleChildScrollView(
+            child: HtmlWidget(html, buildAsync: false),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     // 遍历 RichText，dump 每个 span 的文本与颜色
-    final red = const Color(0xFFFF0000);
     final found = <String>[];
     void walk(InlineSpan span, String path) {
       if (span is TextSpan) {
@@ -84,8 +97,12 @@ void main() {
             'fontSize=${span.style?.fontSize}',
           );
           found.add(text);
-          // 回归断言：颜色必须是红色，不能是 alpha=0 的异常色
-          expect(span.style?.color, red);
+          // 回归断言：颜色必须是不透明的红，不能是 alpha=0 的透明色
+          expect(
+            _isOpaqueRed(span.style?.color),
+            isTrue,
+            reason: '「$text」渲染色应为不透明红，实际 ${span.style?.color}',
+          );
         }
         for (final c in span.children ?? const <InlineSpan>[]) {
           walk(c, '$path/');
@@ -93,21 +110,22 @@ void main() {
       }
     }
 
-    final richTexts = tester
-        .elementList(find.byType(RichText))
+    final richTexts = find
+        .byType(RichText)
+        .evaluate()
         .map((e) => e.widget as RichText);
     // ignore: avoid_print
     print('RichText count: ${richTexts.length}');
     for (final rt in richTexts) {
-      walk(rt.text as InlineSpan, 'root');
+      walk(rt.text, 'root');
     }
     expect(found, isNotEmpty);
   });
 
-  testWidgets('flutter_html 颜色解析对照：确认修复边界', (tester) async {
-    // 各组颜色：期望网页语义下的目标色
+  testWidgets('渲染器颜色解析边界：4 位 hex 不被识别（故转换层必须归一化）', (tester) async {
+    // 各组颜色：网页 legacy 语义 vs 渲染器实际解析
     const cases = [
-      '#ff00', // 4 位 hex，网页 legacy 语义 = 红 rgb(255,0,0)
+      '#ff00', // 4 位 hex → 网页 legacy 语义为红，CSS 语义为 #RGBA
       '#ff0000', // 6 位 hex = 红
       'rgb(255, 0, 0)', // rgb() = 红
       'red', // 命名色 = 红
@@ -124,16 +142,21 @@ void main() {
       MaterialApp(
         theme: ThemeData(brightness: Brightness.dark),
         home: Scaffold(
-          body: SingleChildScrollView(child: Html(data: html)),
+          body: SingleChildScrollView(
+            child: HtmlWidget(html, buildAsync: false),
+          ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
+    final resolved = <String, Color?>{};
     void walk(InlineSpan span) {
       if (span is TextSpan) {
-        final text = span.text ?? '';
+        final text = span.text?.trim() ?? '';
         if (text.startsWith('[color=')) {
+          resolved[text] = span.style?.color;
           // ignore: avoid_print
           print('$text -> ${span.style?.color}');
         }
@@ -144,10 +167,24 @@ void main() {
     }
 
     for (final rt
-        in tester
-            .elementList(find.byType(RichText))
-            .map((e) => e.widget as RichText)) {
-      walk(rt.text as InlineSpan);
+        in find.byType(RichText).evaluate().map((e) => e.widget as RichText)) {
+      walk(rt.text);
     }
+
+    // 除 4 位 hex 外的写法渲染器都能给出不透明红
+    for (final c in ['#ff0000', 'rgb(255, 0, 0)', 'red']) {
+      expect(
+        _isOpaqueRed(resolved['[color=$c]']),
+        isTrue,
+        reason: '$c 应解析为不透明红',
+      );
+    }
+
+    // 4 位 hex：渲染器不识别该写法 → 不套用颜色（回落到继承色）。
+    // 无论如何都不能是 alpha=0 的透明色（那会让文字"消失"，见 docs/07 #30）。
+    final raw4 = resolved['[color=#ff00]'];
+    // ignore: avoid_print
+    print('4 位 hex 渲染器解析结果: $raw4');
+    expect(raw4 == null || raw4.a == 1.0, isTrue, reason: '4 位 hex 绝不能让文字变透明');
   });
 }
