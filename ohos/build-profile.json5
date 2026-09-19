@@ -1,0 +1,43 @@
+{
+  "app": {
+    // 签名配置留空：证书路径与口令属于"仅本机有效"，不入库。
+    // 本地构建前用 DevEco Studio 打开 ohos/ 目录，
+    // File → Project Structure → Signing Configs → 勾选 Automatically generate signature。
+    // ⚠️ 提交前请确认 signingConfigs 为空（DevEco 会把本机证书路径和加密口令写进来）。
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "targetSdkVersion": "26.0.0",
+        "runtimeOS": "HarmonyOS",
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "profile"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+# 鸿蒙（OpenHarmony）依赖覆盖模板 —— 由 scripts/ohos.ps1 复制为 pubspec_overrides.yaml 生效
+#
+# 为什么需要：
+#   pub.dev 上的这些插件没有 ohos 平台实现，在鸿蒙上调用会抛 MissingPluginException
+#   （path_provider 更是启动即崩）。这里换成 OpenHarmony 社区维护的适配分支。
+#
+# 为什么用"模板 + 生成"而不是常驻生效：
+#   dependency_overrides 全局生效，且 flutter_inappwebview 的 fork 硬编码了
+#   TargetPlatform.ohos（官方 Flutter 框架没有该枚举），一旦常驻，官方 SDK 编译会直接失败：
+#       Error: Member not found: 'ohos'.  case TargetPlatform.ohos:
+#   因此真正生效的 pubspec_overrides.yaml 已被 .gitignore 忽略，只由脚本按需生成/删除。
+#
+# 版本差异（fork 保留了上游全部平台实现，故 Android/Windows 只是版本变化）：
+#   path_provider         2.1.6 -> 2.1.5（降 1 个小版本）
+#   url_launcher          6.3.2 -> 6.3.2（无变化）
+#   flutter_inappwebview  6.1.5 -> 6.1.5（无变化）
+#   file_picker           8.3.7 -> 8.0.7（降 3 个小版本，OH 侧无 8.3.7 分支）
+#
+# 维护：改动本文件后，下次 scripts/ohos.ps1 build 会自动带上。
+
+dependency_overrides:
+  path_provider:
+    git:
+      url: https://gitcode.com/openharmony-tpc/flutter_packages.git
+      path: packages/path_provider/path_provider
+      ref: br_path_provider-v2.1.5_ohos
+
+  url_launcher:
+    git:
+      url: https://gitcode.com/openharmony-tpc/flutter_packages.git
+      path: packages/url_launcher/url_launcher
+      ref: br_url_launcher-v6.3.2_ohos
+
+  # 登录页 / 内置浏览器；版本与上游锁定版本一致
+  # 已知缺陷：InAppWebViewKeepAlive 在鸿蒙上未实现（页面弹出后原生 WebView 销毁）
+  flutter_inappwebview:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_inappwebview.git
+      path: flutter_inappwebview
+      ref: br_v6.1.5_ohos
+
+  # 编辑器选图 / 附件 / 图床上传；包位于仓库根目录，故不写 path
+  file_picker:
+    git:
+      url: https://gitcode.com/openharmony-sig/fluttertpc_file_picker.git
+      ref: br_v8.0.7_ohos
+
+  # 解决 file_picker 8.0.7 与 flutter_inappwebview_web 的版本冲突：
+  #   file_picker 8.0.7 要求 web ^0.5.1，而上游 8.3.7 与 inappwebview_web 都要求 web ^1.x。
+  #   这里对齐项目原本就已锁定的 web 1.1.x —— web 包只服务 Web 平台，
+  #   不影响 Android / Windows / 鸿蒙构建；file_picker 的 web 实现也不会被这些平台编译。
+  #   根治办法：给 fork 提 PR 把 web 约束改为 ^1.1.0。
+  web: ^1.1.0

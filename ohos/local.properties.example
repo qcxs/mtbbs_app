@@ -1,0 +1,21 @@
+# 鸿蒙构建的本机路径配置 —— 示例文件
+#
+# 用法（重命名即可）：
+#   Copy-Item ohos\local.properties.example ohos\local.properties
+#   然后按你机器上的实际路径修改下面两行。
+#
+# 说明：
+#   - 本文件被 ohos/.gitignore 忽略（含绝对路径，属于"仅本机有效"，不要提交）
+#   - 执行 flutter build hap 或用 DevEco 打开 ohos/ 时，工具会自动生成 local.properties
+#     并补全缺失项；只有在需要"固定/覆盖 SDK 路径"时才需要手工创建本文件
+#   - 格式为 Java properties：路径中的反斜杠要写成两个，例如 C:\\Program Files\\...
+
+# DevEco Studio 自带的 HarmonyOS SDK 目录
+hwsdk.dir=C:\\Program Files\\Huawei\\DevEco Studio\\sdk
+
+# Flutter-OH SDK 根目录（用 fvm list 查看实际安装路径）
+flutter.sdk=C:\\Users\\<你的用户名>\\fvm\\versions\\flutter_ohos\\oh-3.44.9-dev
+
+# 以下两项由构建工具依据 pubspec.yaml 自动写入，一般无需手填
+# flutter.versionName=1.0.0
+# flutter.versionCode=1

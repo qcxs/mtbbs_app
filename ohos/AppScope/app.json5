@@ -1,0 +1,16 @@
+{
+  "app": {
+    "bundleName": "com.github.qcxs.mtbbs",
+    "vendor": "example",
+    "versionCode": 1000000,
+    "versionName": "1.0.0",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name",
+    // 应用分身（多开）：同一个设备上可安装多个副本，各自独立登录、数据隔离
+    // appClone 模式 maxCount 取值范围 1~5（multiInstance 模式才是 1~10，但仅支持 2in1 且数据共享）
+    "multiAppMode": {
+      "multiAppModeType": "appClone",
+      "maxCount": 5
+    }
+  }
+}

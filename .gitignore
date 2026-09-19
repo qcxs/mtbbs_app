@@ -34,6 +34,10 @@ migrate_working_dir/
 /coverage/
 bin/
 
+# 鸿蒙依赖覆盖：由 scripts/ohos.ps1 从 ohos/pubspec_overrides.ohos.yaml 生成，
+# 用完即删。常驻会污染 Android/Windows 构建（见 docs/ohos/01-环境与构建.md）。
+/pubspec_overrides.yaml
+
 # Symbolication related
 app.*.symbols
 

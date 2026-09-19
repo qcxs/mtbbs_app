@@ -1,0 +1,17 @@
+# Android 正式签名配置 —— 示例文件（可选）
+#
+# 用法（重命名即可）：
+#   Copy-Item android\key.properties.example android\key.properties
+#   然后填入你自己的 keystore 信息，并把 keystore 放到 android/app/key.jks
+#
+# 说明：
+#   - 本文件被 android/.gitignore 忽略（含口令，属于"仅本机有效"，不要提交）
+#   - 不配置也能打包：Android 会回退到 debug 签名，仅够自测安装，不能正式分发
+#   - storeFile 是相对 android/app/ 的路径（构建脚本里用 file() 解析）
+#   - 生成 keystore：keytool -genkey -v -keystore android/app/key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias <你的别名>
+#   - 详见 docs/15-版本发布.md
+
+storeFile=key.jks
+storePassword=<你的 keystore 口令>
+keyAlias=<密钥别名>
+keyPassword=<密钥口令>
