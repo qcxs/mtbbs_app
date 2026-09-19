@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/pages/settings/emoji_management.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
+import 'package:mtbbs/pages/settings/mt_image_manage_sheet.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:provider/provider.dart';
 
-/// 数据与缓存组设置项
+/// 存储与工具组设置项
 List<SettingsModel> dataSettings() => [
   NormalSetting(
     title: '缓存管理',
@@ -17,13 +19,13 @@ List<SettingsModel> dataSettings() => [
     title: '表情管理',
     subtitle: '查看和刷新当前站点表情',
     icon: Icons.emoji_emotions,
-    onTap: (ctx, s) => ctx.push('/settings/emoji'),
+    onTap: (ctx, s) => showEmojiManagementSheet(ctx),
   ),
   NormalSetting(
     title: 'MT 图床管理',
     subtitle: '查看和管理 MT 图床图片',
     icon: Icons.photo_library,
-    onTap: (ctx, s) => ctx.push('/settings/mt-images'),
+    onTap: (ctx, s) => showMtImageManageSheet(ctx),
   ),
   NormalSetting(
     title: '浏览历史最大记录数',

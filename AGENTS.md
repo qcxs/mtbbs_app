@@ -44,4 +44,4 @@ Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：
 
 - 静态检查：`flutter analyze lib`
 - 真实请求：`flutter test tool/api_probe_test.dart --dart-define=cmd=help` 查看全部探针命令（docs/10）
-- 渲染单测：`test/`（BBCode 渲染链路，docs/07 第 15-18 条）
+- 渲染单测：`test/`（BBCode 渲染链路的三层 dump 方法，见 docs/07 #15、#17、#18）

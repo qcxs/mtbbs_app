@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mtbbs/pages/settings/bbcode_dialog.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 
-/// 内容渲染组设置项
+/// 阅读与渲染组设置项
 List<SettingsModel> contentSettings() => [
   NormalSetting(
     title: '禁用样式标签',
@@ -19,11 +18,5 @@ List<SettingsModel> contentSettings() => [
     icon: Icons.link,
     value: (s) => s.autoDetectUrls,
     onChanged: (ctx, s, v) => s.setAutoDetectUrls(v),
-  ),
-  NormalSetting(
-    title: '插入格式',
-    subtitle: '编辑器引用时格式化文本',
-    icon: Icons.format_quote,
-    onTap: (ctx, s) => ctx.push('/settings/history-format'),
   ),
 ];

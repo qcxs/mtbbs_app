@@ -16,6 +16,9 @@ class SettingsProvider extends ChangeNotifier {
   double _fontSize = 16;
   String _creditFormula = defaultFormula;
   List<ManagedItem> _guideTabs = defaultGuideTabs();
+
+  /// 首页区块（顺序 + 显隐 + 默认展开），见 [defaultHomeSections]
+  List<ManagedItem> _homeSections = defaultHomeSections();
   int _currentSiteIndex = 0;
 
   /// 默认启动 Tab (0=首页, 1=导读, 2=社区, 3=我的)
@@ -29,6 +32,9 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 自动识别并链接 URL
   bool _autoDetectUrls = true;
+
+  /// 请求携带 Referer / Accept 等浏览器仿真头（模拟浏览器访问）
+  bool _simulateBrowserHeaders = true;
 
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;
@@ -121,6 +127,37 @@ class SettingsProvider extends ChangeNotifier {
       ManagedItem(id: id, name: tabLabels[id] ?? id),
   ];
 
+  /// 首页区块默认定义：顺序、显示名、是否显示、是否默认展开。
+  ///
+  /// RSS 默认隐藏 —— 内容与导读 Tab 重合，用户可在
+  /// 「设置 → 外观 → 首页区块」里重新开启。
+  static const List<Map<String, dynamic>> _homeSectionDefaults = [
+    {'id': 'shortcuts', 'name': '快捷链接', 'visible': true, 'expanded': true},
+    {'id': 'forums', 'name': '版块', 'visible': true, 'expanded': true},
+    {'id': 'rank', 'name': '帖子排行', 'visible': true, 'expanded': true},
+    {'id': 'rss', 'name': 'RSS 订阅', 'visible': false, 'expanded': false},
+  ];
+
+  /// 生成默认首页区块列表
+  static List<ManagedItem> defaultHomeSections() => [
+    for (final d in _homeSectionDefaults)
+      ManagedItem(
+        id: d['id'] as String,
+        name: d['name'] as String,
+        visible: d['visible'] as bool,
+        data: {'expanded': d['expanded']},
+      ),
+  ];
+
+  /// 合法首页区块 id，用于过滤损坏的持久化数据
+  static final Set<String> _homeSectionIds = {
+    for (final d in _homeSectionDefaults) d['id'] as String,
+  };
+
+  /// 读取区块的展开状态（缺字段视为折叠）
+  static bool homeSectionExpanded(ManagedItem item) =>
+      item.data?['expanded'] == true;
+
   // ==================== 数据库快捷引用 ====================
 
   DatabaseHelper get _db => DatabaseHelper.instance;
@@ -137,6 +174,15 @@ class SettingsProvider extends ChangeNotifier {
     for (final t in _guideTabs)
       if (t.visible) t.id,
   ];
+
+  /// 完整首页区块列表（含隐藏项，供设置面板使用）
+  List<ManagedItem> get homeSections => List.unmodifiable(_homeSections);
+
+  /// 首页当前显示的区块（按用户排序）
+  List<ManagedItem> get visibleHomeSections => [
+    for (final s in _homeSections)
+      if (s.visible) s,
+  ];
   int get currentSiteIndex => _currentSiteIndex;
   int get defaultTabIndex => _defaultTabIndex;
   List<Site> get sites => _sites;
@@ -148,6 +194,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Set<String> get disabledBbcodeTags => Set.unmodifiable(_disabledBbcodeTags);
   bool get autoDetectUrls => _autoDetectUrls;
+  bool get simulateBrowserHeaders => _simulateBrowserHeaders;
   int get staggerInterval => _staggerInterval;
   int get avatarCacheDays => _avatarCacheDays;
   int get emojiCacheDays => _emojiCacheDays;
@@ -215,6 +262,10 @@ class SettingsProvider extends ChangeNotifier {
         .clamp(0, 3);
 
     _autoDetectUrls = (await _db.getSettingBool('autoDetectUrls')) ?? true;
+    // 浏览器仿真头：此处在 ApiService.init 之前，只登记开关值，init 会读它
+    _simulateBrowserHeaders =
+        (await _db.getSettingBool('simulateBrowserHeaders')) ?? true;
+    applyBrowserHeaders(_simulateBrowserHeaders);
     _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
     // 缓存过期天数（默认取自 defaults.json，无配置或 JSON 错误时为 1 天）
     final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
@@ -289,6 +340,17 @@ class SettingsProvider extends ChangeNotifier {
             ),
         ];
       }
+    }
+
+    // 首页区块（顺序/显隐/默认展开；缺失或损坏时回退默认）
+    final homeJson = await _db.getSetting('homeSections');
+    if (homeJson != null && homeJson.isNotEmpty) {
+      try {
+        final loaded = ManagedItem.decodeList(
+          homeJson,
+        ).where((e) => _homeSectionIds.contains(e.id)).toList();
+        if (loaded.isNotEmpty) _homeSections = loaded;
+      } catch (_) {}
     }
 
     // 快捷键映射
@@ -394,6 +456,14 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setAutoDetectUrls(bool enabled) async {
     _autoDetectUrls = enabled;
     await _db.setSettingBool('autoDetectUrls', enabled);
+    notifyListeners();
+  }
+
+  /// 开关浏览器仿真头（Referer / Accept），立即作用于后续请求
+  Future<void> setSimulateBrowserHeaders(bool enabled) async {
+    _simulateBrowserHeaders = enabled;
+    applyBrowserHeaders(enabled);
+    await _db.setSettingBool('simulateBrowserHeaders', enabled);
     notifyListeners();
   }
 
@@ -665,6 +735,36 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> _persistGuideTabs() async {
     await _db.setSetting('guideTabs', ManagedItem.encodeList(_guideTabs));
+    notifyListeners();
+  }
+
+  // ==================== 首页区块 ====================
+
+  Future<void> moveHomeSection(int from, int to) async {
+    reorderManagedItems(_homeSections, from, to);
+    await _persistHomeSections();
+  }
+
+  Future<void> toggleHomeSectionVisibility(String id) async {
+    toggleManagedItem(_homeSections, id);
+    await _persistHomeSections();
+  }
+
+  /// 设置区块展开状态。
+  ///
+  /// 首页里当场折叠与设置面板里改默认值走同一入口，因此用户折叠过的
+  /// 区块下次启动仍是折叠的，不需要两套状态。
+  Future<void> setHomeSectionExpanded(String id, bool expanded) async {
+    final i = _homeSections.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    final data = Map<String, dynamic>.from(_homeSections[i].data ?? {});
+    data['expanded'] = expanded;
+    _homeSections[i] = _homeSections[i].copyWith(data: data);
+    await _persistHomeSections();
+  }
+
+  Future<void> _persistHomeSections() async {
+    await _db.setSetting('homeSections', ManagedItem.encodeList(_homeSections));
     notifyListeners();
   }
 

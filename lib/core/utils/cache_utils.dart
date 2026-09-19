@@ -7,6 +7,7 @@ import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/services/api_service.dart';
 
 // ==================== 文件服务（忽略服务器 Cache-Control） ====================
 
@@ -57,9 +58,9 @@ class IgnoreCacheFileService extends FileService {
         ? '...${url.substring(url.length - 60)}'
         : url;
     AppLogger.i('CACHE', 'download: $short');
-    // 模拟浏览器行为：携带当前站点的 Referer
+    // 模拟浏览器行为：携带当前站点的 Referer（受「模拟浏览器请求头」设置控制）
     final reqHeaders = <String, String>{
-      'Referer': SiteStore.instance.baseUrl,
+      if (browserHeadersEnabled()) 'Referer': SiteStore.instance.baseUrl,
       ...?headers,
     };
     final response = await http.get(Uri.parse(url), headers: reqHeaders);

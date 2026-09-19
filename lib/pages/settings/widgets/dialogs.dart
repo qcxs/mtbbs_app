@@ -121,6 +121,46 @@ Future<T?> showSelectDialog<T>({
   );
 }
 
+/// 主题模式显示名
+String themeModeLabel(ThemeMode mode) => switch (mode) {
+  ThemeMode.light => '浅色',
+  ThemeMode.dark => '深色',
+  ThemeMode.system => '跟随系统',
+};
+
+/// 主题模式选择弹窗（设置页「外观」组与「我的」页共用同一实现）
+Future<void> showThemeModeDialog(
+  BuildContext context,
+  SettingsProvider settings,
+) async {
+  final picked = await showSelectDialog<ThemeMode>(
+    context: context,
+    title: '主题模式',
+    options: [
+      SelectOption(
+        value: ThemeMode.light,
+        icon: Icons.light_mode,
+        label: '浅色',
+        description: '始终使用浅色界面',
+      ),
+      SelectOption(
+        value: ThemeMode.dark,
+        icon: Icons.dark_mode,
+        label: '深色',
+        description: '始终使用深色界面',
+      ),
+      SelectOption(
+        value: ThemeMode.system,
+        icon: Icons.settings_brightness,
+        label: '跟随系统',
+        description: '随系统深浅色自动切换',
+      ),
+    ],
+    selected: settings.themeMode,
+  );
+  if (picked != null) await settings.setThemeMode(picked);
+}
+
 /// 主题色选择弹窗（从原设置页抽离）
 Future<void> showColorPickerDialog(
   BuildContext context,

@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
+import 'package:mtbbs/pages/settings/mt_image_manage_sheet.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -409,7 +410,12 @@ class _MtImageSheetState extends State<MtImageSheet> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () => context.push('/settings/mt-images'),
+                // 管理面板同样是底部面板：先关掉当前面板，避免两层叠加
+                onPressed: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  showMtImageManageSheet(nav.context);
+                },
                 icon: const Icon(Icons.settings, size: 16),
                 label: const Text('管理', style: TextStyle(fontSize: 13)),
                 style: TextButton.styleFrom(

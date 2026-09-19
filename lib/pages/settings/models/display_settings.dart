@@ -4,25 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/pages/settings/default_tab_dialog.dart';
+import 'package:mtbbs/pages/settings/home_sections_sheet.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 
-/// 界面组设置项
+/// 外观组设置项
 List<SettingsModel> displaySettings() => [
-  if (Platform.isWindows)
-    SwitchSetting(
-      title: '显示窗口标题栏',
-      subtitle: '关闭后隐藏原生标题栏（需重启应用生效）',
-      icon: Icons.window,
-      value: (s) => s.showWindowTitleBar,
-      onChanged: (ctx, s, v) => s.setShowWindowTitleBar(v),
-    ),
   NormalSetting(
-    title: '默认启动页',
-    icon: Icons.tab,
-    subtitleBuilder: (s) => _tabNameFor(s.defaultTabIndex),
-    onTap: (ctx, s) => DefaultTabDialog.show(ctx, s),
+    title: '主题模式',
+    icon: Icons.brightness_6,
+    subtitleBuilder: (s) => themeModeLabel(s.themeMode),
+    onTap: (ctx, s) => showThemeModeDialog(ctx, s),
   ),
   NormalSetting(
     title: '主题色',
@@ -36,6 +29,18 @@ List<SettingsModel> displaySettings() => [
     icon: Icons.dark_mode,
     value: (s) => s.isPureBlackTheme,
     onChanged: (ctx, s, v) => s.setPureBlackTheme(v),
+  ),
+  NormalSetting(
+    title: '默认启动页',
+    icon: Icons.tab,
+    subtitleBuilder: (s) => _tabNameFor(s.defaultTabIndex),
+    onTap: (ctx, s) => DefaultTabDialog.show(ctx, s),
+  ),
+  NormalSetting(
+    title: '首页区块',
+    icon: Icons.dashboard_customize,
+    subtitleBuilder: (s) => '${s.visibleHomeSections.length} 个区块，可调顺序与默认展开',
+    onTap: (ctx, s) => showHomeSectionsSheet(ctx),
   ),
   NormalSetting(
     title: '图片最大宽度',
@@ -65,6 +70,14 @@ List<SettingsModel> displaySettings() => [
     subtitleBuilder: (s) => s.avatarSizeMode.label,
     onTap: (ctx, s) => _showAvatarSizeDialog(ctx, s),
   ),
+  if (Platform.isWindows)
+    SwitchSetting(
+      title: '显示窗口标题栏',
+      subtitle: '关闭后隐藏原生标题栏（需重启应用生效）',
+      icon: Icons.window,
+      value: (s) => s.showWindowTitleBar,
+      onChanged: (ctx, s, v) => s.setShowWindowTitleBar(v),
+    ),
 ];
 
 Future<void> _showAvatarSizeDialog(

@@ -5,7 +5,6 @@ import 'package:mtbbs/pages/settings/models/data_settings.dart';
 import 'package:mtbbs/pages/settings/models/display_settings.dart';
 import 'package:mtbbs/pages/settings/models/editor_settings.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
-import 'package:mtbbs/pages/settings/models/shortcut_settings.dart';
 import 'package:mtbbs/pages/settings/models/site_settings.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
@@ -28,14 +27,13 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
     super.dispose();
   }
 
-  /// 全部分组（与主页共享同一份模型列表）
+  /// 全部分组（与设置主页共享同一份模型列表）
   static final List<({String group, List<SettingsModel> models})> _all = [
-    (group: '站点', models: siteSettings()),
-    (group: '数据与缓存', models: dataSettings()),
-    (group: '界面', models: displaySettings()),
-    (group: '内容渲染', models: contentSettings()),
-    (group: '编辑器', models: editorSettings()),
-    (group: '快捷键', models: shortcutSettings()),
+    (group: '站点与网络', models: siteSettings()),
+    (group: '外观', models: displaySettings()),
+    (group: '阅读与渲染', models: contentSettings()),
+    (group: '编辑与快捷键', models: editorSettings()),
+    (group: '存储与工具', models: dataSettings()),
     (group: '关于', models: aboutSettings()),
   ];
 

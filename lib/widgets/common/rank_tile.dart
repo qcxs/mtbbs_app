@@ -27,15 +27,14 @@ class RankTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isTop = rank > 0 && rank <= 3;
     return Card(
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6),
-        side: BorderSide(color: cs.outlineVariant),
-      ),
+      color: cs.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         onTap: () {
           if (tid.isNotEmpty) context.push('/thread/$tid');
         },
@@ -43,18 +42,22 @@ class RankTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
-              // 排名
-              SizedBox(
-                width: 24,
+              // 排名 — 前三名用实心徽章，其余只是数字，拉开主次
+              Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isTop ? cs.primary : null,
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 child: Text(
                   '$rank',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: rank <= 3
-                        ? cs.onSurfaceVariant
-                        : cs.onSurfaceVariant,
+                    color: isTop ? cs.onPrimary : cs.onSurfaceVariant,
                   ),
                 ),
               ),

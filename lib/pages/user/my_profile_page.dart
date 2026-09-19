@@ -5,55 +5,11 @@ import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/pages/settings/user_management_dialog.dart';
+import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 
 /// 我的页面
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
-
-  /// 显示夜间模式选择弹窗
-  static void _showThemeModePicker(BuildContext context) {
-    final settings = context.read<SettingsProvider>();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('夜间模式'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _modeOption(ctx, settings, ThemeMode.light, '浅色', Icons.light_mode),
-            _modeOption(ctx, settings, ThemeMode.dark, '深色', Icons.dark_mode),
-            _modeOption(
-              ctx,
-              settings,
-              ThemeMode.system,
-              '跟随系统',
-              Icons.settings_brightness,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _modeOption(
-    BuildContext ctx,
-    SettingsProvider settings,
-    ThemeMode mode,
-    String label,
-    IconData icon,
-  ) {
-    final mCs = Theme.of(ctx).colorScheme;
-    final active = settings.themeMode == mode;
-    return ListTile(
-      leading: Icon(icon, color: active ? mCs.onSurfaceVariant : null),
-      title: Text(label),
-      trailing: active ? Icon(Icons.check, color: mCs.onSurfaceVariant) : null,
-      onTap: () {
-        settings.setThemeMode(mode);
-        Navigator.of(ctx).pop();
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,8 +59,11 @@ class ProfilePage extends StatelessWidget {
                 ),
                 IconButton(
                   icon: Icon(themeIcon),
-                  tooltip: '夜间模式',
-                  onPressed: () => _showThemeModePicker(context),
+                  tooltip: '主题模式',
+                  onPressed: () => showThemeModeDialog(
+                    context,
+                    context.read<SettingsProvider>(),
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.swap_horiz, size: 20),

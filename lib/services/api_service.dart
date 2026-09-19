@@ -27,6 +27,10 @@ class ApiService {
   String _currentHost = '';
   bool _initialized = false;
 
+  /// 浏览器默认 Accept（模拟浏览器访问时使用）
+  static const String _browserAccept =
+      'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+
   /// 当前活跃账号名，null 表示游客
   String? get activeAccount => _activeAccount;
 
@@ -45,13 +49,16 @@ class ApiService {
         baseUrl: url,
         // 默认 UA 为 PC 版（Discuz 按 UA 返回不同模板）；
         // 个别接口（导读/版块/我的帖子）按需用 Options 覆盖为站点配置 UA
-        // X-Requested-With 统一标记 AJAX 请求
         headers: {
+          // 功能性头：UA 决定 Discuz 返回哪套模板，
+          // X-Requested-With 决定是否按 AJAX 格式返回（去掉会拿到整页 HTML）
           'User-Agent': Site.uaPc,
           'X-Requested-With': 'XMLHttpRequest',
-          'Referer': url,
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          // 浏览器仿真头：按设置开关决定是否携带
+          if (_simulateBrowserHeaders) ...{
+            'Referer': url,
+            'Accept': _browserAccept,
+          },
         },
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 15),
@@ -147,13 +154,32 @@ class ApiService {
     _initialized = true;
   }
 
+  /// 按当前开关状态刷新 Dio 默认头。
+  ///
+  /// 关闭时只移除 Referer / Accept，User-Agent 与 X-Requested-With 是
+  /// 功能性头，始终保留。
+  ///
+  /// [init] 尚未完成时直接返回 —— 那时模块级开关已是最终值，init 会读它。
+  void refreshBrowserHeaders() {
+    if (!_initialized) return;
+    final headers = dio.options.headers;
+    if (_simulateBrowserHeaders) {
+      headers['Referer'] = dio.options.baseUrl;
+      headers['Accept'] = _browserAccept;
+    } else {
+      headers.remove('Referer');
+      headers.remove('Accept');
+    }
+  }
+
   /// 切换站点 — 更新 baseUrl + 重建 guest jar
   Future<void> switchSite() async {
     _currentHost = SiteStore.instance.host;
     final newUrl = SiteStore.instance.baseUrl;
     dio.options.baseUrl = newUrl;
-    dio.options.headers['Referer'] = newUrl;
     dio.options.headers['User-Agent'] = Site.uaPc;
+    // Referer 要跟着新站点走；开关关闭时这里只会移除它
+    refreshBrowserHeaders();
 
     _guestJar = PersistCookieJar(
       storage: FileStorage(await AppPaths.cookiesDirForHost(_currentHost)),
@@ -215,4 +241,22 @@ class ApiService {
     dio.interceptors.removeWhere((i) => i is CookieManager);
     dio.interceptors.insert(0, CookieManager(jar));
   }
+}
+
+// ==================== 浏览器仿真头 ====================
+
+/// 是否携带 `Referer` / `Accept` 等"浏览器仿真头"，默认开启。
+///
+/// 放在模块级而不是 [ApiService] 的实例字段上：`SettingsProvider.load()`
+/// 早于 `ApiService.init()` 执行，那时实例还没建好、`dio` 也不存在。
+/// init 会读这个值构建请求头，因此设置能在任何时机安全写入。
+bool _simulateBrowserHeaders = true;
+
+/// 当前是否携带浏览器仿真头（图片下载等非 Dio 请求共用此状态）
+bool browserHeadersEnabled() => _simulateBrowserHeaders;
+
+/// 开关浏览器仿真头，立即作用于后续请求。
+void applyBrowserHeaders(bool enabled) {
+  _simulateBrowserHeaders = enabled;
+  ApiService().refreshBrowserHeaders();
 }

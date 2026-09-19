@@ -80,29 +80,7 @@ class _RssSectionState extends State<RssSection>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题栏
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              Text(
-                'RSS 订阅',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface,
-                ),
-              ),
-              const Spacer(),
-              if (_items.isNotEmpty)
-                Text(
-                  '${_items.length} 条',
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                ),
-            ],
-          ),
-        ),
-        // 内容
+        // 标题由外层首页区块卡片提供，这里不再重复渲染
         if (_loading && _items.isEmpty)
           const Padding(
             padding: EdgeInsets.all(32),

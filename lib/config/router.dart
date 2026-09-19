@@ -9,12 +9,11 @@ import 'package:mtbbs/pages/message/message_page.dart';
 import 'package:mtbbs/pages/community/community_page.dart';
 import 'package:mtbbs/pages/user/my_profile_page.dart';
 import 'package:mtbbs/pages/settings/settings_page.dart';
+import 'package:mtbbs/pages/settings/settings_search_page.dart';
+import 'package:mtbbs/pages/settings/about_page.dart';
 import 'package:mtbbs/pages/settings/cache_settings_page.dart';
-import 'package:mtbbs/pages/settings/emoji_management.dart';
 import 'package:mtbbs/pages/settings/editor_settings_page.dart';
 import 'package:mtbbs/pages/settings/history_format_page.dart';
-import 'package:mtbbs/pages/settings/shortcut_settings_page.dart';
-import 'package:mtbbs/pages/settings/mt_image_manage_page.dart';
 import 'package:mtbbs/pages/thread/thread_view_page.dart';
 import 'package:mtbbs/pages/editor/editor_page.dart';
 import 'package:mtbbs/pages/editor/editor_history_page.dart';
@@ -74,9 +73,13 @@ GoRouter buildRouter({
                 const NoTransitionPage(child: CacheSettingsPage()),
           ),
           GoRoute(
-            path: '/settings/emoji',
+            path: '/settings/search',
             pageBuilder: (_, __) =>
-                const NoTransitionPage(child: EmojiManagementPage()),
+                const NoTransitionPage(child: SettingsSearchPage()),
+          ),
+          GoRoute(
+            path: '/settings/about',
+            pageBuilder: (_, __) => const NoTransitionPage(child: AboutPage()),
           ),
           GoRoute(
             path: '/settings/editor',
@@ -231,16 +234,6 @@ GoRouter buildRouter({
                     FadeTransition(opacity: animation, child: child),
               );
             },
-          ),
-          GoRoute(
-            path: '/settings/shortcuts',
-            pageBuilder: (_, __) =>
-                const NoTransitionPage(child: ShortcutSettingsPage()),
-          ),
-          GoRoute(
-            path: '/settings/mt-images',
-            pageBuilder: (_, __) =>
-                const NoTransitionPage(child: MtImageManagePage()),
           ),
         ],
       ),

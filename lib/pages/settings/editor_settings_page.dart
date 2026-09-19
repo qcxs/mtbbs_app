@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
+import 'package:mtbbs/pages/settings/shortcut_sheet.dart';
 import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
@@ -85,7 +85,7 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
               title: const Text('快捷键设置'),
               subtitle: const Text('配置全局和工具栏快捷键'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/settings/shortcuts'),
+              onTap: () => showShortcutSheet(context),
             ),
           ]),
         ],

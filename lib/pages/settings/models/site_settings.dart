@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/pages/settings/forum_management.dart';
 import 'package:mtbbs/pages/settings/formula_dialog.dart';
@@ -10,7 +11,7 @@ import 'package:mtbbs/pages/settings/user_management_dialog.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 
-/// 站点组设置项
+/// 站点与网络组设置项
 List<SettingsModel> siteSettings() => [
   NormalSetting(
     title: '当前站点',
@@ -31,6 +32,13 @@ List<SettingsModel> siteSettings() => [
     icon: Icons.phone_android,
     onTap: (ctx, s) => _showUADialog(ctx, s),
   ),
+  SwitchSetting(
+    title: '模拟浏览器请求头',
+    subtitle: 'API 与图片请求携带 Referer / Accept；关闭后部分站点可能拒绝访问',
+    icon: Icons.travel_explore,
+    value: (s) => s.simulateBrowserHeaders,
+    onChanged: (ctx, s, v) => s.setSimulateBrowserHeaders(v),
+  ),
   NormalSetting(
     title: '版块管理',
     icon: Icons.forum,
@@ -48,6 +56,24 @@ List<SettingsModel> siteSettings() => [
     icon: Icons.link,
     subtitleBuilder: (s) => '${s.shortcutLinks.length} 个链接',
     onTap: (ctx, s) => ShortcutLinksDialog.show(ctx, s),
+  ),
+  NormalSetting(
+    title: '通用错峰间隔',
+    icon: Icons.motion_photos_on,
+    subtitleBuilder: (s) => '${s.staggerInterval}ms，批量请求逐个放行',
+    onTap: (ctx, s) => showNumberDialog(
+      context: ctx,
+      title: '通用错峰间隔',
+      description: '短时间大量请求时，可能封ip，设置请求间隔，主动放慢请求。取值范围：（20-300ms），自行测试。',
+      initValue: s.staggerInterval,
+      min: 20,
+      max: 300,
+      helperText: '默认 40ms',
+      onSave: (v) async {
+        await s.setStaggerInterval(v);
+        setStaggerInterval(Duration(milliseconds: v));
+      },
+    ),
   ),
 ];
 
