@@ -60,48 +60,19 @@ class _WebLoginPageState extends State<WebLoginPage> {
   /// 显示 URL 输入对话框，点击标题触发
   void _showUrlDialog() {
     final cs = Theme.of(context).colorScheme;
-    final ctl = TextEditingController(text: _urlController.text);
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('输入网址'),
-        content: TextField(
-          controller: ctl,
-          autofocus: true,
-          keyboardType: TextInputType.url,
-          textInputAction: TextInputAction.go,
-          decoration: InputDecoration(
-            hintText: 'https://...',
-            border: const OutlineInputBorder(),
-            isDense: true,
-            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-            filled: true,
-          ),
-          onSubmitted: (value) {
-            Navigator.of(ctx).pop();
-            _navigateFromController(ctl);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _navigateFromController(ctl);
-            },
-            child: const Text('前往'),
-          ),
-        ],
+      builder: (_) => _UrlInputDialog(
+        initialUrl: _urlController.text,
+        cs: cs,
+        onNavigate: _navigateFromController,
       ),
     );
   }
 
-  /// 从对话框控制器提取 URL 并导航
-  void _navigateFromController(TextEditingController ctl) {
-    var url = ctl.text.trim();
+  /// 从对话框文本提取 URL 并导航
+  void _navigateFromController(String text) {
+    var url = text.trim();
     if (url.isEmpty) return;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://$url';
@@ -223,51 +194,9 @@ class _WebLoginPageState extends State<WebLoginPage> {
   /// 显示 Cookie 输入对话框
   void _showCookieInputDialog() {
     final cs = Theme.of(context).colorScheme;
-    final cookieController = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 420),
-        title: const Row(
-          children: [
-            Expanded(child: Text('Cookie 登录', style: TextStyle(fontSize: 16))),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '从浏览器开发者工具复制完整的 Cookie 字符串后粘贴到下方：',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: cookieController,
-              maxLines: 6,
-              decoration: const InputDecoration(
-                hintText: 'name1=value1; name2=value2; ...',
-                border: OutlineInputBorder(),
-                isDense: true,
-                contentPadding: EdgeInsets.all(12),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _handleCookieLogin(cookieController.text);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      builder: (_) => _CookieInputDialog(cs: cs, onSubmit: _handleCookieLogin),
     );
   }
 
@@ -438,6 +367,141 @@ class _WebLoginPageState extends State<WebLoginPage> {
           });
         }
       },
+    );
+  }
+}
+
+/// URL 输入弹窗内容
+///
+/// 控制器由本 State 持有、随弹窗子树卸载才释放：pop 只完成 Future，
+/// 弹窗退场动画期间子树仍在；提前或延后 dispose 会抛
+/// 「A TextEditingController was used after being disposed」。
+class _UrlInputDialog extends StatefulWidget {
+  const _UrlInputDialog({
+    required this.initialUrl,
+    required this.cs,
+    required this.onNavigate,
+  });
+
+  final String initialUrl;
+  final ColorScheme cs;
+  final void Function(String text) onNavigate;
+
+  @override
+  State<_UrlInputDialog> createState() => _UrlInputDialogState();
+}
+
+class _UrlInputDialogState extends State<_UrlInputDialog> {
+  late final TextEditingController _ctl = TextEditingController(
+    text: widget.initialUrl,
+  );
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  /// 先关闭弹窗，再取本控制器文本回调（与弹窗打开时的时序一致）
+  void _navigate() {
+    Navigator.of(context).pop();
+    widget.onNavigate(_ctl.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('输入网址'),
+      content: TextField(
+        controller: _ctl,
+        autofocus: true,
+        keyboardType: TextInputType.url,
+        textInputAction: TextInputAction.go,
+        decoration: InputDecoration(
+          hintText: 'https://...',
+          border: const OutlineInputBorder(),
+          isDense: true,
+          fillColor: widget.cs.surfaceContainerHighest.withValues(alpha: 0.5),
+          filled: true,
+        ),
+        onSubmitted: (_) => _navigate(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _navigate, child: const Text('前往')),
+      ],
+    );
+  }
+}
+
+/// Cookie 输入弹窗内容
+///
+/// 控制器由本 State 持有，理由同 [_UrlInputDialog]。
+class _CookieInputDialog extends StatefulWidget {
+  const _CookieInputDialog({required this.cs, required this.onSubmit});
+
+  final ColorScheme cs;
+  final void Function(String rawCookie) onSubmit;
+
+  @override
+  State<_CookieInputDialog> createState() => _CookieInputDialogState();
+}
+
+class _CookieInputDialogState extends State<_CookieInputDialog> {
+  final _cookieController = TextEditingController();
+
+  @override
+  void dispose() {
+    _cookieController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      constraints: const BoxConstraints(maxWidth: 420),
+      title: const Row(
+        children: [
+          Expanded(child: Text('Cookie 登录', style: TextStyle(fontSize: 16))),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '从浏览器开发者工具复制完整的 Cookie 字符串后粘贴到下方：',
+            style: TextStyle(fontSize: 13, color: widget.cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _cookieController,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              hintText: 'name1=value1; name2=value2; ...',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.all(12),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            widget.onSubmit(_cookieController.text);
+          },
+          child: const Text('确定'),
+        ),
+      ],
     );
   }
 }

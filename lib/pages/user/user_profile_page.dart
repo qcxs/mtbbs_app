@@ -99,38 +99,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void _navigateToUid(int uid) => GoRouter.of(context).replace('/user/$uid');
 
   void _showUidPicker() {
-    final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('跳转用户'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入 UID',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final uid = int.tryParse(controller.text);
-              if (uid != null && uid > 0) {
-                Navigator.of(ctx).pop();
-                _navigateToUid(uid);
-              }
-            },
-            child: const Text('跳转'),
-          ),
-        ],
-      ),
+      builder: (_) => _UidPickerDialog(onNavigateToUid: _navigateToUid),
     );
   }
 
@@ -1003,5 +974,62 @@ class _UserProfilePageState extends State<UserProfilePage> {
       }
     }
     return value;
+  }
+}
+
+/// UID 跳转弹窗内容
+///
+/// 控制器由本 State 持有、随弹窗子树卸载才释放：pop 只完成 Future，
+/// 弹窗退场动画期间子树仍在；提前或延后 dispose 会抛
+/// 「A TextEditingController was used after being disposed」。
+class _UidPickerDialog extends StatefulWidget {
+  const _UidPickerDialog({required this.onNavigateToUid});
+
+  final void Function(int uid) onNavigateToUid;
+
+  @override
+  State<_UidPickerDialog> createState() => _UidPickerDialogState();
+}
+
+class _UidPickerDialogState extends State<_UidPickerDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// UID 合法才关闭并跳转；非法时保持弹窗打开
+  void _submit() {
+    final uid = int.tryParse(_controller.text);
+    if (uid != null && uid > 0) {
+      Navigator.of(context).pop();
+      widget.onNavigateToUid(uid);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('跳转用户'),
+      content: TextField(
+        controller: _controller,
+        keyboardType: TextInputType.number,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: '输入 UID',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('跳转')),
+      ],
+    );
   }
 }

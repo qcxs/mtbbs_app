@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标前景层：白色 mt 字标。
+  画布 108dp；字标墨迹原始尺寸 2079x971（宽高比 2.141），等比缩放到 59.8x27.9dp 并居中，
+  四角正好内切 ⌀66dp 安全圆（108dp 画布最严苛的可见区），任何蒙版形状都不会裁到字标。
+  变换是等比缩放，不要改成 scaleX != scaleY，否则字形会被拉伸变形。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="2242"
+    android:viewportHeight="2242">
+    <group
+        android:scaleX="0.597108452"
+        android:scaleY="0.597108452"
+        android:translateX="451.93998"
+        android:translateY="451.93998">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M535 637a490 490 0 0 0-446 397c-7 40-6 19-7 308v264h13c129 0 225-82 235-200 1-8 2-67 2-157 0-150 0-154 5-178 18-92 97-173 186-190 139-28 266 63 288 207 1 11 2 31 2 171 1 136 1 159 3 166 22 109 107 177 226 181h20v-238c0-278 0-276 9-311a252 252 0 0 1 184-177l-5-5-37-37c-38-45-60-105-60-166v-12l-9 3c-68 23-134 65-188 118l-18 17-15-15a478 478 0 0 0-388-146m649 31c4 122 75 206 183 220l95 1h85v261c0 244 0 262 2 272 21 110 106 180 227 184h20V889h86c102 0 113-1 144-13 82-33 130-106 133-206l1-20h-977l1 18" />
+    </group>
+</vector>

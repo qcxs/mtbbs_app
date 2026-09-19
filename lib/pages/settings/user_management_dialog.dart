@@ -278,74 +278,10 @@ class UserManagementDialog extends StatelessWidget {
     AuthProvider auth,
     String initialText,
   ) {
-    final cs = Theme.of(context).colorScheme;
-    final ctl = TextEditingController(text: initialText);
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('导入账号'),
-        constraints: const BoxConstraints(maxWidth: 420),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '请确认或编辑账号 JSON 数据：',
-              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: ctl,
-              maxLines: 6,
-              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final raw = ctl.text.trim();
-              // 校验 JSON
-              try {
-                final parsed = jsonDecode(raw);
-                if (parsed is! List) {
-                  showToast('JSON 格式错误：应为数组');
-                  return;
-                }
-                for (final item in parsed) {
-                  if (item is! Map ||
-                      !item.containsKey('username') ||
-                      !item.containsKey('uid')) {
-                    showToast('JSON 格式错误：缺少 username 或 uid');
-                    return;
-                  }
-                }
-              } catch (e) {
-                showToast('JSON 解析失败: $e');
-                return;
-              }
-              Navigator.of(ctx).pop();
-              final result = auth.importAccounts(raw);
-              if (context.mounted) {
-                showToast(
-                  result['success'] == true
-                      ? '成功导入'
-                      : '导入失败: ${result['message']}',
-                );
-              }
-            },
-            child: const Text('导入'),
-          ),
-        ],
-      ),
+      builder: (_) =>
+          _ImportAccountsDialog(initialText: initialText, auth: auth),
     );
   }
 
@@ -360,5 +296,99 @@ class UserManagementDialog extends StatelessWidget {
     if (ok == true) {
       auth.logout();
     }
+  }
+}
+
+/// 导入账号预览弹窗内容
+///
+/// 控制器由本 State 持有、随弹窗子树卸载才释放：showDialog 返回的 Future 在 pop
+/// 时即完成，而弹窗退场动画期间子树仍会重建（导入成功会触发 AuthProvider
+/// notifyListeners 重建整棵树），在 pop 前后提前 dispose 会抛
+/// 「A TextEditingController was used after being disposed」。
+class _ImportAccountsDialog extends StatefulWidget {
+  const _ImportAccountsDialog({required this.initialText, required this.auth});
+
+  final String initialText;
+  final AuthProvider auth;
+
+  @override
+  State<_ImportAccountsDialog> createState() => _ImportAccountsDialogState();
+}
+
+class _ImportAccountsDialogState extends State<_ImportAccountsDialog> {
+  late final TextEditingController _ctl = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final raw = _ctl.text.trim();
+    // 校验 JSON
+    try {
+      final parsed = jsonDecode(raw);
+      if (parsed is! List) {
+        showToast('JSON 格式错误：应为数组');
+        return;
+      }
+      for (final item in parsed) {
+        if (item is! Map ||
+            !item.containsKey('username') ||
+            !item.containsKey('uid')) {
+          showToast('JSON 格式错误：缺少 username 或 uid');
+          return;
+        }
+      }
+    } catch (e) {
+      showToast('JSON 解析失败: $e');
+      return;
+    }
+    Navigator.of(context).pop();
+    final result = widget.auth.importAccounts(raw);
+    if (mounted) {
+      showToast(
+        result['success'] == true ? '成功导入' : '导入失败: ${result['message']}',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: const Text('导入账号'),
+      constraints: const BoxConstraints(maxWidth: 420),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '请确认或编辑账号 JSON 数据：',
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _ctl,
+            maxLines: 6,
+            style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('导入')),
+      ],
+    );
   }
 }

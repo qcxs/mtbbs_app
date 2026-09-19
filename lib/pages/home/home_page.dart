@@ -15,6 +15,7 @@ import 'package:mtbbs/widgets/common/ranklist_section.dart';
 import 'package:mtbbs/widgets/common/rss_section.dart';
 import 'package:mtbbs/pages/settings/shortcut_links_dialog.dart';
 import 'package:mtbbs/pages/settings/forum_management.dart';
+import 'package:mtbbs/pages/settings/site_management.dart';
 
 /// 首页
 ///
@@ -164,23 +165,11 @@ class _SiteHeader extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                site.name.isEmpty ? '?' : site.name.substring(0, 1),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onPrimaryContainer,
-                ),
-              ),
-            ),
+            // 站点自身没有可直接渲染的图标（论坛 favicon 基本是 .ico，Flutter 的解码器
+            // 不支持），统一用设置页「当前站点」那个图标：裸 Icon、无背景容器。
+            // 颜色要显式给 —— 裸 Icon 在设置页由 M3 ListTile 兜到 onSurfaceVariant，
+            // 这里没有 ListTile，不给就会落回 ThemeData.iconTheme 的 black87/白。
+            Icon(Icons.dns, color: cs.onSurfaceVariant),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -212,6 +201,12 @@ class _SiteHeader extends StatelessWidget {
                 icon: const Icon(Icons.check_circle_outline, size: 16),
                 label: const Text('签到'),
               ),
+            IconButton(
+              icon: const Icon(Icons.swap_horiz, size: 20),
+              tooltip: '切换站点',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => SiteManagement.showPicker(context, settings),
+            ),
           ],
         ),
       ),

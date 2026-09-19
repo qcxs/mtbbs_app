@@ -15,53 +15,106 @@ Future<void> showNumberDialog({
   int max = 100000,
   String? helperText,
   required Future<void> Function(int value) onSave,
-}) async {
-  final ctl = TextEditingController(text: initValue.toString());
-  await showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
+}) => showDialog<void>(
+  context: context,
+  builder: (_) => _NumberInputDialog(
+    title: title,
+    description: description,
+    initValue: initValue,
+    min: min,
+    max: max,
+    helperText: helperText,
+    onSave: onSave,
+  ),
+);
+
+/// 数字输入弹窗内容
+///
+/// 控制器必须由本 State 持有、在 [dispose] 中释放，**不能**在
+/// `await showDialog(...)` 之后释放：`showDialog` 的 Future 在 pop 时就完成，
+/// 此时弹窗仍在退场动画中、子树仍会被重建（保存设置 → `notifyListeners()`
+/// 重建整个 MaterialApp 就会命中），提前 dispose 会抛
+/// 「A TextEditingController was used after being disposed」。
+class _NumberInputDialog extends StatefulWidget {
+  const _NumberInputDialog({
+    required this.title,
+    this.description,
+    required this.initValue,
+    required this.min,
+    required this.max,
+    this.helperText,
+    required this.onSave,
+  });
+
+  final String title;
+  final String? description;
+  final int initValue;
+  final int min;
+  final int max;
+  final String? helperText;
+  final Future<void> Function(int value) onSave;
+
+  @override
+  State<_NumberInputDialog> createState() => _NumberInputDialogState();
+}
+
+class _NumberInputDialogState extends State<_NumberInputDialog> {
+  late final TextEditingController _ctl = TextEditingController(
+    text: widget.initValue.toString(),
+  );
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
       constraints: const BoxConstraints(maxWidth: settingsDialogMaxWidth),
-      title: Text(title),
+      title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (description != null) ...[
-            Text(description),
+          if (widget.description != null) ...[
+            Text(widget.description!),
             const SizedBox(height: 12),
           ],
           TextField(
-            controller: ctl,
+            controller: _ctl,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               labelText: '数值',
               border: const OutlineInputBorder(),
               isDense: true,
               helperText:
-                  helperText ??
-                  (min > 0 || max < 100000 ? '$min - $max' : null),
+                  widget.helperText ??
+                  (widget.min > 0 || widget.max < 100000
+                      ? '${widget.min} - ${widget.max}'
+                      : null),
             ),
           ),
         ],
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
         FilledButton(
           onPressed: () async {
-            final v = int.tryParse(ctl.text.trim());
+            final v = int.tryParse(_ctl.text.trim());
             if (v == null) return;
-            final clamped = v.clamp(min, max);
-            await onSave(clamped);
-            if (ctx.mounted) Navigator.of(ctx).pop();
+            final clamped = v.clamp(widget.min, widget.max);
+            await widget.onSave(clamped);
+            if (mounted) Navigator.of(context).pop();
           },
           child: const Text('确定'),
         ),
       ],
-    ),
-  );
-  ctl.dispose();
+    );
+  }
 }
 
 /// 单选弹窗选项

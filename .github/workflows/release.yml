@@ -4,12 +4,18 @@ name: Release
 # tag 留空则仅构建并上传为 workflow artifact，可在 Actions 页面下载。
 #
 # 版本号规则（对齐 PiliPlus）：
-#   - 版本名：pubspec.yaml `version:`（发布前手动改）
+#   - 版本名：`version` 输入优先；**留空 → beta 形态**（固定 1.0-beta / 1，
+#     Android 另切成 .beta 独立应用，与正式版共存）
 #   - build 号：git 提交总数（scripts/version.ps1 计算）
-#   - Android 发布包版本名追加 9 位 commit hash
+#   - Android 发布包版本名追加 9 位 commit hash（beta 不加）
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: '版本名（如 1.2.0，可带 v 前缀）；留空 → beta 形态，版本固定 1.0-beta'
+        required: false
+        default: ''
+        type: string
       build_android:
         description: '构建 Android APK（arm64-v8a / armeabi-v7a / x86_64）'
         required: false
@@ -55,7 +61,14 @@ jobs:
 
       - name: 生成版本信息
         shell: pwsh
-        run: scripts/version.ps1 android
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:INPUT_VERSION)) {
+            scripts/version.ps1 android -Beta
+          } else {
+            scripts/version.ps1 android -VersionName $env:INPUT_VERSION
+          }
 
       - name: 写入签名（可选，配置无效自动跳过 → debug 签名）
         shell: pwsh
@@ -90,11 +103,15 @@ jobs:
           }
 
       - name: 构建 APK
+        env:
+          # beta 形态：gradle 按 dart-define 切成 .beta 独立应用（独立 appId/应用名/签名）
+          BETA_FLAG: ${{ env.MTBBS_BETA == 'true' && '--dart-define=BETA=true' || '' }}
         run: |
           flutter build apk --release --split-per-abi \
             --dart-define-from-file=mtbbs_release.json \
             --build-name=${{ env.MTBBS_VERSION_NAME }} \
-            --build-number=${{ env.MTBBS_VERSION_CODE }}
+            --build-number=${{ env.MTBBS_VERSION_CODE }} \
+            $BETA_FLAG
 
       - name: 重命名
         shell: bash
@@ -161,7 +178,14 @@ jobs:
 
       - name: 生成版本信息
         shell: pwsh
-        run: scripts/version.ps1
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:INPUT_VERSION)) {
+            scripts/version.ps1 -Beta
+          } else {
+            scripts/version.ps1 -VersionName $env:INPUT_VERSION
+          }
 
       - name: 构建 Windows Release
         shell: pwsh

@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/config/build_config.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/models/special_thanks.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -28,6 +31,9 @@ class AboutPage extends StatefulWidget {
   /// 应用介绍帖
   static const String introUrl = 'https://bbs.binmt.cc/thread-169295-1-1.html';
 
+  /// 应用图标位图（`mipmap-xxxhdpi/ic_launcher.png` 的副本，见 docs/16）
+  static const String iconAsset = 'assets/icon/app_icon.png';
+
   @override
   State<AboutPage> createState() => _AboutPageState();
 }
@@ -36,11 +42,30 @@ class _AboutPageState extends State<AboutPage> {
   /// 只加载一次，避免主题切换等 rebuild 重复读 assets
   late final Future<List<SpecialThanks>> _thanks = SpecialThanks.load();
 
+  /// 应用图标的累计旋转圈数；点一下随机叠加，交给 AnimatedRotation 平滑过渡
+  double _turns = 0;
+  final math.Random _random = math.Random();
+
+  /// 随机方向转 0.5~1.5 圈
+  void _spinIcon() {
+    final delta = 0.5 + _random.nextDouble();
+    setState(() => _turns += _random.nextBool() ? delta : -delta);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final hash = BuildConfig.commitHash;
     final shortHash = hash.length > 7 ? hash.substring(0, 7) : hash;
+    // 未注入时 buildTime 为 0，显示占位而非 1970
+    final buildTime = BuildConfig.buildTime > 0
+        ? formatDateTimeFull(
+            DateTime.fromMillisecondsSinceEpoch(
+              BuildConfig.buildTime * 1000,
+              isUtc: true,
+            ).toLocal(),
+          )
+        : 'N/A';
 
     return Scaffold(
       appBar: AppBar(title: const Text('关于'), centerTitle: true),
@@ -96,6 +121,7 @@ class _AboutPageState extends State<AboutPage> {
             _infoTile('版本名', BuildConfig.versionName),
             _infoTile('构建号', '${BuildConfig.versionCode}'),
             _infoTile('构建提交', shortHash),
+            _infoTile('构建时间', buildTime),
           ]),
 
           FutureBuilder<List<SpecialThanks>>(
@@ -117,14 +143,21 @@ class _AboutPageState extends State<AboutPage> {
       padding: const EdgeInsets.only(top: 24, bottom: 4),
       child: Column(
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(18),
+          // 图标位图自带圆角与透明角，无需再裁切或描边；点一下随机转个角度
+          GestureDetector(
+            onTap: _spinIcon,
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedRotation(
+              turns: _turns,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+              child: Image.asset(
+                AboutPage.iconAsset,
+                width: 72,
+                height: 72,
+                filterQuality: FilterQuality.medium,
+              ),
             ),
-            child: Icon(Icons.forum, size: 36, color: cs.onPrimaryContainer),
           ),
           const SizedBox(height: 12),
           const Text(

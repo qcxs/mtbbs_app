@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 自适应图标背景层：纯黑。前景为白色 mt 字标，见 drawable/ic_launcher_foreground.xml -->
+    <color name="ic_launcher_background">#000000</color>
+</resources>

@@ -14,29 +14,95 @@ Future<void> showPageJumpDialog(
   bool autofocus = false,
   bool showSummary = true,
 }) {
-  final tc = TextEditingController(text: initialText);
   return showDialog<void>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
+    builder: (_) => _PageJumpDialog(
+      currentPage: currentPage,
+      totalPages: totalPages,
+      onGoToPage: onGoToPage,
+      title: title,
+      initialText: initialText,
+      autofocus: autofocus,
+      showSummary: showSummary,
+    ),
+  );
+}
+
+/// 页码跳转弹窗内容
+///
+/// 控制器由本 State 持有、随弹窗子树卸载才释放：pop 只完成 Future，
+/// 弹窗退场动画期间子树仍在；提前或延后 dispose 会抛
+/// 「A TextEditingController was used after being disposed」。
+class _PageJumpDialog extends StatefulWidget {
+  const _PageJumpDialog({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onGoToPage,
+    required this.title,
+    required this.initialText,
+    required this.autofocus,
+    required this.showSummary,
+  });
+
+  final int currentPage;
+  final int totalPages;
+  final void Function(int page) onGoToPage;
+  final String title;
+  final String? initialText;
+  final bool autofocus;
+  final bool showSummary;
+
+  @override
+  State<_PageJumpDialog> createState() => _PageJumpDialogState();
+}
+
+class _PageJumpDialogState extends State<_PageJumpDialog> {
+  late final TextEditingController _tc = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _tc.dispose();
+    super.dispose();
+  }
+
+  /// 校验合法才关闭并回调；页码非法时保持弹窗打开
+  void _submit() {
+    final p = int.tryParse(_tc.text);
+    if (p != null &&
+        p >= 1 &&
+        (widget.totalPages <= 0 || p <= widget.totalPages)) {
+      Navigator.of(context).pop();
+      widget.onGoToPage(p);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (showSummary && (totalPages > 0 || currentPage > 0)) ...[
+          if (widget.showSummary &&
+              (widget.totalPages > 0 || widget.currentPage > 0)) ...[
             Text(
-              totalPages > 0
-                  ? '共 $totalPages 页，当前第 $currentPage 页'
-                  : '当前第 $currentPage 页',
+              widget.totalPages > 0
+                  ? '共 ${widget.totalPages} 页，当前第 ${widget.currentPage} 页'
+                  : '当前第 ${widget.currentPage} 页',
             ),
             const SizedBox(height: 8),
           ],
           TextField(
-            controller: tc,
-            autofocus: autofocus,
+            controller: _tc,
+            autofocus: widget.autofocus,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
-              hintText: totalPages > 0 ? '输入页码 (1-$totalPages)' : '输入页码',
+              hintText: widget.totalPages > 0
+                  ? '输入页码 (1-${widget.totalPages})'
+                  : '输入页码',
               border: const OutlineInputBorder(),
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
@@ -49,20 +115,11 @@ Future<void> showPageJumpDialog(
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: () {
-            final p = int.tryParse(tc.text);
-            if (p != null && p >= 1 && (totalPages <= 0 || p <= totalPages)) {
-              Navigator.of(ctx).pop();
-              onGoToPage(p);
-            }
-          },
-          child: const Text('跳转'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('跳转')),
       ],
-    ),
-  );
+    );
+  }
 }

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
@@ -6,6 +7,7 @@ import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 /// - 窄屏：默认图片占满可用宽度
 /// - 宽屏：默认图片封顶 maxImageWidth（600）
 /// - [img=W,H]：尊重显式宽，但 clamp 到可用宽度防溢出
+/// - 未指定尺寸：只约束宽度上限，不强制宽度 → 低分辨率小图按原始像素渲染，不被放大拉糊
 void main() {
   group('resolvePostImageWidth 公式', () {
     test('窄屏无显式宽：占满可用宽度', () {
@@ -102,6 +104,41 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(tester.getSize(find.byType(BbcodeImage)).width, 120);
+    });
+
+    testWidgets('未指定尺寸：不强制宽度，宽度由原始像素决定', (tester) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(build());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final image = tester.widget<CachedNetworkImage>(
+        find.byType(CachedNetworkImage),
+      );
+      // 关键回归：width 必须留空，否则低分辨率小图会被拉伸放大（变糊）。
+      // 渲染器对块级自定义组件下发松约束，留空即按解码后的原始像素测量；
+      // 解码链路 allowUpscaling=false，故结果天然 ≤ 原始像素宽。
+      expect(image.width, isNull);
+      // 上限（可用宽封顶 maxImageWidth）仍用于解码与占位，取 2 倍
+      expect(image.memCacheWidth, 1200);
+    });
+
+    testWidgets('[img=120,H] 显式宽：强制该宽度（尊重作者，可放大）', (tester) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(build(explicitWidth: 120));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final image = tester.widget<CachedNetworkImage>(
+        find.byType(CachedNetworkImage),
+      );
+      expect(image.width, 120);
     });
   });
 }

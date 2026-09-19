@@ -570,8 +570,8 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> setFontSize(double size) async {
-    _fontSize = size;
-    await _db.setSettingDouble('fontSize', size);
+    _fontSize = size.clamp(12, 32);
+    await _db.setSettingDouble('fontSize', _fontSize);
     notifyListeners();
   }
 

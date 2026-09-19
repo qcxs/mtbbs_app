@@ -204,134 +204,114 @@ class SiteManagement {
     int index,
   ) {
     final site = SiteStore.instance.sites[index];
-    final nameCtl = TextEditingController(text: site.name);
-    final urlCtl = TextEditingController(text: site.baseUrl);
-    final cdnCtl = TextEditingController(text: site.cdn ?? '');
-    final loginPathCtl = TextEditingController(text: site.loginPagePath);
-    final avatarCtl = TextEditingController(text: site.avatarTemplate ?? '');
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('编辑站点'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtl,
-                decoration: const InputDecoration(
-                  labelText: '站点名称',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: urlCtl,
-                decoration: const InputDecoration(
-                  labelText: '站点地址',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: cdnCtl,
-                decoration: const InputDecoration(
-                  labelText: 'CDN 地址（可选）',
-                  hintText: '留空则使用站点地址',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: loginPathCtl,
-                decoration: const InputDecoration(
-                  labelText: '登录页路径（可选）',
-                  hintText: '留空使用默认 /member.php?mod=logging&action=login',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: avatarCtl,
-                decoration: const InputDecoration(
-                  labelText: '头像 URL 模板（可选）',
-                  hintText:
-                      '留空使用默认 API 方案，例如：\nhttps://avatar.xxx.com/data/avatar/{dir}/{tail}_avatar_{size}.jpg',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                maxLines: 2,
-                keyboardType: TextInputType.url,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final name = nameCtl.text.trim();
-              var url = urlCtl.text.trim();
-              final cdnText = cdnCtl.text.trim();
-              final loginPath = loginPathCtl.text.trim();
-              final avatarTemplate = avatarCtl.text.trim();
-              if (name.isEmpty || url.isEmpty) return;
-              if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                url = 'https://$url';
-              }
-              final cdn = cdnText.isNotEmpty ? cdnText : null;
-              await settings.updateSite(
-                index,
-                Site(
-                  name: name,
-                  baseUrl: url,
-                  cdn: cdn,
-                  loginPagePath: loginPath,
-                  forums: site.forums,
-                  defaultForumOrder: site.defaultForumOrder,
-                  userAgent: site.userAgent,
-                  avatarTemplate: avatarTemplate.isEmpty
-                      ? null
-                      : avatarTemplate,
-                ),
-              );
-              if (ctx.mounted) Navigator.of(ctx).pop();
-              if (context.mounted) {
-                showToast('已更新「$name」', duration: const Duration(seconds: 1));
-              }
-            },
-            child: const Text('保存'),
-          ),
-        ],
+      builder: (_) => _EditSiteDialog(
+        settings: settings,
+        index: index,
+        site: site,
       ),
     );
   }
 
   static void showAddDialog(BuildContext context, SettingsProvider settings) {
-    final nameCtl = TextEditingController();
-    final urlCtl = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('添加站点'),
-        content: Column(
+      builder: (_) => _AddSiteDialog(settings: settings),
+    );
+  }
+}
+
+/// 编辑站点弹窗内容
+///
+/// 控制器由本 State 持有、随弹窗子树卸载才释放：showDialog 返回的 Future 在
+/// pop 时即完成，此时弹窗仍在退场动画中、子树仍会重建（保存站点会触发
+/// notifyListeners → MaterialApp 重建），在 pop 前后提前 dispose 会抛
+/// 「A TextEditingController was used after being disposed」；完全不 dispose
+/// 则控制器泄漏。
+class _EditSiteDialog extends StatefulWidget {
+  const _EditSiteDialog({
+    required this.settings,
+    required this.index,
+    required this.site,
+  });
+
+  final SettingsProvider settings;
+  final int index;
+  final Site site;
+
+  @override
+  State<_EditSiteDialog> createState() => _EditSiteDialogState();
+}
+
+class _EditSiteDialogState extends State<_EditSiteDialog> {
+  late final TextEditingController _nameCtl = TextEditingController(
+    text: widget.site.name,
+  );
+  late final TextEditingController _urlCtl = TextEditingController(
+    text: widget.site.baseUrl,
+  );
+  late final TextEditingController _cdnCtl = TextEditingController(
+    text: widget.site.cdn ?? '',
+  );
+  late final TextEditingController _loginPathCtl = TextEditingController(
+    text: widget.site.loginPagePath,
+  );
+  late final TextEditingController _avatarCtl = TextEditingController(
+    text: widget.site.avatarTemplate ?? '',
+  );
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    _urlCtl.dispose();
+    _cdnCtl.dispose();
+    _loginPathCtl.dispose();
+    _avatarCtl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtl.text.trim();
+    var url = _urlCtl.text.trim();
+    final cdnText = _cdnCtl.text.trim();
+    final loginPath = _loginPathCtl.text.trim();
+    final avatarTemplate = _avatarCtl.text.trim();
+    if (name.isEmpty || url.isEmpty) return;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+    final cdn = cdnText.isNotEmpty ? cdnText : null;
+    await widget.settings.updateSite(
+      widget.index,
+      Site(
+        name: name,
+        baseUrl: url,
+        cdn: cdn,
+        loginPagePath: loginPath,
+        forums: widget.site.forums,
+        defaultForumOrder: widget.site.defaultForumOrder,
+        userAgent: widget.site.userAgent,
+        avatarTemplate: avatarTemplate.isEmpty ? null : avatarTemplate,
+      ),
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    showToast('已更新「$name」', duration: const Duration(seconds: 1));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('编辑站点'),
+      content: SingleChildScrollView(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: nameCtl,
+              controller: _nameCtl,
               decoration: const InputDecoration(
                 labelText: '站点名称',
-                hintText: '例如：我的论坛',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -339,49 +319,144 @@ class SiteManagement {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: urlCtl,
+              controller: _urlCtl,
               decoration: const InputDecoration(
                 labelText: '站点地址',
-                hintText: 'https://example.com',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
               keyboardType: TextInputType.url,
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _cdnCtl,
+              decoration: const InputDecoration(
+                labelText: 'CDN 地址（可选）',
+                hintText: '留空则使用站点地址',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _loginPathCtl,
+              decoration: const InputDecoration(
+                labelText: '登录页路径（可选）',
+                hintText: '留空使用默认 /member.php?mod=logging&action=login',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _avatarCtl,
+              decoration: const InputDecoration(
+                labelText: '头像 URL 模板（可选）',
+                hintText:
+                    '留空使用默认 API 方案，例如：\nhttps://avatar.xxx.com/data/avatar/{dir}/{tail}_avatar_{size}.jpg',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 2,
+              keyboardType: TextInputType.url,
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('保存')),
+      ],
+    );
+  }
+}
+
+/// 添加站点弹窗内容
+///
+/// 控制器由本 State 持有，理由同 [_EditSiteDialog]。
+class _AddSiteDialog extends StatefulWidget {
+  const _AddSiteDialog({required this.settings});
+
+  final SettingsProvider settings;
+
+  @override
+  State<_AddSiteDialog> createState() => _AddSiteDialogState();
+}
+
+class _AddSiteDialogState extends State<_AddSiteDialog> {
+  final _nameCtl = TextEditingController();
+  final _urlCtl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    _urlCtl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _add() async {
+    final name = _nameCtl.text.trim();
+    var url = _urlCtl.text.trim();
+    if (name.isEmpty || url.isEmpty) return;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+    await widget.settings.addSite(
+      Site(
+        name: name,
+        baseUrl: url,
+        loginPagePath: '/member.php?mod=logging&action=login',
+        forums: {},
+        defaultForumOrder: [],
+        userAgent: '',
+      ),
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    showToast('已添加「$name」');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('添加站点'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameCtl,
+            decoration: const InputDecoration(
+              labelText: '站点名称',
+              hintText: '例如：我的论坛',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            autofocus: true,
           ),
-          FilledButton(
-            onPressed: () async {
-              final name = nameCtl.text.trim();
-              var url = urlCtl.text.trim();
-              if (name.isEmpty || url.isEmpty) return;
-              if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                url = 'https://$url';
-              }
-              await settings.addSite(
-                Site(
-                  name: name,
-                  baseUrl: url,
-                  loginPagePath: '/member.php?mod=logging&action=login',
-                  forums: {},
-                  defaultForumOrder: [],
-                  userAgent: '',
-                ),
-              );
-              if (ctx.mounted) Navigator.of(ctx).pop();
-              if (context.mounted) {
-                showToast('已添加「$name」');
-              }
-            },
-            child: const Text('添加'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _urlCtl,
+            decoration: const InputDecoration(
+              labelText: '站点地址',
+              hintText: 'https://example.com',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            keyboardType: TextInputType.url,
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _add, child: const Text('添加')),
+      ],
     );
   }
 }

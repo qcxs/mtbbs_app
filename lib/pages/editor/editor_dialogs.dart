@@ -120,65 +120,100 @@ void showInlineInputDialog(
   BBCodeController contentCtl,
   VoidCallback onFocusContent,
 ) {
-  final textCtl = TextEditingController();
   showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
+    builder: (_) => _InlineInputDialog(
+      openTag: openTag,
+      closeTag: closeTag,
+      dialogTitle: dialogTitle,
+      hint: hint,
+      contentCtl: contentCtl,
+      onFocusContent: onFocusContent,
+    ),
+  );
+}
+
+/// 内联输入弹窗内容
+///
+/// 控制器由本 State 持有、随弹窗子树卸载才释放：pop 之后弹窗仍在退场动画中、
+/// 子树仍会重建（插入内容会重建编辑器与预览），在 pop 前后提前 dispose 会抛
+/// 「A TextEditingController was used after being disposed」。
+class _InlineInputDialog extends StatefulWidget {
+  const _InlineInputDialog({
+    required this.openTag,
+    required this.closeTag,
+    required this.dialogTitle,
+    required this.hint,
+    required this.contentCtl,
+    required this.onFocusContent,
+  });
+
+  final String openTag;
+  final String closeTag;
+  final String dialogTitle;
+  final String hint;
+  final BBCodeController contentCtl;
+  final VoidCallback onFocusContent;
+
+  @override
+  State<_InlineInputDialog> createState() => _InlineInputDialogState();
+}
+
+class _InlineInputDialogState extends State<_InlineInputDialog> {
+  final _textCtl = TextEditingController();
+
+  @override
+  void dispose() {
+    _textCtl.dispose();
+    super.dispose();
+  }
+
+  /// 写入 BBCode 并关闭；内容为空时不动作（保持弹窗打开）
+  void _submit(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return;
+    widget.contentCtl.wrapInline(widget.openTag, widget.closeTag, v);
+    widget.onFocusContent();
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
       constraints: const BoxConstraints(maxWidth: 400),
       title: Row(
         children: [
-          Expanded(child: Text(dialogTitle)),
+          Expanded(child: Text(widget.dialogTitle)),
           IconButton(
             icon: const Icon(Icons.close, size: 20),
-            onPressed: () {
-              textCtl.dispose();
-              Navigator.of(ctx).pop();
-            },
+            onPressed: () => Navigator.of(context).pop(),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
         ],
       ),
       content: TextField(
-        controller: textCtl,
+        controller: _textCtl,
         autofocus: true,
         decoration: InputDecoration(
-          hintText: hint,
+          hintText: widget.hint,
           border: const OutlineInputBorder(),
           isDense: true,
         ),
-        onSubmitted: (value) {
-          if (value.trim().isNotEmpty) {
-            contentCtl.wrapInline(openTag, closeTag, value.trim());
-            onFocusContent();
-            textCtl.dispose();
-            Navigator.of(ctx).pop();
-          }
-        },
+        onSubmitted: _submit,
       ),
       actions: [
         TextButton(
-          onPressed: () {
-            textCtl.dispose();
-            Navigator.of(ctx).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: () {
-            final value = textCtl.text.trim();
-            if (value.isNotEmpty) {
-              contentCtl.wrapInline(openTag, closeTag, value);
-              onFocusContent();
-              textCtl.dispose();
-              Navigator.of(ctx).pop();
-            }
-          },
+          onPressed: () => _submit(_textCtl.text),
           child: const Text('确定'),
         ),
       ],
-    ),
-  );
+    );
+  }
 }
 
 /// 显示文本输入对话框（链接/图片URL等，支持双输入框）
@@ -193,22 +228,87 @@ void showTextInputDialog(
   String? secondValue,
   required void Function(String, String) onSubmit,
 }) {
-  final urlCtl = TextEditingController(text: value);
-  final textCtl = TextEditingController(text: secondValue ?? '');
   showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
+    builder: (_) => _TextInputDialog(
+      title: title,
+      label: label,
+      hint: hint,
+      value: value,
+      secondLabel: secondLabel,
+      secondHint: secondHint,
+      secondValue: secondValue,
+      onSubmit: onSubmit,
+    ),
+  );
+}
+
+/// 文本输入弹窗内容（单个或双输入框）
+///
+/// 控制器由本 State 持有，理由同 [_InlineInputDialog]。
+class _TextInputDialog extends StatefulWidget {
+  const _TextInputDialog({
+    required this.title,
+    required this.label,
+    required this.hint,
+    required this.value,
+    this.secondLabel,
+    this.secondHint,
+    this.secondValue,
+    required this.onSubmit,
+  });
+
+  final String title;
+  final String label;
+  final String hint;
+  final String value;
+  final String? secondLabel;
+  final String? secondHint;
+  final String? secondValue;
+  final void Function(String, String) onSubmit;
+
+  @override
+  State<_TextInputDialog> createState() => _TextInputDialogState();
+}
+
+class _TextInputDialogState extends State<_TextInputDialog> {
+  late final TextEditingController _urlCtl = TextEditingController(
+    text: widget.value,
+  );
+  late final TextEditingController _textCtl = TextEditingController(
+    text: widget.secondValue ?? '',
+  );
+
+  @override
+  void dispose() {
+    _urlCtl.dispose();
+    _textCtl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final url = _urlCtl.text.trim();
+    final text = _textCtl.text.trim();
+    Navigator.of(context).pop();
+    widget.onSubmit(url, text);
+  }
+
+  void _swap() {
+    final tmp = _urlCtl.text;
+    _urlCtl.text = _textCtl.text;
+    _textCtl.text = tmp;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
       constraints: const BoxConstraints(maxWidth: 400),
       title: Row(
         children: [
-          Expanded(child: Text(title)),
+          Expanded(child: Text(widget.title)),
           IconButton(
             icon: const Icon(Icons.close, size: 20),
-            onPressed: () {
-              urlCtl.dispose();
-              textCtl.dispose();
-              Navigator.of(ctx).pop();
-            },
+            onPressed: () => Navigator.of(context).pop(),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -218,16 +318,16 @@ void showTextInputDialog(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
-            controller: urlCtl,
+            controller: _urlCtl,
             decoration: InputDecoration(
-              labelText: label,
-              hintText: hint,
+              labelText: widget.label,
+              hintText: widget.hint,
               border: const OutlineInputBorder(),
               isDense: true,
             ),
             autofocus: true,
           ),
-          if (secondLabel != null) ...[
+          if (widget.secondLabel != null) ...[
             Row(
               children: [
                 const Spacer(),
@@ -240,20 +340,16 @@ void showTextInputDialog(
                   tooltip: '交换',
                   padding: const EdgeInsets.all(4),
                   constraints: const BoxConstraints(),
-                  onPressed: () {
-                    final tmp = urlCtl.text;
-                    urlCtl.text = textCtl.text;
-                    textCtl.text = tmp;
-                  },
+                  onPressed: _swap,
                 ),
               ],
             ),
             const SizedBox(height: 4),
             TextField(
-              controller: textCtl,
+              controller: _textCtl,
               decoration: InputDecoration(
-                labelText: secondLabel,
-                hintText: secondHint ?? '',
+                labelText: widget.secondLabel,
+                hintText: widget.secondHint ?? '',
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
@@ -263,27 +359,13 @@ void showTextInputDialog(
       ),
       actions: [
         TextButton(
-          onPressed: () {
-            urlCtl.dispose();
-            textCtl.dispose();
-            Navigator.of(ctx).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: () {
-            final url = urlCtl.text.trim();
-            final text = textCtl.text.trim();
-            urlCtl.dispose();
-            textCtl.dispose();
-            Navigator.of(ctx).pop();
-            onSubmit(url, text);
-          },
-          child: const Text('确定'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
       ],
-    ),
-  );
+    );
+  }
 }
 
 /// 显示页面信息对话框

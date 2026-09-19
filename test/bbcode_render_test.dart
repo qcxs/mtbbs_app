@@ -23,6 +23,7 @@ import 'package:provider/provider.dart';
 ///   ⑨ 附件卡片不溢出
 ///   ⑩ 转换层遗留缺陷（与渲染器无关，换渲染器不会自动消失）
 ///   ⑪ 列表（无 ul/li，转换层展开为带前缀段落）
+///   ⑫ 正文字号接线（跟随设置项 / 显式覆盖 / 代码块联动）
 ///
 /// 两条测试约定（迁移时必须知道）：
 /// 1. flutter_widget_from_html 的文本由 **RichText** 承载（不是 Text widget），
@@ -51,14 +52,31 @@ Rect? _rectOfText(String s) {
   return null;
 }
 
-Widget _wrap(Widget child) => MaterialApp(
+Widget _wrap(Widget child, {SettingsProvider? settings}) => MaterialApp(
   home: Scaffold(
     body: ChangeNotifierProvider.value(
-      value: SettingsProvider(),
+      value: settings ?? SettingsProvider(),
       child: SingleChildScrollView(child: child),
     ),
   ),
 );
+
+/// 固定字号的 SettingsProvider —— 只覆盖 getter，避免测试触发数据库写入
+class _FixedFontSettings extends SettingsProvider {
+  @override
+  double get fontSize => 24;
+}
+
+/// 取「包含指定文本的 RichText」的字号
+double? _fontSizeOf(String s) {
+  for (final el in find.byType(RichText).evaluate()) {
+    final rich = el.widget as RichText;
+    if (rich.text.toPlainText().contains(s)) {
+      return rich.text.style?.fontSize;
+    }
+  }
+  return null;
+}
 
 Widget _post(String bbcode, {double fontSize = 16}) =>
     _wrap(PostHtmlWidget(bbcode: bbcode, fontSize: fontSize));
@@ -473,6 +491,47 @@ void main() {
             '当前转换器用非贪婪正则配对 quote，嵌套时闭标签泄漏——'
             '这是转换层缺陷，换渲染器不能解决',
       );
+    });
+  });
+
+  group('⑫ 正文字号接线', () {
+    testWidgets('未显式传字号：跟随设置项「正文字号」', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const PostHtmlWidget(bbcode: '正文'),
+          settings: _FixedFontSettings(),
+        ),
+      );
+      await _settle(tester);
+
+      expect(_fontSizeOf('正文'), 24);
+    });
+
+    testWidgets('显式传字号：覆盖设置项（列表预览 / 签名等次要位置）', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const PostHtmlWidget(bbcode: '正文', fontSize: 12),
+          settings: _FixedFontSettings(),
+        ),
+      );
+      await _settle(tester);
+
+      expect(_fontSizeOf('正文'), 12);
+    });
+
+    testWidgets('代码块字号跟随正文，不被 16 封顶', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const PostHtmlWidget(bbcode: '[code]var x = 1;[/code]'),
+          settings: _FixedFontSettings(),
+        ),
+      );
+      await _settle(tester);
+
+      final block = tester.widget<BbcodeCodeBlock>(
+        find.byType(BbcodeCodeBlock),
+      );
+      expect(block.fontSize, 24);
     });
   });
 }

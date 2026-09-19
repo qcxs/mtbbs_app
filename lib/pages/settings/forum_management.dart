@@ -94,54 +94,9 @@ class ForumManagement {
       ],
       onAdd: () async {
         // 关闭主对话框，打开添加对话框
-        final fidCtl = TextEditingController();
-        final nameCtl = TextEditingController();
         final added = await showDialog<MapEntry<String, String>>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('添加板块'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: fidCtl,
-                  decoration: const InputDecoration(
-                    labelText: '版块 ID (fid)',
-                    hintText: '例如：2',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameCtl,
-                  decoration: const InputDecoration(
-                    labelText: '版块名称',
-                    hintText: '例如：综合交流',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final fid = fidCtl.text.trim();
-                  final name = nameCtl.text.trim();
-                  if (fid.isEmpty || name.isEmpty) return;
-                  Navigator.of(ctx).pop(MapEntry(fid, name));
-                },
-                child: const Text('添加'),
-              ),
-            ],
-          ),
+          builder: (_) => const _AddForumDialog(),
         );
         if (added != null) {
           await settings.addForum(added.key, added.value);
@@ -149,52 +104,10 @@ class ForumManagement {
         return null;
       },
       onEdit: (item) async {
-        final fidCtl = TextEditingController(text: item.id);
-        final nameCtl = TextEditingController(text: item.name);
         final edited = await showDialog<({String fid, String name})>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('编辑板块'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: fidCtl,
-                  decoration: const InputDecoration(
-                    labelText: '版块 ID',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameCtl,
-                  decoration: const InputDecoration(
-                    labelText: '版块名称',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  autofocus: true,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final fid = fidCtl.text.trim();
-                  final name = nameCtl.text.trim();
-                  if (fid.isEmpty || name.isEmpty) return;
-                  Navigator.of(ctx).pop((fid: fid, name: name));
-                },
-                child: const Text('保存'),
-              ),
-            ],
-          ),
+          builder: (_) =>
+              _EditForumDialog(initialFid: item.id, initialName: item.name),
         );
         if (edited != null) {
           // 如果 fid 变了，先添加新 fid，再删旧 fid
@@ -211,6 +124,154 @@ class ForumManagement {
         await settings.removeForum(id);
         return true;
       },
+    );
+  }
+}
+
+/// 添加板块弹窗内容
+///
+/// 控制器由本 State 持有、随弹窗子树卸载才释放：showDialog 返回的 Future 在 pop
+/// 时即完成，而弹窗退场动画期间子树仍会重建（设置项保存触发 notifyListeners
+/// 会重建 MaterialApp），在 pop 前后提前 dispose 会抛
+/// 「A TextEditingController was used after being disposed」。
+class _AddForumDialog extends StatefulWidget {
+  const _AddForumDialog();
+
+  @override
+  State<_AddForumDialog> createState() => _AddForumDialogState();
+}
+
+class _AddForumDialogState extends State<_AddForumDialog> {
+  final _fidCtl = TextEditingController();
+  final _nameCtl = TextEditingController();
+
+  @override
+  void dispose() {
+    _fidCtl.dispose();
+    _nameCtl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('添加板块'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _fidCtl,
+            decoration: const InputDecoration(
+              labelText: '版块 ID (fid)',
+              hintText: '例如：2',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            keyboardType: TextInputType.number,
+            autofocus: true,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nameCtl,
+            decoration: const InputDecoration(
+              labelText: '版块名称',
+              hintText: '例如：综合交流',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final fid = _fidCtl.text.trim();
+            final name = _nameCtl.text.trim();
+            if (fid.isEmpty || name.isEmpty) return;
+            Navigator.of(context).pop(MapEntry(fid, name));
+          },
+          child: const Text('添加'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 编辑板块弹窗内容
+///
+/// 控制器由本 State 持有，理由同 [_AddForumDialog]。
+class _EditForumDialog extends StatefulWidget {
+  const _EditForumDialog({required this.initialFid, required this.initialName});
+
+  final String initialFid;
+  final String initialName;
+
+  @override
+  State<_EditForumDialog> createState() => _EditForumDialogState();
+}
+
+class _EditForumDialogState extends State<_EditForumDialog> {
+  late final TextEditingController _fidCtl = TextEditingController(
+    text: widget.initialFid,
+  );
+  late final TextEditingController _nameCtl = TextEditingController(
+    text: widget.initialName,
+  );
+
+  @override
+  void dispose() {
+    _fidCtl.dispose();
+    _nameCtl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('编辑板块'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _fidCtl,
+            decoration: const InputDecoration(
+              labelText: '版块 ID',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nameCtl,
+            decoration: const InputDecoration(
+              labelText: '版块名称',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            autofocus: true,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final fid = _fidCtl.text.trim();
+            final name = _nameCtl.text.trim();
+            if (fid.isEmpty || name.isEmpty) return;
+            Navigator.of(context).pop((fid: fid, name: name));
+          },
+          child: const Text('保存'),
+        ),
+      ],
     );
   }
 }

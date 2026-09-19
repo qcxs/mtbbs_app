@@ -449,7 +449,8 @@ class BBCode2Html {
 
   /// 渲染图片附件类型 appdata
   ///
-  /// 不输出 width/height：图片布局由渲染层统一控制（窄屏占满、宽屏封顶）。
+  /// 不输出 width/height：图片布局由渲染层统一控制（BbcodeImage 按可用宽/封顶宽收缩，
+  /// 且不超过图片原始像素宽）。
   String _renderImageAttach(Map<String, dynamic> data) {
     final url = data['url'] as String? ?? '';
     if (url.isEmpty) return '';

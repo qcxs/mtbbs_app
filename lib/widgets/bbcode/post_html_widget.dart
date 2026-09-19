@@ -33,9 +33,10 @@ const bbcodeStyleTags = <String>{
   'qq',
 };
 
-/// 计算帖子图片显示宽度（px）。
+/// 计算帖子图片的**宽度上限**（px）。
 ///
-/// - 无显式宽：占满可用宽度，但封顶 [maxImageWidth]（宽屏平衡）
+/// - 无显式宽：占满可用宽度，但封顶 [maxImageWidth]（宽屏平衡）；
+///   实际渲染宽度还会被图片原始像素进一步收窄，见 [BbcodeImage]
 /// - 显式宽（[img=W,H]）：尊重作者意图，但 clamp 到可用宽度防溢出
 double resolvePostImageWidth({
   double? explicitWidth,
@@ -63,14 +64,17 @@ double resolvePostImageWidth({
 /// 支持：所有标准 BBCode 格式、链接点击弹窗、表情、标签禁用、图片长按菜单。
 class PostHtmlWidget extends StatelessWidget {
   final String bbcode;
-  final double fontSize;
+
+  /// 正文字号（px）。为 null 时跟随设置项「正文字号」（`SettingsProvider.fontSize`）；
+  /// 显式传入则覆盖（列表内回复预览、个人签名等次要位置用更小字号）
+  final double? fontSize;
   final Set<String>? disabledTags;
   final bool autoDetectUrls;
 
   const PostHtmlWidget({
     super.key,
     required this.bbcode,
-    this.fontSize = 16,
+    this.fontSize,
     this.disabledTags,
     this.autoDetectUrls = true,
   });
@@ -86,6 +90,9 @@ class PostHtmlWidget extends StatelessWidget {
     final maxImageWidth = context.select<SettingsProvider, int>(
       (s) => s.maxImageWidth,
     );
+    // 正文字号：显式值优先，否则跟随设置项（与 disabledTags 同一套"可覆盖"约定）
+    final textSize =
+        fontSize ?? context.select<SettingsProvider, double>((s) => s.fontSize);
 
     final converter = BBCode2Html(
       // 表情数据由 EmojiService 按站点维护且几乎不变，渲染层直接获取
@@ -105,7 +112,7 @@ class PostHtmlWidget extends StatelessWidget {
         html,
         // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
         buildAsync: false,
-        textStyle: TextStyle(fontSize: fontSize, color: cs.onSurface),
+        textStyle: TextStyle(fontSize: textSize, color: cs.onSurface),
         customStylesBuilder: (element) => _stylesFor(element, cs),
         customWidgetBuilder: (element) {
           // [code] 占位 div → 代码高亮组件（块级）
@@ -115,7 +122,8 @@ class PostHtmlWidget extends StatelessWidget {
             if (i < 0 || i >= codeBlocks.length) return const SizedBox.shrink();
             return BbcodeCodeBlock(
               code: codeBlocks[i],
-              fontSize: fontSize.clamp(11, 16).toDouble(),
+              // 代码块跟随正文字号，上限同步设置项上限（曾封顶 16，字号调大后代码块不跟）
+              fontSize: textSize.clamp(11, 32).toDouble(),
             );
           }
           // img → 表情内联 / 帖子图片块级
@@ -245,6 +253,11 @@ class _EmojiImage extends StatelessWidget {
 ///
 /// 不挂 `onTap`：点击需冒泡给外层 `[url]` 链接，挂 tap 会消费掉。
 /// 只提供长按菜单（查看大图 / 保存）。
+///
+/// 宽度策略：
+/// - 显式尺寸（`[img=W,H]`）→ 强制该宽度（同 HTML `<img width>`，可放大）
+/// - 未指定尺寸 → 只约束上限，实际宽度由图片原始像素决定：低分辨率小图
+///   **不放大**（放大只会更糊），高分辨率大图仍按可用宽 / 封顶宽收缩
 class BbcodeImage extends StatelessWidget {
   final String url;
   final double? explicitWidth;
@@ -270,36 +283,42 @@ class BbcodeImage extends StatelessWidget {
           availableWidth: available,
           maxImageWidth: maxImageWidth,
         );
-        return GestureDetector(
-          onLongPress: () =>
-              showImageActions(context, imageUrls: [url], sourceInfo: '帖子图片'),
-          // 外层固定解析出的宽度：加载中/加载失败时也保持占位宽度，
-          // 避免图片状态切换引起布局跳动
-          child: SizedBox(
-            width: width,
-            child: CachedNetworkImage(
-              imageUrl: url,
-              cacheManager: imageCacheManager,
-              width: width,
-              memCacheWidth: (width * 2).toInt(),
-              fit: BoxFit.contain,
-              placeholder: (_, __) => const SizedBox(
-                height: 100,
-                child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ),
-              errorWidget: (_, __, ___) => Icon(
-                Icons.broken_image_outlined,
-                size: 48,
-                color: cs.outline,
+        // 未指定尺寸时只给宽度上限、不传 width：渲染器对块级自定义组件下发的是
+        // 松约束，图片会按解码后的原始像素测量。解码链路（memCacheWidth →
+        // ResizeImage）与缓存层的磁盘缩放都是 allowUpscaling=false，解码结果
+        // 不会超过原图，因此"只设上限"即等价于 min(上限, 原始像素宽)。
+        final hasExplicitWidth = explicitWidth != null && explicitWidth! > 0;
+        final image = CachedNetworkImage(
+          imageUrl: url,
+          cacheManager: imageCacheManager,
+          // 显式尺寸才给 width：给了就会把低分辨率小图拉伸放大（变糊）
+          width: hasExplicitWidth ? width : null,
+          memCacheWidth: (width * 2).toInt(),
+          fit: BoxFit.contain,
+          placeholder: (_, __) => const SizedBox(
+            height: 100,
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
           ),
+          errorWidget: (_, __, ___) =>
+              Icon(Icons.broken_image_outlined, size: 48, color: cs.outline),
+        );
+        return GestureDetector(
+          onLongPress: () =>
+              showImageActions(context, imageUrls: [url], sourceInfo: '帖子图片'),
+          // 显式尺寸：固定盒宽，加载中/加载失败也保持占位宽度，避免状态切换跳动
+          // 未指定尺寸：上限盒宽，加载中按上限占位，解码后收敛到原始像素宽
+          child: hasExplicitWidth
+              ? SizedBox(width: width, child: image)
+              : ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: width),
+                  child: image,
+                ),
         );
       },
     );

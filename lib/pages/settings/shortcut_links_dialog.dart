@@ -35,24 +35,21 @@ class ShortcutLinksDialog {
     BuildContext context,
     SettingsProvider settings,
   ) async {
-    final nameCtl = TextEditingController();
-    final urlCtl = TextEditingController();
-    final imgCtl = TextEditingController();
     final added = await _showForm(
       context: context,
       title: '添加快捷链接',
-      nameCtl: nameCtl,
-      urlCtl: urlCtl,
-      imgCtl: imgCtl,
+      name: '',
+      url: '',
+      imageUrl: '',
       submitLabel: '添加',
-      onSubmit: () {
-        if (nameCtl.text.trim().isEmpty) return null;
+      onSubmit: (name, url, imageUrl) {
+        if (name.trim().isEmpty) return null;
         return ManagedItem(
           id: 'link_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}',
-          name: nameCtl.text.trim(),
+          name: name.trim(),
           data: {
-            'url': urlCtl.text.trim(),
-            if (imgCtl.text.trim().isNotEmpty) 'imageUrl': imgCtl.text.trim(),
+            'url': url.trim(),
+            if (imageUrl.trim().isNotEmpty) 'imageUrl': imageUrl.trim(),
           },
         );
       },
@@ -66,27 +63,20 @@ class ShortcutLinksDialog {
     SettingsProvider settings,
     ManagedItem item,
   ) async {
-    final nameCtl = TextEditingController(text: item.name);
-    final urlCtl = TextEditingController(
-      text: item.data?['url']?.toString() ?? '',
-    );
-    final imgCtl = TextEditingController(
-      text: item.data?['imageUrl']?.toString() ?? '',
-    );
     final edited = await _showForm(
       context: context,
       title: '编辑快捷链接',
-      nameCtl: nameCtl,
-      urlCtl: urlCtl,
-      imgCtl: imgCtl,
+      name: item.name,
+      url: item.data?['url']?.toString() ?? '',
+      imageUrl: item.data?['imageUrl']?.toString() ?? '',
       submitLabel: '保存',
-      onSubmit: () {
-        if (nameCtl.text.trim().isEmpty) return null;
+      onSubmit: (name, url, imageUrl) {
+        if (name.trim().isEmpty) return null;
         return item.copyWith(
-          name: nameCtl.text.trim(),
+          name: name.trim(),
           data: {
-            'url': urlCtl.text.trim(),
-            if (imgCtl.text.trim().isNotEmpty) 'imageUrl': imgCtl.text.trim(),
+            'url': url.trim(),
+            if (imageUrl.trim().isNotEmpty) 'imageUrl': imageUrl.trim(),
           },
         );
       },
@@ -98,63 +88,124 @@ class ShortcutLinksDialog {
   static Future<ManagedItem?> _showForm({
     required BuildContext context,
     required String title,
-    required TextEditingController nameCtl,
-    required TextEditingController urlCtl,
-    required TextEditingController imgCtl,
+    required String name,
+    required String url,
+    required String imageUrl,
     required String submitLabel,
-    required ManagedItem? Function() onSubmit,
+    required ManagedItem? Function(String name, String url, String imageUrl)
+    onSubmit,
   }) {
     return showDialog<ManagedItem>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtl,
-              decoration: const InputDecoration(
-                labelText: '名称',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              autofocus: true,
+      builder: (_) => _ShortcutLinkFormDialog(
+        title: title,
+        name: name,
+        url: url,
+        imageUrl: imageUrl,
+        submitLabel: submitLabel,
+        onSubmit: onSubmit,
+      ),
+    );
+  }
+}
+
+/// 快捷链接表单弹窗内容
+///
+/// 三个控制器由本 State 持有、随弹窗子树卸载才释放：pop 之后弹窗仍在退场动画中、
+/// 子树仍会重建（保存设置会触发 notifyListeners 重建 MaterialApp），在 pop 前后
+/// 提前 dispose 会抛「A TextEditingController was used after being disposed」。
+class _ShortcutLinkFormDialog extends StatefulWidget {
+  const _ShortcutLinkFormDialog({
+    required this.title,
+    required this.name,
+    required this.url,
+    required this.imageUrl,
+    required this.submitLabel,
+    required this.onSubmit,
+  });
+
+  final String title;
+  final String name;
+  final String url;
+  final String imageUrl;
+  final String submitLabel;
+  final ManagedItem? Function(String name, String url, String imageUrl)
+  onSubmit;
+
+  @override
+  State<_ShortcutLinkFormDialog> createState() =>
+      _ShortcutLinkFormDialogState();
+}
+
+class _ShortcutLinkFormDialogState extends State<_ShortcutLinkFormDialog> {
+  late final TextEditingController _nameCtl = TextEditingController(
+    text: widget.name,
+  );
+  late final TextEditingController _urlCtl = TextEditingController(
+    text: widget.url,
+  );
+  late final TextEditingController _imgCtl = TextEditingController(
+    text: widget.imageUrl,
+  );
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    _urlCtl.dispose();
+    _imgCtl.dispose();
+    super.dispose();
+  }
+
+  /// 提交：onSubmit 返回 null（名称为空）时不关闭弹窗
+  void _submit() {
+    final result = widget.onSubmit(_nameCtl.text, _urlCtl.text, _imgCtl.text);
+    if (result != null) Navigator.of(context).pop(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameCtl,
+            decoration: const InputDecoration(
+              labelText: '名称',
+              border: OutlineInputBorder(),
+              isDense: true,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlCtl,
-              decoration: const InputDecoration(
-                labelText: '链接 URL',
-                hintText: 'https://... 或 /thread/xxx',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: imgCtl,
-              decoration: const InputDecoration(
-                labelText: '图标 URL（可选）',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
+            autofocus: true,
           ),
-          FilledButton(
-            onPressed: () {
-              final result = onSubmit();
-              if (result != null) Navigator.of(ctx).pop(result);
-            },
-            child: Text(submitLabel),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _urlCtl,
+            decoration: const InputDecoration(
+              labelText: '链接 URL',
+              hintText: 'https://... 或 /thread/xxx',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _imgCtl,
+            decoration: const InputDecoration(
+              labelText: '图标 URL（可选）',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: Text(widget.submitLabel)),
+      ],
     );
   }
 }
