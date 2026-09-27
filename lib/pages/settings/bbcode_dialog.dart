@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 
 /// BBCode 样式标签禁用对话框 — 独立组件，可在任意页面调用
@@ -7,7 +8,6 @@ class BbcodeDialog {
     'bold': '加粗 [b]',
     'italic': '斜体 [i]',
     'underline': '下划线 [u]',
-    'strikethrough': '删除线 [s]',
     'color': '文字颜色 [color]',
     'size': '字号 [size]',
     'font': '字体 [font]',
@@ -16,19 +16,8 @@ class BbcodeDialog {
     'imgDimension': '忽略图片宽高设置',
   };
 
-  /// 可禁用的 BBCode 样式标签列表
-  static const List<String> tags = [
-    'bold',
-    'italic',
-    'underline',
-    'strikethrough',
-    'color',
-    'size',
-    'font',
-    'backcolor',
-    'align',
-    'imgDimension',
-  ];
+  /// 可禁用的 BBCode 样式标签列表（与渲染层 / MCP 精简输出共用同一份定义）
+  static const List<String> tags = bbcodeStyleTagIds;
 
   static void show(BuildContext context, SettingsProvider settings) {
     // 本地快照，关闭时统一提交

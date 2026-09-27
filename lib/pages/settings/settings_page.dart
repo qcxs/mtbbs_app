@@ -6,6 +6,7 @@ import 'package:mtbbs/pages/settings/models/content_settings.dart';
 import 'package:mtbbs/pages/settings/models/data_settings.dart';
 import 'package:mtbbs/pages/settings/models/display_settings.dart';
 import 'package:mtbbs/pages/settings/models/editor_settings.dart';
+import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/models/site_settings.dart';
 import 'package:mtbbs/pages/settings/settings_group_page.dart';
@@ -22,13 +23,17 @@ class _SettingsGroup {
 
   final String title;
   final IconData icon;
-  final List<SettingsModel> models;
+
+  /// 每次构建时重新生成设置项：MCP 令牌列表、调用记录等是随运行时
+  /// 变化的动态内容，不能只在启动时求值一次
+  final List<SettingsModel> Function() models;
 }
 
 /// 设置页面 — 分组入口列表（竖屏）/ 分组内容（宽屏双栏）
 ///
 /// 分组按「用户关心什么」划分：站点与网络 / 外观 / 阅读与渲染 /
-/// 编辑与快捷键 / 存储与工具；「关于」作为列表底部单独一行，不占分组位。
+/// 编辑与快捷键 / 存储与工具 / MCP 服务；「关于」作为列表底部单独一行，
+/// 不占分组位。
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -40,20 +45,17 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 宽屏双栏下当前选中的分组索引（竖屏不使用）
   int _currentIndex = 0;
 
-  static final List<_SettingsGroup> _groups = [
-    _SettingsGroup(title: '站点与网络', icon: Icons.dns, models: siteSettings()),
-    _SettingsGroup(title: '外观', icon: Icons.palette, models: displaySettings()),
+  static const List<_SettingsGroup> _groups = [
+    _SettingsGroup(title: '站点与网络', icon: Icons.dns, models: siteSettings),
+    _SettingsGroup(title: '外观', icon: Icons.palette, models: displaySettings),
     _SettingsGroup(
       title: '阅读与渲染',
       icon: Icons.article,
-      models: contentSettings(),
+      models: contentSettings,
     ),
-    _SettingsGroup(
-      title: '编辑与快捷键',
-      icon: Icons.edit,
-      models: editorSettings(),
-    ),
-    _SettingsGroup(title: '存储与工具', icon: Icons.storage, models: dataSettings()),
+    _SettingsGroup(title: '编辑与快捷键', icon: Icons.edit, models: editorSettings),
+    _SettingsGroup(title: '存储与工具', icon: Icons.storage, models: dataSettings),
+    _SettingsGroup(title: 'MCP 服务', icon: Icons.hub, models: mcpSettings),
   ];
 
   @override
@@ -119,7 +121,7 @@ class _SettingsPageState extends State<SettingsPage> {
           flex: 1,
           child: SettingsGroupPage(
             title: group.title,
-            models: group.models,
+            modelsBuilder: group.models,
             showAppBar: false,
           ),
         ),
@@ -168,7 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return ListTile(
       leading: settingIcon(context, g.icon),
       title: Text(g.title),
-      subtitle: Text('${g.models.length} 项'),
+      subtitle: Text('${g.models().length} 项'),
       trailing: Icon(Icons.chevron_right, color: cs.outline),
       selected: selected,
       selectedTileColor: cs.secondaryContainer,
@@ -176,7 +178,8 @@ class _SettingsPageState extends State<SettingsPage> {
         if (isPortrait) {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => SettingsGroupPage(title: g.title, models: g.models),
+              builder: (_) =>
+                  SettingsGroupPage(title: g.title, modelsBuilder: g.models),
             ),
           );
         } else if (index != null) {

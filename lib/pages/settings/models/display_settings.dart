@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
@@ -70,14 +68,6 @@ List<SettingsModel> displaySettings() => [
     subtitleBuilder: (s) => s.avatarSizeMode.label,
     onTap: (ctx, s) => _showAvatarSizeDialog(ctx, s),
   ),
-  if (Platform.isWindows)
-    SwitchSetting(
-      title: '显示窗口标题栏',
-      subtitle: '关闭后隐藏原生标题栏（需重启应用生效）',
-      icon: Icons.window,
-      value: (s) => s.showWindowTitleBar,
-      onChanged: (ctx, s, v) => s.setShowWindowTitleBar(v),
-    ),
 ];
 
 Future<void> _showAvatarSizeDialog(

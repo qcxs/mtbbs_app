@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
@@ -11,6 +12,7 @@ import 'package:mtbbs/providers/search_history_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
+import 'package:mtbbs/core/app/app_link.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
@@ -23,6 +25,7 @@ import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/core/app/desktop_window.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/max_screen_size.dart';
+import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/auth/widgets/login_sheet.dart';
 
@@ -53,8 +56,8 @@ void main() async {
   await settings.load(); // 加载持久化站点列表覆盖默认值
 
   // 桌面窗口初始化：最小尺寸 + 恢复上次窗口尺寸/位置/最大化状态
-  // （依赖 settings.showWindowTitleBar，故放在 settings 加载后）
-  await initDesktopWindow(showTitleBar: settings.showWindowTitleBar);
+  // （依赖 settings.themeMode，故放在 settings 加载后）
+  await initDesktopWindow(brightness: windowBrightnessFor(settings.themeMode));
 
   // 同步通用错峰间隔到全局队列
   setStaggerInterval(Duration(milliseconds: settings.staggerInterval));
@@ -87,6 +90,27 @@ void main() async {
 
   final auth = AuthProvider();
   await auth.tryRestore();
+
+  // MCP：注入登录态快照（MCP 层不直接依赖 UI Provider），
+  // 并后台拉起只读服务——未启用时不会占用端口，不阻塞首帧。
+  McpServerController.instance.bindAccountInfo(
+    () => auth.isLoggedIn
+        ? McpAccountInfo(
+            isLoggedIn: true,
+            username: auth.username,
+            uid: auth.uid,
+            userGroup: auth.userGroup,
+          )
+        : const McpAccountInfo.guest(),
+  );
+  unawaited(McpServerController.instance.bootstrap());
+
+  // Windows 窗口标题标注 MCP 状态（服务在跑时一眼可见）
+  void syncMcpTitle() => unawaited(
+    syncMcpWindowTitle(mcpRunning: McpServerController.instance.isRunning),
+  );
+  McpServerController.instance.addListener(syncMcpTitle);
+  syncMcpTitle();
 
   // 订阅登录过期事件 — 清除登录态 + 全局提示
   // 状态清理由 AuthProvider 幂等处理；UI 提示做节流，防并发请求重复弹窗
@@ -150,6 +174,10 @@ void main() async {
     router,
   );
   runApp(Platform.isWindows ? WindowStateSaver(child: app) : app);
+
+  // Android：接管系统「打开方式」传入的论坛链接
+  // （UrlRouter.resolveTarget 决定落地页：App 内路由优先，兜底内置浏览器）
+  unawaited(AppLink.init(onOpen: (target) => router.push(target)));
 
   // 设置守卫：UI 启动后后台加载，不阻塞首帧渲染
   _runSettingsGuard(settings);
@@ -241,6 +269,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: SiteStore.instance),
+        // MCP 服务状态（设置分组页订阅它刷新）
+        ChangeNotifierProvider.value(value: McpServerController.instance),
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: history),
@@ -285,12 +315,45 @@ class MyApp extends StatelessWidget {
             theme: _buildThemeData(schemeLight),
             darkTheme: _buildThemeData(schemeDark),
             themeMode: s.themeMode,
+            // 主题变化时同步 Windows 窗口底色（非 Windows 平台为 no-op）。
+            // 标题栏本体是自绘的，不在这里——它需要 Theme/Overlay/Material 祖先，见 WindowChrome
+            builder: (context, child) =>
+                _WindowBackgroundSync(child: child ?? const SizedBox.shrink()),
             routerConfig: router,
           );
         },
       ),
     );
   }
+}
+
+/// 主题变化时同步 Windows 窗口底色。
+///
+/// 放在 MaterialApp 的 builder 里：这里能拿到 `Theme.of(context)`，
+/// 主题（含"跟随系统"切换）一变就重新下发，避免首帧或切换瞬间露出反色底。
+class _WindowBackgroundSync extends StatefulWidget {
+  const _WindowBackgroundSync({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_WindowBackgroundSync> createState() => _WindowBackgroundSyncState();
+}
+
+class _WindowBackgroundSyncState extends State<_WindowBackgroundSync> {
+  Brightness? _applied;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final brightness = Theme.of(context).brightness;
+    if (brightness == _applied) return;
+    _applied = brightness;
+    unawaited(syncWindowBackground(brightness));
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 ThemeData _buildThemeData(ColorScheme cs) {

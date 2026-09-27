@@ -90,6 +90,44 @@ class SwitchSetting extends SettingsModel {
   }
 }
 
+/// 只读信息行（无点击、无箭头）——展示状态、记录等不可操作内容
+class InfoSetting extends SettingsModel {
+  const InfoSetting({
+    required super.title,
+    super.subtitle,
+    required super.icon,
+    this.subtitleBuilder,
+    this.trailing,
+    this.dense = false,
+    this.iconColor,
+  }) : assert(
+         subtitle == null || subtitleBuilder == null,
+         'subtitle 与 subtitleBuilder 只能提供一个',
+       );
+
+  /// 动态副标题（读取实时状态；返回 null 或空串表示无副标题）
+  final String? Function(SettingsProvider)? subtitleBuilder;
+  final Widget? trailing;
+  final bool dense;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context, SettingsProvider settings) {
+    final sub = subtitleBuilder?.call(settings) ?? subtitle;
+    return ListTile(
+      dense: dense,
+      leading: iconColor == null
+          ? settingIcon(context, icon)
+          : Icon(icon, color: iconColor, size: 24),
+      title: Text(title, style: dense ? const TextStyle(fontSize: 14) : null),
+      subtitle: (sub == null || sub.isEmpty)
+          ? null
+          : Text(sub, style: const TextStyle(fontSize: 12, height: 1.5)),
+      trailing: trailing,
+    );
+  }
+}
+
 /// 分组小标题（非点击项，如快捷键分组内的区域标题）
 class HeaderSetting extends SettingsModel {
   const HeaderSetting({required super.title, super.subtitle})

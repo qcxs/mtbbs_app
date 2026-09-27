@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MCP 服务端只监听 127.0.0.1，本机客户端（App 内连通性自检 / 同机 AI 客户端）
+  需要通过 http 访问回环地址。这里**只**对回环地址放行明文流量，
+  其余域名仍遵循 Android 默认的"禁止明文"策略。
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

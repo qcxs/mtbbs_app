@@ -55,4 +55,40 @@ void main() {
       expect(html, isNot(contains('<div align=')));
     });
   });
+
+  group('stripDisabledBbcodeTags（渲染层与 MCP 精简输出共用）', () {
+    test('删除样式标签标记但保留内容', () {
+      const bbcode = '[b]加粗[/b][color=red]红字[/color][size=5]大字[/size]';
+      expect(
+        stripDisabledBbcodeTags(bbcode, bbcodeStyleTagIds.toSet()),
+        '加粗红字大字',
+      );
+    });
+
+    test('带值与闭合标记都删（[tag=xxx] / [/tag]）', () {
+      const bbcode = '[align=center]居中[/align][font=微软雅黑]字体[/font]';
+      expect(
+        stripDisabledBbcodeTags(bbcode, bbcodeStyleTagIds.toSet()),
+        '居中字体',
+      );
+    });
+
+    test('删除线带语义：不在清单内，因此被保留', () {
+      expect(bbcodeStyleTagIds, isNot(contains('strikethrough')));
+      expect(
+        stripDisabledBbcodeTags('[s]作废[/s]', bbcodeStyleTagIds.toSet()),
+        '[s]作废[/s]',
+      );
+    });
+
+    test('禁用 backcolor 时连带删除同义的 background', () {
+      const bbcode = '[backcolor=yellow]黄底[/backcolor][background=pink]粉底[/background]';
+      expect(stripDisabledBbcodeTags(bbcode, {'backcolor'}), '黄底粉底');
+    });
+
+    test('非样式标签（quote/code/url/img）不受影响', () {
+      const bbcode = '[quote]引用[/quote][code]var a=1;[/code][url=x]链接[/url][img]a.png[/img]';
+      expect(stripDisabledBbcodeTags(bbcode, bbcodeStyleTagIds.toSet()), bbcode);
+    });
+  });
 }

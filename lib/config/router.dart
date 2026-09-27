@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/widgets/layout/global_shortcuts.dart';
+import 'package:mtbbs/widgets/layout/window_title_bar.dart';
 import 'package:mtbbs/widgets/layout/app_shell.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
 import 'package:mtbbs/pages/home/home_page.dart';
@@ -36,9 +37,16 @@ GoRouter buildRouter({
   return GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: initialLocation,
+    // 入站链接（Android「打开方式」）不走 GoRouter 的平台初始路由，而是由
+    // AppLink 通道解析成 appPath 再 push —— Flutter 自带的 deep link 处理
+    // 已在 AndroidManifest 里关掉（flutter_deeplinking_enabled=false），
+    // 否则它会把完整论坛 URL 塞进来导致 "no routes for location"。
     routes: [
       ShellRoute(
-        builder: (_, __, child) => GlobalShortcutsWrapper(child: child),
+        // 套一层窗口外壳：Windows 自绘标题栏（含 MCP 状态），不再用原生标题栏。
+        // 放在这里而不是 MaterialApp.builder：需要 Theme / Overlay / Material 祖先
+        builder: (_, __, child) =>
+            WindowChrome(child: GlobalShortcutsWrapper(child: child)),
         routes: [
           ShellRoute(
             builder: (_, __, child) => AppShell(child: child),

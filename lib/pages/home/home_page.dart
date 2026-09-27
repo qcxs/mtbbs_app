@@ -120,19 +120,11 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-/// 打开链接：优先走 App 内路由，匹配不到（或属于其他站点）再交给内置浏览器
+/// 打开链接：决策统一交给 `UrlRouter.resolveTarget`
+/// （App 内路由优先，解析不出或属于其他站点则兜底内置浏览器）
 void _openUrl(BuildContext context, String url) {
-  if (url.isEmpty) return;
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    final result = UrlRouter.parse(url);
-    if (result.appPath != null && !result.isOtherSite) {
-      context.push(result.appPath!);
-    } else {
-      context.push('/browser?url=${Uri.encodeComponent(url)}&intercept=false');
-    }
-  } else {
-    context.push(url);
-  }
+  final target = UrlRouter.resolveTarget(url);
+  if (target != null) context.push(target);
 }
 
 // ==================== 站点条 ====================

@@ -2,6 +2,58 @@ import 'dart:convert';
 
 import 'package:mtbbs/core/utils/string_utils.dart';
 
+/// 「纯样式」BBCode 标签 id 全集。
+///
+/// 这是「设置 → 禁用样式标签」与 MCP 精简输出**共用的唯一来源**，改这里即两边同步。
+///
+/// 刻意**不含 `strikethrough`**：删除线带有语义（表示内容被否定/作废），
+/// 不属于可以随意丢弃的纯样式。
+/// `imgDimension` 是"忽略图片宽高"的开关，文本层没有同名标签，删除时自然无副作用。
+const bbcodeStyleTagIds = <String>[
+  'bold',
+  'italic',
+  'underline',
+  'color',
+  'size',
+  'font',
+  'backcolor',
+  'align',
+  'imgDimension',
+];
+
+/// 删除指定的 BBCode 样式标签标记（保留标签内文本）。
+///
+/// 例：禁用 `color` 时 `[color=red]文字[/color]` → `文字`。
+/// 只删除 `[tag]`、`[tag=xxx]`、`[/tag]` 标记本身，不触碰内容，也不涉及嵌套。
+/// 渲染层（[BBCode2Html]）与 MCP 精简输出共用此实现，避免两处逻辑漂移。
+String stripDisabledBbcodeTags(String text, Set<String> tagIds) {
+  // 设置项 id → BBCode 实际标签名
+  const tagMapping = {
+    'bold': 'b',
+    'italic': 'i',
+    'underline': 'u',
+    'strikethrough': 's',
+  };
+  // 次标签：禁用主标签时连带删除的同义标签
+  const secondaryMapping = {
+    'backcolor': ['background'],
+  };
+  var result = text;
+  for (final tag in tagIds) {
+    result = _stripTagMarkers(result, tagMapping[tag] ?? tag);
+    for (final sec in secondaryMapping[tag] ?? const <String>[]) {
+      result = _stripTagMarkers(result, sec);
+    }
+  }
+  return result;
+}
+
+/// 删除全部 `[tag]`、`[tag=xxx]`、`[/tag]` 标记
+String _stripTagMarkers(String text, String tag) => text.replaceAllMapped(
+  RegExp('\\[$tag(?:=[^\\]]*)?\\]|\\[/$tag\\]', caseSensitive: false),
+  (_) => '',
+);
+
 /// BBCode → HTML 转换器
 ///
 /// 将 BBCode 字符串转换为 HTML，由 flutter_widget_from_html 渲染为 Widget。
@@ -528,41 +580,10 @@ class BBCode2Html {
       .replaceAll('&amp;', '&');
 
   /// 移除被禁用的 BBCode 标签（保留标签内的内容）
-  /// 例如禁用 "color" 时，[color=red]text[/color] → text
-  /// 不涉及嵌套问题，只需删除所有匹配的 [tag]、[tag=xxx]、[/tag] 标记
-  String _stripDisabledTags(String html) {
-    // 标签名 → BBCode 实际标签名的映射
-    const tagMapping = {
-      'bold': 'b',
-      'italic': 'i',
-      'underline': 'u',
-      'strikethrough': 's',
-    };
-    // 次标签：禁用一个主标签时连带屏蔽的同义词
-    const secondaryMapping = {
-      'backcolor': ['background'],
-    };
-    for (final tag in _disabledTags!) {
-      final bbcodeTag = tagMapping[tag] ?? tag;
-      html = _stripTag(html, bbcodeTag);
-      // 连带屏蔽同义词
-      final secondaries = secondaryMapping[tag];
-      if (secondaries != null) {
-        for (final sec in secondaries) {
-          html = _stripTag(html, sec);
-        }
-      }
-    }
-    return html;
-  }
-
-  /// 删除全部 [tag]、[tag=xxx]、[/tag]
-  String _stripTag(String html, String tag) {
-    return html.replaceAllMapped(
-      RegExp('\\[$tag(?:=[^\\]]*)?\\]|\\[/$tag\\]', caseSensitive: false),
-      (_) => '',
-    );
-  }
+  ///
+  /// 实现见顶层 [stripDisabledBbcodeTags] —— 与 MCP 精简输出共用同一份逻辑。
+  String _stripDisabledTags(String html) =>
+      stripDisabledBbcodeTags(html, _disabledTags!);
 
   /// 替换带值标签 [tag=value]...[/tag]
   String _replaceTag(

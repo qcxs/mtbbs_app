@@ -4,6 +4,7 @@ import 'package:mtbbs/pages/settings/models/content_settings.dart';
 import 'package:mtbbs/pages/settings/models/data_settings.dart';
 import 'package:mtbbs/pages/settings/models/display_settings.dart';
 import 'package:mtbbs/pages/settings/models/editor_settings.dart';
+import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/models/site_settings.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -27,14 +28,16 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
     super.dispose();
   }
 
-  /// 全部分组（与设置主页共享同一份模型列表）
-  static final List<({String group, List<SettingsModel> models})> _all = [
-    (group: '站点与网络', models: siteSettings()),
-    (group: '外观', models: displaySettings()),
-    (group: '阅读与渲染', models: contentSettings()),
-    (group: '编辑与快捷键', models: editorSettings()),
-    (group: '存储与工具', models: dataSettings()),
-    (group: '关于', models: aboutSettings()),
+  /// 全部分组（与设置主页共享同一份模型函数，每次检索时重新生成）
+  static final List<({String group, List<SettingsModel> Function() models})>
+  _all = [
+    (group: '站点与网络', models: siteSettings),
+    (group: '外观', models: displaySettings),
+    (group: '阅读与渲染', models: contentSettings),
+    (group: '编辑与快捷键', models: editorSettings),
+    (group: '存储与工具', models: dataSettings),
+    (group: 'MCP 服务', models: mcpSettings),
+    (group: '关于', models: aboutSettings),
   ];
 
   List<({String group, List<SettingsModel> items})> _results(
@@ -44,7 +47,8 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
     if (q.isEmpty) return const [];
     final results = <({String group, List<SettingsModel> items})>[];
     for (final entry in _all) {
-      final matched = entry.models
+      final matched = entry
+          .models()
           .where((m) => _matches(m, q, settings))
           .toList();
       if (matched.isNotEmpty) {

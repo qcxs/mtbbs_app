@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知栏状态图标（MCP 服务运行中）。
+  通知小图标会被系统当作 alpha 蒙版着色，因此用单色实心圆环，
+  保证在任何通知栏配色下都能看清轮廓。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,3 C16.97,3 21,7.03 21,12 C21,16.97 16.97,21 12,21 C7.03,21 3,16.97 3,12 C3,7.03 7.03,3 12,3 Z M12,7 C14.76,7 17,9.24 17,12 C17,14.76 14.76,17 12,17 C9.24,17 7,14.76 7,12 C7,9.24 9.24,7 12,7 Z" />
+</vector>

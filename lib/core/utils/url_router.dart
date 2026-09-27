@@ -96,6 +96,19 @@ class UrlRouter {
 
     if (path.endsWith('/forum.php') || path.endsWith('forum.php')) {
       final mod = query['mod'];
+
+      // 导读：forum.php?mod=guide&view={newthread|hot|new|digest|sofa|my}[&index=N]
+      // App 内对应「导读」页；具体 view 由页内 Tab 承载，路由层不带参数，
+      // index（页码）同理由页内列表自管。
+      if (mod == 'guide') {
+        return UrlRouteResult(
+          label: '导读',
+          appPath: '/guide',
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
+
       if (mod == 'viewthread') {
         final tid = query['tid'];
         if (tid != null && tid.isNotEmpty) {
@@ -336,6 +349,29 @@ class UrlRouter {
       siteHost: otherSiteHost,
       siteName: otherSiteName,
     );
+  }
+
+  /// 决定一个链接的落地位置 —— **链接 → 页面的唯一决策点**。
+  ///
+  /// - 能映射到 App 内页面、且属于当前站点 → 返回 App 内路由路径
+  /// - 解析不出、属于其他站点、或不是 http(s) 链接 → 返回内置浏览器兜底路径
+  /// - 空串 → 返回 null（调用方不跳转）
+  ///
+  /// 兜底路径带 `intercept=false`：内置浏览器不再二次拦截，否则会出现
+  /// "App 打开 → 又被浏览器接管"的往返。
+  ///
+  /// 首页链接点击、帖子正文里的链接、系统「打开方式」入站链接都走这里，
+  /// 保证行为一致（此前各处各写一份，兜底参数还漏过）。
+  static String? resolveTarget(String url) {
+    final text = url.trim();
+    if (text.isEmpty) return null;
+    if (!text.startsWith('http://') && !text.startsWith('https://')) {
+      // 已经是 App 内路径
+      return text;
+    }
+    final result = parse(text);
+    if (result.appPath != null && !result.isOtherSite) return result.appPath;
+    return '/browser?url=${Uri.encodeComponent(text)}&intercept=false';
   }
 
   /// 构建帖子路由路径，page > 1 时附加 ?page=N

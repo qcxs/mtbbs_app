@@ -81,6 +81,10 @@ dependencies:
   charset: ^2.0.1
   flutter_widget_from_html_core: ^0.17.4
 
+  # MCP 服务端（只读，本机 Streamable HTTP，双 era 兼容 2026-07-28 / 2025-11-25）
+  # 锁到具体版本：协议与安全默认值随版本变化，升级前先读 docs/09
+  mcp_dart: 2.4.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

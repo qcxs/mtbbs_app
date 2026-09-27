@@ -9,6 +9,7 @@ import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/core/app/default_config.dart';
+import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 
 /// 设置管理 — 统一通过 [DatabaseHelper] 持久化
@@ -206,10 +207,6 @@ class SettingsProvider extends ChangeNotifier {
   bool _showAvatars = true;
   bool get showAvatars => _showAvatars;
 
-  /// 桌面窗口标题栏（Windows 专属，默认显示；切换需重启生效）
-  bool _showWindowTitleBar = true;
-  bool get showWindowTitleBar => _showWindowTitleBar;
-
   /// 头像尺寸策略（固定某一尺寸可提高头像缓存命中率），默认 middle
   AvatarSizeMode _avatarSizeMode = AvatarSizeMode.middle;
   AvatarSizeMode get avatarSizeMode => _avatarSizeMode;
@@ -367,7 +364,13 @@ class SettingsProvider extends ChangeNotifier {
     if (disabledJson != null && disabledJson.isNotEmpty) {
       try {
         final parsed = jsonDecode(disabledJson) as List<dynamic>;
-        _disabledBbcodeTags = parsed.map((e) => e.toString()).toSet();
+        // 只保留仍可配置的项：老版本可能存过已被移出清单的标签
+        // （如 strikethrough —— 删除线带语义，已不再允许禁用），
+        // 否则它会留在集合里继续生效，而用户在 UI 上已无处取消。
+        _disabledBbcodeTags = parsed
+            .map((e) => e.toString())
+            .where(bbcodeStyleTagIds.contains)
+            .toSet();
       } catch (_) {}
     }
 
@@ -421,8 +424,6 @@ class SettingsProvider extends ChangeNotifier {
 
     // 头像设置
     _showAvatars = (await _db.getSettingBool('showAvatars')) ?? true;
-    _showWindowTitleBar =
-        (await _db.getSettingBool('showWindowTitleBar')) ?? true;
 
     // 头像尺寸策略（默认 middle，未知值回退 middle）
     _avatarSizeMode = AvatarSizeMode.fromValue(
@@ -518,12 +519,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setShowAvatars(bool value) async {
     _showAvatars = value;
     await _db.setSettingBool('showAvatars', value);
-    notifyListeners();
-  }
-
-  Future<void> setShowWindowTitleBar(bool value) async {
-    _showWindowTitleBar = value;
-    await _db.setSettingBool('showWindowTitleBar', value);
     notifyListeners();
   }
 

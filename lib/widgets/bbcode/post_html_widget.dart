@@ -18,11 +18,13 @@ import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/image_preview/image_preview.dart';
 
 /// 可被全局/局部禁用的 BBCode 样式标签
+///
+/// 不含 `strikethrough`：删除线带语义（内容被否定/作废），
+/// 不应在"禁用样式"时被一并丢弃。
 const bbcodeStyleTags = <String>{
   'bold',
   'italic',
   'underline',
-  'strikethrough',
   'color',
   'size',
   'font',
@@ -430,14 +432,9 @@ Future<void> _showUrlEditDialog(BuildContext context, String url) async {
 
   switch (action) {
     case '__app__':
-      final routeResult = UrlRouter.parse(url);
-      if (routeResult.appPath != null) {
-        context.push(routeResult.appPath!);
-      } else {
-        context.push(
-          '/browser?url=${Uri.encodeComponent(url)}&intercept=false',
-        );
-      }
+      // 与首页链接点击、系统入站链接共用同一决策（App 内优先，兜底内置浏览器）
+      final target = UrlRouter.resolveTarget(url);
+      if (target != null) context.push(target);
     case '__external__':
       await launchUrl(uri, mode: LaunchMode.externalApplication);
   }

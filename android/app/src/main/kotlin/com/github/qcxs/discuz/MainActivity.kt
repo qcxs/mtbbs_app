@@ -1,10 +1,12 @@
 package com.github.qcxs.discuz
 
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Point
 import android.graphics.Rect
 import android.os.Build
+import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -18,6 +20,41 @@ import kotlin.math.roundToInt
 ///   Dart 侧刷新缓存；普通手机/平板无此开销。
 class MainActivity : FlutterActivity() {
     private lateinit var channel: MethodChannel
+
+    /// 论坛链接入站通道（见 AppLink）
+    private var linkChannel: MethodChannel? = null
+
+    /// Flutter 尚未就绪时暂存的入站链接（冷启动场景）
+    private var pendingUrl: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // 冷启动时先抓住 intent；configureFlutterEngine 之后 Dart 会来取。
+        // savedInstanceState 非空说明只是重建，不要重复导航。
+        // 注意：Flutter 自带的 deep link 处理已在 manifest 里关掉
+        // （flutter_deeplinking_enabled=false），所以 intent 不会被 Flutter
+        // 拿去当初始路由，入站链接只走下面的 mtbbs/intent 通道。
+        if (savedInstanceState == null) {
+            pendingUrl = intent?.data?.toString()?.takeIf { it.isNotEmpty() }
+        }
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        dispatchUrl(intent.data?.toString())
+    }
+
+    /// 把入站链接交给 Dart（Flutter 没就绪就先存下来）
+    private fun dispatchUrl(url: String?) {
+        if (url.isNullOrEmpty()) return
+        val target = linkChannel
+        if (target == null) {
+            pendingUrl = url
+        } else {
+            target.invokeMethod("openedUrl", url)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -34,6 +71,51 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // MCP 运行状态常驻通知（见 McpStatusNotification）
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            McpStatusNotification.CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "show" -> {
+                    McpStatusNotification.start(this, call.argument<String>("endpoint").orEmpty())
+                    result.success(null)
+                }
+                "hide" -> {
+                    McpStatusNotification.stop(this)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // 论坛链接入站（见 AppLink）
+        linkChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "mtbbs/intent",
+        )
+        linkChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialUrl" -> {
+                    result.success(pendingUrl)
+                    pendingUrl = null
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != McpStatusNotification.PERMISSION_REQUEST_CODE) return
+        val granted = grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        McpStatusNotification.onPermissionResult(this, granted)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
