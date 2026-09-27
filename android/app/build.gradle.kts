@@ -11,7 +11,7 @@ plugins {
 
 // beta 开关：`flutter build apk --release --dart-define=BETA=true` 时构建为 beta 形态。
 // Flutter 会把 --dart-define 逐个 base64 编码后以逗号分隔透传给 gradle（-Pdart-defines），这里解码还原。
-// beta 为独立 applicationId（.beta 后缀）+ 「MT论坛 beta」应用名 + 固定 1.0-beta/1 + debug 签名，
+// beta 为独立 applicationId（.beta 后缀）+ 「MT论坛 beta」应用名 + 固定 1.0.0-beta/1 + debug 签名，
 // 与正式版互不影响，版本号固定 1 反而便于随意覆盖安装（无升降级限制），仅临时测试用。
 val dartDefines: Map<String, String> = run {
     (project.findProperty("dart-defines") as? String).orEmpty()
@@ -95,7 +95,7 @@ android {
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = if (isBeta) 1 else flutter.versionCode
-        versionName = if (isBeta) "1.0-beta" else flutter.versionName
+        versionName = if (isBeta) "1.0.0-beta" else flutter.versionName
         // 应用名走占位符，beta 变体单独命名，与正式版在桌面区分开
         manifestPlaceholders.put("appName", "MT论坛")
     }

@@ -15,9 +15,11 @@ import 'package:mtbbs/widgets/dialog/rate_dialog.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
+import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/models/browse_record.dart';
 import 'package:mtbbs/providers/history_provider.dart';
@@ -290,11 +292,16 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   void _scrollToPid() {
     final pid = widget.pid;
     if (pid == null || pid.isEmpty) return;
+    _scrollToPost(pid);
+  }
+
+  /// 平滑滚动到指定楼层（无该楼层时不做任何事）
+  void _scrollToPost(String pid) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final key = _postKeys[pid];
-      if (key?.currentContext == null) return;
+      final ctx = _postKeys[pid]?.currentContext;
+      if (ctx == null) return;
       Scrollable.ensureVisible(
-        key!.currentContext!,
+        ctx,
         duration: const Duration(milliseconds: 300),
         alignment: 0.3,
       );
@@ -491,8 +498,9 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   void _editPost(PostItem post) {
     final isOp = post.pid == _data?.mainPost?.pid;
-    context.push(
+    _openEditor(
       '/editor?type=${isOp ? 'editPost' : 'editReply'}&tid=${widget.tid}&pid=${post.pid}',
+      editingPid: post.pid,
     );
   }
 
@@ -544,7 +552,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   void _navigateComment() {
     if (_data == null) return;
-    context.push('/editor?type=comment&tid=${widget.tid}');
+    _openEditor('/editor?type=comment&tid=${widget.tid}');
   }
 
   /// 窄屏时滚动到评论区顶部
@@ -562,6 +570,109 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   Future<void> _refreshCurrentPage() async {
     _commentPages.remove(_currentPage);
     await _loadCommentPage(_currentPage);
+  }
+
+  /// 打开编辑器并处理发布结果
+  ///
+  /// 只有发布成功才动作——用户返回/放弃时 pop 为 null，什么都不做。
+  /// - 编辑类：用已知 pid 取回内容，原地覆盖那一楼
+  /// - 回复/评论：取回新楼追加到当前评论页末尾（对齐网页追加行为，不整页刷新）
+  /// - 审核中：不追加（与网页一致，只由编辑器提示）
+  Future<void> _openEditor(String path, {String? editingPid}) async {
+    final r = await context.push<Map<String, dynamic>>(path);
+    if (!mounted || r == null || r['success'] != true) return;
+    final result = r['result'] as SubmitResult?;
+    if (result == null) return;
+
+    if (editingPid != null && editingPid.isNotEmpty) {
+      await _replacePost(editingPid);
+      return;
+    }
+    if (result.needsApproval || result.pid.isEmpty) return;
+    await _appendPost(result.pid);
+  }
+
+  /// 取回单个楼层（网页追加回复时请求的 viewpid 接口）
+  Future<PostItem?> _fetchPost(String pid) async {
+    try {
+      await EmojiService().load();
+      final raw = await viewpid_api.getPostByPid(
+        ApiService().dio,
+        tid: widget.tid,
+        viewpid: pid,
+      );
+      if (raw['success'] != true || raw['post'] == null) return null;
+      final map = Map<String, dynamic>.from(raw['post'] as Map);
+      map['floor'] = _resolveFloor(map);
+      return PostItem.fromMap(map);
+    } catch (e) {
+      AppLogger.w('PAGE', 'fetch post $pid error: $e');
+      return null;
+    }
+  }
+
+  /// 楼层号兜底
+  ///
+  /// viewpid 的 postnum 形如 `<em>8</em><sup>#</sup>`（"8#"），解析层按
+  /// `#(\d+)` 匹配不到，这里从 floorLabel 里取数字补齐；仍取不到时顺延末楼。
+  int _resolveFloor(Map<String, dynamic> post) {
+    final floor = (post['floor'] as int?) ?? 0;
+    if (floor > 0) return floor;
+    final label = post['floorLabel']?.toString() ?? '';
+    final m = RegExp(r'(\d+)').firstMatch(label);
+    if (m != null) return int.tryParse(m.group(1)!) ?? 0;
+    final posts = _commentPages[_currentPage];
+    if (posts != null && posts.isNotEmpty) return posts.last.floor + 1;
+    return 0;
+  }
+
+  /// 把新楼追加到当前评论页末尾并滚动过去（按 pid 去重）
+  Future<void> _appendPost(String pid) async {
+    final post = await _fetchPost(pid);
+    if (post == null || !mounted) return;
+    final posts = _commentPages[_currentPage] ??= <PostItem>[];
+    if (posts.any((p) => p.pid == post.pid)) return;
+    setState(() => posts.add(post));
+    _scrollToPost(post.pid);
+  }
+
+  /// 用取回的内容原地覆盖指定楼层（编辑成功后使用）
+  Future<void> _replacePost(String pid) async {
+    // 楼主帖不在评论列表里，单独刷新主帖区
+    if (_data?.mainPost?.pid == pid) {
+      await _reloadMainPost();
+      return;
+    }
+    final post = await _fetchPost(pid);
+    if (post == null || !mounted) return;
+    final posts = _commentPages[_currentPage];
+    if (posts == null) return;
+    final index = posts.indexWhere((p) => p.pid == post.pid);
+    if (index < 0) return;
+    setState(() => posts[index] = post);
+  }
+
+  /// 重新加载第 1 页以刷新主帖（不动已加载的评论页）
+  Future<void> _reloadMainPost() async {
+    try {
+      await EmojiService().load();
+      final raw = await detail_api.getThreadDetail(
+        ApiService().dio,
+        tid: widget.tid,
+        page: 1,
+        authorid: widget.authorid,
+      );
+      if (raw['success'] != true || !mounted) return;
+      final data = ThreadViewData.fromMap(raw, widget.tid);
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _totalPages = data.totalPages;
+        _liked = data.mainPost?.isLiked ?? false;
+      });
+    } catch (e) {
+      AppLogger.w('PAGE', 'reload main post error: $e');
+    }
   }
 
   // ==================== Build ====================
@@ -783,7 +894,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       globalDisableStyle: _globalDisableStyle,
       onScrollNotification: _handleScrollNotification,
       onReply: (post) =>
-          context.push('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}'),
+          _openEditor('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}'),
       onRecommend: _handleRecommend,
       onPopupAction: (action, post) {
         switch (action) {

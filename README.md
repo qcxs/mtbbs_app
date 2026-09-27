@@ -156,7 +156,7 @@ Fork 后 Actions 默认可用，`release.yml` 为**手动触发**（`workflow_di
 1. 进入仓库 **Actions** 页 → 左侧选 **Release** → **Run workflow**
 2. 勾选平台（Android / Windows），填 `tag` 参数：
    - **留空**：只构建不发布，产物在运行页底部作为 artifact 下载（推荐用于测试流程）
-   - **填 `v1.0.0`**：构建后自动创建/更新 GitHub Release 并上传产物；若 tag 不存在则由发布动作自动创建（指向当前迁出的提交）
+   - **填 `v1.0.0`**：构建后自动创建/更新 GitHub Release 并上传产物（应用版本名 = `1.0.0` + 9 位提交 hash）；若 tag 不存在则由发布动作自动创建（指向当前迁出的提交）
 3. 版本号规则与完整发布流程见 `docs/15-版本发布.md`
 
 **Android 签名（可选但正式分发必配）**：CI 默认降级为 debug 签名（仅自测可装）。正式发布需在仓库 **Settings → Secrets and variables → Actions** 配置以下 4 个变量，`release.yml` 会自动检测并正式签名；缺任一变量会静默降级，**不会报错**：
@@ -164,9 +164,9 @@ Fork 后 Actions 默认可用，`release.yml` 为**手动触发**（`workflow_di
 | Secret 名 | 说明 |
 |-----------|------|
 | `SIGN_KEYSTORE_BASE64` | `keytool` 生成的 keystore 文件 base64 编码 |
-| `SIGN_STORE_PASSWORD` | keystore 密码 |
-| `SIGN_KEY_ALIAS` | 密钥别名 |
-| `SIGN_KEY_PASSWORD` | 密钥密码 |
+| `KEYSTORE_PASSWORD` | keystore 密码 |
+| `KEY_ALIAS` | 密钥别名 |
+| `KEY_PASSWORD` | 密钥密码 |
 
 Windows 端无需额外配置：CI 使用 `windows-2022` 镜像（与本地 VS2022 工具链对齐），Inno Setup 中文语言文件已随仓库内置。
 

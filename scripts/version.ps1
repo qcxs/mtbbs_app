@@ -1,11 +1,13 @@
-﻿# 版本生成脚本（本地与 GitHub CI 通用）
+# 版本生成脚本（本地与 GitHub CI 通用）
 #
 # 思路对齐 PiliPlus 的 lib/scripts/build.ps1：
-#   - 版本名来源：-VersionName（GitHub Action 的版本输入）优先，否则读 pubspec.yaml 的
-#     `version:` 行（本地发布的唯一事实源）
+#   - 版本名来源：-VersionName（GitHub Action 的 tag 输入，自动去掉 v 前缀）优先，
+#     否则读 pubspec.yaml 的 `version:` 行（本地发布的唯一事实源）
 #   - build 号 = git 提交总数（git rev-list --count HEAD，单调递增不重复）
-#   - Android 发布包在版本名后追加 9 位 commit hash，便于用户反馈定位
-#   - beta 形态（-Beta）：版本固定 1.0-beta / 1，不追加 hash，配合
+#   - 版本名后追加 9 位 commit hash（beta 除外）：Android 始终追加；
+#     其他平台仅当显式传入 -VersionName（CI 发布路径）时追加，
+#     保证 Release 产物文件名带版本，便于用户反馈定位
+#   - beta 形态（-Beta）：版本固定 1.0.0-beta / 1，不追加 hash，配合
 #     `--dart-define=BETA=true` 由 gradle 切成独立应用（见 docs/15）
 #   - 生成 mtbbs_release.json，供 `flutter build --dart-define-from-file` 注入
 #   - 导出 MTBBS_VERSION_NAME / MTBBS_VERSION_CODE / MTBBS_VERSION / MTBBS_BETA
@@ -15,7 +17,8 @@
 #   scripts/version.ps1                               # 桌面平台，版本名读 pubspec.yaml
 #   scripts/version.ps1 android                       # Android（版本名带 hash 后缀）
 #   scripts/version.ps1 android -VersionName 1.2.0    # 显式指定版本名（容忍 v 前缀）
-#   scripts/version.ps1 android -Beta                 # beta 形态（固定 1.0-beta / 1）
+#   scripts/version.ps1 -VersionName v1.2.0           # 桌面显式指定（同样追加 hash）
+#   scripts/version.ps1 android -Beta                 # beta 形态（固定 1.0.0-beta / 1）
 param(
     [string]$Platform = '',
     [string]$VersionName = '',
@@ -25,7 +28,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # 与 android/app/build.gradle.kts 中 beta 分支硬编码的值保持一致
-$BETA_VERSION_NAME = '1.0-beta'
+$BETA_VERSION_NAME = '1.0.0-beta'
 $BETA_VERSION_CODE = 1
 
 # 版本名格式：x.y.z，可带 -后缀（与 pubspec 的 semver 写法一致），用于校验 Action 输入
@@ -77,8 +80,10 @@ try {
     # commit hash
     $commitHash = (git rev-parse HEAD).Trim()
 
-    # Android 版本名追加短 hash（beta 版本号固定，不加）
-    if ($Platform -eq 'android' -and -not $Beta) {
+    # 版本名追加 9 位短 hash（beta 版本号固定，不加）
+    # Android 始终追加（本地/CI 一致）；其他平台仅在显式传入 -VersionName 时追加
+    $explicitName = -not [string]::IsNullOrWhiteSpace($VersionName)
+    if (-not $Beta -and ($Platform -eq 'android' -or $explicitName)) {
         $verName = "$verName-$($commitHash.Substring(0, 9))"
     }
 

@@ -555,6 +555,18 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
         _isLeavingNormally = true;
         _autoSaveTimer?.cancel();
         context.read<EditorHistoryProvider>().markSubmitted(_sessionKey);
+
+        // 发帖成功：直接打开新帖，覆盖编辑器路由（返回时回到来源页，编辑器不留在栈里）
+        if (widget.type == EditorType.post &&
+            !result.needsApproval &&
+            result.tid.isNotEmpty) {
+          AppLogger.i(
+            'EDITOR',
+            jsonEncode({'action': 'open_new_thread', 'tid': result.tid}),
+          );
+          context.replace('/thread/${result.tid}');
+          return;
+        }
         Navigator.of(context).pop({'success': true, 'result': result});
       } else {
         setState(() => _isSubmitting = false);

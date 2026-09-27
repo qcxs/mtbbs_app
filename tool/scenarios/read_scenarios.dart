@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:mtbbs/api/forum/forumdisplay/export.dart' as forum_api;
 import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as thread_api;
+import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/api/home/friend/export.dart' as friend_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
@@ -81,6 +82,15 @@ final Map<String, ApiScenario> readScenarios = {
       tid: a['tid'] ?? '',
       page: intArg(a, 'page', 1),
       authorid: (a['authorid'] ?? '').isEmpty ? null : a['authorid'],
+    ),
+  ),
+  'post.byPid': ApiScenario(
+    desc: '按 pid 取单个楼层（viewpid 接口；回复成功后追加新楼用的就是它）',
+    params: {'tid': '*帖子 ID', 'pid': '*楼层 ID（viewpid）'},
+    run: (a) => viewpid_api.getPostByPid(
+      ApiService().dio,
+      tid: a['tid'] ?? '',
+      viewpid: a['pid'] ?? '',
     ),
   ),
   'user.info': ApiScenario(
