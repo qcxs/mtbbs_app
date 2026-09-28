@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/managed_item.dart';
@@ -1039,7 +1040,7 @@ class SettingsProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      debugPrint('[SettingsProvider] fetch formula error: $e');
+      AppLogger.w('SETTINGS', 'fetch formula error: $e');
       return null;
     }
   }

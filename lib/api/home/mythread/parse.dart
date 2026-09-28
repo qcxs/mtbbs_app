@@ -1,3 +1,4 @@
+import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/parser/thread_parser.dart';
 
@@ -10,12 +11,21 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   }
 
   try {
-    final threads = parseThreadList(body);
+    final info = parseThreadListInfo(body);
+    final threads = info.items;
+    // 列表外框（表头行）在、却解析不出帖子 → 结构可能变了（只告警，不报错）
+    final hasShell = htmlParser.parse(body).querySelector('table tr.th') != null;
 
     return {
       'success': true,
       'threads': threads.map((t) => t.toJson()).toList(),
       'count': threads.length,
+      '_health': {
+        'parser': info.parser,
+        'missing': (threads.isEmpty && hasShell)
+            ? const ['列表容器存在但未解析出帖子']
+            : const <String>[],
+      },
     };
   } catch (e) {
     AppLogger.e('PARSE', 'mythreads parse error: $e');

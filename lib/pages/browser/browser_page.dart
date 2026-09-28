@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:provider/provider.dart';
@@ -8,8 +10,10 @@ import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
@@ -67,22 +71,58 @@ class _BrowserPageState extends State<BrowserPage> {
     }
   }
 
+  @override
+  void dispose() {
+    // 离开浏览器时把 WebView 里新增的 Cookie 回流给 App。
+    // dispose 是同步的，这里不能 await；失败只记日志，不影响关闭。
+    unawaited(_syncCookiesBack());
+    super.dispose();
+  }
+
   String get _host => Uri.tryParse(_currentUrl)?.host ?? '';
 
   // ==================== Cookie 同步 ====================
 
   Future<void> _syncCookies() async {
+    final auth = context.read<AuthProvider>();
+    // 两步必须互相独立：清理失败绝不能连累注入，否则浏览器会显示成"未登录"。
+    // （这里以前是一个大 try 包住两步 + `catch (_)` 静默吞掉，
+    //  清理步骤一旦抛异常，注入就被整体跳过——见 docs/07 静默失败）
     try {
-      final auth = context.read<AuthProvider>();
-      // 先清除旧 Cookie，避免残留
-      await CookieManager.instance().deleteAllCookies();
+      // 先清除本站点旧 Cookie，避免残留
+      // （只清当前站点：打开浏览器不能把其他站点的 WebView 登录态一起清掉）
+      await clearCookiesForHost(SiteStore.instance.baseUrl);
+    } catch (e) {
+      AppLogger.w('PAGE', 'clear webview cookies failed: $e');
+    }
+    try {
       // 再设置当前账号的 Cookie
       await syncCookieStringToWebView(
         auth.currentCookieString,
         SiteStore.instance.baseUrl,
       );
-    } catch (_) {
-      // Cookie 同步失败不应阻塞页面加载
+    } catch (e) {
+      AppLogger.w('PAGE', 'inject webview cookies failed: $e');
+    }
+  }
+
+  /// WebView → Dio：把浏览器里新增/刷新的 Cookie 回流给 App。
+  ///
+  /// 场景：在内置浏览器里过了验证码、重新登录，或站点刷新了会话 Cookie——
+  /// 这些 Cookie 只落在 WebView，不回流的话 App 后续请求仍带旧 Cookie，
+  /// 表现为「浏览器里验证通过了，App 里还是失败」。
+  ///
+  /// 只在离开浏览器时调用（关闭页面 / 跳回 App 内页面），不做逐页同步。
+  Future<void> _syncCookiesBack() async {
+    try {
+      final jar = ApiService().activeCookieJar;
+      if (jar == null) return;
+      await syncWebViewCookiesToJar(
+        jar: jar,
+        baseUrl: SiteStore.instance.baseUrl,
+      );
+    } catch (e) {
+      AppLogger.w('PAGE', 'cookie 回流失败: $e');
     }
   }
 
@@ -428,9 +468,10 @@ class _BrowserPageState extends State<BrowserPage> {
         // 匹配 App 路由成功则拦截并在 App 中打开
         final result = UrlRouter.parse(url);
         if (result.appPath != null && mounted) {
-          if (mounted) {
-            showToast('拦截：已在 App 中打开', duration: const Duration(seconds: 1));
-          }
+          // 浏览器容器还留在栈上、不会走 dispose，这里先回流一次
+          await _syncCookiesBack();
+          if (!mounted) return NavigationActionPolicy.ALLOW;
+          showToast('拦截：已在 App 中打开', duration: const Duration(seconds: 1));
           context.push(result.appPath!);
           return NavigationActionPolicy.CANCEL;
         }

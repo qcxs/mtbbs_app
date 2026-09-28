@@ -14,6 +14,11 @@ List<ThreadItem> parseThreadList(String html) {
   return ThreadListParserFactory.parse(html);
 }
 
+/// 同 [parseThreadList]，但额外返回命中的解析器名（供健康自检/告警用）。
+ThreadListParseResult parseThreadListInfo(String html) {
+  return ThreadListParserFactory.parseWithInfo(html);
+}
+
 /// 调试用：检测当前 HTML 适用的解析器名称
 String detectThreadListParser(String html) {
   return ThreadListParserFactory.detectParser(html);

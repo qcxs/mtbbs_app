@@ -207,6 +207,29 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // 楼层解析失败：显示降级提示，别让用户把"空白楼层"当成帖子本来就是空的
+    if (widget.post.degraded) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        color: cs.surface,
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '该楼层（${widget.post.floorText}）解析失败，可能页面结构已变更',
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(12),
       color: cs.surface,

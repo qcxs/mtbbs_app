@@ -31,9 +31,6 @@ class _RanklistSectionState extends State<RanklistSection>
   void initState() {
     super.initState();
     updateKeepAlive();
-    debugPrint(
-      '[RanklistSection] initState called, _items isEmpty=${_items.isEmpty}',
-    );
     _fetch(tab: 0);
   }
 

@@ -45,6 +45,7 @@ void _logParseResult(Map<String, dynamic> result, String path) {
   // 摘要：完整 JSON，列表/Map 缩略为 "[N items]" / "{N entries}"
   final summary = <String, dynamic>{};
   for (final entry in result.entries) {
+    if (entry.key == '_health') continue; // 健康自检单独输出，见下
     final v = entry.value;
     if (v is List) {
       summary[entry.key] = '[${v.length} items]';
@@ -55,6 +56,19 @@ void _logParseResult(Map<String, dynamic> result, String path) {
     }
   }
   AppLogger.i('PARSE', '$path ← ${jsonEncode(summary)}');
+
+  // 健康自检：结构解析成功但关键字段为空 → 明确告警
+  // （区别于"页面本身没有数据"：这里表示"页面结构可能变了"，见 docs/07 静默失败）
+  final health = result['_health'];
+  if (health is Map) {
+    final missing = health['missing'];
+    if (missing is List && missing.isNotEmpty) {
+      AppLogger.w(
+        'PARSE',
+        '$path 解析健康告警（${health['parser'] ?? '?'}）：${missing.join('；')}',
+      );
+    }
+  }
 
   // 详情：首个列表/Map 展示实际内容
   for (final k in result.keys) {

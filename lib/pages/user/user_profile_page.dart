@@ -72,7 +72,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
       if (context.mounted) {
         context.read<HistoryProvider>().addRecord(
           BrowseRecord(
-            id: 'user_${widget.uid}',
+            id: '${SiteStore.instance.host}:user_${widget.uid}',
+            host: SiteStore.instance.host,
             type: 'user',
             routePath: '/user/${widget.uid}',
             timestamp: DateTime.now(),

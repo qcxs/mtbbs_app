@@ -10,6 +10,7 @@ import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 我的帖子/回复页面
 class MyThreadPage extends StatefulWidget {
@@ -80,7 +81,8 @@ class _MyThreadPageState extends State<MyThreadPage> {
     if (!context.mounted) return;
     context.read<HistoryProvider>().addRecord(
       BrowseRecord(
-        id: recordId,
+        id: '${SiteStore.instance.host}:$recordId',
+        host: SiteStore.instance.host,
         type: recordType,
         routePath: '/my-threads$queryString',
         timestamp: DateTime.now(),

@@ -424,4 +424,31 @@ void main() {
       expect(result, isEmpty);
     });
   });
+
+  group('解析器命中信息（健康自检用）', () {
+    test('命中时返回解析器名与条目', () {
+      const html =
+          ''
+          '<div id="threadlist" class="tl bm bmw">'
+          '<table><tbody id="normalthread_2118990"><tr>'
+          '<th class="common"><a class="xst" href="thread-2118990-1-1.html">标题</a></th>'
+          '<td class="by"><cite><a>user</a></cite><em>time</em></td>'
+          '<td class="num"><a class="xi2">1</a><em>2</em></td>'
+          '<td class="by"><cite><a>u2</a></cite><em>t2</em></td>'
+          '</tr></tbody></table>'
+          '</div>';
+      final info = parseThreadListInfo(html);
+      expect(info.matched, true);
+      expect(info.parser, 'DiscuzTableParser');
+      expect(info.items, hasLength(1));
+      expect(info.items.first.title, '标题');
+    });
+
+    test('无解析器匹配时 parser 为 NoParser，且不抛异常', () {
+      final info = parseThreadListInfo('<html><body><p>无关内容</p></body></html>');
+      expect(info.matched, false);
+      expect(info.parser, 'NoParser');
+      expect(info.items, isEmpty);
+    });
+  });
 }

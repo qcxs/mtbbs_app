@@ -433,7 +433,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     if (_data == null) return;
     context.read<HistoryProvider>().addRecord(
       BrowseRecord(
-        id: 'thread_${widget.tid}',
+        id: '${SiteStore.instance.host}:thread_${widget.tid}',
+        host: SiteStore.instance.host,
         type: 'thread',
         routePath: '/thread/${widget.tid}',
         timestamp: DateTime.now(),

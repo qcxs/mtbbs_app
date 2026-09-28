@@ -50,10 +50,12 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
       'currentPage': pagination['currentPage'] ?? 1,
       'totalPages': pagination['totalPages'] ?? 1,
       'hasMore': false,
+      '_health': const {'parser': 'skipped', 'missing': <String>[]},
     };
   }
 
-  final threads = parseThreadList(body);
+  final info = parseThreadListInfo(body);
+  final threads = info.items;
 
   final cp = pagination['currentPage'] ?? 1;
   final tp = pagination['totalPages'] ?? 1;
@@ -66,5 +68,13 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     'currentPage': cp,
     'totalPages': tp,
     'hasMore': hasMore,
+    '_health': {
+      'parser': info.parser,
+      // 容器存在却解析不出帖子 = 结构可能变了（区别于"版块确实没帖子"）。
+      // 这里只告警不报错：空列表无法与"真的没帖子"区分，误报一个错误页更糟。
+      'missing': (threads.isEmpty && hasThreadList)
+          ? const ['列表容器存在但未解析出帖子']
+          : const <String>[],
+    },
   };
 }

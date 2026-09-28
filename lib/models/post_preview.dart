@@ -5,6 +5,7 @@ import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 帖子预览数据
 class PostPreviewData {
@@ -31,10 +32,13 @@ class PostPreviewData {
 
 /// 帖子预览缓存（FIFO，最多 100 条）
 ///
-/// 内存 + SQLite 双重存储：
+/// 内存 + sembast 双重存储：
 /// - 内存中 LinkedHashMap 保持插入顺序，O(1) 访问
-/// - 每次写入后增量持久化到 SQLite
-/// - 启动时从 SQLite 恢复缓存
+/// - 每次写入后增量持久化到 sembast
+/// - 启动时从 sembast 恢复缓存
+///
+/// **键含站点 host**：MT 与 52 的 tid/pid 各自独立编号，不含 host 会互相覆盖，
+/// 导致引用预览显示成别的站点的正文。
 class PostPreviewCache {
   static const int _maxSize = 100;
 
@@ -43,19 +47,35 @@ class PostPreviewCache {
 
   int get size => _cache.length;
 
-  /// 从 SQLite 加载缓存
+  /// 缓存 key：站点 host + tid + pid
+  static String _key(String tid, String pid) =>
+      '${SiteStore.instance.host}_${tid}_$pid';
+
+  /// 从 sembast 加载缓存
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
     try {
       _cache.clear();
       final rows = await DatabaseHelper.instance.getAllPreviewCache();
+      final legacyKeys = <String>[];
       for (final row in rows) {
-        final key = '${row['tid']}_${row['pid']}';
-        _cache[key] = PostPreviewData(
-          tid: row['tid'] as String,
-          pid: row['pid'] as String,
-          bbcode: row['bbcode'] as String,
+        final host = row['host'] as String?;
+        final tid = row['tid'] as String?;
+        final pid = row['pid'] as String?;
+        if (tid == null || pid == null) continue;
+        if (host == null) {
+          // 升级前的旧记录（key 不含站点）无法判断归属，淘汰重取
+          legacyKeys.add('${tid}_$pid');
+          continue;
+        }
+        _cache['${host}_${tid}_$pid'] = PostPreviewData(
+          tid: tid,
+          pid: pid,
+          bbcode: row['bbcode'] as String? ?? '',
         );
+      }
+      for (final key in legacyKeys) {
+        await DatabaseHelper.instance.deletePreviewCache(key);
       }
       AppLogger.i('CACHE', 'loaded ${_cache.length} previews');
     } catch (_) {
@@ -65,16 +85,21 @@ class PostPreviewCache {
   }
 
   PostPreviewData? get(String tid, String pid) {
-    return _cache['${tid}_$pid'];
+    return _cache[_key(tid, pid)];
   }
 
   Future<void> put(String tid, String pid, PostPreviewData data) async {
     await _ensureLoaded();
-    final key = '${tid}_$pid';
+    final key = _key(tid, pid);
     _cache[key] = data;
 
-    // 增量写入 SQLite
-    await DatabaseHelper.instance.upsertPreviewCache(tid, pid, data.bbcode);
+    // 增量写入 sembast
+    await DatabaseHelper.instance.upsertPreviewCache(
+      SiteStore.instance.host,
+      tid,
+      pid,
+      data.bbcode,
+    );
 
     // FIFO 淘汰：内存与 DB 同步移除最旧条目，保持双端一致
     if (_cache.length > _maxSize) {

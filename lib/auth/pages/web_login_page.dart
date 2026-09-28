@@ -6,6 +6,7 @@ import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
 import 'package:mtbbs/core/app/cookie_sync.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
@@ -47,8 +48,9 @@ class _WebLoginPageState extends State<WebLoginPage> {
   void initState() {
     super.initState();
     _urlController = TextEditingController(text: _loginUrl.toString());
-    // 清除 WebView Cookie，避免已登录状态跳过登录页
-    CookieManager.instance().deleteAllCookies();
+    // 清除本站点的 WebView Cookie，避免已登录状态跳过登录页
+    // （只清当前站点，不能影响其他站点的 WebView 登录态）
+    clearCookiesForHost(SiteStore.instance.baseUrl);
   }
 
   @override
@@ -154,7 +156,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
         }
       }
     } catch (e) {
-      debugPrint('[WebLogin] error: $e');
+      AppLogger.w('AUTH', 'web login error: $e');
       _loginDone = false;
       if (mounted) {
         Navigator.of(context).pop(false);
@@ -219,8 +221,8 @@ class _WebLoginPageState extends State<WebLoginPage> {
       return;
     }
 
-    // 3. 清除旧 Cookie → 注入新 Cookie（与内置浏览器相同模式）
-    await CookieManager.instance().deleteAllCookies();
+    // 3. 清除本站点旧 Cookie → 注入新 Cookie（与内置浏览器相同模式）
+    await clearCookiesForHost(SiteStore.instance.baseUrl);
     await syncCookieStringToWebView(cookieStr, SiteStore.instance.baseUrl);
 
     // 4. 跳转到站点首页，原 _checkLoginOnLoadStop 会自动检测 _auth 并完成登录
@@ -357,7 +359,7 @@ class _WebLoginPageState extends State<WebLoginPage> {
         return NavigationActionPolicy.ALLOW;
       },
       onReceivedError: (controller, request, error) {
-        debugPrint('[WebLogin] error: $error');
+        AppLogger.w('AUTH', 'webview load error: $error');
         if (!mounted) return;
         final errorHost = Uri.tryParse(request.url.toString())?.host;
         if (errorHost == Uri.parse(SiteStore.instance.baseUrl).host) {

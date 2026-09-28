@@ -27,8 +27,15 @@ import 'dart:convert';
 /// }
 /// ```
 class BrowseRecord {
-  /// 唯一标识 "thread_123" / "user_456"
+  /// 唯一标识 "mt.example.com:thread_123"
+  ///
+  /// 含站点 host 前缀，避免不同站点的同号 tid/uid 互相覆盖。
   final String id;
+
+  /// 记录所属站点 host（多站点隔离用）
+  ///
+  /// 老记录可能为空——此时回退到从 [info] 的 url 推断，见 [effectiveHost]。
+  final String host;
 
   /// 记录类型 "thread" | "user" | "mythread" | "reply"
   final String type;
@@ -44,11 +51,30 @@ class BrowseRecord {
 
   const BrowseRecord({
     required this.id,
+    this.host = '',
     required this.type,
     required this.routePath,
     required this.timestamp,
     this.info = const {},
   });
+
+  /// 记录归属的站点 host。
+  ///
+  /// 优先取 [host]；老记录（无 host 字段）回退到从 [info] 的 url 推断。
+  /// 都取不到时返回空串，表示"归属未知"。
+  String get effectiveHost {
+    if (host.isNotEmpty) return host;
+    final url = info['url']?.toString() ?? '';
+    return Uri.tryParse(url)?.host ?? '';
+  }
+
+  /// 是否可在 [siteHost] 站点下展示。
+  ///
+  /// 归属未知（空串）的记录按当前站点展示——兼容升级前落库的老记录。
+  bool belongsTo(String siteHost) {
+    final h = effectiveHost;
+    return h.isEmpty || h == siteHost;
+  }
 
   /// 根据模板渲染标题
   ///
@@ -74,21 +100,24 @@ class BrowseRecord {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'routePath': routePath,
-        'timestamp': timestamp.toIso8601String(),
-        'info': info,
-      };
+    'id': id,
+    'host': host,
+    'type': type,
+    'routePath': routePath,
+    'timestamp': timestamp.toIso8601String(),
+    'info': info,
+  };
 
   factory BrowseRecord.fromJson(Map<String, dynamic> json) => BrowseRecord(
-        id: json['id']?.toString() ?? '',
-        type: json['type']?.toString() ?? '',
-        routePath: json['routePath']?.toString() ?? '',
-        timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
-            DateTime.now(),
-        info: _toMap(json['info']),
-      );
+    id: json['id']?.toString() ?? '',
+    host: json['host']?.toString() ?? '',
+    type: json['type']?.toString() ?? '',
+    routePath: json['routePath']?.toString() ?? '',
+    timestamp:
+        DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+        DateTime.now(),
+    info: _toMap(json['info']),
+  );
 
   static Map<String, dynamic> _toMap(dynamic v) {
     if (v is Map<String, dynamic>) return v;

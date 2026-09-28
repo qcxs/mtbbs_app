@@ -7,6 +7,7 @@ import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
 
 /// 账号模型
@@ -171,7 +172,7 @@ class AuthProvider extends ChangeNotifier {
       if (saved) await refreshCurrentUserInfo();
       return saved;
     } catch (e) {
-      debugPrint('[AuthProvider] saveWebLogin error: $e');
+      AppLogger.w('AUTH', 'saveWebLogin error: $e');
       return false;
     }
   }
@@ -261,7 +262,7 @@ class AuthProvider extends ChangeNotifier {
       final retry = await _tryFetchUserStatus(tempDio);
       if (retry['success'] == true) return retry;
     } catch (e) {
-      debugPrint('[AuthProvider] userstatus retry error: $e');
+      AppLogger.w('AUTH', 'userstatus retry error: $e');
     }
     return result;
   }
@@ -270,7 +271,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       return await userstatus_api.fetch(dio);
     } catch (e) {
-      debugPrint('[AuthProvider] userstatus fetch error: $e');
+      AppLogger.w('AUTH', 'userstatus fetch error: $e');
       return {'success': false, 'message': '$e'};
     }
   }
@@ -334,7 +335,7 @@ class AuthProvider extends ChangeNotifier {
       _saveState();
       notifyListeners();
     } catch (e) {
-      debugPrint('[AuthProvider] clearAllLoginData error: $e');
+      AppLogger.w('AUTH', 'clearAllLoginData error: $e');
     }
   }
 
@@ -454,7 +455,7 @@ class AuthProvider extends ChangeNotifier {
         cookies,
       );
     } catch (e) {
-      debugPrint('[AuthProvider] restoreCookieString error: $e');
+      AppLogger.w('AUTH', 'restoreCookieString error: $e');
     }
   }
 

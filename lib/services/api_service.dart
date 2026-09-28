@@ -23,6 +23,9 @@ class ApiService {
 
   late final Dio dio;
   PersistCookieJar? _guestJar;
+
+  /// 当前活跃的 CookieJar（游客或当前账号）
+  CookieJar? _activeJar;
   String? _activeAccount;
   String _currentHost = '';
   bool _initialized = false;
@@ -33,6 +36,11 @@ class ApiService {
 
   /// 当前活跃账号名，null 表示游客
   String? get activeAccount => _activeAccount;
+
+  /// 当前活跃的 CookieJar —— 供 Cookie 反向同步（WebView → Dio）等场景写入。
+  ///
+  /// Dio 内部通过拦截器持有它，外部拿不到；这里显式暴露一个引用。
+  CookieJar? get activeCookieJar => _activeJar ?? _guestJar;
 
   Future<void> init({String? baseUrl}) async {
     if (_initialized) return;
@@ -98,6 +106,7 @@ class ApiService {
     );
 
     dio.interceptors.add(CookieManager(_guestJar!));
+    _activeJar = _guestJar;
     // 统一日志 + 错误处理拦截器
     dio.interceptors.add(
       InterceptorsWrapper(
@@ -238,6 +247,7 @@ class ApiService {
   }
 
   void _replaceCookieManager(CookieJar jar) {
+    _activeJar = jar;
     dio.interceptors.removeWhere((i) => i is CookieManager);
     dio.interceptors.insert(0, CookieManager(jar));
   }

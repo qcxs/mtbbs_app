@@ -43,6 +43,7 @@ class ThreadListController extends ChangeNotifier {
 
     try {
       final result = await fetchFn(page: page);
+      _throwIfFailed(result);
       items = _parseItems(result);
       totalPages = result['totalPages'] as int? ?? 0;
       _cachePage(1, items);
@@ -65,13 +66,15 @@ class ThreadListController extends ChangeNotifier {
 
     try {
       final result = await fetchFn(page: 1);
+      _throwIfFailed(result);
       final newItems = _parseItems(result);
       items = newItems;
       totalPages = result['totalPages'] as int? ?? 0;
       _cachePage(1, newItems);
       notifyListeners();
     } catch (e) {
-      debugPrint('[ThreadList] refresh error: $e');
+      // 刷新失败保留当前列表，只记录：清空会让"一刷新就空白"
+      AppLogger.w('PAGE', 'refresh failed: $e');
     }
   }
 
@@ -95,6 +98,7 @@ class ThreadListController extends ChangeNotifier {
 
     try {
       final result = await fetchFn(page: targetPage);
+      _throwIfFailed(result);
       final newItems = _parseItems(result);
 
       // 有无数据都停在此页，无数据时显示空状态（分页器仍在，可翻走）
@@ -126,11 +130,32 @@ class ThreadListController extends ChangeNotifier {
     _pageCache[p] = List.from(pageItems);
   }
 
+  /// 把 API 层的 `success:false` 转成异常。
+  ///
+  /// 否则它会被当成"空列表"静默吞掉，用户看到的是"暂无帖子"而不是
+  /// "需要先登录"（见 docs/07 经验教训：静默失败）。
+  void _throwIfFailed(Map<String, dynamic> result) {
+    if (result['success'] == false) {
+      throw Exception(result['message']?.toString() ?? '加载失败');
+    }
+  }
+
+  /// 逐项解析：单条坏数据不能让整个列表挂掉
   List<ThreadItem> _parseItems(Map<String, dynamic> result) {
     final list = result['threads'] as List<dynamic>?;
     if (list == null) return [];
-    return list
-        .map((j) => ThreadItem.fromJson(j as Map<String, dynamic>))
-        .toList();
+    final items = <ThreadItem>[];
+    var failed = 0;
+    for (final j in list) {
+      try {
+        items.add(ThreadItem.fromJson(j as Map<String, dynamic>));
+      } catch (e) {
+        failed++;
+      }
+    }
+    if (failed > 0) {
+      AppLogger.w('PARSE', 'thread item degraded: $failed/${list.length}');
+    }
+    return items;
   }
 }

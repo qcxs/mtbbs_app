@@ -83,6 +83,9 @@ class PostItem {
   /// 评分记录，结构 {header, detailUrl, totalScore, entries: [{username, uid, score, reason}]}
   final Map<String, dynamic>? rating;
 
+  /// 该楼层的解析是否失败（解析异常时降级为占位，避免拖垮整页）
+  final bool degraded;
+
   const PostItem({
     this.pid = '',
     this.floor = 0,
@@ -101,6 +104,7 @@ class PostItem {
     this.kickUrl = '',
     this.isLiked = false,
     this.rating,
+    this.degraded = false,
   });
 
   bool get isMainPost => isOp;
@@ -135,6 +139,7 @@ class PostItem {
     rating: p['rating'] != null
         ? Map<String, dynamic>.from(p['rating'] as Map)
         : null,
+    degraded: p['degraded'] == true,
   );
 
   Map<String, dynamic> toMap() => {
@@ -155,6 +160,7 @@ class PostItem {
     'kickUrl': kickUrl,
     'isLiked': isLiked,
     'rating': rating,
+    'degraded': degraded,
   };
 }
 

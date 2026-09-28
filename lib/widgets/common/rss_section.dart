@@ -28,7 +28,6 @@ class _RssSectionState extends State<RssSection>
   void initState() {
     super.initState();
     updateKeepAlive();
-    debugPrint('[RssSection] initState called, _everLoaded=$_everLoaded');
     _fetch();
   }
 

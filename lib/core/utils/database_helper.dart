@@ -371,19 +371,6 @@ class DatabaseHelper {
     await _browseStore.record(id).delete(db);
   }
 
-  Future<void> deleteBrowseRecordsByType(String type) async {
-    final db = await database;
-    await _browseStore.delete(
-      db,
-      finder: Finder(filter: Filter.equals('type', type)),
-    );
-  }
-
-  Future<void> clearBrowseRecords() async {
-    final db = await database;
-    await _browseStore.delete(db);
-  }
-
   Future<int> countBrowseRecords() async {
     final db = await database;
     return _browseStore.count(db);
@@ -597,10 +584,19 @@ class DatabaseHelper {
     return records.map((r) => r.value).toList();
   }
 
-  Future<void> upsertPreviewCache(String tid, String pid, String bbcode) async {
+  /// 写入/更新单条帖子预览缓存。
+  ///
+  /// key 含站点 host：MT 与 52 的 tid/pid 各自独立编号，不含 host 会互相覆盖。
+  Future<void> upsertPreviewCache(
+    String host,
+    String tid,
+    String pid,
+    String bbcode,
+  ) async {
     final db = await database;
-    final key = '${tid}_$pid';
+    final key = '${host}_${tid}_$pid';
     await _previewStore.record(key).put(db, {
+      'host': host,
       'tid': tid,
       'pid': pid,
       'bbcode': bbcode,
