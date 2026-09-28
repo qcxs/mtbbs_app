@@ -1,6 +1,7 @@
 export 'browse_record.dart';
 export 'editor_snapshot.dart';
 export 'managed_item.dart';
+export 'md_convert_templates.dart';
 export 'notice_segment.dart';
 export 'post_preview.dart';
 export 'thread_detail.dart';

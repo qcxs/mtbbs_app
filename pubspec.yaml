@@ -70,6 +70,9 @@ dependencies:
   html: ^0.15.4
   xml: ^6.5.0
 
+  # Markdown 解析（编辑器「导入 Markdown」→ BBCode，见 lib/core/parser/md2bbcode.dart）
+  markdown: ^7.3.1
+
   # 瀑布流布局
   flutter_staggered_grid_view: ^0.7.0
 

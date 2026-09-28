@@ -208,4 +208,34 @@ extension on _EditorPageState {
       );
     }
   }
+
+  /// 打开「导入 Markdown」底部面板，并把转换结果写入正文。
+  ///
+  /// 面板只做 Markdown → BBCode 的编辑与预览，写入动作在这里完成：
+  /// 通过 `controller.value` 一次性替换/插入，由 Flutter 的 UndoHistory
+  /// 自动入栈（见 docs/07 #8），因此整次导入可一步撤销。
+  Future<void> _openMdImportSheet() async {
+    final result = await showMdImportSheet(
+      context,
+      editorHasContent: _contentCtl.text.trim().isNotEmpty,
+    );
+    if (result == null || !mounted) return;
+
+    if (result.mode == MdImportMode.replace) {
+      _contentCtl.value = TextEditingValue(
+        text: result.bbcode,
+        selection: TextSelection.collapsed(offset: result.bbcode.length),
+      );
+      showToast('已替换正文');
+    } else {
+      final sel = _contentCtl.selection;
+      final pos = sel.isValid ? sel.start : _contentCtl.text.length;
+      _contentCtl.value = TextEditingValue(
+        text: _contentCtl.text.replaceRange(pos, pos, result.bbcode),
+        selection: TextSelection.collapsed(offset: pos + result.bbcode.length),
+      );
+      showToast('已插入到光标处');
+    }
+    _focusContent();
+  }
 }

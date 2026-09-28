@@ -37,6 +37,7 @@ import 'package:mtbbs/pages/editor/editor_submit.dart';
 import 'package:mtbbs/pages/editor/editor_dialogs.dart';
 import 'package:mtbbs/pages/editor/editor_intents.dart';
 import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
+import 'package:mtbbs/pages/editor/md_import_sheet.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
 import 'package:mtbbs/widgets/editor/editor_hint_bar.dart';
@@ -799,6 +800,8 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
                         await _saveManualSnapshot();
                       case 'history':
                         _openHistoryPage();
+                      case 'markdown':
+                        await _openMdImportSheet();
                       case 'toolbar':
                         if (!context.mounted) return;
                         await context.push('/settings/editor');
@@ -851,6 +854,15 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
                       child: ListTile(
                         leading: Icon(Icons.history, size: 20),
                         title: Text('编辑历史'),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'markdown',
+                      child: ListTile(
+                        leading: Icon(Icons.article_outlined, size: 20),
+                        title: Text('导入 Markdown'),
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
