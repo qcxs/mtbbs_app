@@ -613,14 +613,11 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   /// 楼层号兜底
   ///
-  /// viewpid 的 postnum 形如 `<em>8</em><sup>#</sup>`（"8#"），解析层按
-  /// `#(\d+)` 匹配不到，这里从 floorLabel 里取数字补齐；仍取不到时顺延末楼。
+  /// 解析层已从 postnum 标签取到楼层（数字 `16#` 或中文名 沙发/椅子…），
+  /// 这里只在取不到时顺延末楼。
   int _resolveFloor(Map<String, dynamic> post) {
     final floor = (post['floor'] as int?) ?? 0;
     if (floor > 0) return floor;
-    final label = post['floorLabel']?.toString() ?? '';
-    final m = RegExp(r'(\d+)').firstMatch(label);
-    if (m != null) return int.tryParse(m.group(1)!) ?? 0;
     final posts = _commentPages[_currentPage];
     if (posts != null && posts.isNotEmpty) return posts.last.floor + 1;
     return 0;

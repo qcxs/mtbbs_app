@@ -65,11 +65,9 @@ Map<String, dynamic> parsePostFromTable(
       floorLabel = sanitizeText(
         postnum.text,
       ).replaceAll(RegExp(r'\s+'), ' ').trim();
-      // 提取楼层数字
-      final floorMatch = RegExp(r'#(\d+)').firstMatch(floorLabel);
-      if (floorMatch != null) {
-        floor = int.tryParse(floorMatch.group(1)!) ?? floor;
-      }
+      // DOM 标签优先：数字（克米 `16#` / 标准 Discuz `#16`）或中文楼层名（沙发/椅子…）
+      final domFloor = parseFloorFromLabel(floorLabel);
+      if (domFloor != null) floor = domFloor;
     }
 
     // 帖子头部信息
@@ -288,6 +286,45 @@ Map<String, dynamic> parsePostFromTable(
     'followUrl': followUrl,
     'rating': rating,
   };
+}
+
+/// 中文楼层名 → 楼层号
+///
+/// 克米模板前 10 楼用中文命名（`a[id^="postnum"].km1` 即楼主 = 1 楼），
+/// 与数字标签连续编号：下水道 = 10 楼，其后的帖子即 `11#`。
+const Map<String, int> _namedFloors = {
+  '楼主': 1,
+  '沙发': 2,
+  '椅子': 3,
+  '板凳': 4,
+  '地毯': 5,
+  '凉席': 6,
+  '报纸': 7,
+  '地板': 8,
+  '地下室': 9,
+  '下水道': 10,
+};
+
+/// 从 `a[id^="postnum"]` 的文本解析楼层号
+///
+/// 两种形态：
+/// - 数字：克米模板 `16#`（数字在前），标准 Discuz `#16`
+/// - 中文名：前 10 楼为 楼主/沙发/…/下水道，按 [_namedFloors] 映射
+///
+/// 解析不出返回 null，由调用方沿用按顺序推算的兜底楼层。
+int? parseFloorFromLabel(String label) {
+  if (label.isEmpty) return null;
+  final match =
+      RegExp(r'(\d+)\s*#').firstMatch(label) ??
+      RegExp(r'#\s*(\d+)').firstMatch(label);
+  if (match != null) {
+    final parsed = int.tryParse(match.group(1)!);
+    if (parsed != null) return parsed;
+  }
+  for (final entry in _namedFloors.entries) {
+    if (label.contains(entry.key)) return entry.value;
+  }
+  return null;
 }
 
 /// 从 table#pidXX 提取 PID

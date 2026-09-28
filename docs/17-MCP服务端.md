@@ -146,9 +146,13 @@ lib/mcp/
 ## 平台集成（都由 `McpServerController` 状态驱动）
 
 - **Android**：前台服务 + 常驻通知（`McpForegroundService` + `McpStatusNotification`）。
-  用前台服务而非普通通知——应用被划掉时进程结束、服务销毁、通知自动消失，
-  不会留下"服务已开启"的假状态。Android 13+ 先请求 `POST_NOTIFICATIONS`，
-  授权后才启动服务（看不见通知的前台服务没有意义）。
+  用前台服务而非普通通知：服务随任务一起结束，通知才不会变成"服务已开启"的假状态。
+  两条退出路径都必须显式收尾——返回键退出走 `MainActivity.onDestroy()`（`isFinishing`
+  时 `McpStatusNotification.stop()`），划掉任务走 `android:stopWithTask="true"`
+  （前台服务默认**不会**随任务移除而停止，见 docs/07 #65）。
+  应用只是切到后台（Activity 未销毁）时服务继续运行，AI 客户端仍可连接——这是前台
+  服务存在的意义，故不在 `onStop` 里停服务。
+  Android 13+ 先请求 `POST_NOTIFICATIONS`，授权后才启动服务（看不见通知的前台服务没有意义）。
 - **Windows**：窗口标题标注 `MTBBS（已开启 MCP）`；标题栏一律由
   `widgets/layout/window_title_bar.dart` 自绘（含 MCP 徽章与三个窗口按钮）。
   不用原生标题栏的原因见 docs/07 #61：其配色由 DWM/系统主题决定，App 无法保证可读。

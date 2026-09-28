@@ -52,10 +52,14 @@
                 <data android:host="bbs.binmt.cc"/>
             </intent-filter>
         </activity>
-        <!-- MCP 运行状态前台服务：仅持有常驻通知，端口在 Flutter 侧 -->
+        <!-- MCP 运行状态前台服务：仅持有常驻通知，端口在 Flutter 侧。
+             stopWithTask=true：从最近任务划掉 App 时立即停止服务、撤掉通知。
+             前台服务的 stopWithTask 默认为 false，不加这一行则服务会在"退出应用"后
+             继续存活，留下假通知（见 docs/07 #65）。 -->
         <service
             android:name=".McpForegroundService"
             android:exported="false"
+            android:stopWithTask="true"
             android:foregroundServiceType="dataSync"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -315,6 +316,16 @@ class MyApp extends StatelessWidget {
             theme: _buildThemeData(schemeLight),
             darkTheme: _buildThemeData(schemeDark),
             themeMode: s.themeMode,
+            // 中文本地化：Material/Cupertino 内置文案（文本选择菜单、日期选择器、
+            // 语义标签等）跟随此配置。不配时回落到 DefaultMaterialLocalizations
+            // ——只有英文，且与系统语言无关。
+            // zh 放第一位：系统语言不在 supportedLocales 时按此回落。
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [Locale('zh'), Locale('en')],
             // 主题变化时同步 Windows 窗口底色（非 Windows 平台为 no-op）。
             // 标题栏本体是自绘的，不在这里——它需要 Theme/Overlay/Material 祖先，见 WindowChrome
             builder: (context, child) =>

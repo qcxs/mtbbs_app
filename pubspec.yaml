@@ -31,6 +31,12 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Material/Cupertino 内置文案的中文本地化（文本选择菜单、日期选择器、
+  # 语义标签等）。未配置时 MaterialLocalizations 回落到 DefaultMaterialLocalizations
+  # ——它只有英文，且与系统语言无关。
+  flutter_localizations:
+    sdk: flutter
+
   cupertino_icons: ^1.0.8
 
   # 网络

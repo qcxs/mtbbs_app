@@ -323,7 +323,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                 borderRadius: BorderRadius.circular(2),
               ),
               child: Text(
-                '#${widget.post.floor}',
+                widget.post.floorText,
                 style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
               ),
             ),

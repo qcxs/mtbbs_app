@@ -106,6 +106,19 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onDestroy() {
+        // 返回键退出（双击退出 → SystemNavigator.pop → activity.finish）后，
+        // FlutterActivity 会销毁 FlutterEngine，Dart 侧的 MCP HTTP 服务随之停止，
+        // 但 McpForegroundService 是独立组件、不会跟着结束：它会把进程留在前台服务
+        // 级别，并让通知以「MCP 服务已开启」的假状态常驻（见 docs/07 #65）。
+        // isFinishing 为 true 才是真退出；配置变化导致的销毁（configChanges 已覆盖
+        // 常用的那些）不走这里，避免误停正在后台服务的 MCP。
+        if (isFinishing) {
+            McpStatusNotification.stop(this)
+        }
+        super.onDestroy()
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,

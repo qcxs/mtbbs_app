@@ -105,6 +105,15 @@ class PostItem {
 
   bool get isMainPost => isOp;
 
+  /// 楼层显示文案
+  ///
+  /// 中文楼层名（沙发/椅子…）原样显示——DOM 给的就是这个名字；
+  /// 数字楼层统一渲染为 `#N`。
+  String get floorText =>
+      floorLabel.isNotEmpty && !RegExp(r'\d').hasMatch(floorLabel)
+      ? floorLabel
+      : '#$floor';
+
   /// 从 parse 返回的 Map 构建
   factory PostItem.fromMap(Map<String, dynamic> p) => PostItem(
     pid: p['pid']?.toString() ?? '',
