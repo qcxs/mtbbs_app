@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/core/app/desktop_window.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/mcp/mcp.dart';
+import 'package:mtbbs/widgets/dialog/mcp_quick_dialog.dart';
 import 'package:window_manager/window_manager.dart';
 
 /// 给整棵树套上自绘标题栏（仅 Windows）。
@@ -153,6 +154,9 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
 }
 
 /// MCP 运行状态徽章 —— 只在服务真正在跑时显示
+///
+/// 可点击：打开 MCP 快捷开关弹窗（与 Android 常驻通知、 「我的」页快捷开关
+/// 共用同一实现，见 `showMcpQuickDialog`）。
 class _McpBadge extends StatelessWidget {
   const _McpBadge();
 
@@ -164,15 +168,23 @@ class _McpBadge extends StatelessWidget {
       builder: (context, _) {
         final running = McpServerController.instance.isRunning;
         if (!running) return const SizedBox.shrink();
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: cs.secondaryContainer,
+        return Tooltip(
+          message: 'MCP 服务运行中，点击查看 / 快捷关闭',
+          waitDuration: const Duration(milliseconds: 600),
+          child: InkWell(
+            onTap: showMcpQuickDialog,
             borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            'MCP 已开启',
-            style: TextStyle(fontSize: 11, color: cs.onSecondaryContainer),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.secondaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'MCP 已开启',
+                style: TextStyle(fontSize: 11, color: cs.onSecondaryContainer),
+              ),
+            ),
           ),
         );
       },

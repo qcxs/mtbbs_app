@@ -79,6 +79,17 @@ class BBCode2Html {
   /// 交给代码高亮组件（[BbcodeCodeBlock]）渲染。
   final List<String> codeBlocks = [];
 
+  /// [convert] 后填充的正文图片 URL（按 HTML 文档顺序，索引对应
+  /// `data-img-index`，不含表情）。一段 BBCode 即一帖/一楼，
+  /// 渲染层据此把该帖/该楼的图片组成一个可左右滑动的画廊。
+  ///
+  /// 这里的每一项都是**可直接使用**的地址（已解码实体、已补全域名），
+  /// 渲染层原样请求、不做任何修正（见 docs/02「数据层 ↔ 渲染层职责边界」）。
+  final List<String> imageUrls = [];
+
+  /// 正文图片的发射点暂存（见 [_emitContentImage] / [_resolveContentImages]）
+  final List<({String url, String tag})> _imageSlots = [];
+
   BBCode2Html({
     Map<String, String>? emojiMap,
     Map<String, String>? smilieIdMap,
@@ -129,8 +140,10 @@ class BBCode2Html {
   String convert(String input) {
     var html = htmlEscape(input);
     final appdataList = <String>[];
-    // codeBlocks 为公开输出字段，每次转换前清空
+    // codeBlocks / imageUrls 为公开输出字段，每次转换前清空
     codeBlocks.clear();
+    imageUrls.clear();
+    _imageSlots.clear();
 
     // ========== 0. 保护 [appdata] 块（JSON 不应被 HTML 转义） ==========
     html = html.replaceAllMapped(
@@ -351,7 +364,10 @@ class BBCode2Html {
             }
           }
         }
-        return '<img src="$src"$width />';
+        final tag = '<img src="$src"$width />';
+        // src 在开头 htmlEscape 时已被转义，数据层负责还原成可直接使用的
+        // URL 交给渲染层（渲染层不碰实体解码）
+        return src.isEmpty ? tag : _emitContentImage(_unescapeHtml(src), tag);
       },
     );
 
@@ -408,7 +424,43 @@ class BBCode2Html {
       html = html.replaceFirst('\x00APPDATA$i\x00', appdataList[i]);
     }
 
+    // ========== 8. 落地正文图片（按文档顺序编号） ==========
+    html = _resolveContentImages(html);
+
     return html;
+  }
+
+  /// 记录一张正文图片（发射点），返回占位符。
+  ///
+  /// [url] 必须是**可直接使用**的地址（已解码实体、已补全域名）——渲染层
+  /// 会原样拿去请求，不再做任何修正。契约见 docs/02「数据层 ↔ 渲染层职责边界」。
+  ///
+  /// [tag] 是待落地的 `<img>`，由 [_resolveContentImages] 按占位符在 HTML 中
+  /// 出现的先后顺序统一展开。之所以先占位、最后落地（而不是当场写 `<img>`）：
+  /// - `[appdata]` 图片附件在步骤 0 就被渲染，早于 `[img]`，直接写入会让
+  ///   [imageUrls] 的次序与文档顺序不符；占位符按出现位置展开天然正确
+  /// - URL 与 HTML 出自同一处、只写一次，渲染层拿到的值与 [imageUrls]
+  ///   不会因为属性转义（`&` → `&amp;`）而漂移
+  String _emitContentImage(String url, String tag) {
+    _imageSlots.add((url: url, tag: tag));
+    return '\x00IMG${_imageSlots.length - 1}\x00';
+  }
+
+  /// 按文档顺序把 `\x00IMG*` 占位符落地为 `<img data-img-index="N">`，
+  /// 并同步填充 [imageUrls]（索引与 `data-img-index` 一一对应）。
+  ///
+  /// 表情 `<img>` 不经过占位符，因此天然不在画廊内，无需再做字符串判别。
+  String _resolveContentImages(String html) {
+    return html.replaceAllMapped(RegExp(r'\x00IMG(\d+)\x00'), (m) {
+      final slot = int.tryParse(m.group(1)!) ?? -1;
+      if (slot < 0 || slot >= _imageSlots.length) return '';
+      final image = _imageSlots[slot];
+      imageUrls.add(image.url);
+      return image.tag.replaceFirst(
+        '<img',
+        '<img data-img-index="${imageUrls.length - 1}"',
+      );
+    });
   }
 
   /// 渲染 [appdata] JSON 为 HTML
@@ -491,7 +543,11 @@ class BBCode2Html {
       if (url.isNotEmpty) {
         final resolvedUrl = _resolveUrl(url);
         if (meta.isNotEmpty) buf.write(' &nbsp; ');
-        buf.write('<a href="$resolvedUrl" target="_blank">下载</a>');
+        // 与正文图片同一约定：写进属性的值必须转义（`&` → `&amp;`），
+        // 否则带参地址会被渲染器解析成非法 HTML 属性
+        buf.write(
+          '<a href="${htmlEscape(resolvedUrl)}" target="_blank">下载</a>',
+        );
       }
       buf.write('</div>');
     }
@@ -506,9 +562,13 @@ class BBCode2Html {
   String _renderImageAttach(Map<String, dynamic> data) {
     final url = data['url'] as String? ?? '';
     if (url.isEmpty) return '';
+    // resolvedUrl 是补全域名后的真实地址（此处尚未转义），直接作为
+    // 渲染层的可用 URL 记录，无需再从生成的 HTML 里回读解码
     final resolvedUrl = _resolveUrl(url);
-    final escapedUrl = htmlEscape(resolvedUrl);
-    return '<img src="$escapedUrl" style="max-width:100%;" />';
+    return _emitContentImage(
+      resolvedUrl,
+      '<img src="${htmlEscape(resolvedUrl)}" style="max-width:100%;" />',
+    );
   }
 
   /// 将相对 URL 解析为绝对 URL

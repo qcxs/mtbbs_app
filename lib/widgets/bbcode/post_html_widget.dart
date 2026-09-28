@@ -108,6 +108,8 @@ class PostHtmlWidget extends StatelessWidget {
     );
     final html = converter.convert(bbcode);
     final codeBlocks = converter.codeBlocks;
+    // 本段 BBCode（= 一帖/一楼）的全部正文图片，供画廊左右滑动
+    final imageUrls = converter.imageUrls;
 
     return SelectionArea(
       child: HtmlWidget(
@@ -142,6 +144,10 @@ class PostHtmlWidget extends StatelessWidget {
               url: src,
               explicitWidth: double.tryParse(element.attributes['width'] ?? ''),
               maxImageWidth: maxImageWidth.toDouble(),
+              galleryUrls: imageUrls,
+              galleryIndex:
+                  int.tryParse(element.attributes['data-img-index'] ?? '') ??
+                  -1,
             );
           }
           return null;
@@ -254,7 +260,15 @@ class _EmojiImage extends StatelessWidget {
 /// 帖子正文图片（块级，独占一行）
 ///
 /// 不挂 `onTap`：点击需冒泡给外层 `[url]` 链接，挂 tap 会消费掉。
-/// 只提供长按菜单（查看大图 / 保存）。
+/// 右上角有一个独立的"看大图"按钮（见 [_ImageZoomButton]）——它自身
+/// 消费点击，不覆盖图片本体，因此不违反上述冒泡约定。
+///
+/// 多图：`galleryUrls` 为**本帖/本楼**的全部正文图片，长按菜单与右上角
+/// 按钮都进入同一画廊，可左右滑动切换（不跨帖、不跨楼层）。
+///
+/// 职责边界（docs/02「数据层 ↔ 渲染层职责边界」）：URL 由转换层产出为
+/// **可直接使用**的地址，本组件原样消费——不解码实体、不拼域名、不猜格式；
+/// 只做越界防护（索引越界按首图、未传画廊按单图），不崩溃。
 ///
 /// 宽度策略：
 /// - 显式尺寸（`[img=W,H]`）→ 强制该宽度（同 HTML `<img width>`，可放大）
@@ -265,16 +279,30 @@ class BbcodeImage extends StatelessWidget {
   final double? explicitWidth;
   final double maxImageWidth;
 
+  /// 同帖/同楼的全部正文图片（按文档顺序，来自 `data-img-index` 同源的
+  /// `BBCode2Html.imageUrls`）；未传时退化为单图
+  final List<String> galleryUrls;
+
+  /// [url] 在 [galleryUrls] 中的下标（来自 `data-img-index`）；越界按 0 处理
+  final int galleryIndex;
+
   const BbcodeImage({
     super.key,
     required this.url,
     this.explicitWidth,
     this.maxImageWidth = 600,
+    this.galleryUrls = const [],
+    this.galleryIndex = -1,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // 越界防护：索引缺失/越界退化为首图，未传画廊退化为单图
+    final urls = galleryUrls.isNotEmpty ? galleryUrls : <String>[url];
+    final index = (galleryIndex >= 0 && galleryIndex < urls.length)
+        ? galleryIndex
+        : 0;
     return LayoutBuilder(
       builder: (context, constraints) {
         final available = constraints.maxWidth.isFinite
@@ -311,18 +339,64 @@ class BbcodeImage extends StatelessWidget {
               Icon(Icons.broken_image_outlined, size: 48, color: cs.outline),
         );
         return GestureDetector(
-          onLongPress: () =>
-              showImageActions(context, imageUrls: [url], sourceInfo: '帖子图片'),
-          // 显式尺寸：固定盒宽，加载中/加载失败也保持占位宽度，避免状态切换跳动
-          // 未指定尺寸：上限盒宽，加载中按上限占位，解码后收敛到原始像素宽
-          child: hasExplicitWidth
-              ? SizedBox(width: width, child: image)
-              : ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: width),
-                  child: image,
+          onLongPress: () => showImageActions(
+            context,
+            imageUrls: urls,
+            initialIndex: index,
+            sourceInfo: '帖子图片',
+          ),
+          child: Stack(
+            children: [
+              // 显式尺寸：固定盒宽，加载中/加载失败也保持占位宽度，避免状态切换跳动
+              // 未指定尺寸：上限盒宽，加载中按上限占位，解码后收敛到原始像素宽
+              hasExplicitWidth
+                  ? SizedBox(width: width, child: image)
+                  : ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: width),
+                      child: image,
+                    ),
+              Positioned(
+                top: 6,
+                right: 6,
+                child: _ImageZoomButton(
+                  onTap: () => showImageViewer(
+                    context,
+                    imageUrls: urls,
+                    initialIndex: index,
+                  ),
                 ),
+              ),
+            ],
+          ),
         );
       },
+    );
+  }
+}
+
+/// 图片右上角的"看大图"按钮
+///
+/// 长按菜单里也有"查看图片"，但长按有延迟、且在 SelectionArea 里容易
+/// 触发文本选择，所以给一个显式的一键入口。
+///
+/// 底色固定为半透明黑 + 白色图标：它叠在任意图片上，跟随主题变色反而
+/// 会与图片内容撞色（与全屏查看器的黑底白字是同一约定）。
+class _ImageZoomButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ImageZoomButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: const BoxDecoration(
+          color: Colors.black45,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.zoom_in, size: 18, color: Colors.white),
+      ),
     );
   }
 }

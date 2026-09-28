@@ -28,6 +28,7 @@ import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/max_screen_size.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/mcp_quick_dialog.dart';
 import 'package:mtbbs/auth/widgets/login_sheet.dart';
 
 /// 全局 ScaffoldMessenger key — 非 Widget 层（事件订阅）也能弹 SnackBar
@@ -175,6 +176,11 @@ void main() async {
     router,
   );
   runApp(Platform.isWindows ? WindowStateSaver(child: app) : app);
+
+  // Android：点常驻通知 → 弹 MCP 快捷开关（与 Windows 标题栏徽章、
+  // 「我的」页开关共用同一实现）。放在 runApp 之后：需要在交出事件循环前
+  // 挂上首帧回调，才能补取冷启动那次点击（见 McpStatusNotice.init）。
+  unawaited(McpStatusNotice.init(onNotificationTap: showMcpQuickDialog));
 
   // Android：接管系统「打开方式」传入的论坛链接
   // （UrlRouter.resolveTarget 决定落地页：App 内路由优先，兜底内置浏览器）

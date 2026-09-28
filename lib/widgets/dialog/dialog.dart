@@ -6,5 +6,6 @@ export 'image_picker_sheet.dart';
 export 'key_recorder_dialog.dart';
 export 'kick_dialog.dart';
 export 'managed_list_dialog.dart';
+export 'mcp_quick_dialog.dart';
 export 'page_jump_dialog.dart';
 export 'rate_dialog.dart';

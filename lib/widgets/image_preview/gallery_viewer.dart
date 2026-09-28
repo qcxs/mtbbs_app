@@ -66,6 +66,25 @@ class _GalleryViewerState extends State<GalleryViewer> {
                   minScale: PhotoViewComputedScale.contained * 0.8,
                   maxScale: PhotoViewComputedScale.covered * 2.0,
                   initialScale: PhotoViewComputedScale.contained,
+                  // 加载失败要给提示：黑底上没有 errorBuilder 时用户只看到纯黑，
+                  // 无法判断是"图挂了"还是"还在加载"（排查成本极高）
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.broken_image_outlined,
+                          size: 40,
+                          color: Colors.white54,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '图片加载失败',
+                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               },
               scrollPhysics: const BouncingScrollPhysics(),

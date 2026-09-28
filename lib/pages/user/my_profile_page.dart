@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/pages/settings/user_management_dialog.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
@@ -16,6 +18,7 @@ class ProfilePage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final auth = context.watch<AuthProvider>();
     final settings = context.watch<SettingsProvider>();
+    final mcp = context.watch<McpServerController>();
 
     final themeIcon = switch (settings.themeMode) {
       ThemeMode.light => Icons.light_mode,
@@ -56,6 +59,20 @@ class ProfilePage extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                // MCP 快捷开关（主题模式左侧）：一键开/关，图标与颜色反映运行状态
+                IconButton(
+                  icon: Icon(mcp.isRunning ? Icons.hub : Icons.hub_outlined),
+                  color: mcp.isRunning ? cs.primary : null,
+                  tooltip: mcp.isRunning ? 'MCP 服务已开启，点击关闭' : 'MCP 服务已关闭，点击开启',
+                  onPressed: () async {
+                    final next = !mcp.enabled;
+                    await mcp.setEnabled(next);
+                    showToast(
+                      next ? '已开启 MCP 服务' : '已关闭 MCP 服务',
+                      duration: const Duration(seconds: 1),
+                    );
+                  },
                 ),
                 IconButton(
                   icon: Icon(themeIcon),

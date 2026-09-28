@@ -32,7 +32,8 @@ void main() {
     });
 
     test('多行多列表格完整渲染', () {
-      const bbcode = ''
+      const bbcode =
+          ''
           '[table]'
           '[tr]'
           '[td][align=center][b]名称[/b][/align][/td]'
@@ -82,13 +83,88 @@ void main() {
     });
 
     test('禁用 backcolor 时连带删除同义的 background', () {
-      const bbcode = '[backcolor=yellow]黄底[/backcolor][background=pink]粉底[/background]';
+      const bbcode =
+          '[backcolor=yellow]黄底[/backcolor][background=pink]粉底[/background]';
       expect(stripDisabledBbcodeTags(bbcode, {'backcolor'}), '黄底粉底');
     });
 
     test('非样式标签（quote/code/url/img）不受影响', () {
-      const bbcode = '[quote]引用[/quote][code]var a=1;[/code][url=x]链接[/url][img]a.png[/img]';
-      expect(stripDisabledBbcodeTags(bbcode, bbcodeStyleTagIds.toSet()), bbcode);
+      const bbcode =
+          '[quote]引用[/quote][code]var a=1;[/code][url=x]链接[/url][img]a.png[/img]';
+      expect(
+        stripDisabledBbcodeTags(bbcode, bbcodeStyleTagIds.toSet()),
+        bbcode,
+      );
+    });
+  });
+
+  group('BBCode2Html - 正文图片标记（渲染层按帖/楼组画廊）', () {
+    test('[img] 按文档顺序收集 URL 并写入 data-img-index', () {
+      const bbcode =
+          '[img]https://a.com/1.png[/img]中间文字[img]https://a.com/2.png[/img]';
+      final converter = BBCode2Html();
+      final html = converter.convert(bbcode);
+      expect(
+        html,
+        contains('<img data-img-index="0" src="https://a.com/1.png"'),
+      );
+      expect(
+        html,
+        contains('<img data-img-index="1" src="https://a.com/2.png"'),
+      );
+      expect(converter.imageUrls, [
+        'https://a.com/1.png',
+        'https://a.com/2.png',
+      ]);
+    });
+
+    test('带参地址还原实体：imageUrls 与渲染层 src 逐字一致（防画廊全黑）', () {
+      // 编辑器里已有的图片就是这种带 & 的 Discuz 附件地址
+      const bbcode =
+          '[img]https://bbs.example.com/forum.php?mod=image&aid=1&key=ab[/img]';
+      final converter = BBCode2Html();
+      final html = converter.convert(bbcode);
+      // HTML 属性里必须转义（渲染器解析时会解码回 &）
+      expect(html, contains('&amp;aid=1&amp;key=ab'));
+      // 交给画廊的必须是未转义的真实 URL，否则请求 404 → 全黑
+      expect(converter.imageUrls, [
+        'https://bbs.example.com/forum.php?mod=image&aid=1&key=ab',
+      ]);
+    });
+
+    test('appdata 图片附件（编辑器预览同款链路）也计入画廊且已还原', () {
+      const bbcode =
+          '[appdata]{"type":"image_attach","url":"forum.php?mod=image&aid=7","aid":"7"}[/appdata]';
+      final converter = BBCode2Html(baseUrl: 'https://bbs.example.com');
+      converter.convert(bbcode);
+      expect(converter.imageUrls, [
+        'https://bbs.example.com/forum.php?mod=image&aid=7',
+      ]);
+    });
+
+    test('顺序按文档而非按发射点：[img] 在前、appdata 附件在后', () {
+      const bbcode =
+          '[img]https://a.com/1.png[/img]中间[appdata]{"type":"image_attach","url":"https://a.com/2.png","aid":"2"}[/appdata]';
+      final converter = BBCode2Html();
+      final html = converter.convert(bbcode);
+      // appdata 在步骤 0 就被渲染（早于 [img]），若按发射顺序收集会颠倒
+      expect(converter.imageUrls, [
+        'https://a.com/1.png',
+        'https://a.com/2.png',
+      ]);
+      expect(
+        html.indexOf('data-img-index="0"'),
+        lessThan(html.indexOf('data-img-index="1"')),
+      );
+    });
+
+    test('表情不计入画廊；code 里的图片文本不算正文图片', () {
+      final converter = BBCode2Html(emojiMap: {'[呵呵]': 'https://x/e.gif'});
+      final html = converter.convert(
+        '[img]https://a.com/1.png[/img][呵呵][code]<img src="x.png">[/code]',
+      );
+      expect(html, contains('data-type="emoji"'));
+      expect(converter.imageUrls, ['https://a.com/1.png']);
     });
   });
 }

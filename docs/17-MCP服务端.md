@@ -49,6 +49,7 @@ lib/mcp/
 
 设置侧：`lib/pages/settings/models/mcp_settings.dart`（分组声明）、
 `lib/pages/settings/mcp_token_dialogs.dart`（令牌创建/详情）。
+快捷开关：`lib/widgets/dialog/mcp_quick_dialog.dart`（`showMcpQuickDialog()`，入口见「平台集成」）。
 
 ## 安全模型（四层，缺一层都不够）
 
@@ -156,6 +157,31 @@ lib/mcp/
 - **Windows**：窗口标题标注 `MTBBS（已开启 MCP）`；标题栏一律由
   `widgets/layout/window_title_bar.dart` 自绘（含 MCP 徽章与三个窗口按钮）。
   不用原生标题栏的原因见 docs/07 #61：其配色由 DWM/系统主题决定，App 无法保证可读。
+
+### 快捷开关入口（弹窗 + 一键开关）
+
+`showMcpQuickDialog()` —— 状态一瞥（状态点 / 端点 / 工具数 / 无令牌告警）+
+**一个**开关控件（开关行），右上角可直达 `/settings/mcp`。
+弹窗内的开/关**只有开关这一处**：不再另设同语义的主按钮，避免"两套入口"。
+
+| 入口 | 说明 |
+|------|------|
+| Android 常驻通知 | 点通知 → `EXTRA_TAP` → `MainActivity` → 通道 `onNotificationTap` → 弹窗 |
+| Windows 标题栏徽章 | `_McpBadge` 可点（Tooltip 提示"点击查看 / 快捷关闭"） |
+| 「我的」页顶部按钮 | 主题模式左侧，**一键直接开/关**（不走弹窗，toast 反馈） |
+
+**为什么弹窗必须走 `rootNavigatorKey` 而不是调用方 context**：点通知可能发生在
+**冷启动首帧之前**，那时任何页面的 context 都不存在。因此弹窗只用根 Overlay
+（与 `showToast` 同一套思路），根未就绪时先等一帧再取一次。
+
+**冷启动的那次点击要补取**：App 没运行时点通知 = 冷启动，Dart 还没注册回调，
+原生先存 `pendingMcpTap`，Dart 就绪后用 `getPendingTap` 取走（与链接入站的
+`getInitialUrl` 同一套"暂存 + 补取"模式）。补取刻意放在**首帧之后**，
+保证根 Navigator 已挂载。
+
+**`/settings/mcp` 是第二个入口、不是第二份实现**：路由里挂的就是设置页
+「MCP 服务」分组用的同一个 `mcpSettings` 声明（docs/07 #54 的"两个入口、
+一份实现"）。
 
 ## 验证方式
 

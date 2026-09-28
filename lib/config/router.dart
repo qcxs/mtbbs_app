@@ -15,6 +15,8 @@ import 'package:mtbbs/pages/settings/about_page.dart';
 import 'package:mtbbs/pages/settings/cache_settings_page.dart';
 import 'package:mtbbs/pages/settings/editor_settings_page.dart';
 import 'package:mtbbs/pages/settings/history_format_page.dart';
+import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
+import 'package:mtbbs/pages/settings/settings_group_page.dart';
 import 'package:mtbbs/pages/thread/thread_view_page.dart';
 import 'package:mtbbs/pages/editor/editor_page.dart';
 import 'package:mtbbs/pages/editor/editor_history_page.dart';
@@ -93,6 +95,17 @@ GoRouter buildRouter({
             path: '/settings/editor',
             pageBuilder: (_, __) =>
                 const NoTransitionPage(child: EditorSettingsPage()),
+          ),
+          // MCP 设置 —— 与设置页「MCP 服务」分组共用同一份声明
+          // （`mcpSettings`），供 MCP 快捷弹窗右上角直达
+          GoRoute(
+            path: '/settings/mcp',
+            pageBuilder: (_, __) => NoTransitionPage(
+              child: SettingsGroupPage(
+                title: 'MCP 服务',
+                modelsBuilder: mcpSettings,
+              ),
+            ),
           ),
           GoRoute(
             path: '/thread/:tid',

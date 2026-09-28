@@ -27,6 +27,12 @@ class MainActivity : FlutterActivity() {
     /// Flutter 尚未就绪时暂存的入站链接（冷启动场景）
     private var pendingUrl: String? = null
 
+    /// MCP 状态通道（供原生在"用户点了常驻通知"时回调 Dart）
+    private var mcpChannel: MethodChannel? = null
+
+    /// Flutter 尚未就绪时暂存的"通知被点开"标记（冷启动场景）
+    private var pendingMcpTap = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // 冷启动时先抓住 intent；configureFlutterEngine 之后 Dart 会来取。
         // savedInstanceState 非空说明只是重建，不要重复导航。
@@ -35,6 +41,8 @@ class MainActivity : FlutterActivity() {
         // 拿去当初始路由，入站链接只走下面的 mtbbs/intent 通道。
         if (savedInstanceState == null) {
             pendingUrl = intent?.data?.toString()?.takeIf { it.isNotEmpty() }
+            pendingMcpTap =
+                intent?.getBooleanExtra(McpStatusNotification.EXTRA_TAP, false) == true
         }
         super.onCreate(savedInstanceState)
     }
@@ -43,6 +51,20 @@ class MainActivity : FlutterActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         dispatchUrl(intent.data?.toString())
+        // 热启动：用户点常驻通知时 Activity 已在运行，直接回调 Dart
+        if (intent.getBooleanExtra(McpStatusNotification.EXTRA_TAP, false)) {
+            dispatchMcpTap()
+        }
+    }
+
+    /// 通知被点开 → 让 Dart 弹「MCP 快捷开关」
+    private fun dispatchMcpTap() {
+        val target = mcpChannel
+        if (target == null) {
+            pendingMcpTap = true
+        } else {
+            target.invokeMethod("onNotificationTap", null)
+        }
     }
 
     /// 把入站链接交给 Dart（Flutter 没就绪就先存下来）
@@ -73,10 +95,11 @@ class MainActivity : FlutterActivity() {
         }
 
         // MCP 运行状态常驻通知（见 McpStatusNotification）
-        MethodChannel(
+        mcpChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             McpStatusNotification.CHANNEL,
-        ).setMethodCallHandler { call, result ->
+        )
+        mcpChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "show" -> {
                     McpStatusNotification.start(this, call.argument<String>("endpoint").orEmpty())
@@ -85,6 +108,12 @@ class MainActivity : FlutterActivity() {
                 "hide" -> {
                     McpStatusNotification.stop(this)
                     result.success(null)
+                }
+                // 冷启动：点通知发生在 Dart 注册回调之前，由原生暂存、Dart 就绪后补取
+                "getPendingTap" -> {
+                    val value = pendingMcpTap
+                    pendingMcpTap = false
+                    result.success(value)
                 }
                 else -> result.notImplemented()
             }

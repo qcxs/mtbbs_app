@@ -31,6 +31,9 @@ object McpStatusNotification {
     const val PERMISSION_REQUEST_CODE = 8765
     const val NOTIFICATION_ID = 8765
 
+    /** 点通知拉起 Activity 时携带的标记：Dart 侧据此弹「MCP 快捷开关」 */
+    const val EXTRA_TAP = "mcp_tap"
+
     private const val CHANNEL_ID = "mtbbs_mcp_status"
 
     /** 等权限时暂存的通知内容（null 表示无需补发） */
@@ -64,12 +67,15 @@ object McpStatusNotification {
     /** 构建常驻通知（前台服务直接复用） */
     @Suppress("DEPRECATION")
     fun buildNotification(context: Context, endpoint: String): Notification {
+        // 点通知 = 打开 App + 弹「MCP 快捷开关」。热启动走 MainActivity.onNewIntent，
+        // 冷启动走 onCreate，两条路径都读 EXTRA_TAP（见 MainActivity）。
         val contentIntent = PendingIntent.getActivity(
             context,
             0,
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_TAP, true)
             },
             pendingIntentFlags(),
         )
