@@ -1,5 +1,11 @@
 part of 'editor_page.dart';
 
+/// 表格模板：Discuz 的表格要手写 `[table][tr][td]` 且必须对齐，
+/// 这里给一份可直接改文字的骨架，不做网格编辑（成本与收益不成比例）。
+const _kTableTemplate =
+    '[table][tr][td]表头1[/td][td]表头2[/td][/tr]\n'
+    '[tr][td]内容[/td][td]内容[/td][/tr][/table]';
+
 /// 工具栏动作分发与剪贴板粘贴。
 extension on _EditorPageState {
   /// 处理工具栏动作（BBCode 包裹/弹窗/选择面板）
@@ -74,6 +80,9 @@ extension on _EditorPageState {
         _focusContent();
       case ToolbarAction.code:
         _contentCtl.wrapBlock('[code]', '[/code]');
+        _focusContent();
+      case ToolbarAction.table:
+        _contentCtl.insertBlockTag(_kTableTemplate);
         _focusContent();
       case ToolbarAction.hr:
         _contentCtl.insertBlockTag('[hr]');

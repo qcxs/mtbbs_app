@@ -23,6 +23,7 @@ enum ToolbarAction {
   hide,
   free,
   code,
+  table,
   link,
   image,
   imageLongPress,
@@ -64,6 +65,11 @@ class ToolbarItemConfig {
 ///
 /// 顺序即默认顺序。`defaultVisible: false` 的项首次使用时默认隐藏。
 /// `imageLongPress` 不在列表中，因为它不是独立按钮（是 image 的长按操作）。
+///
+/// **默认快捷键取自 Typora（Windows）官方默认表**，只映射两边都有的能力
+/// （见 `assets/config/defaults.json` 的 `_toolbarNote`）。
+/// 真正的落地值以 defaults.json 为准，此处只是 JSON 读取失败时的兜底，
+/// **两处必须保持一致**。
 const allToolbarItemConfigs = [
   // ── 默认显示（第一组） ──
   ToolbarItemConfig(action: ToolbarAction.undo, id: 'undo', name: '撤销'),
@@ -86,13 +92,40 @@ const allToolbarItemConfigs = [
     name: '加粗',
     defaultShortcut: 'Ctrl+B',
   ),
-  ToolbarItemConfig(action: ToolbarAction.link, id: 'link', name: '链接'),
-  ToolbarItemConfig(action: ToolbarAction.image, id: 'image', name: '图片'),
+  ToolbarItemConfig(
+    action: ToolbarAction.link,
+    id: 'link',
+    name: '链接',
+    defaultShortcut: 'Ctrl+K',
+  ),
+  ToolbarItemConfig(
+    action: ToolbarAction.image,
+    id: 'image',
+    name: '图片',
+    defaultShortcut: 'Ctrl+Shift+I',
+  ),
   ToolbarItemConfig(action: ToolbarAction.emoji, id: 'emoji', name: '表情'),
-  ToolbarItemConfig(action: ToolbarAction.quote, id: 'quote', name: '引用'),
+  ToolbarItemConfig(
+    action: ToolbarAction.quote,
+    id: 'quote',
+    name: '引用',
+    defaultShortcut: 'Ctrl+Shift+Q',
+  ),
   ToolbarItemConfig(action: ToolbarAction.hide, id: 'hide', name: '隐藏'),
   ToolbarItemConfig(action: ToolbarAction.free, id: 'free', name: '免费'),
-  ToolbarItemConfig(action: ToolbarAction.code, id: 'code', name: '代码'),
+  ToolbarItemConfig(
+    action: ToolbarAction.code,
+    id: 'code',
+    name: '代码',
+    defaultShortcut: 'Ctrl+Shift+K',
+  ),
+  ToolbarItemConfig(
+    action: ToolbarAction.table,
+    id: 'table',
+    name: '表格',
+    defaultShortcut: 'Ctrl+T',
+    defaultVisible: false,
+  ),
   ToolbarItemConfig(action: ToolbarAction.history, id: 'history', name: '历史'),
   ToolbarItemConfig(
     action: ToolbarAction.mtImage,
@@ -124,7 +157,7 @@ const allToolbarItemConfigs = [
     action: ToolbarAction.strikethrough,
     id: 'strikethrough',
     name: '删除线',
-    defaultShortcut: 'Ctrl+Shift+S',
+    defaultShortcut: 'Alt+Shift+5',
   ),
   ToolbarItemConfig(
     action: ToolbarAction.color,
@@ -142,38 +175,38 @@ const allToolbarItemConfigs = [
   ToolbarItemConfig(action: ToolbarAction.fontSize, id: 'fontSize', name: '字号'),
 
   // ── 默认隐藏 ──
+  // 对齐没有 Typora 对应项，且刻意留空：快捷键与显隐解耦后，
+  // 留着 Ctrl+L/E/R 会平白占用三个常用键
   ToolbarItemConfig(
     action: ToolbarAction.alignLeft,
     id: 'alignLeft',
     name: '左对齐',
-    defaultShortcut: 'Ctrl+L',
     defaultVisible: false,
   ),
   ToolbarItemConfig(
     action: ToolbarAction.alignCenter,
     id: 'alignCenter',
     name: '居中',
-    defaultShortcut: 'Ctrl+E',
     defaultVisible: false,
   ),
   ToolbarItemConfig(
     action: ToolbarAction.alignRight,
     id: 'alignRight',
     name: '右对齐',
-    defaultShortcut: 'Ctrl+R',
     defaultVisible: false,
   ),
   ToolbarItemConfig(
     action: ToolbarAction.listUl,
     id: 'listUl',
     name: '无序',
-    defaultShortcut: 'Ctrl+Shift+L',
+    defaultShortcut: 'Ctrl+Shift+]',
     defaultVisible: false,
   ),
   ToolbarItemConfig(
     action: ToolbarAction.listOl,
     id: 'listOl',
     name: '有序',
+    defaultShortcut: 'Ctrl+Shift+[',
     defaultVisible: false,
   ),
 ];

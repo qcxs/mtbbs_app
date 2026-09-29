@@ -167,4 +167,21 @@ void main() {
       expect(converter.imageUrls, ['https://a.com/1.png']);
     });
   });
+
+  group('BBCode2Html - 重复 convert 不累积', () {
+    test('[code] 里的 [img] 不算正文图片', () {
+      final c = BBCode2Html();
+      c.convert('[code][img]https://a.com/x.png[/img][/code]\n后面');
+      expect(c.imageUrls, isEmpty);
+    });
+
+    test('重复 convert 时输出列表被清空', () {
+      final c = BBCode2Html();
+      c.convert('[img]https://a.com/1.png[/img]');
+      expect(c.imageUrls, ['https://a.com/1.png']);
+      c.convert('纯文本');
+      expect(c.imageUrls, isEmpty);
+      expect(c.codeBlocks, isEmpty);
+    });
+  });
 }

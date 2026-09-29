@@ -43,6 +43,11 @@ import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
 import 'package:mtbbs/widgets/editor/editor_hint_bar.dart';
 import 'package:mtbbs/widgets/editor/editor_preview.dart';
+import 'package:mtbbs/widgets/editor/editor_line_metrics.dart';
+import 'package:mtbbs/widgets/editor/block_marker_gutter.dart';
+import 'package:mtbbs/core/parser/bbcode_anchors.dart';
+import 'package:mtbbs/core/parser/bbcode_source_lines.dart';
+import 'package:mtbbs/core/parser/bbcode_selection_highlight.dart';
 
 part 'editor_media.dart';
 part 'editor_pickers.dart';
@@ -52,6 +57,7 @@ part 'editor_page_fetch.dart';
 part 'editor_page_changes.dart';
 part 'editor_page_actions.dart';
 part 'editor_page_layout.dart';
+part 'editor_page_locator.dart';
 
 /// 编辑器页面
 ///
@@ -103,11 +109,44 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   final _contentCtl = BBCodeController();
   final _contentFocusNode = FocusNode();
   final _undoController = UndoHistoryController();
+
+  // ==================== 锚点标记槽 / 跨区定位 ====================
+  //
+  // 编辑区与预览区各带一个标记槽：当前锚点的标记换成箭头，点标记可跳到另一
+  // 个区。两边**共用同一份锚点表**（[_anchors]）——id 就是跨区对应的全部依据，
+  // y 只是各自渲染树里的真实位置（编辑区问 RenderEditable，预览区问挂在该
+  // 锚点 widget 上的 GlobalKey）。
+  //
+  // 见 `core/parser/bbcode_anchors.dart` 与 `widgets/editor/editor_preview.dart`。
+
+  /// 当前源码的锚点表（内容变了才重算）
+  List<BbAnchor> _anchors = const [];
+
+  /// 编辑区正文容器（标记槽与它共用一个 Stack 坐标系）
+  final _editorContentKey = GlobalKey();
+
+  /// 预览面板句柄（用于"点编辑区标记 → 预览定位"）
+  final _previewKey = GlobalKey<EditorPreviewState>();
+  final _editorScrollCtl = ScrollController();
+
+  /// 编辑区每个锚点的标记位置
+  List<BlockMark> _editorMarks = const [];
+
+  /// 两个标记槽共用的"当前锚点"（光标所在锚点；标记槽里显示为箭头）
+  int? _activeAnchor;
+
+  String _lastSeenText = '';
+
+  Timer? _gutterMeasureDebounce;
+  bool _gutterMeasureScheduled = false;
+
+  /// 最近一次测量时的窗口宽度（用于宽度变化后重算标记位置）
+  double? _lastGutterWidth;
   Map<String, String> _emojiMap = {};
   bool _showPreview = false;
   Timer? _previewDebounce;
   final ValueNotifier<EditorPreviewData> _previewData = ValueNotifier(
-    const EditorPreviewData('', ''),
+    const EditorPreviewData.empty(),
   );
   bool _isSubmitting = false;
   bool _loadingPage = false;
@@ -215,6 +254,10 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
     _toolbarCtl = BBCodeToolbarController(onAction: _handleToolbarAction);
     _titleCtl.addListener(_onContentChanged);
     _contentCtl.addListener(_onContentChanged);
+    // 光标/选区变化 → 更新标记槽与（必要时）预览定位
+    _contentCtl.addListener(_onEditingChanged);
+    _lastSeenText = _contentCtl.text;
+    _anchors = bbAnchors(_lastSeenText);
 
     _doFetchPage();
 
@@ -251,10 +294,13 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   void dispose() {
     _titleCtl.removeListener(_onContentChanged);
     _contentCtl.removeListener(_onContentChanged);
+    _contentCtl.removeListener(_onEditingChanged);
     _titleCtl.dispose();
     _contentCtl.dispose();
     _contentFocusNode.dispose();
     _undoController.dispose();
+    _editorScrollCtl.dispose();
+    _gutterMeasureDebounce?.cancel();
     _previewDebounce?.cancel();
     _previewData.dispose();
     _autoSaveTimer?.cancel();

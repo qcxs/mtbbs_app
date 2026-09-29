@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/parser/bbcode_list_edit.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_code_block.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
@@ -392,20 +393,30 @@ void main() {
   });
 
   group('⑪ 列表', () {
-    testWidgets('无序列表：项即普通段落，无前缀、无左侧缩进', (tester) async {
+    testWidgets('无序列表：项前拼 • / ◦，不产生左侧留白', (tester) async {
       const bbcode = '正文段落\n[list][*]项一\n[*]项二[/list]';
       await tester.pumpWidget(_post(bbcode));
       await _settle(tester);
       expect(tester.takeException(), isNull);
 
-      expect(_text('项一'), findsWidgets);
-      expect(_text('项二'), findsWidgets);
-      // 与正文同一左边界：列表不产生任何左侧留白
+      // 符号由转换层拼进文字（不是渲染器的悬挂标记），因此项内容能被搜到
+      expect(_text('• 项一'), findsWidgets);
+      expect(_text('• 项二'), findsWidgets);
+      // 与正文同一左边界：行本身不产生任何左侧留白
       expect(_rectOfText('项一')!.left, _rectOfText('正文段落')!.left);
-      expect(_rectOfText('项二')!.left, _rectOfText('正文段落')!.left);
       // 原始标签不泄漏
       expect(_text('[list]'), findsNothing);
       expect(_text('[*]'), findsNothing);
+    });
+
+    testWidgets('无序列表嵌套：符号按层级轮换 • / ◦ / ▪', (tester) async {
+      const bbcode =
+          '[list][*]一级\n[list][*]二级\n[list][*]三级[/list]\n[/list]\n[/list]';
+      await tester.pumpWidget(_post(bbcode));
+      await _settle(tester);
+      expect(_text('• 一级'), findsWidgets);
+      expect(_text('◦ 二级'), findsWidgets);
+      expect(_text('▪ 三级'), findsWidgets);
     });
 
     testWidgets('有序列表：项前拼 1. / 2.，同样不缩进', (tester) async {
@@ -444,6 +455,20 @@ void main() {
       await _settle(tester);
       expect(_text('项一'), findsWidgets);
       expect(_text('项二'), findsWidgets);
+    });
+
+    testWidgets('创作辅助：段落转列表后能渲染出编号 / 项目符号', (tester) async {
+      // toListItems 是「把段落变成列表」的实现（编辑器块类型切换用它）。
+      // 这条用例把它接到真实渲染上：产出必须真的能看到编号与符号。
+      await tester.pumpWidget(_post('[list=1]${toListItems('甲\n乙')}[/list]'));
+      await _settle(tester);
+      expect(_text('1. 甲'), findsWidgets);
+      expect(_text('2. 乙'), findsWidgets);
+
+      await tester.pumpWidget(_post('[list]${toListItems('甲\n乙')}[/list]'));
+      await _settle(tester);
+      expect(_text('• 甲'), findsWidgets);
+      expect(_text('• 乙'), findsWidgets);
     });
 
     testWidgets('嵌套 + [/*] 项结束标记：不产生重复段落、标签不泄漏', (tester) async {

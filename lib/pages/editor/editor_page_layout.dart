@@ -7,10 +7,14 @@ extension on _EditorPageState {
     final isWide = MediaQuery.sizeOf(context).isWide;
     final settings = context.watch<SettingsProvider>();
 
-    // 动态生成快捷键绑定：仅对可见且有关联快捷键的工具栏项注册
+    // 动态生成快捷键绑定：对**所有**有快捷键的工具栏项注册。
+    //
+    // 刻意不看 item.visible：按钮显隐管的是"界面清爽"，快捷键管的是
+    // "能力是否可用"，两者解耦后隐藏按钮不会连带废掉快捷键
+    // （列表/表格默认不显示按钮，但 Ctrl+Shift+] / Ctrl+T 仍应生效）。
+    // 真要停用某个键，把它的快捷键清空即可。
     final editorShortcuts = <ShortcutActivator, Intent>{};
     for (final item in settings.toolbarItems) {
-      if (!item.visible) continue;
       final keyStr = settings.toolbarShortcut(item.id);
       if (keyStr.isEmpty) continue;
       final activator = ShortcutHelper.parse(keyStr);
@@ -226,6 +230,7 @@ extension on _EditorPageState {
   }
 
   Widget _buildEditor() {
+    _syncGutterMeasureWithWidth(context);
     return Column(
       children: [
         _buildHintBar(),
@@ -284,25 +289,52 @@ extension on _EditorPageState {
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: _contentCtl,
-              focusNode: _contentFocusNode,
-              undoController: _undoController,
-              decoration: InputDecoration(
-                hintText: _isPost
-                    ? '想和大家分享点什么...'
-                    : _isReply
-                    ? '输入回复内容...'
-                    : '输入评论内容...',
-                border: const OutlineInputBorder(),
-                isDense: true,
-                alignLabelWithHint: true,
-              ),
-              maxLines: null,
-              minLines: 1,
-              expands: false,
-              keyboardType: TextInputType.multiline,
+            controller: _editorScrollCtl,
+            padding: const EdgeInsets.fromLTRB(6, 12, 12, 12),
+            child: Stack(
+              children: [
+                // 正文用内边距给标记槽让位。
+                // 不让标记槽用负偏移落进外边距：越界的子树能画出来但**点不到**
+                // （RenderBox.hitTest 先判 size.contains）。
+                Padding(
+                  padding: const EdgeInsets.only(left: kMarkerGutterWidth),
+                  // SizedBox 撑满宽度：Stack 的 loose 约束下 TextField 否则会缩到内容宽
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: TextField(
+                      key: _editorContentKey,
+                      controller: _contentCtl,
+                      focusNode: _contentFocusNode,
+                      undoController: _undoController,
+                      decoration: InputDecoration(
+                        hintText: _isPost
+                            ? '想和大家分享点什么...'
+                            : _isReply
+                            ? '输入回复内容...'
+                            : '输入评论内容...',
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: null,
+                      minLines: 1,
+                      expands: false,
+                      keyboardType: TextInputType.multiline,
+                    ),
+                  ),
+                ),
+                // 标记槽：与编辑框同一个 Stack（同一坐标系），当前锚点显示箭头
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: BlockMarkerGutter(
+                    marks: _editorMarks,
+                    activeId: _activeAnchor,
+                    onTapId: _onEditorGutterTap,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -312,8 +344,11 @@ extension on _EditorPageState {
 
   Widget _buildPreview() {
     return EditorPreview(
+      key: _previewKey,
       data: _previewData,
-      onShowRaw: (bbcode) => showRawBbcodeDialog(context, bbcode),
+      activeAnchor: _activeAnchor,
+      onTapAnchor: _onPreviewGutterTap,
+      onShowRaw: () => showRawBbcodeDialog(context, _contentCtl.text),
     );
   }
 }

@@ -334,8 +334,21 @@ class MyApp extends StatelessWidget {
             supportedLocales: const [Locale('zh'), Locale('en')],
             // 主题变化时同步 Windows 窗口底色（非 Windows 平台为 no-op）。
             // 标题栏本体是自绘的，不在这里——它需要 Theme/Overlay/Material 祖先，见 WindowChrome
-            builder: (context, child) =>
-                _WindowBackgroundSync(child: child ?? const SizedBox.shrink()),
+            //
+            // 外面这层 ExcludeSemantics = **整个 App 关闭无障碍**（本 App 不为
+            // 无障碍设计）。目的很具体：Windows 上只要有 UIA 客户端在观察窗口
+            // （读屏、自动化工具、部分输入法），引擎就会启用 accessibility_bridge，
+            // 之后每次重建都可能打印
+            //   `Failed to update ui::AXTree, error: NNN …`
+            // —— 那是引擎 AccessibilityBridge::CommitUpdates() 的失败分支（框架
+            // 节点 id 与 AX 树不同步），Dart 侧关不掉它，只能不给它内容。
+            // 语义树恒为空 → 没有节点更新 → 不再刷屏。
+            // 副作用：读屏软件读不到任何东西；将来若要恢复无障碍，删掉这一层即可。
+            builder: (context, child) => ExcludeSemantics(
+              child: _WindowBackgroundSync(
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
             routerConfig: router,
           );
         },

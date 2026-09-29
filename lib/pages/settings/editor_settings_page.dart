@@ -187,11 +187,13 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
       titleActions: [
         IconButton(
           icon: const Icon(Icons.restart_alt, size: 22),
-          tooltip: '重置为默认排序',
+          // 重置的是「顺序 + 显隐 + 快捷键」三项（resetToolbarItems），
+          // 文案不能只说排序——否则用户找不到"恢复默认快捷键"的入口
+          tooltip: '重置工具栏与快捷键为默认',
           onPressed: () async {
             await settings.resetToolbarItems();
             if (context.mounted) {
-              showToast('已重置为默认排序', duration: const Duration(seconds: 1));
+              showToast('已恢复默认工具栏与快捷键', duration: const Duration(seconds: 1));
             }
           },
         ),

@@ -1,3 +1,5 @@
+export 'parser/bbcode_blocks.dart';
+export 'parser/bbcode_list_edit.dart';
 export 'parser/bbcode_parser.dart';
 export 'parser/bbcode2html.dart';
 export 'parser/html2bbcode.dart';

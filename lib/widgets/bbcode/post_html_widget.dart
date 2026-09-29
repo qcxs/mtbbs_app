@@ -75,12 +75,23 @@ class PostHtmlWidget extends StatelessWidget {
   final Set<String>? disabledTags;
   final bool autoDetectUrls;
 
+  /// 是否自带 [SelectionArea]（文本选择作用域）。
+  ///
+  /// **编辑器预览必须传 false**：预览是"逐锚点"渲染的一列 `PostHtmlWidget`，
+  /// 每个都自带 `SelectionArea` 的话，选区就被切成一格一格 —— 跨段选中直接
+  /// 失效（嵌套 `SelectionArea` = 嵌套选区作用域）。预览改为在整列外面套
+  /// **一个** `SelectionArea`，选区自然贯通全文。
+  ///
+  /// 正常帖子渲染保持默认 true，行为不变。
+  final bool selectable;
+
   const PostHtmlWidget({
     super.key,
     required this.bbcode,
     this.fontSize,
     this.disabledTags,
     this.autoDetectUrls = true,
+    this.selectable = true,
   });
 
   @override
@@ -113,52 +124,53 @@ class PostHtmlWidget extends StatelessWidget {
     // 本段 BBCode（= 一帖/一楼）的全部正文图片，供画廊左右滑动
     final imageUrls = converter.imageUrls;
 
-    return SelectionArea(
-      child: HtmlWidget(
-        html,
-        // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
-        buildAsync: false,
-        textStyle: TextStyle(fontSize: textSize, color: cs.onSurface),
-        customStylesBuilder: (element) => _stylesFor(element, cs),
-        customWidgetBuilder: (element) {
-          // [code] 占位 div → 代码高亮组件（块级）
-          final codeIndex = element.attributes['data-code-index'];
-          if (codeIndex != null) {
-            final i = int.tryParse(codeIndex) ?? -1;
-            if (i < 0 || i >= codeBlocks.length) return const SizedBox.shrink();
-            return BbcodeCodeBlock(
-              code: codeBlocks[i],
-              // 代码块跟随正文字号，上限同步设置项上限（曾封顶 16，字号调大后代码块不跟）
-              fontSize: textSize.clamp(11, 32).toDouble(),
+    final htmlWidget = HtmlWidget(
+      html,
+      // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
+      buildAsync: false,
+      textStyle: TextStyle(fontSize: textSize, color: cs.onSurface),
+      customStylesBuilder: (element) => _stylesFor(element, cs),
+      customWidgetBuilder: (element) {
+        // [code] 占位 div → 代码高亮组件（块级）
+        final codeIndex = element.attributes['data-code-index'];
+        if (codeIndex != null) {
+          final i = int.tryParse(codeIndex) ?? -1;
+          if (i < 0 || i >= codeBlocks.length) return const SizedBox.shrink();
+          return BbcodeCodeBlock(
+            code: codeBlocks[i],
+            // 代码块跟随正文字号，上限同步设置项上限（曾封顶 16，字号调大后代码块不跟）
+            fontSize: textSize.clamp(11, 32).toDouble(),
+          );
+        }
+        // img → 表情内联 / 帖子图片块级
+        if (element.localName == 'img') {
+          final src = element.attributes['src'] ?? '';
+          if (src.isEmpty) return const SizedBox.shrink();
+          if (element.attributes['data-type'] == 'emoji') {
+            return InlineCustomWidget(
+              alignment: PlaceholderAlignment.middle,
+              child: _EmojiImage(url: src),
             );
           }
-          // img → 表情内联 / 帖子图片块级
-          if (element.localName == 'img') {
-            final src = element.attributes['src'] ?? '';
-            if (src.isEmpty) return const SizedBox.shrink();
-            if (element.attributes['data-type'] == 'emoji') {
-              return InlineCustomWidget(
-                alignment: PlaceholderAlignment.middle,
-                child: _EmojiImage(url: src),
-              );
-            }
-            return BbcodeImage(
-              url: src,
-              explicitWidth: double.tryParse(element.attributes['width'] ?? ''),
-              maxImageWidth: maxImageWidth.toDouble(),
-              galleryUrls: imageUrls,
-              galleryIndex:
-                  int.tryParse(element.attributes['data-img-index'] ?? '') ??
-                  -1,
-            );
-          }
-          return null;
-        },
-        onTapUrl: (url) {
-          _handleLinkTap(context, url);
-          return true;
-        },
-      ),
+          // data-img-index 是这张图在正文图片里的文档序（与 imageUrls 同下标）
+          final imgIndex =
+              int.tryParse(element.attributes['data-img-index'] ?? '') ?? -1;
+          return BbcodeImage(
+            url: src,
+            explicitWidth: double.tryParse(element.attributes['width'] ?? ''),
+            maxImageWidth: maxImageWidth.toDouble(),
+            galleryUrls: imageUrls,
+            galleryIndex: imgIndex,
+          );
+        }
+        return null;
+      },
+      onTapUrl: (url) {
+        _handleLinkTap(context, url);
+        return true;
+      },
     );
+    // 选区作用域见 [selectable] 的说明
+    return selectable ? SelectionArea(child: htmlWidget) : htmlWidget;
   }
 }

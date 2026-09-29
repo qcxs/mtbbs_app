@@ -164,6 +164,14 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
           name: item.name,
           cs: cs,
         );
+      case ToolbarAction.table:
+        return _toolBtn(
+          icon: Icons.table_chart_outlined,
+          tooltip: tooltip,
+          action: action,
+          name: item.name,
+          cs: cs,
+        );
       case ToolbarAction.alignLeft:
         return _toolBtn(
           icon: Icons.format_align_left,

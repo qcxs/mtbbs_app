@@ -4,7 +4,13 @@ import 'package:mtbbs/core/app/default_config.dart';
 
 /// 快捷键序列化与反序列化
 ///
-/// 格式：`"Ctrl+T"`、`"F5"`、`"Ctrl+Shift+R"`、`"Escape"`
+/// 格式：`"Ctrl+T"`、`"F5"`、`"Ctrl+Shift+R"`、`"Alt+Shift+5"`、
+/// `"Ctrl+Shift+]"`、`"Ctrl+\\"`、`"Escape"`
+///
+/// 修饰键支持 `Ctrl` / `Alt` / `Shift` / `Meta`；主键支持字母、数字、
+/// 方括号、反斜杠与若干功能键。**无法识别的主键一律返回 null（不绑定）**，
+/// 而不是回退成某个默认键——否则会静默绑到错误的键上
+/// （历史 bug：`Ctrl+\` 曾被解析成 `Ctrl+Escape`）。
 
 // ==================== Intent 定义 ====================
 
@@ -126,9 +132,9 @@ class ShortcutHelper {
     );
   }
 
-  static LogicalKeyboardKey _parseKey(String name) {
+  static LogicalKeyboardKey? _parseKey(String name) {
     // 功能键
-    if (name == 'Esc') return LogicalKeyboardKey.escape;
+    if (name == 'Esc' || name == 'Escape') return LogicalKeyboardKey.escape;
     if (name == 'F1') return LogicalKeyboardKey.f1;
     if (name == 'F2') return LogicalKeyboardKey.f2;
     if (name == 'F3') return LogicalKeyboardKey.f3;
@@ -147,18 +153,29 @@ class ShortcutHelper {
     if (name == 'Home') return LogicalKeyboardKey.home;
     if (name == 'End') return LogicalKeyboardKey.end;
     if (name == 'Tab') return LogicalKeyboardKey.tab;
+    // 符号键（Typora 的列表快捷键用方括号、清除格式用反斜杠）
+    if (name == '[' || name == 'BracketLeft') {
+      return LogicalKeyboardKey.bracketLeft;
+    }
+    if (name == ']' || name == 'BracketRight') {
+      return LogicalKeyboardKey.bracketRight;
+    }
+    if (name == '\\' || name == 'Backslash') {
+      return LogicalKeyboardKey.backslash;
+    }
     // 字母
     if (name.length == 1 &&
         name.codeUnitAt(0) >= 65 &&
         name.codeUnitAt(0) <= 90) {
-      return _letters[name] ?? LogicalKeyboardKey.keyA;
+      return _letters[name];
     }
     // 数字
     if (name.length == 1 &&
         name.codeUnitAt(0) >= 48 &&
         name.codeUnitAt(0) <= 57) {
-      return _digits[name] ?? LogicalKeyboardKey.digit0;
+      return _digits[name];
     }
-    return LogicalKeyboardKey.escape;
+    // 无法识别 → 不绑定（调用方拿到 null 就不会注册这个快捷键）
+    return null;
   }
 }
