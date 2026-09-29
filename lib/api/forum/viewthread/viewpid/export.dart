@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/forum/viewthread/viewpid/http.dart' as http;
+import 'package:mtbbs/api/forum/viewthread/viewpid/parse.dart' as parse;
 
 /// 获取单帖详情（表情还原由解析层自行从 EmojiService 读取当前站点数据）。
 Future<Map<String, dynamic>> getPostByPid(

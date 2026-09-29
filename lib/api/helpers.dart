@@ -1,10 +1,49 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:html/dom.dart' as dom;
+import 'package:html/parser.dart' as html_parser;
 import 'package:mtbbs/core/app/event_bus.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
 /// 从 Dio Response 中安全解码响应体
 String safeDecode(Response<String> resp) => resp.data ?? '';
+
+/// parse.dart 统一前置：HTTP 状态码校验 + 解析 DOM + Discuz 错误页/登录页检测。
+///
+/// 失败时 [error] 非空，应直接作为 `parseResponse` 的返回值；
+/// 通过时 [doc] 非空，可继续解析。
+///
+/// 用法：
+/// ```dart
+/// final pre = prepareDoc(body, statusCode);
+/// if (pre.error != null) return pre.error!;
+/// final doc = pre.doc!;
+/// ```
+({dom.Document? doc, Map<String, dynamic>? error}) prepareDoc(
+  String body,
+  int statusCode,
+) {
+  if (statusCode != 200) {
+    return (
+      doc: null,
+      error: {'success': false, 'message': 'HTTP $statusCode'},
+    );
+  }
+  final doc = html_parser.parse(body);
+  final pageError = checkPageError(doc, body);
+  if (pageError.isError) {
+    return (
+      doc: null,
+      error: {
+        'success': false,
+        'message': pageError.message ?? '页面错误',
+        'loginRequired': pageError.loginRequired,
+      },
+    );
+  }
+  return (doc: doc, error: null);
+}
 
 /// 解析响应并自动输出解析日志
 ///

@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/home/friend/http.dart' as http;
+import 'package:mtbbs/api/home/friend/parse.dart' as parse;
 
 /// 好友列表 API 导出
 ///

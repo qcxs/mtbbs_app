@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/home/pm/http.dart' as http;
+import 'package:mtbbs/api/home/pm/parse.dart' as parse;
 
 /// PM 消息 API 导出
 

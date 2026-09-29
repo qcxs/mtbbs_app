@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/forum/ranklist/http.dart' as http;
+import 'package:mtbbs/api/forum/ranklist/parse.dart' as parse;
 
 /// 获取帖子排行榜
 ///

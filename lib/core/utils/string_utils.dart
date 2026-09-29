@@ -24,6 +24,18 @@ String htmlEscape(String s) => s
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
+/// HTML 实体反转义（[htmlEscape] 的逆操作）。
+///
+/// `&amp;` 最后还原：否则 `&amp;lt;`（字面量 `&lt;`）会被二次解码成 `<`。
+String unescapeHtml(String s) => s
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&#x27;', "'")
+    .replaceAll('&#x2F;', '/')
+    .replaceAll('&amp;', '&');
+
 /// 解析带千分位逗号的整数："1,234" → 1234
 int parseIntWithComma(Object? v, {int fallback = 0}) {
   final s = v?.toString().replaceAll(',', '').trim() ?? '';

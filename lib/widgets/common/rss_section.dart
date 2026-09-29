@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/api/forum/rss/export.dart' as rss_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'rss_tile.dart';
+import 'package:mtbbs/widgets/common/rss_tile.dart';
 
 /// RSS 订阅区块
 ///

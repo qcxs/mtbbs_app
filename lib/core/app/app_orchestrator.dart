@@ -1,6 +1,6 @@
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
-import 'site_store.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 
 /// 应用编排器 — 统一管理站点/用户切换等跨模块操作
 ///

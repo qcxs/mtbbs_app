@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/forum/viewthread/detail/http.dart' as http;
+import 'package:mtbbs/api/forum/viewthread/detail/parse.dart' as parse;
 
 Future<Map<String, dynamic>> getThreadDetail(
   Dio dio, {

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
-import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -263,7 +263,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
           _buildCacheTile(
             title: '头像图片缓存',
             sizeText: _avatarInfo != null
-                ? AppLogger.bytes(_avatarInfo!.bytes)
+                ? formatBytes(_avatarInfo!.bytes)
                 : null,
             countText: _avatarInfo != null ? '${_avatarInfo!.files} 个' : null,
             loading: _loadingAvatar,
@@ -285,7 +285,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
           _buildCacheTile(
             title: '表情图片缓存',
             sizeText: _emojiInfo != null
-                ? AppLogger.bytes(_emojiInfo!.bytes)
+                ? formatBytes(_emojiInfo!.bytes)
                 : null,
             countText: _emojiInfo != null ? '${_emojiInfo!.files} 个' : null,
             loading: _loadingEmoji,
@@ -302,7 +302,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
           _buildCacheTile(
             title: '帖子图片缓存',
             sizeText: _imageInfo != null
-                ? AppLogger.bytes(_imageInfo!.bytes)
+                ? formatBytes(_imageInfo!.bytes)
                 : null,
             countText: _imageInfo != null ? '${_imageInfo!.files} 个' : null,
             loading: _loadingImage,
@@ -319,7 +319,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
           _buildCacheTile(
             title: '勋章图片缓存',
             sizeText: _medalInfo != null
-                ? AppLogger.bytes(_medalInfo!.bytes)
+                ? formatBytes(_medalInfo!.bytes)
                 : null,
             countText: _medalInfo != null ? '${_medalInfo!.files} 个' : null,
             loading: _loadingMedal,
@@ -337,7 +337,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
             title: '文件选择器缓存',
             subtitle: 'file_picker 选取文件时复制的临时副本（Android）',
             sizeText: _filePickerInfo != null
-                ? AppLogger.bytes(_filePickerInfo!.bytes)
+                ? formatBytes(_filePickerInfo!.bytes)
                 : null,
             countText: _filePickerInfo != null
                 ? '${_filePickerInfo!.files} 个'

@@ -17,7 +17,11 @@
 
 实现层（Dart，复杂逻辑全部在此，shell 只做转发）
   tool/api_bootstrap.dart  模拟 App 初始化序列（真实 HttpOverrides + Windows 证书 + 站点 + Cookie）
-  tool/api_scenarios.dart  场景注册表（命令 → 描述/参数/needsLogin/run）
+  tool/api_scenarios.dart  场景聚合器（合并 scenarios/ 下三个子模块，对外接口不变）
+  tool/scenarios/scenario_types.dart   ApiScenario 类型定义
+  tool/scenarios/read_scenarios.dart   只读场景（含 Cookie 目录扫描）
+  tool/scenarios/write_scenarios.dart  写操作场景（发帖/评论/回复/修改/评分/收藏）
+  tool/scenarios/debug_scenarios.dart  调试场景（debug.http）
   tool/api_probe_test.dart 入口：解析 --dart-define、执行场景、输出协议
 ```
 
@@ -46,6 +50,8 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `cmd` | 场景命令（默认 `session.list`），见第 4 节清单 |
 | `account` | 登录账号名（空 = 游客）。先跑 `session.list` 查看可用账号，再追加 `account=<账号名>` |
 | `site` | 站点（索引数字或名称，空 = 第一个站点），如 `site=1` 切到吾爱破解 |
+| `baseUrl` | 指定任意站点 URL（测试站等不在默认列表中的站点）；传入时站点列表替换为单站，Cookie 目录自动跟随 host |
+| `siteName` | 与 `baseUrl` 配合的站点名（空则用域名） |
 | `log` | `off` / `info` / `debug`（默认 `info`；`off` 只输出协议 JSON，`debug` 输出 PARSE 明细） |
 | 其余键 | 透传给场景的 `params`（见 help 中每个场景的 `params` 字段） |
 
@@ -58,7 +64,11 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `guide.list` | 导读列表（默认移动端 UA），`view=newthread/newreply/digest` | 否 |
 | `forum.list` | 版块帖子列表，`fid=*`（必填） | 否 |
 | `thread.detail` | 帖子详情（楼主 + 楼层，自动截断），`tid=*` | 否 |
+| `post.byPid` | 按 pid 取单个楼层（viewpid 接口），`tid=*`/`pid=*` | 否 |
 | `user.info` | 用户空间信息，`uid`/`username` 二选一，空则查自己 | 否 |
+| `friend.list` | 好友列表，`uid`（空=自己） | 否 |
+| `follow.list` | 关注/粉丝列表，`type=*`（following/follower），`uid`（空=自己） | 否 |
+| `favorite.list` | 收藏列表（含 favid，供删除用） | 是 |
 | `message.system` | 系统提醒列表 | 是 |
 | `message.pm` | 私人消息列表 | 是 |
 | `message.mypost` | 帖子提醒列表，`type=post/at` | 是 |
@@ -122,7 +132,11 @@ debug.http 拿原始响应（含登录态 Cookie） → 对照 Chrome MCP 渲染
 | 文件 | 作用 |
 |---|---|
 | `tool/api_probe_test.dart` | 探针入口：参数解析、执行、协议输出、help 自描述 |
-| `tool/api_scenarios.dart` | 场景注册表 + Cookie 目录扫描 |
+| `tool/api_scenarios.dart` | 场景聚合器（合并 `tool/scenarios/` 三个子模块） |
+| `tool/scenarios/scenario_types.dart` | `ApiScenario` 类型定义 |
+| `tool/scenarios/read_scenarios.dart` | 只读场景 + Cookie 目录扫描 |
+| `tool/scenarios/write_scenarios.dart` | 写操作场景 |
+| `tool/scenarios/debug_scenarios.dart` | 调试场景（`debug.http`） |
 | `tool/api_bootstrap.dart` | 初始化序列（真实网络 + Windows 证书 + 站点 + Cookie 切换） |
 | `lib/api/**/export.dart` | 被测 API 层（http 请求 + parse 解析） |
 | `lib/core/app/app_paths.dart` | Cookie 目录定位（Windows 分支） |

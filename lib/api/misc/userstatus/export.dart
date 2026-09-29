@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/misc/userstatus/http.dart' as http;
+import 'package:mtbbs/api/misc/userstatus/parse.dart' as parse;
 
 /// 获取当前登录用户状态
 ///

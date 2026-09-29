@@ -1,5 +1,5 @@
 import 'package:html/dom.dart' as dom;
-import 'package:html/parser.dart' as html_parser;
+import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
@@ -34,21 +34,9 @@ import 'package:mtbbs/core/utils/logger.dart';
 /// 分页复用 [extractPagination]（.pg 分页栏）。
 
 Map<String, dynamic> parseResponse(String body, int statusCode) {
-  if (statusCode != 200) {
-    return {'success': false, 'message': 'HTTP $statusCode'};
-  }
-
-  final doc = html_parser.parse(body);
-
-  // 统一检测 Discuz 错误页
-  final pageError = checkPageError(doc, body);
-  if (pageError.isError) {
-    return {
-      'success': false,
-      'message': pageError.message ?? '页面错误',
-      'loginRequired': pageError.loginRequired,
-    };
-  }
+  final pre = prepareDoc(body, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
 
   // 隐私设置：无权查看该用户的好友列表
   final privacy = doc.querySelector('.nfl h2');

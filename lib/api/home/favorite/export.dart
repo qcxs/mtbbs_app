@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/home/favorite/http.dart' as http;
+import 'package:mtbbs/api/home/favorite/parse.dart' as parse;
 
 /// 收藏 API 导出
 
@@ -23,11 +23,7 @@ Future<Map<String, dynamic>> addFavorite(
   final threadResp = await dio.get<String>(
     '/forum.php?mod=viewthread&tid=$tid',
   );
-  final formhash =
-      RegExp(
-        r'name="formhash"\s+value="([^"]+)"',
-      ).firstMatch(threadResp.data ?? '')?.group(1) ??
-      '';
+  final formhash = _extractFormhash(threadResp.data ?? '');
   if (formhash.isEmpty) {
     return {'success': false, 'message': '未提取到 formhash（可能未登录）'};
   }
@@ -52,11 +48,7 @@ Future<Map<String, dynamic>> deleteFavorite(
 }) async {
   // 1. GET 收藏列表页提取 formhash（每页都有全局隐藏 input）
   final listResp = await http.getFavorites(dio, page: 1);
-  final formhash =
-      RegExp(
-        r'name="formhash"\s+value="([^"]+)"',
-      ).firstMatch(listResp.data ?? '')?.group(1) ??
-      '';
+  final formhash = _extractFormhash(listResp.data ?? '');
   if (formhash.isEmpty) {
     return {'success': false, 'message': '未提取到 formhash（可能未登录）'};
   }
@@ -65,3 +57,8 @@ Future<Map<String, dynamic>> deleteFavorite(
   final resp = await http.deleteFavorite(dio, favid: favid, formhash: formhash);
   return parseWithLog(resp, parse.parseDeleteResult);
 }
+
+/// 从页面 HTML 提取全局 formhash（Discuz CSRF 令牌隐藏 input）
+String _extractFormhash(String html) =>
+    RegExp(r'name="formhash"\s+value="([^"]+)"').firstMatch(html)?.group(1) ??
+    '';

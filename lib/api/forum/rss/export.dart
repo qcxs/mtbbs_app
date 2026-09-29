@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/forum/rss/http.dart' as http;
+import 'package:mtbbs/api/forum/rss/parse.dart' as parse;
 
 /// 获取 RSS 订阅列表
 ///

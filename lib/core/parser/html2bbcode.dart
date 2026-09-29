@@ -448,14 +448,4 @@ class Html2BBCode {
 
     return null;
   }
-
-  /// 将各种格式的 URL 统一转换为绝对 URL
-  ///
-  /// 支持的输入格式：
-  ///   https://...       → 原样返回
-  ///   //host/path       → https://host/path
-  ///   /path             → {baseUrl}/path
-  ///   ./path            → {baseUrl}/path（去掉 ./）
-  ///   path/file.ext     → {baseUrl}/path/file.ext
-  ///   forum.php?query   → {baseUrl}/forum.php?query
 }

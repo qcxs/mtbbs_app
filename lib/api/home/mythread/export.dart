@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/home/mythread/http.dart' as http;
+import 'package:mtbbs/api/home/mythread/parse.dart' as parse;
 
 /// 我的帖子/回复 API 导出
 

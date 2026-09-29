@@ -2,11 +2,11 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/models/thread_item.dart';
-import 'thread_list_parser.dart';
-import 'comiis_card_parser.dart';
-import 'discuz_table_parser.dart';
-import 'comiis_table_parser.dart';
-import 'space_thread_parser.dart';
+import 'package:mtbbs/core/app/thread_parsers/thread_list_parser.dart';
+import 'package:mtbbs/core/app/thread_parsers/comiis_card_parser.dart';
+import 'package:mtbbs/core/app/thread_parsers/discuz_table_parser.dart';
+import 'package:mtbbs/core/app/thread_parsers/comiis_table_parser.dart';
+import 'package:mtbbs/core/app/thread_parsers/space_thread_parser.dart';
 
 /// 帖子列表解析结果
 ///

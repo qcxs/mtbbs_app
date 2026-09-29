@@ -2,8 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/forum/viewthread/action/http.dart' as http;
+import 'package:mtbbs/api/forum/viewthread/action/parse.dart' as parse;
 
 /// 获取评分弹窗表单数据
 ///

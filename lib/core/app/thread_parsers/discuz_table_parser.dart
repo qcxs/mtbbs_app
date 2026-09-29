@@ -2,8 +2,8 @@ import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/models/thread_item.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
-import 'parser_utils.dart';
-import 'thread_list_parser.dart';
+import 'package:mtbbs/core/app/thread_parsers/parser_utils.dart';
+import 'package:mtbbs/core/app/thread_parsers/thread_list_parser.dart';
 
 /// 标准 Discuz 表格帖子列表解析器
 ///

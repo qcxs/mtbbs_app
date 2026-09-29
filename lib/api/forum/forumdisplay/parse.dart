@@ -1,4 +1,4 @@
-import 'package:html/parser.dart' as htmlParser;
+import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/parser/thread_parser.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 
@@ -17,21 +17,9 @@ import 'package:mtbbs/core/app/page_helper.dart';
 /// }
 
 Map<String, dynamic> parseResponse(String body, int statusCode) {
-  if (statusCode != 200) {
-    return {'success': false, 'message': 'HTTP $statusCode'};
-  }
-
-  final doc = htmlParser.parse(body);
-
-  // 统一检测 Discuz 错误页
-  final pageError = checkPageError(doc, body);
-  if (pageError.isError) {
-    return {
-      'success': false,
-      'message': pageError.message ?? '页面错误',
-      'loginRequired': pageError.loginRequired,
-    };
-  }
+  final pre = prepareDoc(body, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
 
   final pagination = extractPagination(doc);
 

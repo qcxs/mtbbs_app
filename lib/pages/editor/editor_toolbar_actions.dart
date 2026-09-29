@@ -198,7 +198,7 @@ extension on _EditorPageState {
     }
 
     // 回退到文本粘贴
-    final text = await ClipboardPasteService.pasteText();
+    final text = await ClipboardHelper.read();
     if (text != null && mounted) {
       final sel = _contentCtl.selection;
       final pos = sel.isValid ? sel.start : _contentCtl.text.length;

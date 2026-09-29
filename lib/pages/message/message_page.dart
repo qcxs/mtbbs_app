@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'message_pm_tab.dart';
-import 'message_mypost_tab.dart';
-import 'message_system_tab.dart';
+import 'package:mtbbs/pages/message/message_pm_tab.dart';
+import 'package:mtbbs/pages/message/message_mypost_tab.dart';
+import 'package:mtbbs/pages/message/message_system_tab.dart';
 
 /// 消息页面 — 聚合私人消息 / 我的帖子 / 系统提醒
 ///

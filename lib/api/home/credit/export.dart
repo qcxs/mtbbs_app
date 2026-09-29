@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/home/credit/http.dart' as http;
+import 'package:mtbbs/api/home/credit/parse.dart' as parse;
 
 /// 积分公式 API 导出
 

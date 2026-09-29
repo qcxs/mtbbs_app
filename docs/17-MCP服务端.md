@@ -44,7 +44,7 @@ lib/mcp/
     ├── mcp_tool_definition.dart 工具声明 + 入参读取（McpArgs）
     ├── mcp_payloads.dart        出站数据结构（字段白名单 + 错误翻译）
     ├── mcp_resources.dart       资源与提示词注册
-    └── mcp_tools_{app,forum,saved,editor}.dart  各能力分组的工具
+    └── mcp_tools_{app,forum,saved,editor,user}.dart  各能力分组的工具（user 承载 list_user_threads / list_user_friends / list_user_follows）
 ```
 
 设置侧：`lib/pages/settings/models/mcp_settings.dart`（分组声明）、
@@ -186,7 +186,7 @@ lib/mcp/
 ## 验证方式
 
 ```bash
-flutter test test/mcp_server_test.dart        # 12 例：鉴权/只读不变量/能力开关/脱敏
+flutter test test/mcp_server_test.dart        # 15 例：鉴权/只读不变量/能力开关/脱敏
 flutter analyze lib test
 curl -i -X POST http://127.0.0.1:8765/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'   # 无令牌应 403

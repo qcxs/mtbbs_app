@@ -11,9 +11,6 @@ import 'package:mtbbs/core/app/default_config.dart';
 /// 返回（Esc）
 class GoBackIntent extends Intent {}
 
-/// 发帖（Ctrl+T）— 已从全局快捷键移除，保留定义供程序化调用
-class NewThreadIntent extends Intent {}
-
 /// 刷新（F5）
 class RefreshIntent extends Intent {}
 

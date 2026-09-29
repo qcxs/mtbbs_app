@@ -13,6 +13,13 @@ import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 
+part 'settings_provider_defaults.dart';
+part 'settings_provider_accessors.dart';
+part 'settings_provider_content.dart';
+part 'settings_provider_managed_lists.dart';
+part 'settings_provider_sites.dart';
+part 'settings_provider_persistence.dart';
+
 /// 设置管理 — 统一通过 [DatabaseHelper] 持久化
 class SettingsProvider extends ChangeNotifier {
   double _fontSize = 16;
@@ -120,24 +127,10 @@ class SettingsProvider extends ChangeNotifier {
 
   static const String defaultFormula = '';
 
-  /// 导读 Tab 默认 id 列表（顺序即默认顺序）
-  static const _defaultTabIds = ['newthread', 'hot', 'new', 'digest', 'sofa'];
-
   /// 生成默认导读 Tab 列表（全量含可见性）
   static List<ManagedItem> defaultGuideTabs() => [
     for (final id in _defaultTabIds)
       ManagedItem(id: id, name: tabLabels[id] ?? id),
-  ];
-
-  /// 首页区块默认定义：顺序、显示名、是否显示、是否默认展开。
-  ///
-  /// RSS 默认隐藏 —— 内容与导读 Tab 重合，用户可在
-  /// 「设置 → 外观 → 首页区块」里重新开启。
-  static const List<Map<String, dynamic>> _homeSectionDefaults = [
-    {'id': 'shortcuts', 'name': '快捷链接', 'visible': true, 'expanded': true},
-    {'id': 'forums', 'name': '版块', 'visible': true, 'expanded': true},
-    {'id': 'rank', 'name': '帖子排行', 'visible': true, 'expanded': true},
-    {'id': 'rss', 'name': 'RSS 订阅', 'visible': false, 'expanded': false},
   ];
 
   /// 生成默认首页区块列表
@@ -151,95 +144,9 @@ class SettingsProvider extends ChangeNotifier {
       ),
   ];
 
-  /// 合法首页区块 id，用于过滤损坏的持久化数据
-  static final Set<String> _homeSectionIds = {
-    for (final d in _homeSectionDefaults) d['id'] as String,
-  };
-
   /// 读取区块的展开状态（缺字段视为折叠）
   static bool homeSectionExpanded(ManagedItem item) =>
       item.data?['expanded'] == true;
-
-  // ==================== 数据库快捷引用 ====================
-
-  DatabaseHelper get _db => DatabaseHelper.instance;
-
-  // ==================== Getter ====================
-
-  double get fontSize => _fontSize;
-
-  /// 完整导读 Tab 列表（含隐藏项，供排序弹窗使用）
-  List<ManagedItem> get guideTabs => List.unmodifiable(_guideTabs);
-
-  /// 可见导读 Tab id（按当前顺序）
-  List<String> get tabOrder => [
-    for (final t in _guideTabs)
-      if (t.visible) t.id,
-  ];
-
-  /// 完整首页区块列表（含隐藏项，供设置面板使用）
-  List<ManagedItem> get homeSections => List.unmodifiable(_homeSections);
-
-  /// 首页当前显示的区块（按用户排序）
-  List<ManagedItem> get visibleHomeSections => [
-    for (final s in _homeSections)
-      if (s.visible) s,
-  ];
-  int get currentSiteIndex => _currentSiteIndex;
-  int get defaultTabIndex => _defaultTabIndex;
-  List<Site> get sites => _sites;
-
-  Map<String, String> get shortcuts => Map.unmodifiable(_shortcuts);
-
-  String shortcut(String action) =>
-      _shortcuts[action] ?? ShortcutHelper.defaults[action] ?? '';
-
-  Set<String> get disabledBbcodeTags => Set.unmodifiable(_disabledBbcodeTags);
-  bool get autoDetectUrls => _autoDetectUrls;
-  bool get simulateBrowserHeaders => _simulateBrowserHeaders;
-  int get staggerInterval => _staggerInterval;
-  int get avatarCacheDays => _avatarCacheDays;
-  int get emojiCacheDays => _emojiCacheDays;
-  int get imageCacheDays => _imageCacheDays;
-  int get medalCacheDays => _medalCacheDays;
-  ThemeMode get themeMode => _themeMode;
-  Color get seedColor => _seedColor;
-  bool get isPureBlackTheme => _isPureBlackTheme;
-  bool _showAvatars = true;
-  bool get showAvatars => _showAvatars;
-
-  /// 头像尺寸策略（固定某一尺寸可提高头像缓存命中率），默认 middle
-  AvatarSizeMode _avatarSizeMode = AvatarSizeMode.middle;
-  AvatarSizeMode get avatarSizeMode => _avatarSizeMode;
-
-  /// 宽屏时帖子图片最大宽度（px），窄屏占满不受此限制；默认 600
-  int _maxImageWidth = 600;
-  int get maxImageWidth => _maxImageWidth;
-
-  /// 编辑器启动自检（默认开启，关闭后跳过启动报错，无条件进入编辑器）
-  bool _editorStartupCheck = true;
-  bool get editorStartupCheck => _editorStartupCheck;
-
-  String get creditFormula => _creditFormula;
-
-  List<ManagedItem> get shortcutLinks =>
-      List.unmodifiable(_shortcutLinks[SiteStore.instance.host] ?? []);
-
-  List<ManagedItem> get toolbarItems => List.unmodifiable(_toolbarItems);
-
-  String toolbarShortcut(String id) =>
-      _toolbarShortcuts[id] ?? defaultToolbarShortcuts()[id] ?? '';
-
-  int get minSnapshotWordCount => _minSnapshotWordCount;
-  int get autoSaveInterval => _autoSaveInterval;
-  int get maxAutoSnapshots => _maxAutoSnapshots;
-  String get historyFormatThread => _historyFormatThread;
-  String get historyFormatUser => _historyFormatUser;
-  int get historyMaxCount => _historyMaxCount;
-  String get historyTitleFormatThread => _historyTitleFormatThread;
-  String get historyTitleFormatUser => _historyTitleFormatUser;
-  String get historyTitleFormatMythread => _historyTitleFormatMythread;
-  String get historyTitleFormatReply => _historyTitleFormatReply;
 
   static const tabLabels = {
     'newthread': '最新发表',
@@ -250,208 +157,48 @@ class SettingsProvider extends ChangeNotifier {
     'my': '我的帖子',
   };
 
-  // ==================== 加载 ====================
+  // ==================== 数据库快捷引用 ====================
 
-  Future<void> load() async {
-    // 基本数值设置
-    _fontSize = (await _db.getSettingDouble('fontSize')) ?? 16;
-    _currentSiteIndex = (await _db.getSettingInt('currentSiteIndex')) ?? 0;
-    _defaultTabIndex = ((await _db.getSettingInt('defaultTabIndex')) ?? 0)
-        .clamp(0, 3);
+  DatabaseHelper get _db => DatabaseHelper.instance;
 
-    _autoDetectUrls = (await _db.getSettingBool('autoDetectUrls')) ?? true;
-    // 浏览器仿真头：此处在 ApiService.init 之前，只登记开关值，init 会读它
-    _simulateBrowserHeaders =
-        (await _db.getSettingBool('simulateBrowserHeaders')) ?? true;
-    applyBrowserHeaders(_simulateBrowserHeaders);
-    _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
-    // 缓存过期天数（默认取自 defaults.json，无配置或 JSON 错误时为 1 天）
-    final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
-    _avatarCacheDays =
-        (await _db.getSettingInt('avatarCacheDays')) ?? cacheDefaults.avatar;
-    _emojiCacheDays =
-        (await _db.getSettingInt('emojiCacheDays')) ?? cacheDefaults.emoji;
-    _imageCacheDays =
-        (await _db.getSettingInt('imageCacheDays')) ?? cacheDefaults.image;
-    _medalCacheDays =
-        (await _db.getSettingInt('medalCacheDays')) ?? cacheDefaults.medal;
-    _minSnapshotWordCount =
-        (await _db.getSettingInt('minSnapshotWordCount')) ?? 10;
-    _autoSaveInterval = (await _db.getSettingInt('autoSaveInterval')) ?? 30;
-    _maxAutoSnapshots = (await _db.getSettingInt('maxAutoSnapshots')) ?? 10;
-    _historyMaxCount = (await _db.getSettingInt('historyMaxCount')) ?? 200;
+  /// 通知监听者（供 part 扩展复用，规避 @protected 限制）
+  void _notify() => notifyListeners();
 
-    _historyFormatThread =
-        (await _db.getSetting('historyFormat_thread')) ?? '{title}';
-    _historyFormatUser =
-        (await _db.getSetting('historyFormat_user')) ?? '{nickname}';
-    _historyTitleFormatThread =
-        (await _db.getSetting('historyTitleFormat_thread')) ?? '{title}';
-    _historyTitleFormatUser =
-        (await _db.getSetting('historyTitleFormat_user')) ?? '{nickname}';
-    _historyTitleFormatMythread =
-        (await _db.getSetting('historyTitleFormat_mythread')) ??
-        '{typeLabel}(UID={uid}, 第{page}页)';
-    _historyTitleFormatReply =
-        (await _db.getSetting('historyTitleFormat_reply')) ??
-        '{typeLabel}(UID={uid}, 第{page}页)';
+  bool _showAvatars = true;
 
-    // 积分公式（按站点）
-    _creditFormula =
-        (await _db.getCreditFormula(SiteStore.instance.host)) ?? defaultFormula;
+  /// 头像尺寸策略（固定某一尺寸可提高头像缓存命中率），默认 middle
+  AvatarSizeMode _avatarSizeMode = AvatarSizeMode.middle;
 
-    // 恢复站点列表
-    final sitesJson = await _db.getSitesRaw();
-    if (sitesJson != null && sitesJson.isNotEmpty) {
-      final list = jsonDecode(sitesJson) as List<dynamic>;
-      _sites = list
-          .map((j) => Site.fromJson(j as Map<String, dynamic>))
-          .toList();
-    }
-    if (_sites.isEmpty) {
-      _sites = SiteConfig.defaultSites();
-    }
-    _currentSiteIndex = _currentSiteIndex.clamp(0, _sites.length - 1);
-    SiteStore.instance.replaceSites(_sites);
-    _currentSiteIndex = _currentSiteIndex.clamp(0, _sites.length - 1);
-    SiteStore.instance.switchTo(_currentSiteIndex);
+  /// 宽屏时帖子图片最大宽度（px），窄屏占满不受此限制；默认 600
+  int _maxImageWidth = 600;
 
-    // 导读 Tab（完整列表含可见性；兼容旧版 tabOrder 逗号字符串迁移）
-    final guideJson = await _db.getSetting('guideTabs');
-    if (guideJson != null && guideJson.isNotEmpty) {
-      try {
-        final loaded = ManagedItem.decodeList(
-          guideJson,
-        ).where((e) => tabLabels.containsKey(e.id)).toList();
-        if (loaded.isNotEmpty) _guideTabs = loaded;
-      } catch (_) {}
-    } else {
-      final legacy = await _db.getSetting('tabOrder');
-      if (legacy != null && legacy.isNotEmpty) {
-        final visible = legacy.split(',').toSet();
-        _guideTabs = [
-          for (final id in _defaultTabIds)
-            ManagedItem(
-              id: id,
-              name: tabLabels[id] ?? id,
-              visible: visible.contains(id),
-            ),
-        ];
-      }
-    }
+  /// 编辑器启动自检（默认开启，关闭后跳过启动报错，无条件进入编辑器）
+  bool _editorStartupCheck = true;
 
-    // 首页区块（顺序/显隐/默认展开；缺失或损坏时回退默认）
-    final homeJson = await _db.getSetting('homeSections');
-    if (homeJson != null && homeJson.isNotEmpty) {
-      try {
-        final loaded = ManagedItem.decodeList(
-          homeJson,
-        ).where((e) => _homeSectionIds.contains(e.id)).toList();
-        if (loaded.isNotEmpty) _homeSections = loaded;
-      } catch (_) {}
-    }
+  // ==================== 留在类体内的成员 ====================
+  //
+  // 部分设置项 model（如 content_settings.dart / shortcut_settings.dart）
+  // 通过回调类型间接持有 [SettingsProvider]，其所在库并未直接 import 本文件，
+  // part 内的扩展成员对它们不可见，故以下 getter/setter 必须保留在类体中。
 
-    // 快捷键映射
-    final shortcutsJson = await _db.getShortcutsRaw();
-    if (shortcutsJson != null && shortcutsJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(shortcutsJson) as Map<String, dynamic>;
-        _shortcuts = parsed.map((k, v) => MapEntry(k, v.toString()));
-      } catch (_) {}
-    }
+  double get fontSize => _fontSize;
 
-    // 禁用的 BBCode 标签
-    final disabledJson = await _db.getDisabledBbcodeRaw();
-    if (disabledJson != null && disabledJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(disabledJson) as List<dynamic>;
-        // 只保留仍可配置的项：老版本可能存过已被移出清单的标签
-        // （如 strikethrough —— 删除线带语义，已不再允许禁用），
-        // 否则它会留在集合里继续生效，而用户在 UI 上已无处取消。
-        _disabledBbcodeTags = parsed
-            .map((e) => e.toString())
-            .where(bbcodeStyleTagIds.contains)
-            .toSet();
-      } catch (_) {}
-    }
+  Set<String> get disabledBbcodeTags => Set.unmodifiable(_disabledBbcodeTags);
+  bool get autoDetectUrls => _autoDetectUrls;
+  int get historyMaxCount => _historyMaxCount;
+  bool get editorStartupCheck => _editorStartupCheck;
 
-    // 快捷链接（每个站点独立存储）
-    for (final site in _sites) {
-      final host = site.host;
-      final linksJson = await _db.getShortcutLinksRaw(host);
-      if (linksJson != null && linksJson.isNotEmpty) {
-        try {
-          _shortcutLinks[host] = ManagedItem.decodeList(linksJson);
-        } catch (_) {}
-      }
-    }
-    for (final site in _sites) {
-      final host = site.host;
-      if (!_shortcutLinks.containsKey(host)) {
-        _shortcutLinks[host] = DefaultConfig.instance.shortcutLinksFor(host);
-      }
-    }
+  List<ManagedItem> get toolbarItems => List.unmodifiable(_toolbarItems);
 
-    // 工具栏配置
-    _toolbarItems = await _loadSyncedToolbar();
+  String shortcut(String action) =>
+      _shortcuts[action] ?? ShortcutHelper.defaults[action] ?? '';
 
-    // 工具栏快捷键
-    final tbShortcutsJson = await _db.getToolbarShortcutsRaw();
-    if (tbShortcutsJson != null && tbShortcutsJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(tbShortcutsJson) as Map<String, dynamic>;
-        _toolbarShortcuts = parsed.map((k, v) => MapEntry(k, v.toString()));
-        _toolbarShortcuts.removeWhere((key, _) => !isValidToolbarItemId(key));
-      } catch (_) {}
-    }
-
-    // 主题模式
-    final themeModeStr = await _db.getSetting('themeMode');
-    if (themeModeStr != null) {
-      _themeMode = ThemeMode.values.firstWhere(
-        (m) => m.name == themeModeStr,
-        orElse: () => ThemeMode.system,
-      );
-    }
-
-    // 主题种子色
-    final seedColorInt = await _db.getSettingInt('seedColor');
-    if (seedColorInt != null) {
-      _seedColor = Color(seedColorInt);
-    }
-
-    // 纯黑主题
-    _isPureBlackTheme = (await _db.getSettingBool('pureBlackTheme')) ?? false;
-
-    // 头像设置
-    _showAvatars = (await _db.getSettingBool('showAvatars')) ?? true;
-
-    // 头像尺寸策略（默认 middle，未知值回退 middle）
-    _avatarSizeMode = AvatarSizeMode.fromValue(
-      await _db.getSetting('avatarSizeMode'),
-    );
-
-    // 宽屏时帖子图片最大宽度（默认 600）
-    _maxImageWidth = (await _db.getSettingInt('maxImageWidth')) ?? 600;
-
-    // 编辑器启动自检
-    _editorStartupCheck =
-        (await _db.getSettingBool('editorStartupCheck')) ?? true;
-
-    notifyListeners();
-  }
-
-  // ==================== 写入方法 ====================
+  String toolbarShortcut(String id) =>
+      _toolbarShortcuts[id] ?? defaultToolbarShortcuts()[id] ?? '';
 
   Future<void> setShortcut(String action, String keyString) async {
     _shortcuts[action] = keyString;
     await _db.setShortcutsRaw(jsonEncode(_shortcuts));
-    notifyListeners();
-  }
-
-  Future<void> setDisabledBbcodeTags(Set<String> tags) async {
-    _disabledBbcodeTags = Set.from(tags);
-    await _db.setDisabledBbcodeRaw(jsonEncode(tags.toList()));
     notifyListeners();
   }
 
@@ -461,77 +208,9 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 开关浏览器仿真头（Referer / Accept），立即作用于后续请求
-  Future<void> setSimulateBrowserHeaders(bool enabled) async {
-    _simulateBrowserHeaders = enabled;
-    applyBrowserHeaders(enabled);
-    await _db.setSettingBool('simulateBrowserHeaders', enabled);
-    notifyListeners();
-  }
-
-  Future<void> setStaggerInterval(int ms) async {
-    _staggerInterval = ms.clamp(20, 300);
-    await _db.setSettingInt('staggerInterval', _staggerInterval);
-    notifyListeners();
-  }
-
-  Future<void> setAvatarCacheDays(int days) async {
-    _avatarCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('avatarCacheDays', _avatarCacheDays);
-    notifyListeners();
-  }
-
-  Future<void> setEmojiCacheDays(int days) async {
-    _emojiCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('emojiCacheDays', _emojiCacheDays);
-    notifyListeners();
-  }
-
-  Future<void> setImageCacheDays(int days) async {
-    _imageCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('imageCacheDays', _imageCacheDays);
-    notifyListeners();
-  }
-
-  Future<void> setMedalCacheDays(int days) async {
-    _medalCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('medalCacheDays', _medalCacheDays);
-    notifyListeners();
-  }
-
-  Future<void> setThemeMode(ThemeMode mode) async {
-    _themeMode = mode;
-    await _db.setSetting('themeMode', mode.name);
-    notifyListeners();
-  }
-
-  Future<void> setSeedColor(Color color) async {
-    _seedColor = color;
-    await _db.setSettingInt('seedColor', color.toARGB32());
-    notifyListeners();
-  }
-
-  Future<void> setPureBlackTheme(bool value) async {
-    _isPureBlackTheme = value;
-    await _db.setSettingBool('pureBlackTheme', value);
-    notifyListeners();
-  }
-
-  Future<void> setShowAvatars(bool value) async {
-    _showAvatars = value;
-    await _db.setSettingBool('showAvatars', value);
-    notifyListeners();
-  }
-
-  Future<void> setAvatarSizeMode(AvatarSizeMode mode) async {
-    _avatarSizeMode = mode;
-    await _db.setSetting('avatarSizeMode', mode.value);
-    notifyListeners();
-  }
-
-  Future<void> setMaxImageWidth(int px) async {
-    _maxImageWidth = px.clamp(100, 2000);
-    await _db.setSettingInt('maxImageWidth', _maxImageWidth);
+  Future<void> setToolbarShortcut(String id, String keyString) async {
+    _toolbarShortcuts[id] = keyString;
+    await _db.setToolbarShortcutsRaw(jsonEncode(_toolbarShortcuts));
     notifyListeners();
   }
 
@@ -541,51 +220,9 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setMinSnapshotWordCount(int v) async {
-    _minSnapshotWordCount = v.clamp(1, 100);
-    await _db.setSettingInt('minSnapshotWordCount', _minSnapshotWordCount);
-    notifyListeners();
-  }
-
-  Future<void> setAutoSaveInterval(int seconds) async {
-    _autoSaveInterval = seconds.clamp(5, 300);
-    await _db.setSettingInt('autoSaveInterval', _autoSaveInterval);
-    notifyListeners();
-  }
-
-  Future<void> setMaxAutoSnapshots(int v) async {
-    _maxAutoSnapshots = v.clamp(1, 50);
-    await _db.setSettingInt('maxAutoSnapshots', _maxAutoSnapshots);
-    notifyListeners();
-  }
-
-  Future<void> setCreditFormula(String formula) async {
-    _creditFormula = formula;
-    await _db.setCreditFormula(SiteStore.instance.host, formula);
-    notifyListeners();
-  }
-
   Future<void> setFontSize(double size) async {
     _fontSize = size.clamp(12, 32);
     await _db.setSettingDouble('fontSize', _fontSize);
-    notifyListeners();
-  }
-
-  Future<void> setDefaultTabIndex(int index) async {
-    _defaultTabIndex = index.clamp(0, 3);
-    await _db.setSettingInt('defaultTabIndex', _defaultTabIndex);
-    notifyListeners();
-  }
-
-  Future<void> setHistoryFormatThread(String format) async {
-    _historyFormatThread = format;
-    await _db.setSetting('historyFormat_thread', format);
-    notifyListeners();
-  }
-
-  Future<void> setHistoryFormatUser(String format) async {
-    _historyFormatUser = format;
-    await _db.setSetting('historyFormat_user', format);
     notifyListeners();
   }
 
@@ -593,455 +230,5 @@ class SettingsProvider extends ChangeNotifier {
     _historyMaxCount = count.clamp(10, 1000);
     await _db.setSettingInt('historyMaxCount', _historyMaxCount);
     notifyListeners();
-  }
-
-  Future<void> setHistoryTitleFormatThread(String format) async {
-    _historyTitleFormatThread = format;
-    await _db.setSetting('historyTitleFormat_thread', format);
-    notifyListeners();
-  }
-
-  Future<void> setHistoryTitleFormatUser(String format) async {
-    _historyTitleFormatUser = format;
-    await _db.setSetting('historyTitleFormat_user', format);
-    notifyListeners();
-  }
-
-  Future<void> setHistoryTitleFormatMythread(String format) async {
-    _historyTitleFormatMythread = format;
-    await _db.setSetting('historyTitleFormat_mythread', format);
-    notifyListeners();
-  }
-
-  Future<void> setHistoryTitleFormatReply(String format) async {
-    _historyTitleFormatReply = format;
-    await _db.setSetting('historyTitleFormat_reply', format);
-    notifyListeners();
-  }
-
-  // ==================== 工具栏 ====================
-
-  Future<List<ManagedItem>> _loadSyncedToolbar() async {
-    final canonical = defaultToolbarItems();
-    final canonicalIds = canonical.map((e) => e.id).toSet();
-
-    final jsonStr = await _db.getToolbarItemsRaw();
-    if (jsonStr == null || jsonStr.isEmpty) return canonical;
-
-    try {
-      final loaded = ManagedItem.decodeList(jsonStr);
-      final loadedIds = loaded.map((e) => e.id).toSet();
-
-      final synced = loaded.where((e) => canonicalIds.contains(e.id)).map((e) {
-        final canonicalItem = canonical.firstWhere((c) => c.id == e.id);
-        return e.copyWith(name: canonicalItem.name);
-      }).toList();
-
-      for (final item in canonical) {
-        if (!loadedIds.contains(item.id)) {
-          synced.add(item);
-        }
-      }
-      return synced;
-    } catch (_) {
-      return canonical;
-    }
-  }
-
-  Future<void> _persistToolbar() async {
-    await _db.setToolbarItemsRaw(ManagedItem.encodeList(_toolbarItems));
-    notifyListeners();
-  }
-
-  Future<void> moveToolbarItem(int from, int to) async {
-    reorderManagedItems(_toolbarItems, from, to);
-    await _persistToolbar();
-  }
-
-  Future<void> toggleToolbarItem(String id) async {
-    toggleManagedItem(_toolbarItems, id);
-    await _persistToolbar();
-  }
-
-  Future<void> setToolbarShortcut(String id, String keyString) async {
-    _toolbarShortcuts[id] = keyString;
-    await _db.setToolbarShortcutsRaw(jsonEncode(_toolbarShortcuts));
-    notifyListeners();
-  }
-
-  Future<void> resetToolbarItems() async {
-    _toolbarItems = defaultToolbarItems();
-    _toolbarShortcuts = defaultToolbarShortcuts();
-    await _db.setToolbarItemsRaw(ManagedItem.encodeList(_toolbarItems));
-    await _db.setToolbarShortcutsRaw(jsonEncode(_toolbarShortcuts));
-    notifyListeners();
-  }
-
-  // ==================== 快捷链接 CRUD ====================
-
-  List<ManagedItem> _linksForCurrent() =>
-      _shortcutLinks.putIfAbsent(SiteStore.instance.host, () => []);
-
-  Future<void> _persistLinks() async {
-    await _db.setShortcutLinksRaw(
-      SiteStore.instance.host,
-      ManagedItem.encodeList(_linksForCurrent()),
-    );
-    notifyListeners();
-  }
-
-  Future<void> addShortcutLink(ManagedItem item) async {
-    _linksForCurrent().add(item);
-    await _persistLinks();
-  }
-
-  Future<void> removeShortcutLink(String id) async {
-    _linksForCurrent().removeWhere((e) => e.id == id);
-    await _persistLinks();
-  }
-
-  Future<void> updateShortcutLink(String id, ManagedItem newValue) async {
-    final idx = _linksForCurrent().indexWhere((e) => e.id == id);
-    if (idx < 0) return;
-    _linksForCurrent()[idx] = newValue;
-    await _persistLinks();
-  }
-
-  Future<void> moveShortcutLink(int from, int to) async {
-    reorderManagedItems(_linksForCurrent(), from, to);
-    await _persistLinks();
-  }
-
-  Future<void> toggleShortcutLink(String id) async {
-    toggleManagedItem(_linksForCurrent(), id);
-    await _persistLinks();
-  }
-
-  // ==================== 导读 Tab ====================
-
-  Future<void> moveTab(int from, int to) async {
-    reorderManagedItems(_guideTabs, from, to);
-    await _persistGuideTabs();
-  }
-
-  Future<void> toggleTab(String id) async {
-    toggleManagedItem(_guideTabs, id);
-    await _persistGuideTabs();
-  }
-
-  Future<void> _persistGuideTabs() async {
-    await _db.setSetting('guideTabs', ManagedItem.encodeList(_guideTabs));
-    notifyListeners();
-  }
-
-  // ==================== 首页区块 ====================
-
-  Future<void> moveHomeSection(int from, int to) async {
-    reorderManagedItems(_homeSections, from, to);
-    await _persistHomeSections();
-  }
-
-  Future<void> toggleHomeSectionVisibility(String id) async {
-    toggleManagedItem(_homeSections, id);
-    await _persistHomeSections();
-  }
-
-  /// 设置区块展开状态。
-  ///
-  /// 首页里当场折叠与设置面板里改默认值走同一入口，因此用户折叠过的
-  /// 区块下次启动仍是折叠的，不需要两套状态。
-  Future<void> setHomeSectionExpanded(String id, bool expanded) async {
-    final i = _homeSections.indexWhere((e) => e.id == id);
-    if (i < 0) return;
-    final data = Map<String, dynamic>.from(_homeSections[i].data ?? {});
-    data['expanded'] = expanded;
-    _homeSections[i] = _homeSections[i].copyWith(data: data);
-    await _persistHomeSections();
-  }
-
-  Future<void> _persistHomeSections() async {
-    await _db.setSetting('homeSections', ManagedItem.encodeList(_homeSections));
-    notifyListeners();
-  }
-
-  // ==================== 站点管理 ====================
-
-  Future<void> addSite(Site site) async {
-    _sites.add(site);
-    await _persistSites();
-  }
-
-  Future<void> deleteSite(int index) async {
-    if (index < 0 || index >= _sites.length) return;
-    _sites.removeAt(index);
-    if (_currentSiteIndex >= _sites.length) {
-      _currentSiteIndex = _sites.length - 1;
-    }
-    await _persistSites();
-  }
-
-  Future<void> updateSite(int index, Site site) async {
-    if (index < 0 || index >= _sites.length) return;
-    _sites[index] = site;
-    if (index == _currentSiteIndex) {
-      final idx = SiteStore.instance.sites.indexWhere(
-        (s) => s.host == site.host,
-      );
-      if (idx >= 0) SiteStore.instance.switchTo(idx);
-    }
-    await _persistSites();
-    notifyListeners();
-  }
-
-  Future<void> setSiteUA(String userAgent) async {
-    final idx = _currentSiteIndex;
-    if (idx < 0 || idx >= _sites.length) return;
-    final old = _sites[idx];
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: old.forums,
-      defaultForumOrder: old.defaultForumOrder,
-      userAgent: userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
-    SiteStore.instance.switchTo(idx);
-    await _persistSites();
-    notifyListeners();
-  }
-
-  /// 设置当前站点的头像 URL 模板，空字符串恢复默认 API 方案
-  Future<void> setSiteAvatarTemplate(String template) async {
-    final idx = _currentSiteIndex;
-    if (idx < 0 || idx >= _sites.length) return;
-    final old = _sites[idx];
-    final t = template.trim();
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: old.forums,
-      defaultForumOrder: old.defaultForumOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: t.isEmpty ? null : t,
-    );
-    SiteStore.instance.switchTo(idx);
-    await _persistSites();
-    notifyListeners();
-  }
-
-  Future<void> replaceSites(List<Site> newSites) async {
-    _sites = List.from(newSites);
-    await _persistSites();
-  }
-
-  /// 从默认配置（defaults.json）同步站点列表。
-  ///
-  /// - 已存在（按 [Site.baseUrl] 匹配）的站点：覆盖为默认配置，保留 forums / defaultForumOrder
-  /// - 缺失的内置站点：追加到列表末尾（例如应用更新后新增的默认站点）
-  /// - 自定义添加的站点：不受影响
-  /// 返回发生变化的站点数量。
-  Future<int> restoreDefaultSites() async {
-    final defaults = SiteConfig.defaultSites();
-    if (defaults.isEmpty) return 0;
-    var count = 0;
-    // 覆盖已存在的内置站点
-    for (var i = 0; i < _sites.length; i++) {
-      final current = _sites[i];
-      Site? def;
-      for (final d in defaults) {
-        if (d.baseUrl == current.baseUrl) {
-          def = d;
-          break;
-        }
-      }
-      if (def == null) continue;
-      _sites[i] = Site(
-        name: def.name,
-        baseUrl: def.baseUrl,
-        cdn: def.cdn,
-        loginPagePath: def.loginPagePath,
-        forums: current.forums,
-        defaultForumOrder: current.defaultForumOrder,
-        userAgent: def.userAgent,
-        avatarTemplate: def.avatarTemplate,
-      );
-      count++;
-    }
-    // 追加缺失的内置站点
-    final existing = _sites.map((s) => s.baseUrl).toSet();
-    for (final d in defaults) {
-      if (existing.contains(d.baseUrl)) continue;
-      _sites.add(
-        Site(
-          name: d.name,
-          baseUrl: d.baseUrl,
-          cdn: d.cdn,
-          loginPagePath: d.loginPagePath,
-          forums: {},
-          defaultForumOrder: [],
-          userAgent: d.userAgent,
-          avatarTemplate: d.avatarTemplate,
-        ),
-      );
-      count++;
-    }
-    await _persistSites();
-    notifyListeners();
-    return count;
-  }
-
-  List<MapEntry<String, String>> get forumEntries {
-    final f = SiteStore.instance.forums;
-    return SiteStore.instance.defaultForumOrder
-        .where((fid) => f.containsKey(fid))
-        .map((fid) => MapEntry(fid, f[fid]!))
-        .toList();
-  }
-
-  Future<void> addForum(String fid, String name) async {
-    final idx = _currentSiteIndex;
-    if (idx < 0 || idx >= _sites.length) return;
-    final old = _sites[idx];
-    final newForums = Map<String, String>.from(old.forums)..[fid] = name;
-    final newOrder = List<String>.from(old.defaultForumOrder)..add(fid);
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: newForums,
-      defaultForumOrder: newOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
-    await _persistSites();
-  }
-
-  Future<void> removeForum(String fid) async {
-    final idx = _currentSiteIndex;
-    if (idx < 0 || idx >= _sites.length) return;
-    final old = _sites[idx];
-    final newForums = Map<String, String>.from(old.forums)..remove(fid);
-    final newOrder = List<String>.from(old.defaultForumOrder)..remove(fid);
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: newForums,
-      defaultForumOrder: newOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
-    await _persistSites();
-    notifyListeners();
-  }
-
-  Future<void> moveForum(int oldIndex, int newIndex) async {
-    final idx = _currentSiteIndex;
-    if (idx < 0 || idx >= _sites.length) return;
-    final order = List<String>.from(_sites[idx].defaultForumOrder);
-    if (oldIndex < 0 || oldIndex >= order.length) return;
-    if (newIndex < 0 || newIndex >= order.length) return;
-    final moved = order.removeAt(oldIndex);
-    order.insert(newIndex, moved);
-    _sites[idx] = Site(
-      name: _sites[idx].name,
-      baseUrl: _sites[idx].baseUrl,
-      cdn: _sites[idx].cdn,
-      loginPagePath: _sites[idx].loginPagePath,
-      forums: _sites[idx].forums,
-      defaultForumOrder: order,
-      userAgent: _sites[idx].userAgent,
-      avatarTemplate: _sites[idx].avatarTemplate,
-    );
-    await _persistSites();
-    notifyListeners();
-  }
-
-  Future<void> renameForum(String fid, String newName) async {
-    final idx = _currentSiteIndex;
-    if (idx < 0 || idx >= _sites.length) return;
-    final old = _sites[idx];
-    final newForums = Map<String, String>.from(old.forums)..[fid] = newName;
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: newForums,
-      defaultForumOrder: List.from(old.defaultForumOrder),
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
-    await _persistSites();
-  }
-
-  Future<void> replaceForums(Map<String, String> newForums) async {
-    final idx = _currentSiteIndex;
-    if (idx < 0 || idx >= _sites.length) return;
-    final old = _sites[idx];
-    final newOrder = old.defaultForumOrder
-        .where((fid) => newForums.containsKey(fid))
-        .toList();
-    for (final fid in newForums.keys) {
-      if (!newOrder.contains(fid)) newOrder.add(fid);
-    }
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: Map.from(newForums),
-      defaultForumOrder: newOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
-    await _persistSites();
-  }
-
-  Future<void> _persistSites() async {
-    SiteStore.instance.replaceSites(_sites);
-    SiteStore.instance.switchTo(_currentSiteIndex.clamp(0, _sites.length - 1));
-    await _db.setSitesRaw(jsonEncode(_sites.map((s) => s.toJson()).toList()));
-    notifyListeners();
-  }
-
-  // ==================== 站点切换 ====================
-
-  Future<void> switchSite(int index) async {
-    if (index == _currentSiteIndex) return;
-    _currentSiteIndex = index;
-    await _db.setSettingInt('currentSiteIndex', index);
-    notifyListeners();
-  }
-
-  Future<void> reloadSiteConfig() async {
-    _creditFormula = await _loadFormulaForHost(SiteStore.instance.host);
-    notifyListeners();
-  }
-
-  Future<String> _loadFormulaForHost(String host) async {
-    return (await _db.getCreditFormula(host)) ?? defaultFormula;
-  }
-
-  Future<String?> fetchAndUpdateFormula() async {
-    try {
-      final result = await credit_api.fetch(ApiService().dio);
-      if (result['success'] == true && result['formula'] != null) {
-        _creditFormula = result['formula'] as String;
-        await _db.setCreditFormula(SiteStore.instance.host, _creditFormula);
-        notifyListeners();
-        return _creditFormula;
-      }
-      return null;
-    } catch (e) {
-      AppLogger.w('SETTINGS', 'fetch formula error: $e');
-      return null;
-    }
   }
 }

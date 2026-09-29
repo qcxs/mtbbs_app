@@ -11,7 +11,6 @@ enum LogLevel { info, debug, warning, error }
 /// 用法：
 /// ```dart
 /// AppLogger.i('PARSE', 'guide: success, 50 threads');
-/// AppLogger.list('PARSE', items, 3, labelFn: (e) => e.title);
 /// ```
 ///
 /// release 模式自动静默（依赖 [debugPrint] + [kReleaseMode] 双保险）。
@@ -45,45 +44,4 @@ class AppLogger {
   static void d(String tag, String msg) => _log(LogLevel.debug, tag, msg);
   static void w(String tag, String msg) => _log(LogLevel.warning, tag, msg);
   static void e(String tag, String msg) => _log(LogLevel.error, tag, msg);
-
-  // ==================== 工具方法 ====================
-
-  /// 截断输出长列表，避免刷屏。
-  ///
-  /// [items]      完整列表
-  /// [maxShow]    最多显示的条数（超出的计为 "N more"）
-  /// [labelFn]    从元素提取显示文本
-  /// [summary]    列表摘要（如 "50 threads"）
-  ///
-  /// 输出格式：
-  /// ```
-  ///   50 threads:
-  ///     + title1
-  ///     + title2
-  ///     + title3
-  ///     ... (47 more)
-  /// ```
-  static void list<T>(
-    String tag,
-    List<T> items,
-    int maxShow, {
-    required String Function(T) labelFn,
-    String summary = '',
-  }) {
-    if (!_allow(LogLevel.info)) return;
-    final prefix = summary.isNotEmpty ? '$summary:\n' : '';
-    final lines = items.take(maxShow).map((e) => '    + ${labelFn(e)}');
-    final rest = items.length > maxShow
-        ? '    ... (${items.length - maxShow} more)'
-        : '';
-    final msg = [prefix, ...lines, if (rest.isNotEmpty) rest].join('\n');
-    debugPrint('[$tag] $msg');
-  }
-
-  /// 格式化字节大小（如 "177KB"）
-  static String bytes(int b) {
-    if (b >= 1024 * 1024) return '${(b / (1024 * 1024)).toStringAsFixed(1)}MB';
-    if (b >= 1024) return '${(b / 1024).toStringAsFixed(0)}KB';
-    return '${b}B';
-  }
 }

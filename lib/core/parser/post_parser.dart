@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/parser/html2bbcode.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 从 table#pidXX.plhin（PC 模板）提取单帖完整数据
 ///
@@ -334,12 +334,8 @@ String extractPidFromTable(dom.Element table) {
   return '';
 }
 
-/// 将相对 URL 解析为绝对 URL
+/// 将相对 URL 解析为绝对 URL（空串原样返回，其余交给 [normalizeUrl]）
 String resolveUrl(String href) {
   if (href.isEmpty) return '';
-  final uri = Uri.tryParse(href);
-  if (uri == null) return href;
-  if (uri.hasScheme) return href;
-  final base = Uri.parse(SiteStore.instance.baseUrl);
-  return base.resolve(href).toString();
+  return normalizeUrl(href);
 }

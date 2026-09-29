@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
 
 /// 剪贴板图片粘贴服务
@@ -69,12 +68,6 @@ ${_buildFallbackDetection(basePath, timestamp)}
     } catch (_) {
       return null;
     }
-  }
-
-  /// 读取剪贴板文本
-  static Future<String?> pasteText() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    return data?.text;
   }
 
   /// 清理过期缓存文件
@@ -161,6 +154,3 @@ if ($img -ne $null) {
 Write-Output "NULL"
 ''';
 }
-
-/// 用于标记异步不等待
-void unawaited(Future<void> future) => future.ignore();

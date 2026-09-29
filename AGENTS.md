@@ -12,7 +12,7 @@ Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：
 1. **改代码前先读文档**：按下方路由表选读，`docs/07-经验教训.md` 收录全部踩坑，务必优先
 2. **日志用 `AppLogger.{d/i/w/e}(tag, msg)`**，禁 `print`/`debugPrint`（lint 未强制，靠约定执行）
 3. **import 用 `package:mtbbs/...` 绝对路径**，禁 `../` 相对导入（仅 barrel 文件的同目录 `export` 例外）
-4. **网络图片必须走 `CachedNetworkImage` + 指定 `cacheManager`**（image/avatar/emoji 三层），禁 `Image.network()`、禁不带 cacheManager 的默认缓存
+4. **网络图片必须走 `CachedNetworkImage` + 指定 `cacheManager`**（image/avatar/emoji/medal 四层），禁 `Image.network()`、禁不带 cacheManager 的默认缓存
 5. **持久化统一走 `DatabaseHelper`（sembast 单库）**，禁新增 SharedPreferences 依赖
 6. **新增 API 必须三文件**：http 只管请求 / parse 纯解析（不打印列表日志）/ export 走 `parseWithLog` 统一输出日志
 7. **验证闭环**：改完跑 `flutter analyze lib`；涉及真实请求用探针 `tool/api_probe_test.dart`（见 docs/10）

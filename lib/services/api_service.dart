@@ -7,6 +7,7 @@ import 'package:charset/charset.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
 /// API 服务 — 基于 Dio + CookieManager 的统一 HTTP 客户端
@@ -134,7 +135,7 @@ class ApiService {
               : 0;
           AppLogger.i(
             'DIO',
-            '$path → $status (${AppLogger.bytes(size)}, ${elapsed}ms)',
+            '$path → $status (${formatBytes(size)}, ${elapsed}ms)',
           );
           handler.next(response);
         },

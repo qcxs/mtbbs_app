@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/api/forum/ranklist/export.dart' as ranklist_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'rank_tile.dart';
+import 'package:mtbbs/widgets/common/rank_tile.dart';
 
 /// 帖子排行区块
 ///

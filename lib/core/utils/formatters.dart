@@ -50,8 +50,3 @@ String formatBytes(int bytes) {
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
-
-/// 安全解析时间，失败回退当前时间
-DateTime parseDateTimeOrNow(Object? value) {
-  return DateTime.tryParse(value?.toString() ?? '') ?? DateTime.now();
-}

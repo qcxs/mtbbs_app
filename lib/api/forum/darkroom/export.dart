@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
-import 'http.dart' as http;
-import 'parse.dart' as parse;
+import 'package:mtbbs/api/forum/darkroom/http.dart' as http;
+import 'package:mtbbs/api/forum/darkroom/parse.dart' as parse;
 
 /// 小黑屋 API 导出
 

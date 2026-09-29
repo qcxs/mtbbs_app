@@ -1,6 +1,5 @@
 import 'package:html/dom.dart' as dom;
-import 'package:html/parser.dart' as htmlParser;
-import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
@@ -66,17 +65,9 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   }
 
   final html = xmlResult.cdataHtml;
-  final doc = htmlParser.parse(html);
-
-  // 先过统一错误检测
-  final pageError = checkPageError(doc, html);
-  if (pageError.isError) {
-    return {
-      'success': false,
-      'message': pageError.message ?? '页面错误',
-      'loginRequired': pageError.loginRequired,
-    };
-  }
+  final pre = prepareDoc(html, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
 
   // 尝试两种解析策略
   var items = _parseTable(doc);

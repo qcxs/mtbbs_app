@@ -20,7 +20,7 @@
 | **版块** | 版块分类浏览 + 帖子列表 |
 | **帖子详情** | BBCode 渲染、评论、点赞、收藏、评分 |
 | **编辑器** | 发帖/评论/回复/编辑，BBCode 工具栏，图片管理，MT 图床，粘贴图片上传，快照自动保存 |
-| **社区** | 用户群组/列表 |
+| **社区** | 版块帖子列表（路由 `/forum`，带 fid 时显示对应版块帖子） |
 | **用户空间** | 个人资料、签名 |
 | **多站点** | 多站点多账号切换 |
 | **设置** | 自定义工具栏、快捷键、颜色主题、BBCode 渲染等 |
@@ -218,10 +218,13 @@ lib/
 ├── api/            Discuz HTML/XML → JSON 适配器
 ├── auth/           登录认证与多账号管理
 ├── config/         站点/导航/工具栏配置
-├── core/           BBCode 解析、日志、快捷键等工具
+├── controllers/    控制器（如线程列表 controller）
+├── core/           BBCode 解析、日志、快捷键等基础工具（parser/utils/app）
+├── mcp/            只读 MCP 服务端（本机 Streamable HTTP，AI 客户端直连）
+├── models/         纯数据模型（barrel models.dart）
 ├── pages/          页面组件
 │   ├── browser/    内置浏览器
-│   ├── community/  社区
+│   ├── community/  社区（版块帖子列表）
 │   ├── editor/     编辑器（发帖/评论/回复）
 │   ├── guide/      导读
 │   ├── home/       首页

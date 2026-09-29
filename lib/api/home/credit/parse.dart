@@ -1,5 +1,4 @@
-import 'package:html/parser.dart' as html_parser;
-import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/api/helpers.dart';
 
 /// 积分公式响应解析 — PC 版 DOM
 ///
@@ -18,21 +17,9 @@ import 'package:mtbbs/core/app/page_helper.dart';
 /// ```
 
 Map<String, dynamic> parseResponse(String body, int statusCode) {
-  if (statusCode != 200) {
-    return {'success': false, 'message': 'HTTP $statusCode'};
-  }
-
-  final doc = html_parser.parse(body);
-
-  // 统一检测 Discuz 错误页
-  final pageError = checkPageError(doc, body);
-  if (pageError.isError) {
-    return {
-      'success': false,
-      'message': pageError.message ?? '页面错误',
-      'loginRequired': pageError.loginRequired,
-    };
-  }
+  final pre = prepareDoc(body, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
 
   // 查找 PC 版积分容器
   final creditUl = doc.querySelector('ul.creditl');

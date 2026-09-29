@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:mtbbs/config/site_config.dart';
-import 'event_bus.dart';
+import 'package:mtbbs/core/app/event_bus.dart';
 
 /// 站点状态存储 — 可观察的 ChangeNotifier
 ///

@@ -1,5 +1,5 @@
 import 'package:html/dom.dart' as dom;
-import 'package:html/parser.dart' as html_parser;
+import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 
 /// 关注/粉丝列表响应解析
@@ -34,21 +34,9 @@ import 'package:mtbbs/core/app/page_helper.dart';
 /// 分页复用 [extractPagination]（标准 .pg，strong 当前页 + 共 N 页 label）。
 
 Map<String, dynamic> parseResponse(String body, int statusCode) {
-  if (statusCode != 200) {
-    return {'success': false, 'message': 'HTTP $statusCode'};
-  }
-
-  final doc = html_parser.parse(body);
-
-  // 统一检测 Discuz 错误页/登录页
-  final pageError = checkPageError(doc, body);
-  if (pageError.isError) {
-    return {
-      'success': false,
-      'message': pageError.message ?? '页面错误',
-      'loginRequired': pageError.loginRequired,
-    };
-  }
+  final pre = prepareDoc(body, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
 
   final items = <Map<String, dynamic>>[];
   for (final li in doc.querySelectorAll('#ct li.cl')) {
