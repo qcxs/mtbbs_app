@@ -85,6 +85,10 @@ extension on _WebLoginPageState {
   }
 
   Widget _buildWebView() {
+    // 清 Cookie 未完成前不创建 WebView：否则它会在旧 Cookie 之上发起请求
+    if (!_cookiesCleared) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
     return InAppWebView(
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,

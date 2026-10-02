@@ -98,29 +98,62 @@ Future<void> clearCookiesForHost(String baseUrl) async {
   if (host.isEmpty) return;
 
   final manager = webview.CookieManager.instance();
-  var removed = 0;
+  var scanned = 0;
+  var deleted = 0;
   try {
     final cookies = await manager.getCookies(url: webview.WebUri(baseUrl));
     for (final cookie in cookies) {
-      try {
-        await manager.deleteCookie(
-          url: webview.WebUri(baseUrl),
-          name: cookie.name,
-          path: cookie.path ?? '/',
-          domain: cookie.domain,
-        );
-        removed++;
-      } catch (e) {
-        AppLogger.d(
-          'PAGE',
-          'delete webview cookie "${cookie.name}" failed: $e',
-        );
+      scanned++;
+      // 一条 Cookie 要按多个 domain 写法各删一次，原因见 [_domainCandidates]
+      for (final domain in _domainCandidates(cookie.domain, host)) {
+        try {
+          await manager.deleteCookie(
+            url: webview.WebUri(baseUrl),
+            name: cookie.name,
+            path: cookie.path ?? '/',
+            domain: domain,
+          );
+          deleted++;
+        } catch (e) {
+          AppLogger.d(
+            'PAGE',
+            'delete webview cookie "${cookie.name}" failed: $e',
+          );
+        }
       }
     }
   } catch (e) {
     AppLogger.w('PAGE', 'clear webview cookies for $host failed: $e');
   }
-  AppLogger.d('PAGE', 'clear webview cookies for $host: $removed 条');
+  AppLogger.d(
+    'PAGE',
+    'clear webview cookies for $host: 扫描 $scanned 条 / 删除调用 $deleted 次',
+  );
+}
+
+/// 删除某条 Cookie 时应当尝试的 domain 候选值（按序执行）。
+///
+/// 平台 API 的坑（`flutter_inappwebview_android` 的 `MyCookieManager.java`）：
+/// - `getCookies` **只在 WebView 支持 `GET_COOKIE_INFO` 时才回填 `domain`**，
+///   否则一律为 null（`cookieMap.put("domain", null)`）；
+/// - 原生 `deleteCookie` 在 `domain == null` 时**不写 `Domain=` 属性**，
+///   于是只会命中 host-only 的那条。
+///
+/// 两者叠加的结果：Discuz 那种 `Domain=.bbs.binmt.cc` 的**域 Cookie 永远删不掉**，
+/// 且删除接口照样返回成功（静默）。登录页因此一直带着上一个账号的登录态，
+/// 用户无法登录其他账号。
+///
+/// 这里把三种存储形态都试一遍：
+/// - `null`    → 不带 Domain，命中 host-only 形态
+/// - `.{host}` → 命中最常见的 `Domain=.bbs.binmt.cc`
+/// - 平台回填的 `cookie.domain`（可能是不带点号或父域写法）
+///
+/// 删除不存在的 Cookie 是无副作用的空操作，多试几次的代价可以接受。
+List<String?> _domainCandidates(String? cookieDomain, String host) {
+  final out = <String?>[null, '.$host'];
+  final raw = (cookieDomain ?? '').trim();
+  if (raw.isNotEmpty && !out.contains(raw)) out.add(raw);
+  return out;
 }
 
 // ==================== WebView → Dio（反向同步） ====================

@@ -10,8 +10,8 @@ import 'scenario_types.dart';
 final Map<String, ApiScenario> debugScenarios = {
   'debug.http': ApiScenario(
     desc:
-        '调试用：GET 指定路径，输出状态码/响应头/原始正文'
-        '（携带当前会话 Cookie，用于 parse 开发时对照 DOM 结构）',
+        '调试用：GET 指定路径，输出状态码/重定向链/响应头（set-cookie、location）'
+        '/原始正文（携带当前会话 Cookie，用于 parse 开发时对照 DOM 结构）',
     params: {
       'path': '请求路径（默认 /forum.php，也可传完整 URL）',
       'q': '额外 query 参数，k=v 逗号分隔，如 mod=guide,index=1',
@@ -51,7 +51,21 @@ final Map<String, ApiScenario> debugScenarios = {
       return {
         'url': uri.toString(),
         'statusCode': resp.statusCode,
+        // 重定向链：站点"回退上一级"是 302 还是 JS 跳，在这里一眼可见
+        'redirects': [
+          for (final r in resp.redirects) '${r.statusCode} → ${r.location}',
+        ],
         'contentType': resp.headers.value(Headers.contentTypeHeader),
+        // 站点"记忆"了什么配置，全在 Set-Cookie 里（其余头无助于排查）
+        'responseHeaders': {
+          for (final e in resp.headers.map.entries)
+            if (const {
+              'set-cookie',
+              'location',
+              'server',
+            }.contains(e.key.toLowerCase()))
+              e.key: e.value,
+        },
         'bodyLength': body.length,
         'body': show,
       };

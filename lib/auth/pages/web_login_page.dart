@@ -33,6 +33,10 @@ class _WebLoginPageState extends State<WebLoginPage> {
   String? _errorMessage;
   bool _loginDone = false;
   double _progress = 0;
+
+  /// 本站点旧 Cookie 是否已清空 —— 没清完不创建 WebView
+  bool _cookiesCleared = false;
+
   late final TextEditingController _urlController;
 
   WebUri get _loginUrl {
@@ -52,9 +56,22 @@ class _WebLoginPageState extends State<WebLoginPage> {
   void initState() {
     super.initState();
     _urlController = TextEditingController(text: _loginUrl.toString());
-    // 清除本站点的 WebView Cookie，避免已登录状态跳过登录页
-    // （只清当前站点，不能影响其他站点的 WebView 登录态）
-    clearCookiesForHost(SiteStore.instance.baseUrl);
+    _clearSiteCookiesThenLoad();
+  }
+
+  /// 先清空本站点的 WebView Cookie，清完才让 WebView 开始加载
+  ///
+  /// 顺序不能反：登录页必须是"干净"的，否则站点看到上一账号的登录态，
+  /// 用户没法登录其他账号。原先是 initState 里 fire-and-forget 地清，
+  /// 而 WebView 在同一帧就带着旧 Cookie 发起了请求 —— 清完也晚了，
+  /// 首屏（乃至重定向结果）已经是"已登录"的样子。
+  ///
+  /// 只清当前站点，不影响其他站点的 WebView 登录态。
+  /// [clearCookiesForHost] 内部吞掉异常、不会抛，因此这里不会卡在加载态。
+  Future<void> _clearSiteCookiesThenLoad() async {
+    await clearCookiesForHost(SiteStore.instance.baseUrl);
+    if (!mounted) return;
+    _setState(() => _cookiesCleared = true);
   }
 
   @override

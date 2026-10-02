@@ -14,6 +14,11 @@ import 'package:mtbbs/core/utils/logger.dart';
 /// 请求级标记：本次请求已由拦截页处理器处理过，避免递归触发。
 const String kInterstitialHandledFlag = 'mtbbsInterstitialHandled';
 
+/// Discuz「浏览方式」Cookie 的名字后缀 —— `{前缀}_mobile`。
+///
+/// 前缀（MT 论坛是 `cQWy_2132_`）由站点配置决定，所以按后缀匹配，不写死全名。
+const String kBrowseModeCookieSuffix = '_mobile';
+
 /// API 服务 — 基于 Dio + CookieManager 的统一 HTTP 客户端
 ///
 /// Cookie 按站点隔离：
@@ -40,6 +45,20 @@ class ApiService {
   String? _activeAccount;
   String _currentHost = '';
   bool _initialized = false;
+
+  /// 「浏览方式」Cookie 过滤器 —— 必须排在 `CookieManager` **之后**。
+  ///
+  /// `dio_cookie_manager` 的 `onRequest` 会把罐里的 Cookie 合并成一个
+  /// `name=value; name2=value2` 字符串写进 `cookie` 头，没有"过滤某一条"的钩子；
+  /// `cookie_jar` 也没有按名删除的接口（4.0.9 的
+  /// `delete(uri, [bool withDomainSharedCookie])` 是按 URI 整体删）。
+  /// 所以在它之后把该条从请求头里摘掉即可 —— 纯请求级编辑，不碰用户罐里的数据。
+  late final InterceptorsWrapper _browseModeFilter = InterceptorsWrapper(
+    onRequest: (options, handler) {
+      _dropBrowseModeCookie(options);
+      handler.next(options);
+    },
+  );
 
   /// 浏览器默认 Accept（模拟浏览器访问时使用）
   static const String _browserAccept =
@@ -116,8 +135,7 @@ class ApiService {
       ),
     );
 
-    dio.interceptors.add(CookieManager(_guestJar!));
-    _activeJar = _guestJar;
+    _replaceCookieManager(_guestJar!);
     // 统一日志 + 错误处理拦截器
     dio.interceptors.add(
       InterceptorsWrapper(
@@ -269,7 +287,49 @@ class ApiService {
   void _replaceCookieManager(CookieJar jar) {
     _activeJar = jar;
     dio.interceptors.removeWhere((i) => i is CookieManager);
-    dio.interceptors.insert(0, CookieManager(jar));
+    dio.interceptors.remove(_browseModeFilter);
+    // 顺序有意义：CookieManager 先把罐里的 Cookie 合成请求头，过滤器才能从里面
+    // 摘掉「浏览方式」Cookie
+    dio.interceptors.insertAll(0, [CookieManager(jar), _browseModeFilter]);
+  }
+
+  /// 从请求头里摘掉站点「浏览方式」Cookie（`{前缀}_mobile`），避免它盖过 App 的
+  /// 「浏览模式」。
+  ///
+  /// Discuz 的优先级是 **`*_mobile` Cookie 高于 UA**：站点"该页面无手机版"提示里的
+  /// 「继续访问电脑版」链接（`…&mobile=no`）会写下 `{前缀}_mobile=no`，此后**该罐内
+  /// 所有请求**都被强制按 PC 模板返回，UA 完全不参与决策。实测同一手机 UA、同一 URL：
+  /// 罐里没有它 → 173.5 KB 移动卡片；有它 → 89.0 KB PC 表格。
+  ///
+  /// 症状之所以"怪"：重新登录不会清它、`Max-Age` 还会被反复续期（表现为「移动版」
+  /// 永久失效）；CookieJar 按账号隔离（`cookies/{host}/{账号}/`），所以换一个账号
+  /// 就正常。
+  ///
+  /// App 的「浏览模式」是显式设置，不该被一条历史遗留的服务端偏好悄悄覆盖。
+  /// 只改本次请求的头、不删罐里的数据 —— 罐里那条会自然过期（`Max-Age=3600`），
+  /// 而只要不发送它，站点就回到按 UA 决策。
+  void _dropBrowseModeCookie(RequestOptions options) {
+    final key = options.headers.keys.firstWhere(
+      (k) => k.toLowerCase() == HttpHeaders.cookieHeader,
+      orElse: () => '',
+    );
+    if (key.isEmpty) return;
+    final raw = options.headers[key];
+    if (raw is! String || raw.isEmpty) return;
+
+    final parts = raw.split(';');
+    final kept = parts
+        .where(
+          (p) => !p.trim().split('=').first.endsWith(kBrowseModeCookieSuffix),
+        )
+        .toList();
+    if (kept.length == parts.length) return;
+
+    // 与 CookieManager 的写法保持一致：空则置 null（Dio 会省略该头）
+    options.headers[key] = kept.isEmpty
+        ? null
+        : kept.map((p) => p.trim()).join('; ');
+    AppLogger.i('DIO', '已剔除请求中的浏览方式 Cookie（它会强制 PC 模板）');
   }
 
   /// 命中"非论坛页"（人机验证 / 防火墙拦截页）时尝试自动恢复。
