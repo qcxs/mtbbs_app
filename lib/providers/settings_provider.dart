@@ -45,6 +45,9 @@ class SettingsProvider extends ChangeNotifier {
   /// 请求携带 Referer / Accept 等浏览器仿真头（模拟浏览器访问）
   bool _simulateBrowserHeaders = true;
 
+  /// 站点返回"非论坛页"（人机验证 / 防火墙）时，自动弹浏览器让用户通过验证
+  bool _interstitialAutoVerify = true;
+
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;
 

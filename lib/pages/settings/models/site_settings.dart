@@ -39,6 +39,13 @@ List<SettingsModel> siteSettings() => [
     value: (s) => s.simulateBrowserHeaders,
     onChanged: (ctx, s, v) => s.setSimulateBrowserHeaders(v),
   ),
+  SwitchSetting(
+    title: '人机验证自动处理',
+    subtitle: '站点返回验证页 / 防火墙拦截页时自动弹出浏览器，通过后自动继续请求',
+    icon: Icons.verified_user,
+    value: (s) => s.interstitialAutoVerify,
+    onChanged: (ctx, s, v) => s.setInterstitialAutoVerify(v),
+  ),
   NormalSetting(
     title: '版块管理',
     icon: Icons.forum,

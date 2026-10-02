@@ -16,6 +16,8 @@ extension SettingsPersistence on SettingsProvider {
     _simulateBrowserHeaders =
         (await _db.getSettingBool('simulateBrowserHeaders')) ?? true;
     applyBrowserHeaders(_simulateBrowserHeaders);
+    _interstitialAutoVerify =
+        (await _db.getSettingBool('interstitialAutoVerify')) ?? true;
     _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
     // 缓存过期天数（默认取自 defaults.json，无配置或 JSON 错误时为 1 天）
     final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
@@ -201,6 +203,13 @@ extension SettingsPersistence on SettingsProvider {
     _simulateBrowserHeaders = enabled;
     applyBrowserHeaders(enabled);
     await _db.setSettingBool('simulateBrowserHeaders', enabled);
+    _notify();
+  }
+
+  /// 开关"非论坛页自动弹浏览器验证"（人机验证 / 防火墙）
+  Future<void> setInterstitialAutoVerify(bool enabled) async {
+    _interstitialAutoVerify = enabled;
+    await _db.setSettingBool('interstitialAutoVerify', enabled);
     _notify();
   }
 

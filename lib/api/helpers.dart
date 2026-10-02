@@ -22,8 +22,9 @@ String safeDecode(Response<String> resp) => resp.data ?? '';
 /// ```
 ({dom.Document? doc, Map<String, dynamic>? error}) prepareDoc(
   String body,
-  int statusCode,
-) {
+  int statusCode, {
+  String? contentType,
+}) {
   if (statusCode != 200) {
     return (
       doc: null,
@@ -39,6 +40,20 @@ String safeDecode(Response<String> resp) => resp.data ?? '';
         'success': false,
         'message': pageError.message ?? '页面错误',
         'loginRequired': pageError.loginRequired,
+      },
+    );
+  }
+  // 未知拦截页（人机验证 / 防火墙）：既不是 Discuz 错误页，也不是能用的论坛页。
+  // Dio 拦截器已尝试过自动恢复（弹窗验证 + 重放）；到这里说明未恢复，给出可读提示。
+  // content-type 缺省按 HTML 处理 —— prepareDoc 只服务"整页 HTML"类解析器。
+  if (looksLikeInterstitialPage(body, contentType ?? 'text/html')) {
+    AppLogger.w('PARSE', '响应疑似拦截页（${body.length}B），非论坛页结构');
+    return (
+      doc: null,
+      error: {
+        'success': false,
+        'message': '页面被拦截，可能需要人机验证',
+        'interstitial': true,
       },
     );
   }

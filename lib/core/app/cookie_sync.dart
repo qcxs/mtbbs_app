@@ -41,6 +41,44 @@ Future<void> syncCookieStringToWebView(
   }
 }
 
+/// CookieJar → WebView：把 App 当前 Cookie 同步进 WebView。
+///
+/// 供"全局人机验证弹窗"这类**非页面**场景使用——它拿不到 AuthProvider，
+/// 但可以直接读当前活跃的 CookieJar。
+///
+/// 语义是"替换本站点 Cookie"：先清本站点（只清当前站点，见
+/// [clearCookiesForHost]），再按 jar 注入，避免上一轮验证残留的旧 Cookie
+/// 让 WebView 显示出错误的登录态。
+///
+/// 「清理」与「注入」两步互相独立：清理失败只记日志，绝不连累注入
+/// （见 docs/07 #67 静默失败教训）。
+Future<void> syncJarCookiesToWebView({
+  required CookieJar jar,
+  required String baseUrl,
+}) async {
+  final uri = Uri.tryParse(baseUrl);
+  if (uri == null || uri.host.isEmpty) return;
+
+  try {
+    await clearCookiesForHost(baseUrl);
+  } catch (e) {
+    AppLogger.w('PAGE', 'clear webview cookies failed: $e');
+  }
+
+  List<Cookie> cookies;
+  try {
+    cookies = await jar.loadForRequest(uri);
+  } catch (e) {
+    AppLogger.w('PAGE', 'read jar cookies failed: $e');
+    return;
+  }
+  final str = cookies
+      .where((c) => c.name.isNotEmpty)
+      .map((c) => '${c.name}=${c.value}')
+      .join('; ');
+  await syncCookieStringToWebView(str, baseUrl);
+}
+
 /// 清除指定站点的 WebView Cookie，**不影响其他站点**。
 ///
 /// WebView 的 CookieManager 是平台级单例：`deleteAllCookies()` 会清掉所有

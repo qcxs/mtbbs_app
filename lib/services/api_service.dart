@@ -6,9 +6,13 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:charset/charset.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
+import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+
+/// 请求级标记：本次请求已由拦截页处理器处理过，避免递归触发。
+const String kInterstitialHandledFlag = 'mtbbsInterstitialHandled';
 
 /// API 服务 — 基于 Dio + CookieManager 的统一 HTTP 客户端
 ///
@@ -24,6 +28,12 @@ class ApiService {
 
   late final Dio dio;
   PersistCookieJar? _guestJar;
+
+  /// 拦截页处理器 —— 由 app 层注入（见 main.dart 的 `VerificationGate`）。
+  ///
+  /// 返回 true 表示"已通过人机验证"。做成注入点而不是直接依赖 UI/WebView，
+  /// 是为了让 services 层不反向依赖 pages / flutter_inappwebview。
+  Future<bool> Function(RequestOptions options)? interstitialHandler;
 
   /// 当前活跃的 CookieJar（游客或当前账号）
   CookieJar? _activeJar;
@@ -125,7 +135,7 @@ class ApiService {
           AppLogger.i('DIO', '$method $fullPath');
           handler.next(options);
         },
-        onResponse: (response, handler) {
+        onResponse: (response, handler) async {
           final path = response.requestOptions.path;
           final status = response.statusCode ?? 0;
           final size = (response.data as String?)?.length ?? 0;
@@ -137,6 +147,15 @@ class ApiService {
             'DIO',
             '$path → $status (${formatBytes(size)}, ${elapsed}ms)',
           );
+          // 通用拦截页（人机验证 / 防火墙）：交由注入的处理器恢复，成功后重放
+          if (await _recoverFromInterstitial(response)) {
+            try {
+              handler.resolve(await dio.fetch(response.requestOptions));
+              return;
+            } catch (e) {
+              AppLogger.w('DIO', '$path 拦截页重放失败: $e');
+            }
+          }
           handler.next(response);
         },
         onError: (error, handler) {
@@ -251,6 +270,49 @@ class ApiService {
     _activeJar = jar;
     dio.interceptors.removeWhere((i) => i is CookieManager);
     dio.interceptors.insert(0, CookieManager(jar));
+  }
+
+  /// 命中"非论坛页"（人机验证 / 防火墙拦截页）时尝试自动恢复。
+  ///
+  /// 返回 true 表示**已通过验证且可以重放本次请求**（打了重放标记）。
+  /// 仅 GET 自动重放：写操作（发帖/评论）重放有重复提交风险，验证通过后
+  /// 交给用户手动重试。POST 命中时同样会触发验证弹窗，只是不自动重放。
+  Future<bool> _recoverFromInterstitial(Response<dynamic> response) async {
+    final recover = interstitialHandler;
+    if (recover == null) return false;
+
+    final options = response.requestOptions;
+    if (options.extra[kInterstitialHandledFlag] == true) return false;
+    if (response.statusCode != 200) return false;
+
+    final body = response.data;
+    if (body is! String || body.isEmpty) return false;
+    // Discuz 的 ajax 响应被 `<root><![CDATA[…]]></root>` / `<?xml …?>` 包着，
+    // 那是"片段"而不是一个独立页面；WAF 拦截不会包这层壳。
+    // 用"是否 CDATA/XML 包装"排除，比按 inajax 参数排除更准 —— 后者会漏掉
+    // 同样会被拦截的写操作（发帖/评论）。
+    final head = body.trimLeft();
+    if (body.contains('<![CDATA[') || head.startsWith('<?xml')) return false;
+    if (!looksLikeInterstitialPage(
+      body,
+      response.headers.value('content-type'),
+    )) {
+      return false;
+    }
+
+    AppLogger.w('DIO', '${options.path} 命中非论坛页（${body.length}B），尝试自动恢复');
+    final recovered = await recover(options);
+    if (!recovered) {
+      AppLogger.w('DIO', '${options.path} 未通过人机验证，按原样返回');
+      return false;
+    }
+    if (options.method != 'GET') {
+      AppLogger.i('DIO', '${options.path} 已通过验证，但非 GET 请求不自动重放');
+      return false;
+    }
+    AppLogger.i('DIO', '${options.path} 已通过验证，重放请求');
+    options.extra[kInterstitialHandledFlag] = true;
+    return true;
   }
 }
 

@@ -26,6 +26,7 @@ extension SettingsAccessors on SettingsProvider {
   Map<String, String> get shortcuts => Map.unmodifiable(_shortcuts);
 
   bool get simulateBrowserHeaders => _simulateBrowserHeaders;
+  bool get interstitialAutoVerify => _interstitialAutoVerify;
   int get staggerInterval => _staggerInterval;
   int get avatarCacheDays => _avatarCacheDays;
   int get emojiCacheDays => _emojiCacheDays;

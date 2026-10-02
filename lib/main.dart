@@ -15,6 +15,7 @@ import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
 import 'package:mtbbs/core/app/app_link.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/verification_gate.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/app/event_bus.dart';
@@ -83,6 +84,12 @@ void main() async {
 
   // 用 settings 中的站点配置初始化 ApiService
   await ApiService().init(baseUrl: SiteStore.instance.baseUrl);
+
+  // 全局人机验证守门器：Dio 命中"非论坛页"（人机验证 / 防火墙）时，
+  // 弹出浏览器让用户通过验证，通过后自动重放原请求。
+  // 检测见 ApiService._recoverFromInterstitial / looksLikeInterstitialPage。
+  ApiService().interstitialHandler = VerificationGate.instance.handle;
+  VerificationGate.instance.isEnabled = () => settings.interstitialAutoVerify;
 
   // 订阅站点切换事件 — ApiService 已就绪，可安全调用 switchSite
   EventBus.stream.where((e) => e is SiteChangedEvent).listen((_) {
