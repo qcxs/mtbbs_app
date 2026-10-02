@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/core/utils/logger.dart';
@@ -32,10 +33,17 @@ class BrowserPage extends StatefulWidget {
   final String initialUrl;
   final bool enableUrlIntercept;
 
+  /// 是否以"桌面模式"（PC UA）打开 —— 调用方通过路由 `?ua=pc` 传入。
+  ///
+  /// 用于 Discuz 的 PC 专属页（在线用户 / 小黑屋）：移动模板通常没有对应实现，
+  /// 用移动 UA 打开只会看到残缺/空页。进页后仍可用「桌面模式」菜单手动切回。
+  final bool desktopUa;
+
   const BrowserPage({
     super.key,
     this.initialUrl = '',
     this.enableUrlIntercept = true,
+    this.desktopUa = false,
   });
 
   @override
@@ -57,6 +65,7 @@ class _BrowserPageState extends State<BrowserPage> {
   void initState() {
     super.initState();
     _urlInterceptEnabled = widget.enableUrlIntercept;
+    _desktopMode = widget.desktopUa;
     _currentUrl = widget.initialUrl.isNotEmpty
         ? widget.initialUrl
         : SiteStore.instance.baseUrl;

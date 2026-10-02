@@ -22,13 +22,8 @@ extension _BrowserPageBuild on _BrowserPageState {
           leading: IconButton(
             icon: Icon(_canGoBack ? Icons.arrow_back : Icons.close),
             tooltip: _canGoBack ? '后退' : '关闭',
-            onPressed: () {
-              if (_canGoBack) {
-                _controller?.goBack();
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: () =>
+                _canGoBack ? _controller?.goBack() : _closeBrowser(),
           ),
           title: GestureDetector(
             onTap: _showUrlEditor,
@@ -44,11 +39,12 @@ extension _BrowserPageBuild on _BrowserPageState {
             ),
           ),
           actions: [
-            // 关闭
+            // 设置入口 —— 必须常驻：开启「全部改用内置浏览器」后浏览器即首屏，
+            // 没有这个入口用户会被锁死在浏览器里，无法关回开关。
             IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              tooltip: '关闭',
-              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.settings_outlined, size: 20),
+              tooltip: '设置',
+              onPressed: () => context.push('/settings'),
             ),
             // 刷新
             IconButton(
@@ -163,7 +159,8 @@ extension _BrowserPageBuild on _BrowserPageState {
     return InAppWebView(
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,
-        userAgent: Site.uaAndroid,
+        // 默认移动 UA；PC 专属页（在线用户/小黑屋）由调用方以 ?ua=pc 传入桌面模式
+        userAgent: _desktopMode ? Site.uaPc : Site.uaAndroid,
         supportZoom: true,
       ),
       initialUrlRequest: URLRequest(url: WebUri(_currentUrl)),
@@ -174,7 +171,10 @@ extension _BrowserPageBuild on _BrowserPageState {
       onLoadStop: _onLoadStop,
       onProgressChanged: _onProgressChanged,
       shouldOverrideUrlLoading: (controller, navigationAction) async {
-        if (!_urlInterceptEnabled) return NavigationActionPolicy.ALLOW;
+        // 降级模式下不再拦截：否则"回退到浏览器 → 又被 App 接管"会来回推页面
+        if (!_urlInterceptEnabled || browserOnlyMode) {
+          return NavigationActionPolicy.ALLOW;
+        }
 
         final url = navigationAction.request.url?.toString() ?? '';
         if (url.isEmpty) return NavigationActionPolicy.ALLOW;
@@ -209,8 +209,11 @@ extension _BrowserPageBuild on _BrowserPageState {
     final auth = context.watch<AuthProvider>();
     final isLoggedIn = auth.isLoggedIn;
     final routeResult = UrlRouter.parse(_currentUrl);
+    // 降级模式下隐藏「在 App 中打开」：点它只会被 redirect 又送回浏览器，无意义
     final canOpenInApp =
-        routeResult.appPath != null && !routeResult.isOtherSite;
+        !browserOnlyMode &&
+        routeResult.appPath != null &&
+        !routeResult.isOtherSite;
 
     return Container(
       decoration: BoxDecoration(

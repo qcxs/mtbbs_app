@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/layout/load_more_footer.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
@@ -194,9 +196,12 @@ class _FavoritePageState extends State<FavoritePage> {
       appBar: AppBar(
         title: const Text('我的收藏'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetch,
+          PageActions(
+            url:
+                '${SiteStore.instance.baseUrl}/home.php?mod=space&do=favorite&view=me',
+            onRefresh: _fetch,
+            loading: _isLoading,
+            copyLabel: '复制收藏链接',
           ),
         ],
       ),

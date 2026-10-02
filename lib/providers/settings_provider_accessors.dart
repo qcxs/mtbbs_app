@@ -27,6 +27,12 @@ extension SettingsAccessors on SettingsProvider {
 
   bool get simulateBrowserHeaders => _simulateBrowserHeaders;
   bool get interstitialAutoVerify => _interstitialAutoVerify;
+
+  /// 该页面是否仍由 App 接管（false = 已改为走内置浏览器）
+  bool isAppPageEnabled(String id) => appPageEnabled(id);
+
+  /// 是否处于"整体退化为内置浏览器"模式（逃生阀）
+  bool get browserOnlyMode => _browserOnlyMode;
   int get staggerInterval => _staggerInterval;
   int get avatarCacheDays => _avatarCacheDays;
   int get emojiCacheDays => _emojiCacheDays;

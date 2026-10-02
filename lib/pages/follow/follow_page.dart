@@ -3,8 +3,10 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/pagination_bar.dart';
@@ -166,7 +168,14 @@ class _FollowPageState extends State<FollowPage> {
       appBar: AppBar(
         title: Text(_title),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _onRefresh),
+          PageActions(
+            url:
+                '${SiteStore.instance.baseUrl}/home.php?mod=follow&do=${widget.type}'
+                '${(widget.uid ?? '').isEmpty ? '' : '&uid=${widget.uid}'}',
+            onRefresh: _onRefresh,
+            loading: _isLoading,
+            copyLabel: '复制${widget.isFollowing ? '关注' : '粉丝'}链接',
+          ),
         ],
       ),
       body: Column(

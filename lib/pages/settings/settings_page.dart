@@ -7,6 +7,7 @@ import 'package:mtbbs/pages/settings/models/data_settings.dart';
 import 'package:mtbbs/pages/settings/models/display_settings.dart';
 import 'package:mtbbs/pages/settings/models/editor_settings.dart';
 import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
+import 'package:mtbbs/pages/settings/models/page_gate_settings.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/models/site_settings.dart';
 import 'package:mtbbs/pages/settings/settings_group_page.dart';
@@ -55,6 +56,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     _SettingsGroup(title: '编辑与快捷键', icon: Icons.edit, models: editorSettings),
     _SettingsGroup(title: '存储与工具', icon: Icons.storage, models: dataSettings),
+    _SettingsGroup(title: '页面接管', icon: Icons.pages, models: pageGateSettings),
     _SettingsGroup(title: 'MCP 服务', icon: Icons.hub, models: mcpSettings),
   ];
 

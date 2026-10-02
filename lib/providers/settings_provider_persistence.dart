@@ -18,6 +18,18 @@ extension SettingsPersistence on SettingsProvider {
     applyBrowserHeaders(_simulateBrowserHeaders);
     _interstitialAutoVerify =
         (await _db.getSettingBool('interstitialAutoVerify')) ?? true;
+    // 页面接管：被关闭的页面 id（JSON 数组），默认空 = 全部走 App 页
+    final fallbackJson = await _db.getSetting('browserFallbackPages');
+    if (fallbackJson != null && fallbackJson.isNotEmpty) {
+      try {
+        final parsed = jsonDecode(fallbackJson) as List<dynamic>;
+        _browserFallbackPages = parsed.map((e) => e.toString()).toSet();
+      } catch (_) {}
+    }
+    applyDisabledAppPages(_browserFallbackPages);
+    // 终极降级开关（逃生阀）：默认关
+    _browserOnlyMode = (await _db.getSettingBool('browserOnlyMode')) ?? false;
+    applyBrowserOnlyMode(_browserOnlyMode);
     _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
     // 缓存过期天数（默认取自 defaults.json，无配置或 JSON 错误时为 1 天）
     final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
@@ -210,6 +222,32 @@ extension SettingsPersistence on SettingsProvider {
   Future<void> setInterstitialAutoVerify(bool enabled) async {
     _interstitialAutoVerify = enabled;
     await _db.setSettingBool('interstitialAutoVerify', enabled);
+    _notify();
+  }
+
+  /// 开启 / 关闭某页的 App 接管（关闭后该页无论从哪进入都走内置浏览器）
+  Future<void> setAppPageEnabled(String id, bool enabled) async {
+    if (enabled) {
+      _browserFallbackPages.remove(id);
+    } else {
+      _browserFallbackPages.add(id);
+    }
+    applyDisabledAppPages(_browserFallbackPages);
+    await _db.setSetting(
+      'browserFallbackPages',
+      jsonEncode(_browserFallbackPages.toList()),
+    );
+    _notify();
+  }
+
+  /// 开关"整体退化为内置浏览器"（逃生阀）。
+  ///
+  /// 开启后所有路由（除内置浏览器与设置）都改走 WebView；设置必须保持可达，
+  /// 否则用户无法自行关闭（浏览器页内另有设置入口）。
+  Future<void> setBrowserOnlyMode(bool enabled) async {
+    _browserOnlyMode = enabled;
+    applyBrowserOnlyMode(enabled);
+    await _db.setSettingBool('browserOnlyMode', enabled);
     _notify();
   }
 

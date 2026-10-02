@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/controllers/thread_list_controller.dart';
 import 'package:mtbbs/widgets/thread/thread_grid.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/home/mythread/export.dart' as my_thread_api;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
@@ -98,9 +99,13 @@ class _MyThreadPageState extends State<MyThreadPage> {
       appBar: AppBar(
         title: Text(_title),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _controller.refresh(),
+          PageActions(
+            url:
+                '${SiteStore.instance.baseUrl}/home.php?mod=space&do=thread'
+                '${(widget.uid ?? '').isEmpty ? '' : '&uid=${widget.uid}'}'
+                '${(widget.type ?? '').isEmpty ? '' : '&type=${widget.type}'}',
+            onRefresh: () => _controller.refresh(),
+            copyLabel: '复制帖子列表链接',
           ),
         ],
       ),

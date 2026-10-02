@@ -9,6 +9,7 @@ import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
+import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
@@ -47,6 +48,12 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 站点返回"非论坛页"（人机验证 / 防火墙）时，自动弹浏览器让用户通过验证
   bool _interstitialAutoVerify = true;
+
+  /// 关闭 App 接管、改用内置浏览器打开的页面 id（空 = 全部走 App 页）
+  Set<String> _browserFallbackPages = <String>{};
+
+  /// 终极降级：App 整体退化为内置浏览器（逃生阀）
+  bool _browserOnlyMode = false;
 
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;

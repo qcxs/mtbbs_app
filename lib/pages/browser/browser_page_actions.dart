@@ -5,6 +5,20 @@ part of 'browser_page.dart';
 /// 方法无法跨文件拆，故以 extension 承载：扩展可访问宿主私有成员，
 /// 宿主类体内也可无前缀直接调用。受保护的 setState 改用宿主预留的 _setState。
 extension _BrowserPageActions on _BrowserPageState {
+  // ==================== 关闭 / 逃生 ====================
+
+  /// 关闭浏览器：能退则退；**无路可退时去设置**。
+  ///
+  /// "全局降级为浏览器"模式下浏览器就是首屏，此时 pop 会把唯一路由弹掉（黑屏 /
+  /// 卡死），且用户也无法改回开关——因此退化到设置页，保证永远出得来。
+  void _closeBrowser() {
+    if (context.canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.push('/settings');
+    }
+  }
+
   // ==================== Cookie 同步 ====================
 
   Future<void> _syncCookies() async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/widgets/layout/global_shortcuts.dart';
 import 'package:mtbbs/widgets/layout/window_title_bar.dart';
 import 'package:mtbbs/widgets/layout/app_shell.dart';
@@ -41,6 +42,11 @@ GoRouter buildRouter({
   return GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: initialLocation,
+    // 「页面接管」开关的唯一生效点（设置 → 页面接管）。
+    // 放在顶层 redirect 而不是各调用点：所有导航（链接点击、帖子卡片、头像、
+    // 入口 ListTile、系统入站链接、深链）都要经过这里，因此天然"全入口覆盖"，
+    // 也不会漏掉将来新增的入口。policy 细节见 core/app/app_page_gate.dart。
+    redirect: (context, state) => appPageRedirect(state.uri.toString()),
     // 入站链接（Android「打开方式」）不走 GoRouter 的平台初始路由，而是由
     // AppLink 通道解析成 appPath 再 push —— Flutter 自带的 deep link 处理
     // 已在 AndroidManifest 里关掉（flutter_deeplinking_enabled=false），
@@ -179,6 +185,8 @@ GoRouter buildRouter({
                 initialUrl: state.uri.queryParameters['url'] ?? '',
                 enableUrlIntercept:
                     state.uri.queryParameters['intercept'] != 'false',
+                // `ua=pc`：以桌面模式（PC UA）打开，供 PC 专属页（在线用户/小黑屋）回退用
+                desktopUa: state.uri.queryParameters['ua'] == 'pc',
               ),
             ),
           ),

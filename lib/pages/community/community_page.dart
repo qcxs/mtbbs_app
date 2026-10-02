@@ -6,6 +6,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/controllers/thread_list_controller.dart';
 import 'package:mtbbs/widgets/thread/thread_grid.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/layout/tab_page_layout.dart';
 
 /// 版块页面
@@ -210,10 +211,11 @@ class _CommunityPageState extends State<CommunityPage> {
           surfaceTintColor: cs.surface,
           elevation: 0.5,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh, size: 20),
-              tooltip: '刷新',
-              onPressed: ctrl != null ? () => ctrl.refresh() : null,
+            PageActions(
+              url:
+                  '${SiteStore.instance.baseUrl}/forum.php?mod=forumdisplay&fid=${widget.fid}',
+              onRefresh: ctrl != null ? () => ctrl.refresh() : null,
+              copyLabel: '复制版块链接',
             ),
             IconButton(
               icon: const Icon(Icons.filter_list, size: 20),

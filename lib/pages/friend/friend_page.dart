@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/friend/export.dart' as friend_api;
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/pagination_bar.dart';
@@ -149,7 +151,14 @@ class _FriendPageState extends State<FriendPage> {
       appBar: AppBar(
         title: const Text('好友'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _onRefresh),
+          PageActions(
+            url: _uid.isEmpty
+                ? '${SiteStore.instance.baseUrl}/home.php?mod=space&do=friend&view=me&from=space'
+                : '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=$_uid&do=friend&from=space',
+            onRefresh: _onRefresh,
+            loading: _isLoading,
+            copyLabel: '复制好友链接',
+          ),
         ],
       ),
       body: Column(

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/forum/online/export.dart' as online_api;
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
@@ -97,7 +99,12 @@ class _OnlinePageState extends State<OnlinePage> {
       appBar: AppBar(
         title: const Text('在线用户'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _onRefresh),
+          PageActions(
+            url: '${SiteStore.instance.baseUrl}/forum.php?showoldetails=yes',
+            onRefresh: _onRefresh,
+            loading: _isLoading,
+            copyLabel: '复制在线列表链接',
+          ),
         ],
       ),
       body: Column(

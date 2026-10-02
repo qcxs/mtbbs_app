@@ -191,13 +191,16 @@ class _SearchResultPageState extends State<SearchResultPage> {
             tooltip: '搜索',
             onPressed: () => _submit(_inputCtrl.text),
           ),
-          // 仿照帖子页的菜单：在浏览器中打开（用 searchid，避免重新搜索）/ 复制链接
+          // 仿照帖子页：刷新 + 在浏览器中打开（用 searchid，避免重新搜索）/ 复制链接
           PageActions(
             url: search_api.searchPageUrl(
               keyword: _keyword,
               searchId: _searchId,
               page: _listCtrl.page,
             ),
+            // 用 refresh 而非 loadInitial：保留 searchid，刷新复用同一次搜索会话，
+            // 不会在服务端新建搜索（避免触发搜索频率限制）
+            onRefresh: () => _listCtrl.refresh(),
             copyLabel: '复制搜索链接',
           ),
         ],

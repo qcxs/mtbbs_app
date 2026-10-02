@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/api/forum/darkroom/export.dart' as darkroom_api;
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/load_more_footer.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
@@ -157,7 +159,13 @@ class _DarkroomPageState extends State<DarkroomPage> {
       appBar: AppBar(
         title: const Text('小黑屋'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _onRefresh),
+          PageActions(
+            url:
+                '${SiteStore.instance.baseUrl}/forum.php?mod=misc&action=showdarkroom',
+            onRefresh: _onRefresh,
+            loading: _isLoading,
+            copyLabel: '复制小黑屋链接',
+          ),
         ],
       ),
       body: Column(
