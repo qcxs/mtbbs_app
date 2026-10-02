@@ -67,12 +67,12 @@ String _stripTagMarkers(String text, String tag) => text.replaceAllMapped(
 /// 参考 docs/BBCode2Html.js 的转换逻辑实现。
 ///
 /// 转换策略：
-/// 1. 先保护 [code] 块（替换为占位符，避免内部 BBCode 被误转换）
-/// 2. 逐一遍历 BBCode 标签替换为对应 HTML
-/// 3. 解析 [appdata] 自定义标签
-/// 4. 表情文本替换为 <img>
-/// 5. 新行替换为 <br>
-/// 6. 恢复 [code] 占位符
+/// 1. 先保护 [code] 块（替换为占位符；内部一律按纯文本，避免被误转换）
+/// 2. 保护 [appdata] 块（JSON 不应被 HTML 转义）—— 必须晚于 [code]，
+///    否则 [code] 内的 appdata 会变成还原不了的占位符
+/// 3. 逐一遍历 BBCode 标签替换为对应 HTML
+/// 4. 表情文本替换为 <img>，新行替换为 <br>
+/// 5. 恢复 [code] / [appdata] 占位符，并按文档顺序落地正文图片
 class BBCode2Html {
   final Map<String, String>? _emojiMap;
   final Map<String, String>? _smilieIdMap;

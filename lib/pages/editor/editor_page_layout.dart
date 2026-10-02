@@ -28,9 +28,9 @@ extension on _EditorPageState {
       final esc = ShortcutHelper.parse('Escape');
       if (esc != null) editorShortcuts[esc] = EditorEscapeIntent();
     }
-    // 拦截 Ctrl+V 以处理剪贴板图片
-    editorShortcuts[SingleActivator(LogicalKeyboardKey.keyV, control: true)] =
-        PasteIntent();
+    // 注意：Ctrl+V 刻意**不在这里注册**。它只服务正文（剪贴板图片→上传），
+    // 注册在正文输入框上；若放到页面级，标题等其它输入框的祖先链里也有它，
+    // Ctrl+V 会被截走并统一写进正文（见 _buildEditor 内正文的 Shortcuts）。
 
     return Shortcuts(
       shortcuts: editorShortcuts,
@@ -301,25 +301,35 @@ extension on _EditorPageState {
                   // SizedBox 撑满宽度：Stack 的 loose 约束下 TextField 否则会缩到内容宽
                   child: SizedBox(
                     width: double.infinity,
-                    child: TextField(
-                      key: _editorContentKey,
-                      controller: _contentCtl,
-                      focusNode: _contentFocusNode,
-                      undoController: _undoController,
-                      decoration: InputDecoration(
-                        hintText: _isPost
-                            ? '想和大家分享点什么...'
-                            : _isReply
-                            ? '输入回复内容...'
-                            : '输入评论内容...',
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        alignLabelWithHint: true,
+                    // Ctrl+V 只在这一层拦截：正文需要"剪贴板图片 → 上传"，
+                    // 且正文的文本粘贴在 _handlePaste 里统一处理。
+                    // 放在页面级会让标题等输入框也被截走、粘贴写进正文；
+                    // 收在这里，其它输入框就沿用框架默认的粘贴行为。
+                    child: Shortcuts(
+                      shortcuts: {
+                        SingleActivator(LogicalKeyboardKey.keyV, control: true):
+                            PasteIntent(),
+                      },
+                      child: TextField(
+                        key: _editorContentKey,
+                        controller: _contentCtl,
+                        focusNode: _contentFocusNode,
+                        undoController: _undoController,
+                        decoration: InputDecoration(
+                          hintText: _isPost
+                              ? '想和大家分享点什么...'
+                              : _isReply
+                              ? '输入回复内容...'
+                              : '输入评论内容...',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                          alignLabelWithHint: true,
+                        ),
+                        maxLines: null,
+                        minLines: 1,
+                        expands: false,
+                        keyboardType: TextInputType.multiline,
                       ),
-                      maxLines: null,
-                      minLines: 1,
-                      expands: false,
-                      keyboardType: TextInputType.multiline,
                     ),
                   ),
                 ),

@@ -184,32 +184,78 @@ class BbcodeImage extends StatelessWidget {
             initialIndex: index,
             sourceInfo: '帖子图片',
           ),
-          child: Stack(
-            children: [
-              // 显式尺寸：固定盒宽，加载中/加载失败也保持占位宽度，避免状态切换跳动
-              // 未指定尺寸：上限盒宽，加载中按上限占位，解码后收敛到原始像素宽
-              hasExplicitWidth
-                  ? SizedBox(width: width, child: image)
-                  : ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: width),
-                      child: image,
-                    ),
-              Positioned(
-                top: 6,
-                right: 6,
-                child: _ImageZoomButton(
-                  onTap: () => showImageViewer(
-                    context,
-                    imageUrls: urls,
-                    initialIndex: index,
+          child: _ZoomableImage(
+            onOpenViewer: () => showImageViewer(
+              context,
+              imageUrls: urls,
+              initialIndex: index,
+            ),
+            // 显式尺寸：固定盒宽，加载中/加载失败也保持占位宽度，避免状态切换跳动
+            // 未指定尺寸：上限盒宽，加载中按上限占位，解码后收敛到原始像素宽
+            child: hasExplicitWidth
+                ? SizedBox(width: width, child: image)
+                : ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: width),
+                    child: image,
                   ),
-                ),
-              ),
-            ],
           ),
         );
       },
     );
+  }
+}
+
+/// 小图阈值：图片渲染宽度小于该值时，右上角不显示"看大图"按钮。
+///
+/// 小图放大后只会更糊，按钮本身还会盖住图片内容；长按菜单里的"查看图片"
+/// 仍然保留，作为需要时的兜底入口。
+const double _kZoomButtonMinImageWidth = 120;
+
+/// 「图片 + 右上角放大按钮」的宿主，负责按实际渲染尺寸过滤小图。
+///
+/// 宽度**量的是渲染结果**（而不是显式尺寸或原始像素），因为"图小不小"取决于
+/// 它最终画出来多大：`[img=60,H]` 这类显式小图与低分辨率小图同样不该给放大入口，
+/// 而低分辨率小图的渲染宽度又要等解码完成才知道。
+/// 量取放在每帧之后（尺寸稳定后就不再 setState），能自然跟上
+/// "占位 → 解码完成" 的尺寸变化。
+class _ZoomableImage extends StatefulWidget {
+  const _ZoomableImage({required this.child, required this.onOpenViewer});
+
+  /// 已按宽度策略约束好的图片
+  final Widget child;
+  final VoidCallback onOpenViewer;
+
+  @override
+  State<_ZoomableImage> createState() => _ZoomableImageState();
+}
+
+class _ZoomableImageState extends State<_ZoomableImage> {
+  final GlobalKey _boxKey = GlobalKey();
+  bool _showZoom = false;
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncZoomButton());
+    return Stack(
+      children: [
+        // 套一层 SizedBox：它的 RenderBox 尺寸即图片渲染尺寸（不含按钮自身）
+        SizedBox(key: _boxKey, child: widget.child),
+        if (_showZoom)
+          Positioned(
+            top: 6,
+            right: 6,
+            child: _ImageZoomButton(onTap: widget.onOpenViewer),
+          ),
+      ],
+    );
+  }
+
+  void _syncZoomButton() {
+    if (!mounted) return;
+    final box = _boxKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final show = box.size.width >= _kZoomButtonMinImageWidth;
+    if (show != _showZoom) setState(() => _showZoom = show);
   }
 }
 

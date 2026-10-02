@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -6,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 
@@ -54,19 +56,56 @@ class IgnoreCacheFileService extends FileService {
     String url, {
     Map<String, String>? headers,
   }) async {
-    final short = url.length > 60
-        ? '...${url.substring(url.length - 60)}'
-        : url;
-    AppLogger.i('CACHE', 'download: $short');
+    AppLogger.i('CACHE', 'download: ${_shortenUrl(url)}');
     // 模拟浏览器行为：携带当前站点的 Referer（受「模拟浏览器请求头」设置控制）
     final reqHeaders = <String, String>{
       if (browserHeadersEnabled()) 'Referer': SiteStore.instance.baseUrl,
       ...?headers,
     };
-    final response = await http.get(Uri.parse(url), headers: reqHeaders);
-    return IgnoreCacheResponse(response, stalePeriod, url);
+
+    try {
+      final response = await http.get(Uri.parse(url), headers: reqHeaders);
+      // 非 200 也算 CDN 不可用（404/403/5xx），与网络异常走同一条回退分支
+      if (response.statusCode != 200) {
+        throw HttpException('HTTP ${response.statusCode}', uri: Uri.parse(url));
+      }
+      return IgnoreCacheResponse(response, stalePeriod, url);
+    } catch (e, s) {
+      final origin = originUrlForCdn(
+        url,
+        cdn: SiteStore.instance.cdnUrl,
+        base: SiteStore.instance.baseUrl,
+      );
+      // 非 CDN 地址无处可退；是 CDN 地址也只按概率回退——
+      // 详见 [_kOriginFallbackChance]
+      if (origin == null || _random.nextDouble() >= _kOriginFallbackChance) {
+        Error.throwWithStackTrace(e, s);
+      }
+      AppLogger.w('CACHE', 'CDN 失败，回退原站重试: ${_shortenUrl(origin)}');
+      try {
+        final retry = await http.get(Uri.parse(origin), headers: reqHeaders);
+        return IgnoreCacheResponse(retry, stalePeriod, url);
+      } catch (e2) {
+        AppLogger.w('CACHE', '回退原站仍失败: $e2');
+        // 原站也失败：抛出最初的失败（保持原有错误语义）
+        Error.throwWithStackTrace(e, s);
+      }
+    }
   }
 }
+
+/// CDN 加载失败时**回退原站**的概率。
+///
+/// 刻意不无条件回退：CDN 抖动时所有客户端一起打回原站，等于把 CDN 的故障
+/// 转嫁成原站的压力（严重时被封 IP）。按概率只放出这部分请求，其余交给
+/// 下次请求再掷一次——次数一多总会命中，而原站的瞬时压力被压到可接受范围。
+const double _kOriginFallbackChance = 0.3;
+
+final Random _random = Random();
+
+/// 日志用的短地址（只保留尾部，够定位即可）
+String _shortenUrl(String url) =>
+    url.length > 60 ? '...${url.substring(url.length - 60)}' : url;
 
 // ==================== 管理器工厂 ====================
 

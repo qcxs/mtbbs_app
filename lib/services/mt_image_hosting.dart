@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
 
 /// MT 图床服务 — 管理认证、上传、历史记录
@@ -130,7 +131,10 @@ class MtImageHosting {
     void Function(String message)? onError,
   }) async {
     final file = File(filePath);
-    if (!file.existsSync()) return null;
+    if (!file.existsSync()) {
+      onError?.call('文件不存在');
+      return null;
+    }
 
     final filename = basename(file.path);
 
@@ -157,12 +161,23 @@ class MtImageHosting {
         onSendProgress: onProgress,
       );
 
-      if (resp.statusCode != 200) return null;
+      if (resp.statusCode != 200) {
+        onError?.call('上传失败：HTTP ${resp.statusCode}');
+        return null;
+      }
 
       final body = resp.data;
-      if (body is Map && body['status'] == true) {
+      if (body is! Map) {
+        onError?.call('上传失败：响应格式异常');
+        return null;
+      }
+
+      if (body['status'] == true) {
         final data = body['data'] as Map?;
-        if (data == null) return null;
+        if (data == null) {
+          onError?.call('上传失败：响应缺少 data');
+          return null;
+        }
 
         final links = data['links'] as Map?;
         final result = MtUploadResult(
@@ -178,19 +193,22 @@ class MtImageHosting {
         return result;
       }
 
-      // 通知调用方服务端错误消息
-      if (body is Map) {
-        final msg = body['message'] as String?;
-        if (msg != null && msg.isNotEmpty) onError?.call(msg);
-        if (_isAuthError(body)) {
-          _cookie = null;
-          _csrfToken = null;
-          _authExpiry = null;
-        }
+      // 服务端明确拒绝：报出它给的原因
+      final msg = body['message'] as String?;
+      onError?.call(msg != null && msg.isNotEmpty ? msg : '上传失败');
+      if (_isAuthError(body)) {
+        _cookie = null;
+        _csrfToken = null;
+        _authExpiry = null;
       }
-
       return null;
-    } on DioException {
+    } on DioException catch (e) {
+      // 服务端返回非 JSON（常见于登录态失效后被挡回 HTML 页）会被 Dio 抛成
+      // DioException(FormatException)——单独点出来，否则只看到"网络错误"找不到北
+      final detail = e.error is FormatException
+          ? '响应不是 JSON（可能登录已失效或被拦截）'
+          : (e.message ?? '网络错误');
+      onError?.call('上传失败：$detail');
       return null;
     }
   }
@@ -212,60 +230,61 @@ class MtImageHosting {
     int limit = 20,
     bool includeHidden = false,
   }) async {
-    final db = DatabaseHelper.instance;
-    final raw = await db.getImageHistoryRaw();
+    final list = await _readHistory();
+    if (list.isEmpty) return [];
+    final results = list.map((e) => MtUploadResult.fromJson(e)).toList()
+      ..sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
+
+    final visible = includeHidden
+        ? results
+        : results.where((r) => !r.hidden).toList();
+    return visible.length > limit ? visible.sublist(0, limit) : visible;
+  }
+
+  /// 读历史原始列表（从未写过、或数据损坏时返回空列表）
+  Future<List<Map<String, dynamic>>> _readHistory() async {
+    final raw = await DatabaseHelper.instance.getImageHistoryRaw();
     if (raw == null || raw.isEmpty) return [];
     try {
-      var list = jsonDecode(raw) as List;
-      var results = list.map((e) => MtUploadResult.fromJson(e)).toList()
-        ..sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
-
-      if (!includeHidden) results = results.where((r) => !r.hidden).toList();
-      if (results.length > limit) results = results.sublist(0, limit);
-      return results;
-    } catch (_) {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+    } catch (e) {
+      // 损坏时按空历史继续：否则每次上传都会在这里抛异常，
+      // 历史再也写不进去，且异常会穿透 upload() 让整条队列静默中断
+      AppLogger.w('EDITOR', '图床历史解析失败，按空历史重建: $e');
       return [];
     }
   }
 
   Future<void> _addHistory(MtUploadResult result) async {
-    final db = DatabaseHelper.instance;
-    final raw = await db.getImageHistoryRaw();
-    final list = (raw != null && raw.isNotEmpty)
-        ? (jsonDecode(raw) as List)
-        : <dynamic>[];
-
-    list.removeWhere((e) => (e as Map)['url'] == result.url);
+    final list = await _readHistory();
+    list.removeWhere((e) => e['url'] == result.url);
     list.insert(0, result.toJson());
     if (list.length > 200) list.removeRange(200, list.length);
-
-    await db.setImageHistoryRaw(jsonEncode(list));
+    await DatabaseHelper.instance.setImageHistoryRaw(jsonEncode(list));
   }
 
   /// 永久删除单条历史
   Future<void> deleteHistory(String url) async {
-    final db = DatabaseHelper.instance;
-    final raw = await db.getImageHistoryRaw();
-    if (raw == null || raw.isEmpty) return;
-    final list = jsonDecode(raw) as List;
-    list.removeWhere((e) => (e as Map)['url'] == url);
-    await db.setImageHistoryRaw(jsonEncode(list));
+    final list = await _readHistory();
+    list.removeWhere((e) => e['url'] == url);
+    await DatabaseHelper.instance.setImageHistoryRaw(jsonEncode(list));
   }
 
   /// 切换隐藏/显示
   Future<void> toggleHistoryHidden(String url) async {
-    final db = DatabaseHelper.instance;
-    final raw = await db.getImageHistoryRaw();
-    if (raw == null || raw.isEmpty) return;
-    final list = jsonDecode(raw) as List;
+    final list = await _readHistory();
     for (final e in list) {
-      final m = e as Map;
-      if (m['url'] == url) {
-        m['hidden'] = !(m['hidden'] == true);
+      if (e['url'] == url) {
+        e['hidden'] = !(e['hidden'] == true);
         break;
       }
     }
-    await db.setImageHistoryRaw(jsonEncode(list));
+    await DatabaseHelper.instance.setImageHistoryRaw(jsonEncode(list));
   }
 }
 

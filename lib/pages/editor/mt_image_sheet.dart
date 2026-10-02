@@ -158,23 +158,34 @@ class _MtImageSheetState extends State<MtImageSheet> {
       _currentProgress = 0;
     });
 
-    for (int i = 0; i < _queue.length && _uploading; i++) {
+    final pending = List<_QueuedFile>.from(_queue);
+    // 失败项留在队列里：否则"进度跑完 + 队列清空"和上传成功完全一样，
+    // 用户只会看到历史没增加却查不出原因（upload 的 onError 现在都会给原因）
+    final failed = <_QueuedFile>[];
+    var uploaded = 0;
+
+    for (int i = 0; i < pending.length && _uploading; i++) {
       if (!mounted) return;
       setState(() => _uploadingIndex = i);
 
-      final item = _queue[i];
+      final item = pending[i];
       final result = await widget.hosting.upload(
         item.path,
         onProgress: (sent, total) {
           if (!mounted) return;
-          setState(() => _currentProgress = sent / total);
+          setState(() => _currentProgress = total > 0 ? sent / total : 0);
         },
         onError: (msg) {
           if (mounted) showToast(msg);
         },
       );
-      // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
-      if (result != null) await deleteFilePickerTempIfAny(item.path);
+      if (result != null) {
+        uploaded++;
+        // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
+        await deleteFilePickerTempIfAny(item.path);
+      } else {
+        failed.add(item);
+      }
       if (!mounted) return;
     }
 
@@ -183,8 +194,15 @@ class _MtImageSheetState extends State<MtImageSheet> {
       _uploading = false;
       _uploadingIndex = -1;
       _currentProgress = 0;
-      _queue.clear();
+      _queue
+        ..clear()
+        ..addAll(failed);
     });
+    if (failed.isNotEmpty) {
+      showToast('上传完成：成功 $uploaded，失败 ${failed.length}（失败项已保留）');
+    } else if (uploaded > 0) {
+      showToast('已上传 $uploaded 张');
+    }
     _loadHistory();
   }
 

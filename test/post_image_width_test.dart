@@ -141,4 +141,42 @@ void main() {
       expect(image.width, 120);
     });
   });
+
+  group('右上角放大按钮：按渲染宽度过滤小图', () {
+    Widget build({double? explicitWidth}) {
+      return MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: BbcodeImage(
+              url: 'https://example.com/x.png',
+              explicitWidth: explicitWidth,
+              maxImageWidth: 600,
+            ),
+          ),
+        ),
+      );
+    }
+
+    /// 按钮显隐在布局后的回调里结算，需要多推一帧
+    Future<void> settle(WidgetTester tester, {double? explicitWidth}) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(build(explicitWidth: explicitWidth));
+      // 图片占位是无限动画，不能 pumpAndSettle
+      await tester.pump();
+      await tester.pump();
+    }
+
+    testWidgets('小图（60）：不显示放大按钮', (tester) async {
+      await settle(tester, explicitWidth: 60);
+      expect(find.byIcon(Icons.zoom_in), findsNothing);
+    });
+
+    testWidgets('大图（300）：显示放大按钮', (tester) async {
+      await settle(tester, explicitWidth: 300);
+      expect(find.byIcon(Icons.zoom_in), findsOneWidget);
+    });
+  });
 }

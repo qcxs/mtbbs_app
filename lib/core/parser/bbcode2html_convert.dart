@@ -14,24 +14,12 @@ extension BBCode2HtmlConvert on BBCode2Html {
     imageUrls.clear();
     _imageSlots.clear();
 
-    // ========== 0. 保护 [appdata] 块（JSON 不应被 HTML 转义） ==========
-    html = html.replaceAllMapped(
-      RegExp(r'\[appdata\]([\s\S]*?)\[/appdata\]', caseSensitive: false),
-      (m) {
-        final raw = m.group(1) ?? '';
-        // 此时 raw 已被 htmlEscape 转义过，需要还原才能解析 JSON
-        final json = unescapeHtml(raw);
-        appdataList.add(_renderAppdata(json));
-        return '\x00APPDATA${appdataList.length - 1}\x00';
-      },
-    );
-
-    // ========== 1. 移除被禁用的标签（保留内容） ==========
-    if (_disabledTags != null && _disabledTags.isNotEmpty) {
-      html = _stripDisabledTags(html);
-    }
-
-    // ========== 3. 保护 [code] 块 ==========
+    // ========== 0. 保护 [code] 块（内部一律按纯文本处理） ==========
+    // 必须早于 [appdata]：`[code][appdata]{…}[/appdata][/code]` 里的 appdata
+    // 属于"被展示的代码原文"，不该被解析。若让 [appdata] 先替换，它会变成
+    // `\x00APPDATA*` 占位符，而该占位符只在 HTML 中还原——此刻它已被收进
+    // codeBlocks（一个 Dart 字符串，不在 HTML 里），于是永远还原不了，
+    // 代码块里就只剩一个占位符。
     html = html.replaceAllMapped(
       RegExp(r'\[code\]([\s\S]*?)\[/code\]', caseSensitive: false),
       (m) {
@@ -43,6 +31,25 @@ extension BBCode2HtmlConvert on BBCode2Html {
         return '\x00CODE${codeBlocks.length - 1}\x00';
       },
     );
+
+    // ========== 1. 保护 [appdata] 块（JSON 不应被 HTML 转义） ==========
+    html = html.replaceAllMapped(
+      RegExp(r'\[appdata\]([\s\S]*?)\[/appdata\]', caseSensitive: false),
+      (m) {
+        final raw = m.group(1) ?? '';
+        // 此时 raw 已被 htmlEscape 转义过，需要还原才能解析 JSON
+        final json = unescapeHtml(raw);
+        appdataList.add(_renderAppdata(json));
+        return '\x00APPDATA${appdataList.length - 1}\x00';
+      },
+    );
+
+    // ========== 2. 移除被禁用的标签（保留内容） ==========
+    // 放在 [code]/[appdata] 保护之后：两者都已是占位符，既不会被剥离误伤，
+    // 代码块内部也保持原样（代码要原样显示，不该被样式标签清理）
+    if (_disabledTags != null && _disabledTags.isNotEmpty) {
+      html = _stripDisabledTags(html);
+    }
 
     // ========== 3. 替换 BBCode 标签 ==========
 

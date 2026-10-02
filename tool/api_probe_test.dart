@@ -40,6 +40,8 @@ void main() {
     final site = const String.fromEnvironment('site', defaultValue: '');
     final baseUrl = const String.fromEnvironment('baseUrl', defaultValue: '');
     final siteName = const String.fromEnvironment('siteName', defaultValue: '');
+    final cookie = const String.fromEnvironment('cookie', defaultValue: '');
+    final header = const String.fromEnvironment('header', defaultValue: '');
     final log = const String.fromEnvironment('log', defaultValue: 'info');
 
     // 日志级别控制
@@ -84,6 +86,8 @@ void main() {
       site: site,
       baseUrl: baseUrl,
       siteName: siteName,
+      cookie: cookie,
+      header: header,
     );
 
     print('=== API_PROBE_BEGIN ===');
@@ -102,6 +106,8 @@ Future<Map<String, dynamic>> runProbe({
   String site = '',
   String baseUrl = '',
   String siteName = '',
+  String cookie = '',
+  String header = '',
 }) async {
   // 自描述：无上下文的 AI 跑 help 即可掌握全部用法，无需读源码
   if (cmd == 'help' || cmd == '--help' || cmd == 'h') {
@@ -126,6 +132,8 @@ Future<Map<String, dynamic>> runProbe({
       site: site,
       baseUrl: baseUrl,
       siteName: siteName,
+      cookie: cookie,
+      header: header,
     );
   } catch (e) {
     return {'ok': false, 'cmd': cmd, 'error': '初始化失败: $e'};
@@ -194,6 +202,7 @@ Future<Map<String, dynamic>> runProbe({
       'account': ApiService().activeAccount ?? '(游客)',
       'result': compactJson(result, maxStr: scenario.raw ? 100000 : 160),
       'usage': scenario.desc,
+      if (probeInterstitialHit) 'reminder': _interstitialReminder,
     };
   } catch (e) {
     // FormatException 表示业务层失败（已评分/已收藏等预期拦截），
@@ -207,6 +216,7 @@ Future<Map<String, dynamic>> runProbe({
           'message': e.message.isNotEmpty ? e.message : '操作失败',
         },
         'runtimeMs': sw.elapsedMilliseconds,
+        if (probeInterstitialHit) 'reminder': _interstitialReminder,
       };
     }
     return {
@@ -214,9 +224,22 @@ Future<Map<String, dynamic>> runProbe({
       'cmd': cmd,
       'error': '$e',
       'runtimeMs': sw.elapsedMilliseconds,
+      if (probeInterstitialHit) 'reminder': _interstitialReminder,
     };
   }
 }
+
+/// 命中"非论坛页"时的提示。
+///
+/// 探针**无法自行通过**人机验证：没有 JS 引擎（挑战页靠 JS 算 Cookie），
+/// 也没有界面（`VerificationGate` 在无 UI 上下文时直接放弃）。
+/// 唯一出路是复用已通过验证的浏览器里的那个 Cookie。
+const String _interstitialReminder =
+    '站点返回了人机验证 / 防火墙拦截页（非论坛页），探针无法自行通过'
+    '（无 JS 引擎、无界面）。解决：在已通过验证的浏览器里打开 F12 → '
+    'Application → Cookies，复制 acw_sc__v2 的值，追加 '
+    '--dart-define=cookie=acw_sc__v2=<值> 重试。该 Cookie 会写入当前账号的 '
+    'CookieJar，有效期内后续探测无需重复传入。';
 
 /// 生成完整使用说明（自描述，无需读源码即可上手）
 Map<String, dynamic> _buildHelp() {
@@ -234,6 +257,13 @@ Map<String, dynamic> _buildHelp() {
       'site': '站点（索引或名称，空=第一个站点），如 site=1',
       'baseUrl': '任意站点 URL（测试站等不在默认列表中的站点），如 baseUrl=http://discuz.qcxs.top',
       'siteName': 'baseUrl 指定站点的显示名（空=域名）',
+      'cookie':
+          '临时注入的 Cookie，格式 k=v,k2=v2（也兼容 k=v; k2=v2）。'
+          '写入当前账号的 CookieJar，用于绕过人机验证 / 防盗链，'
+          '如 cookie=acw_sc__v2=<40位hex>',
+      'header':
+          '临时注入的请求头，格式 Name:Value,Name2:Value2，加到 Dio 默认头，'
+          '如 header=Referer:https://bbs.binmt.cc/',
       'log': 'off/info/debug（默认 info，off 只输出协议 JSON）',
     },
     'scenarios': {
@@ -251,11 +281,15 @@ Map<String, dynamic> _buildHelp() {
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=thread.detail --dart-define=tid=170313        # 帖子详情',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=debug.http --dart-define=path=/forum.php --dart-define=q=mod=guide,index=1',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=session.status --dart-define=site=1 --dart-define=account=qcxs  # 跨站点账号',
+      r'flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=cookie=acw_sc__v2=<40位hex>   # 站点开了人机验证时补凭证',
     ],
     'tips': [
       '首次使用：先运行一次 App（flutter run -d windows）并登录，生成 Cookie；'
           '或先跑 cmd=session.list 确认本机登录状态',
       '需要登录的命令返回 blocked=true 时，追加 account=<账号名> 重试',
+      '站点开启人机验证 / 防火墙时，返回体会是"非论坛页"（如阿里云的 JS 挑战页），'
+          '结果里会带 reminder。探针没有 JS 引擎也没有界面，无法自行过验证：'
+          '请在已通过验证的浏览器里复制 acw_sc__v2，用 cookie= 传入后重试',
       'debug.http 的额外 query 参数用 q=k1=v1,k2=v2 逗号分隔'
           '（URL 中的 & 会被 PowerShell→cmd 拆散，禁止直接传完整 URL）',
       '参数值不要包含 & | ; " 空格 等特殊字符',

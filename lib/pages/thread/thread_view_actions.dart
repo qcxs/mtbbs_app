@@ -1,5 +1,13 @@
 part of 'thread_view_page.dart';
 
+/// 主帖"回复可见"占位标记。
+///
+/// 与 `post_parser.dart` / `html2bbcode.dart` 写出的 appdata 保持一致：
+/// 未回复时 Discuz 只下发 `.locked`（🔒 提示），回复后才会换成正文。
+final _lockedAppdataRe = RegExp(
+  r'\[appdata\]\{"type":"locked".*?\}\[/appdata\]',
+);
+
 /// 帖子浏览页 — 交互与数据操作。
 ///
 /// 通过 `part of` 与 thread_view_page.dart 共享库内私有成员。
@@ -248,7 +256,8 @@ extension on _ThreadViewPageState {
   ///
   /// 只有发布成功才动作——用户返回/放弃时 pop 为 null，什么都不做。
   /// - 编辑类：用已知 pid 取回内容，原地覆盖那一楼
-  /// - 回复/评论：取回新楼追加到当前评论页末尾（对齐网页追加行为，不整页刷新）
+  /// - 回复/评论：取回新楼追加到当前评论页末尾（对齐网页追加行为，不整页刷新），
+  ///   并检查是否需要重新取一次主帖
   /// - 审核中：不追加（与网页一致，只由编辑器提示）
   Future<void> _openEditor(String path, {String? editingPid}) async {
     final r = await context.push<Map<String, dynamic>>(path);
@@ -262,6 +271,28 @@ extension on _ThreadViewPageState {
     }
     if (result.needsApproval || result.pid.isEmpty) return;
     await _appendPost(result.pid);
+    await _reloadMainPostIfLocked();
+  }
+
+  /// 回复成功后重取主帖以解锁"回复可见"内容
+  ///
+  /// 隐藏内容是**服务端按当前用户是否已回复**渲染的：未回复时主帖正文里只有
+  /// `[appdata] locked` 占位（🔒 请回复可见），回复成功后才会换成真正的正文。
+  /// 所以回复后只追加评论是不够的——主帖还是旧的那份，用户依然看到 🔒 提示。
+  ///
+  /// 只在主帖确实存在 locked 占位时才重取，普通帖子回复不产生额外请求。
+  Future<void> _reloadMainPostIfLocked() async {
+    final mainPost = _data?.mainPost;
+    if (mainPost == null) return;
+    if (!_lockedAppdataRe.hasMatch(mainPost.bbcode)) return;
+
+    final ok = await _reloadMainPost();
+    if (!mounted || !ok) return;
+    // 重取后占位确实消失了才算解锁成功——隐藏内容还可能带积分门槛，
+    // 只回复并没有放开，那就别报喜（用户看到的仍是 🔒 提示）
+    if (!_lockedAppdataRe.hasMatch(_data?.mainPost?.bbcode ?? '')) {
+      showToast('隐藏内容已解锁');
+    }
   }
 
   /// 取回单个楼层（网页追加回复时请求的 viewpid 接口）
@@ -322,7 +353,9 @@ extension on _ThreadViewPageState {
   }
 
   /// 重新加载第 1 页以刷新主帖（不动已加载的评论页）
-  Future<void> _reloadMainPost() async {
+  ///
+  /// 返回是否成功（调用方据此决定要不要给用户反馈）。
+  Future<bool> _reloadMainPost() async {
     try {
       await EmojiService().load();
       final raw = await detail_api.getThreadDetail(
@@ -331,16 +364,18 @@ extension on _ThreadViewPageState {
         page: 1,
         authorid: widget.authorid,
       );
-      if (raw['success'] != true || !mounted) return;
+      if (raw['success'] != true || !mounted) return false;
       final data = ThreadViewData.fromMap(raw, widget.tid);
-      if (!mounted) return;
+      if (!mounted) return false;
       _setState(() {
         _data = data;
         _totalPages = data.totalPages;
         _liked = data.mainPost?.isLiked ?? false;
       });
+      return true;
     } catch (e) {
       AppLogger.w('PAGE', 'reload main post error: $e');
+      return false;
     }
   }
 }

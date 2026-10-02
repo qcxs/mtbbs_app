@@ -147,7 +147,7 @@ void main() {
           '[img]https://a.com/1.png[/img]中间[appdata]{"type":"image_attach","url":"https://a.com/2.png","aid":"2"}[/appdata]';
       final converter = BBCode2Html();
       final html = converter.convert(bbcode);
-      // appdata 在步骤 0 就被渲染（早于 [img]），若按发射顺序收集会颠倒
+      // appdata 在步骤 1 就被渲染（早于 [img]），若按发射顺序收集会颠倒
       expect(converter.imageUrls, [
         'https://a.com/1.png',
         'https://a.com/2.png',
@@ -182,6 +182,36 @@ void main() {
       c.convert('纯文本');
       expect(c.imageUrls, isEmpty);
       expect(c.codeBlocks, isEmpty);
+    });
+  });
+
+  group('BBCode2Html - [code] 内的 [appdata] 按原文展示', () {
+    const appdata = '[appdata]{"type":"locked","message":"回复可见"}[/appdata]';
+
+    test('存进 codeBlocks 的是原文，不解析成组件、不残留内部占位符', () {
+      final converter = BBCode2Html(emitCodePlaceholder: true);
+      final html = converter.convert('[code]$appdata[/code]');
+      expect(converter.codeBlocks, hasLength(1));
+      expect(converter.codeBlocks.single, appdata);
+      expect(html, contains('data-code-index="0"'));
+      // 内部占位符（\x00APPDATA* / \x00CODE*）绝不能外泄到 HTML
+      expect(html.contains('\x00'), isFalse);
+    });
+
+    test('非占位元素模式：直接输出转义后的原文，不渲染成组件', () {
+      final converter = BBCode2Html();
+      final html = converter.convert('[code]$appdata[/code]');
+      expect(html, contains('&quot;type&quot;:&quot;locked&quot;'));
+      expect(html, isNot(contains('bbcode-locked')));
+    });
+
+    test('code 外的 [appdata] 仍正常解析（顺序调整不影响原有行为）', () {
+      final converter = BBCode2Html();
+      final html = converter.convert('$appdata\n[code]$appdata[/code]');
+      // 代码外那一份渲染成组件
+      expect(html, contains('bbcode-locked'));
+      // 代码内那一份仍是原文
+      expect(converter.codeBlocks.single, appdata);
     });
   });
 }
