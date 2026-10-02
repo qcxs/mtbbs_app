@@ -25,6 +25,7 @@ import 'package:mtbbs/pages/user/user_profile_page.dart';
 import 'package:mtbbs/pages/user/my_thread_page.dart';
 import 'package:mtbbs/pages/browser/browser_page.dart';
 import 'package:mtbbs/pages/search/search_page.dart';
+import 'package:mtbbs/pages/search/search_result_page.dart';
 import 'package:mtbbs/pages/history/history_page.dart';
 import 'package:mtbbs/pages/darkroom/darkroom_page.dart';
 import 'package:mtbbs/pages/online/online_page.dart';
@@ -184,6 +185,14 @@ GoRouter buildRouter({
           GoRoute(
             path: '/search',
             pageBuilder: (_, __) => const NoTransitionPage(child: SearchPage()),
+          ),
+          GoRoute(
+            path: '/search/result',
+            pageBuilder: (_, state) => NoTransitionPage(
+              child: SearchResultPage(
+                keyword: state.uri.queryParameters['kw'] ?? '',
+              ),
+            ),
           ),
           GoRoute(
             path: '/history',

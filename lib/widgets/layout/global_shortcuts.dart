@@ -52,11 +52,10 @@ class _GlobalShortcutsWrapperState extends State<GlobalShortcutsWrapper>
     final tabIdx = navItems.indexWhere((e) => e.path == uri);
     if (tabIdx < 0) return; // 非 tab 页面，忽略
     // 默认启动 Tab 以设置为准（不一定是首页）
-    final defaultIdx =
-        context
-            .read<SettingsProvider>()
-            .defaultTabIndex
-            .clamp(0, navItems.length - 1);
+    final defaultIdx = context.read<SettingsProvider>().defaultTabIndex.clamp(
+      0,
+      navItems.length - 1,
+    );
     if (tabIdx != defaultIdx) {
       // 非默认 tab → 切回默认
       context.go(navItems[defaultIdx].path);

@@ -4,6 +4,7 @@ import 'package:mtbbs/api/forum/guide/export.dart' as guide;
 import 'package:mtbbs/api/forum/online/export.dart' as online;
 import 'package:mtbbs/api/forum/ranklist/export.dart' as ranklist;
 import 'package:mtbbs/api/forum/rss/export.dart' as rss;
+import 'package:mtbbs/api/forum/search/export.dart' as search;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as viewthread;
 import 'package:mtbbs/api/home/space/export.dart' as space;
 import 'package:mtbbs/mcp/mcp_types.dart';
@@ -73,6 +74,51 @@ List<McpToolDefinition> forumTools() => [
         page: page,
       );
       return McpPayloads.threadList(result, extra: {'view': view});
+    },
+  ),
+  McpToolDefinition(
+    name: 'search_forum_threads',
+    group: McpToolGroup.publicData,
+    description:
+        '按关键词站内搜索帖子（标题匹配），返回帖子列表与 searchId。'
+        '首次传 keyword；翻页时把上次返回的 searchId 回传并传 page（回传 searchId 不会新建搜索）。'
+        '注意：站点对新搜索有频率限制（短时间内重复搜索会失败并返回"搜索过于频繁/稍后再试"），'
+        '无结果时返回 noMatch=true，需登录时返回 loginRequired=true。',
+    properties: {
+      'keyword': JsonSchema.string(description: '搜索关键词；首次搜索必填'),
+      'search_id': JsonSchema.string(
+        description: '上次搜索返回的 searchId；翻页时传它（此时 keyword 可省略）',
+      ),
+      'page': JsonSchema.integer(
+        minimum: 1,
+        maximum: 200,
+        description: '页码，默认 1',
+      ),
+    },
+    run: (args) async {
+      final keyword = McpArgs.str(args, 'keyword');
+      final searchId = McpArgs.str(args, 'search_id');
+      final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
+      if (keyword.isEmpty && searchId.isEmpty) {
+        throw ArgumentError(
+          'keyword 与 search_id 至少传一个（首次搜索传 keyword，翻页传 search_id）',
+        );
+      }
+      final result = await search.searchThreads(
+        ApiService().dio,
+        keyword: keyword,
+        page: page,
+        searchId: searchId.isEmpty ? null : searchId,
+      );
+      return McpPayloads.threadList(
+        result,
+        extra: {
+          if (keyword.isNotEmpty) 'keyword': keyword,
+          if (result['searchId'] != null) 'searchId': result['searchId'],
+          if (result['noMatch'] == true) 'noMatch': true,
+          if (result['loginRequired'] == true) 'loginRequired': true,
+        },
+      );
     },
   ),
   McpToolDefinition(

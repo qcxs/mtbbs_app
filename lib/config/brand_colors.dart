@@ -35,6 +35,9 @@ const levelColor = Color(0xFFFF9900);
 const forumColor = Color(0xFF53BCF5);
 const onlineColor = Color(0xFF4CAF50);
 
+// -- 搜索结果关键词高亮（对应网页 <font color="#ff0000">；深色提高亮度保证可读）--
+const _searchHlPair = _ColorPair(Color(0xFFD32F2F), Color(0xFFFF8A80));
+
 // -- 编码块 --
 const codeBg = Color(0xFF1E1E1E);
 const codeText = Color(0xFF98C379);
@@ -75,6 +78,9 @@ const iconDecoration = Color(0xFFFF5722);
 extension BrandColors on ColorScheme {
   /// 链接色（浅色 #336699，深色 #64B5F6）
   Color get linkColor => _linkPair.resolve(brightness);
+
+  /// 搜索结果关键词高亮色
+  Color get searchHighlightColor => _searchHlPair.resolve(brightness);
 
   /// 容器引用/免费/隐藏背景色（浅色暖黄，深色使用 tertiaryContainer）
   Color get quoteBg =>

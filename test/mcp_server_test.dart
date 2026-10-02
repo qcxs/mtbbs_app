@@ -129,6 +129,7 @@ void main() {
       expect(names, contains('get_app_info'));
       expect(names, contains('list_forums'));
       expect(names, contains('get_thread_detail'));
+      expect(names, contains('search_forum_threads'));
       expect(names, contains('get_editor_draft'));
       expect(names, contains('list_my_favorites'));
       // 用户维度（都支持 uid）与首次使用引导

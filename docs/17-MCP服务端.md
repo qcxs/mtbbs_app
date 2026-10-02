@@ -57,7 +57,7 @@ lib/mcp/
 | 分组 | 默认 | 工具 |
 |------|------|------|
 | App 信息 | 开 | `help`、`get_app_info`、`list_sites` |
-| 论坛公开数据 | 开 | `list_forums`、`list_forum_threads`、`list_guide_threads`、`get_thread_detail`、`get_user_profile`、`list_user_threads`、`list_user_friends`、`list_user_follows`、`get_ranklist`、`get_online_users`、`get_rss_feed` |
+| 论坛公开数据 | 开 | `list_forums`、`list_forum_threads`、`list_guide_threads`、`search_forum_threads`、`get_thread_detail`、`get_user_profile`、`list_user_threads`、`list_user_friends`、`list_user_follows`、`get_ranklist`、`get_online_users`、`get_rss_feed` |
 | 只读编辑器草稿 | 开 | `list_editor_sessions`、`get_editor_draft` |
 | 账号相关数据 | **关** | `list_my_favorites` |
 | 本地浏览记录 | **关** | `get_browse_history` |
@@ -72,6 +72,7 @@ lib/mcp/
 |---|---|---|
 | `guide.list` | `list_guide_threads` | 已覆盖 |
 | `forum.list` | `list_forum_threads` | 已覆盖 |
+| `search.list` | `search_forum_threads` | 已覆盖；翻页需回传 `search_id`（见 docs/18） |
 | `thread.detail` | `get_thread_detail` | 已覆盖 |
 | `user.info` | `get_user_profile` | 已覆盖 |
 | `my.threads` | `list_user_threads` | 已覆盖，且**支持 uid** 与 `type=reply` |
@@ -142,7 +143,6 @@ curl -i -X POST http://127.0.0.1:8765/mcp -H "Content-Type: application/json" \
 
 ## 已知限制 / 后续可做
 
-- **搜索工具未做**：现有搜索走内置浏览器 WebView，`lib/api/` 没有解析层；按铁律要先补 `lib/api/forum/search/` 三文件才暴露。
 - **Android QS 磁贴未做**（下拉栏一键开关）。
 - **Windows 的 URL 打开方式未做**：Android 已注册 App Links（见 `AndroidManifest.xml`），Windows 需要在安装包里写注册表关联。
 - **自定义站点不在 Android intent-filter 里**：换站/加站时要同步 manifest 的 `host`。

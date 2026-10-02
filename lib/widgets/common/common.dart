@@ -1,4 +1,5 @@
 export 'history_picker.dart';
+export 'highlighted_text.dart';
 export 'page_actions.dart';
 export 'pie_chart.dart';
 export 'rank_tile.dart';

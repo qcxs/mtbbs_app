@@ -121,11 +121,11 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _performSiteSearch(String query) async {
-    await _addHistory(query);
+    final kw = query.trim();
+    if (kw.isEmpty) return;
+    await _addHistory(kw);
     if (!mounted) return;
-    final url =
-        '${SiteStore.instance.baseUrl}/search.php?mod=forum&srchtxt=${Uri.encodeComponent(query)}&searchsubmit=yes';
-    context.push('/browser?url=${Uri.encodeComponent(url)}');
+    context.push('/search/result?kw=${Uri.encodeComponent(kw)}');
   }
 
   Future<void> _addHistory(String text) async {

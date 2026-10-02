@@ -5,6 +5,7 @@ import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/models/thread_item.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/widgets/common/highlighted_text.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/image_preview/image_preview.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
@@ -23,6 +24,9 @@ class ThreadCard extends StatelessWidget {
   final bool repliesLoading;
   final String? replyError;
 
+  /// 关键词高亮：非空时在标题/摘要中强调该词（搜索场景使用）
+  final String highlight;
+
   const ThreadCard({
     super.key,
     required this.item,
@@ -31,6 +35,7 @@ class ThreadCard extends StatelessWidget {
     this.replies,
     this.repliesLoading = false,
     this.replyError,
+    this.highlight = '',
   });
 
   @override
@@ -51,7 +56,7 @@ class ThreadCard extends StatelessWidget {
             children: [
               _buildUserRow(context),
               const SizedBox(height: 6),
-              _buildTitle(),
+              _buildTitle(context),
               if (item.summary != null && item.summary!.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 _buildSummary(context),
@@ -315,16 +320,21 @@ class ThreadCard extends StatelessWidget {
 
   // ==================== 标题 ====================
 
-  Widget _buildTitle() {
-    return Text(
+  Widget _buildTitle(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return HighlightedText(
       item.title ?? '',
+      keyword: highlight,
       style: const TextStyle(
         fontSize: 17,
         fontWeight: FontWeight.w600,
         height: 1.3,
       ),
+      highlightStyle: TextStyle(
+        color: cs.searchHighlightColor,
+        fontWeight: FontWeight.w700,
+      ),
       maxLines: 2,
-      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -332,11 +342,15 @@ class ThreadCard extends StatelessWidget {
 
   Widget _buildSummary(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Text(
+    return HighlightedText(
       item.summary!,
+      keyword: highlight,
       style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant, height: 1.4),
+      highlightStyle: TextStyle(
+        color: cs.searchHighlightColor,
+        fontWeight: FontWeight.w700,
+      ),
       maxLines: 2,
-      overflow: TextOverflow.ellipsis,
     );
   }
 

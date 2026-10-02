@@ -5,11 +5,15 @@
     <!-- MCP 运行状态前台服务（Android 14+ 需要声明服务类型对应的权限） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- 注意：不要给下面的 <application> 开启 android:enableOnBackInvokedCallback。
+         开启后（Android 13+）系统会用预测性返回接管返回键：根 Tab 页无栈可退、
+         且没有 PopScope(canPop:false) 时，框架会 setFrameworkHandlesBack(false)
+         把返回交给系统直接 finish，Dart 侧的 didPopRoute 不再被调用
+         —— 双击退出（global_shortcuts.dart）会被整个跳过，表现为"按一次返回就退出"。 -->
     <application
         android:label="${appName}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:enableOnBackInvokedCallback="true"
         android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"

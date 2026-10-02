@@ -59,6 +59,8 @@ void main() {
       'fid': const String.fromEnvironment('fid'),
       'orderby': const String.fromEnvironment('orderby'),
       'filter': const String.fromEnvironment('filter'),
+      'kw': const String.fromEnvironment('kw'),
+      'searchid': const String.fromEnvironment('searchid'),
       'tid': const String.fromEnvironment('tid'),
       'pid': const String.fromEnvironment('pid'),
       'favid': const String.fromEnvironment('favid'),

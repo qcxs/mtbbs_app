@@ -107,6 +107,7 @@ extension on _ThreadGridState {
           child: ThreadCard(
             key: ValueKey('thread_${item.threadId}'),
             item: item,
+            highlight: widget.highlight,
             onTap: () {
               final tid = item.threadId;
               if (tid != null && tid > 0) context.push('/thread/$tid');
@@ -140,6 +141,7 @@ extension on _ThreadGridState {
           final item = ctrl.items[index];
           return ThreadCard(
             item: item,
+            highlight: widget.highlight,
             onTap: () {
               final tid = item.threadId;
               if (tid != null && tid > 0) context.push('/thread/$tid');
@@ -261,7 +263,7 @@ extension on _ThreadGridState {
   // ==================== 空状态 / 错误状态 ====================
 
   Widget _buildEmpty() {
-    return const EmptyView(icon: Icons.inbox_outlined, text: '暂无帖子');
+    return EmptyView(icon: widget.emptyIcon, text: widget.emptyText);
   }
 
   Widget _buildError(ThreadListController ctrl) {

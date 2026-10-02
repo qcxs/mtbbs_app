@@ -86,10 +86,23 @@ Map<String, dynamic> _help() => {
       ],
       'note': '草稿由 App 自动保存，最近一次快照可能滞后数十秒。',
     },
+    {
+      'task': '搜索论坛内容（关键词）',
+      'steps': [
+        'search_forum_threads(keyword=关键词) 取搜索结果列表与 searchId',
+        '需要更多结果时：search_forum_threads(search_id=上次的 searchId, page=2)',
+        '挑出 tid，用 get_thread_detail(tid) 读正文',
+      ],
+      'note':
+          '站点对新搜索有频率限制（短时间内重复搜同一/不同词都可能被拒），'
+          '翻页务必回传 search_id 以避免新建搜索；无结果返回 noMatch=true，'
+          '需登录返回 loginRequired=true。',
+    },
   ],
   'conventions': [
     'uid 省略 = 当前登录账号；显式传入 = 指定该用户。',
-    '分页统一用 page（从 1 开始），返回里有 currentPage / totalPages / hasMore。',
+    '分页统一用 page（从 1 开始），返回里有 currentPage / totalPages / hasMore。'
+        '例外：search_forum_threads 翻页要回传 search_id（仅传 page 不生效）。',
     'get_thread_detail 默认只回前 10 层、正文精简；用 max_posts 调层数、'
         'full_bbcode=true 取逐字原文。',
   ],

@@ -27,6 +27,13 @@ class ThreadGrid extends StatefulWidget {
   final Set<int> loadingReplies;
   final Map<int, String> errorReplies;
 
+  /// 空列表时的提示文案 / 图标（搜索等场景可定制）
+  final String emptyText;
+  final IconData emptyIcon;
+
+  /// 关键词高亮：非空时透传给 [ThreadCard]（搜索场景使用）
+  final String highlight;
+
   const ThreadGrid({
     super.key,
     required this.controller,
@@ -35,6 +42,9 @@ class ThreadGrid extends StatefulWidget {
     this.expandedReplies = const {},
     this.loadingReplies = const {},
     this.errorReplies = const {},
+    this.emptyText = '暂无帖子',
+    this.emptyIcon = Icons.inbox_outlined,
+    this.highlight = '',
   });
 
   @override

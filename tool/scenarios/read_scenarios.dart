@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:mtbbs/api/forum/forumdisplay/export.dart' as forum_api;
 import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
+import 'package:mtbbs/api/forum/search/export.dart' as search_api;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as thread_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/api/home/friend/export.dart' as friend_api;
@@ -72,6 +73,20 @@ final Map<String, ApiScenario> readScenarios = {
       orderby: a['orderby'] ?? '',
       filter: a['filter'] ?? '',
       page: intArg(a, 'page', 1),
+    ),
+  ),
+  'search.list': ApiScenario(
+    desc: '站内搜索帖子列表（search.php；UA 随「浏览模式」→ 移动克米 / 桌面 Discuz）',
+    params: {
+      'kw': '*搜索关键词',
+      'page': '页码（默认 1）',
+      'searchid': '搜索结果会话 id（翻页用；空=发起新搜索）',
+    },
+    run: (a) => search_api.searchThreads(
+      ApiService().dio,
+      keyword: a['kw'] ?? '',
+      page: intArg(a, 'page', 1),
+      searchId: (a['searchid'] ?? '').isEmpty ? null : a['searchid'],
     ),
   ),
   'thread.detail': ApiScenario(

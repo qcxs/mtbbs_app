@@ -62,6 +62,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `session.status` | 当前会话用户状态（uid/用户名/积分/用户组） | 否 |
 | `guide.list` | 导读列表（默认移动端 UA），`view=newthread/newreply/digest` | 否 |
 | `forum.list` | 版块帖子列表，`fid=*`（必填） | 否 |
+| `search.list` | 站内搜索帖子列表，`kw=*`、`page`、`searchid`（翻页） | 否 |
 | `thread.detail` | 帖子详情（楼主 + 楼层，自动截断），`tid=*` | 否 |
 | `post.byPid` | 按 pid 取单个楼层（viewpid 接口），`tid=*`/`pid=*` | 否 |
 | `user.info` | 用户空间信息，`uid`/`username` 二选一，空则查自己 | 否 |
