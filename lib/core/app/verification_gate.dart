@@ -102,7 +102,14 @@ class VerificationGate {
     final baseUrl = SiteStore.instance.baseUrl;
     if (jar != null) {
       try {
-        await syncWebViewCookiesToJar(jar: jar, baseUrl: baseUrl);
+        // 回流到账号罐（当前会话用），并把「账号罐里没有的」新 cookie 同时写进
+        // 站点共享罐 —— 人机验证 / 防火墙 cookie 与账号无关，只有落进共享罐
+        // 才能在切账号、切游客、重启后继续生效（否则每次重启都要重新验证）。
+        await syncWebViewCookiesToJar(
+          jar: jar,
+          baseUrl: baseUrl,
+          sharedJar: ApiService().sharedCookieJar,
+        );
       } catch (e) {
         AppLogger.d('PAGE', '探测前回流 cookie 失败: $e');
       }

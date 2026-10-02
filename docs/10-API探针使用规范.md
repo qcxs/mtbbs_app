@@ -2,8 +2,7 @@
 
 > 适用：用探针真实请求 API（只读验证、调试），新增场景前先看第 7 节。按需。
 
-> 本规范供 AI 与人类快速上手 API 只读探针：以"命令 + 参数"方式真实请求 Discuz API，
-> 复用 App 的 Cookie 登录态，输出机器可解析的 JSON 协议。
+> 以"命令 + 参数"方式真实请求 Discuz API，复用 App 的 Cookie 登录态，输出机器可解析的 JSON 协议，供 AI 与人类快速上手只读探针。
 
 ## 1. 架构
 
@@ -25,10 +24,8 @@
   tool/api_probe_test.dart 入口：解析 --dart-define、执行场景、输出协议
 ```
 
-- 曾有一个 `api_probe.ps1` 便捷层，因 Windows-only 且 PowerShell 5.1 存在编码/解析坑，
-  已移除。跨平台一律直接调用 `flutter test`（见 help 的 `invoke` 字段）。
-- 每个场景都真实调用 API 层 export 函数（`lib/api/**/export.dart`），非 mock，
-  解析管线与 App 完全一致。
+- 旧的 `api_probe.ps1` 便捷层已移除（Windows-only，且 PowerShell 5.1 有编码/解析坑），跨平台一律直接调用 `flutter test`（见 help 的 `invoke` 字段）。
+- 每个场景都真实调用 `lib/api/**/export.dart`，非 mock，解析管线与 App 完全一致。
 
 ## 2. 快速上手（三步）
 
@@ -81,34 +78,20 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 
 ## 5. 调用规范与参数约定
 
-- **输出协议**：`=== API_PROBE_BEGIN ===` + JSON + `=== API_PROBE_END ===`。
-  - `ok=true` = 管线无异常；`result.success` = 业务层结果。
-  - 缺登录态时 `blocked=true` + `reminder` 提示先运行 App 登录。
-- **大结果压缩**：列表保留前 3 项 + `__more__`，长字符串截断 160 字符
-  （`debug.http` 等 `raw` 场景除外，由场景自己控制长度）。
-- **参数值禁止包含** `& | ; " 空格` 等特殊字符：
-  - `&` 在 PowerShell→cmd 传递时会被拆成命令分隔符；
-  - `"` 会被 shell 剥离（JSON 方案不可行）。
-- **`debug.http` 的 query 参数**：用 `q=k1=v1,k2=v2` 逗号分隔（逗号在各类 shell 中均安全），
-  禁止直接传含 `&` 的完整 URL：
+- **输出协议**：`=== API_PROBE_BEGIN ===` + JSON + `=== API_PROBE_END ===`。`ok=true` = 管线无异常；`result.success` = 业务层结果。缺登录态时 `blocked=true` + `reminder` 提示先运行 App 登录。
+- **大结果压缩**：列表保留前 3 项 + `__more__`，长字符串截断 160 字符（`debug.http` 等 `raw` 场景除外，由场景自己控制长度）。
+- **参数值禁止包含** `& | ; " 空格` 等特殊字符：`&` 在 PowerShell→cmd 传递时会被拆成命令分隔符；`"` 会被 shell 剥离（JSON 方案不可行）。
+- **`debug.http` 的 query 参数**：用 `q=k1=v1,k2=v2` 逗号分隔（逗号在各类 shell 中均安全），禁止直接传含 `&` 的完整 URL：
   ```
   --dart-define=cmd=debug.http --dart-define=path=/forum.php --dart-define=q=mod=guide,index=1,view=newthread
   ```
-- **登录态复用**：探针读取 `%APPDATA%\qcxs\mtbbs_debug\cookies\{host}`（与 App 共享目录）。
-  首次使用前先运行一次 App（`flutter run -d windows`）并登录生成 Cookie；
-  无 Cookie 时 `needsLogin` 场景会自动拦截并提示。
+- **登录态复用**：探针读取 `%APPDATA%\qcxs\mtbbs_debug\cookies\{host}`（与 App 共享目录）。首次使用前先运行一次 App（`flutter run -d windows`）并登录生成 Cookie；无 Cookie 时 `needsLogin` 场景会自动拦截并提示。
 
 ### 5.1 站点开启人机验证 / 防火墙时
 
-探针**无法自行通过**人机验证，两条路都堵死：
+探针**无法自行通过**人机验证，两条路都堵死：**没有 JS 引擎**（挑战页如阿里云 ESA 的 `acw_sc__v2` 靠 JS 计算并写入 Cookie，Dart 侧执行不了）；**没有界面**（`VerificationGate` 在无 UI 上下文时直接放弃，不会弹浏览器）。
 
-- 没有 JS 引擎 —— 挑战页（如阿里云 ESA 的 `acw_sc__v2`）靠 JS 计算并写入 Cookie，Dart 侧执行不了；
-- 没有界面 —— `VerificationGate` 在无 UI 上下文时直接放弃，不会弹浏览器。
-
-表现：请求返回 200 但正文是"非论坛页"（几 KB 的挑战页，而非论坛 HTML）。探针会检测到并：
-
-- 日志打 `[DIO] … 命中非论坛页（人机验证/防火墙拦截）`；
-- 输出协议里追加 `reminder`，写明补救步骤。
+表现：请求返回 200 但正文是"非论坛页"（几 KB 的挑战页，而非论坛 HTML）。探针会检测到并：日志打 `[DIO] … 命中非论坛页（人机验证/防火墙拦截）`；输出协议里追加 `reminder`，写明补救步骤。
 
 出路是**复用已通过验证的浏览器里的那个 Cookie**：
 
@@ -117,9 +100,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=cookie=acw_sc__v2=<40位hex>
 ```
 
-该 Cookie 会写进当前账号的 CookieJar（与 App 共用），有效期内后续探测不用重复传。
-也可先正常跑一次 App（走弹窗验证，见 docs/01「Referer 模拟策略」旁的验证流程），
-让 Cookie 自动回流后再跑探针。
+该 Cookie 会写进当前账号的 CookieJar（与 App 共用），有效期内后续探测不用重复传。也可先正常跑一次 App（走弹窗验证，见 docs/01「Referer 模拟策略」旁的验证流程），让 Cookie 自动回流后再跑探针。
 
 ## 6. 踩坑记录（历史教训，勿重蹈）
 
@@ -140,13 +121,8 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 
 新增一个只读 API 的测试：
 
-1. 在 [api_scenarios.dart](../tool/api_scenarios.dart) 注册一条 `ApiScenario`：
-   - `desc`：说明用途（AI 可读）；
-   - `params`：参数说明，`*` 前缀 = 必填（自动校验）；
-   - `needsLogin`：需登录设 true（无 Cookie 自动拦截）；
-   - `run`：调用对应 `lib/api/**/export.dart` 函数。
-2. 若参数键不在 [api_probe_test.dart](../tool/api_probe_test.dart) 的 `args` 白名单，
-   需显式补一行 `const String.fromEnvironment('键')`。
+1. 在 [api_scenarios.dart](../tool/api_scenarios.dart) 注册一条 `ApiScenario`：`desc`（说明用途，AI 可读）、`params`（参数说明，`*` 前缀 = 必填，自动校验）、`needsLogin`（需登录设 true，无 Cookie 自动拦截）、`run`（调用对应 `lib/api/**/export.dart` 函数）。
+2. 若参数键不在 [api_probe_test.dart](../tool/api_probe_test.dart) 的 `args` 白名单，需显式补一行 `const String.fromEnvironment('键')`。
 3. 跑 `cmd=help` 确认新场景已自动出现在清单，再实际执行验证。
 
 开发新 API（http/parse/export 未完成时）的调试循环：

@@ -6,6 +6,7 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:charset/charset.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
+import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
@@ -34,14 +35,24 @@ class ApiService {
   late final Dio dio;
   PersistCookieJar? _guestJar;
 
+  /// 站点级共享罐 —— 承载与账号无关的客户端级 cookie（人机验证 / 防火墙）。
+  ///
+  /// 按 `cookies/{host}/_shared/` 落盘，**切账号不重建**；请求时与账号罐合并
+  /// 下发（见 [SiteCookieJar]）。由验证流程写入（见 VerificationGate）。
+  PersistCookieJar? _sharedJar;
+
   /// 拦截页处理器 —— 由 app 层注入（见 main.dart 的 `VerificationGate`）。
   ///
   /// 返回 true 表示"已通过人机验证"。做成注入点而不是直接依赖 UI/WebView，
   /// 是为了让 services 层不反向依赖 pages / flutter_inappwebview。
   Future<bool> Function(RequestOptions options)? interstitialHandler;
 
-  /// 当前活跃的 CookieJar（游客或当前账号）
+  /// 当前活跃的 CookieJar（游客或当前账号）—— 写入目标
   CookieJar? _activeJar;
+
+  /// 交给 CookieManager 的请求视图（共享罐 + 活跃罐合并）
+  CookieJar? _requestJar;
+
   String? _activeAccount;
   String _currentHost = '';
   bool _initialized = false;
@@ -72,12 +83,30 @@ class ApiService {
   /// Dio 内部通过拦截器持有它，外部拿不到；这里显式暴露一个引用。
   CookieJar? get activeCookieJar => _activeJar ?? _guestJar;
 
+  /// 站点级共享罐 —— 人机验证 / 防火墙 cookie 的存放处。
+  ///
+  /// 验证流程把新拿到的客户端级 cookie 写进这里（见 `syncWebViewCookiesToJar`
+  /// 的 `sharedJar` 参数），因此切账号 / 切游客 / 重启后依然生效。
+  CookieJar? get sharedCookieJar => _sharedJar;
+
+  /// 请求实际使用的罐视图（站点共享罐 + 当前活跃罐合并）。
+  ///
+  /// 供 WebView 注入这类"需要与会话同源"的场景使用；普通请求由 CookieManager
+  /// 内部使用同一视图。
+  CookieJar? get requestCookieJar => _requestJar;
+
   Future<void> init({String? baseUrl}) async {
     if (_initialized) return;
 
     _currentHost = SiteStore.instance.host;
     _guestJar = PersistCookieJar(
       storage: FileStorage(await AppPaths.cookiesDirForHost(_currentHost)),
+      ignoreExpires: true,
+    );
+    _sharedJar = PersistCookieJar(
+      storage: FileStorage(
+        await AppPaths.sharedCookiesDirForHost(_currentHost),
+      ),
       ignoreExpires: true,
     );
 
@@ -232,6 +261,13 @@ class ApiService {
       storage: FileStorage(await AppPaths.cookiesDirForHost(_currentHost)),
       ignoreExpires: true,
     );
+    // 共享罐按 host 落盘，随站点一起换
+    _sharedJar = PersistCookieJar(
+      storage: FileStorage(
+        await AppPaths.sharedCookiesDirForHost(_currentHost),
+      ),
+      ignoreExpires: true,
+    );
     _replaceCookieManager(_guestJar!);
     _activeAccount = null;
   }
@@ -280,17 +316,33 @@ class ApiService {
       storage: FileStorage(sitePath),
       ignoreExpires: true,
     );
+    // 共享罐目录位于 sitePath 之下，一并被删掉，需重建（否则内存里还留着
+    // 已失效的 jar，请求会继续下发已被清除的 cookie）
+    _sharedJar = PersistCookieJar(
+      storage: FileStorage(
+        await AppPaths.sharedCookiesDirForHost(_currentHost),
+      ),
+      ignoreExpires: true,
+    );
     _replaceCookieManager(_guestJar!);
     _activeAccount = null;
   }
 
   void _replaceCookieManager(CookieJar jar) {
     _activeJar = jar;
+    // 交给 CookieManager 的是「共享罐 + 账号罐」的合并视图：请求既有客户端级
+    // cookie（人机验证 / 防火墙），也有本账号的会话 cookie；写入仍只落账号罐，
+    // 避免账号之间串号（见 SiteCookieJar）。
+    final shared = _sharedJar;
+    final view = shared == null
+        ? jar
+        : SiteCookieJar(accountJar: jar, sharedJar: shared);
+    _requestJar = view;
     dio.interceptors.removeWhere((i) => i is CookieManager);
     dio.interceptors.remove(_browseModeFilter);
     // 顺序有意义：CookieManager 先把罐里的 Cookie 合成请求头，过滤器才能从里面
     // 摘掉「浏览方式」Cookie
-    dio.interceptors.insertAll(0, [CookieManager(jar), _browseModeFilter]);
+    dio.interceptors.insertAll(0, [CookieManager(view), _browseModeFilter]);
   }
 
   /// 从请求头里摘掉站点「浏览方式」Cookie（`{前缀}_mobile`），避免它盖过 App 的

@@ -167,6 +167,13 @@ List<String?> _domainCandidates(String? cookieDomain, String host) {
 ///   此时回退到站点 host。
 /// - 单条非法（`dart:io` 的 Cookie 按 RFC 6265 严格校验 name/value，值含 `,`
 ///   会抛 FormatException，见 docs/07 #26）时跳过该条，不让整次回流失败。
+///
+/// **过期时间只认"确实在将来"的值**，其余一律当作会话 cookie（不带 expires）。
+/// 原因：`cookie_jar` 的 `PersistCookieJar._filterPathEntries` 在**落盘**时会
+/// 无视 `ignoreExpires` 直接丢掉"已过期"条目 —— 而 App 的罐全部用
+/// `ignoreExpires: true`（本就不按过期丢弃 cookie）。一旦 WebView 报出的
+/// `expiresDate` 落在这个陷阱里（Windows 端曾见非毫秒量级的值），这条 cookie
+/// 就会"内存里有、磁盘上没有"，重启后消失、人机验证反复出现。
 List<Cookie> toJarCookies(List<webview.Cookie> webCookies, Uri siteUri) {
   final result = <Cookie>[];
   for (final wc in webCookies) {
@@ -185,7 +192,12 @@ List<Cookie> toJarCookies(List<webview.Cookie> webCookies, Uri siteUri) {
 
       final expires = wc.expiresDate;
       if (expires != null && expires > 0) {
-        cookie.expires = DateTime.fromMillisecondsSinceEpoch(expires);
+        final at = DateTime.fromMillisecondsSinceEpoch(expires);
+        if (at.isAfter(DateTime.now())) {
+          cookie.expires = at;
+        } else {
+          AppLogger.d('PAGE', '忽略异常过期时间 "${wc.name}": $expires（按会话 cookie 处理）');
+        }
       }
       result.add(cookie);
     } catch (e) {
@@ -204,10 +216,15 @@ List<Cookie> toJarCookies(List<webview.Cookie> webCookies, Uri siteUri) {
 /// 用 `getCookies(url:)` 而不是 `getAllCookies()`：前者天然按 URL 过滤（只返回
 /// 会发给该 URL 的 Cookie），不依赖 domain 字段（Android 上可能取不到）。
 ///
+/// 传了 [sharedJar] 时，额外把「账号罐里没有的」那部分写进站点共享罐（见
+/// [SiteCookieJar]）——人机验证 / 防火墙下发的 cookie 是客户端级的，只有落进
+/// 共享罐才能在切账号、切游客、重启后继续生效。
+///
 /// 返回实际写回的 Cookie 条数。
 Future<int> syncWebViewCookiesToJar({
   required CookieJar jar,
   required String baseUrl,
+  CookieJar? sharedJar,
 }) async {
   final uri = Uri.tryParse(baseUrl);
   if (uri == null || uri.host.isEmpty) return 0;
@@ -220,8 +237,93 @@ Future<int> syncWebViewCookiesToJar({
   final cookies = toJarCookies(webCookies, uri);
   if (cookies.isEmpty) return 0;
 
+  // 「账号罐里已有哪些名字」必须在写入前取快照：写入之后这些 cookie 也算已有，
+  // 差集就永远为空了。
+  Set<String>? existingNames;
+  if (sharedJar != null) {
+    try {
+      existingNames = (await jar.loadForRequest(
+        uri,
+      )).map((c) => c.name).toSet();
+    } catch (e) {
+      AppLogger.w('PAGE', '读取账号罐 cookie 失败: $e');
+    }
+  }
+
   // saveFromResponse 按 (domain, path, name) 覆盖同名条目，不会重复累积
   await jar.saveFromResponse(uri, cookies);
+
+  // 共享罐只收「账号罐里没有的」——即验证 / 防火墙新下发的客户端级 cookie。
+  // 全量写入会把 syncJarCookiesToWebView 注入进 WebView 的账号登录态也灌进去，
+  // 切到其他账号 / 游客时就会串号。
+  if (sharedJar != null && existingNames != null) {
+    final extras = cookies
+        .where((c) => !existingNames!.contains(c.name))
+        .toList();
+    if (extras.isNotEmpty) {
+      try {
+        await sharedJar.saveFromResponse(uri, extras);
+        AppLogger.i(
+          'PAGE',
+          '站点共享罐写入 ${extras.length} 条: ${extras.map((c) => c.name).join(', ')}',
+        );
+      } catch (e) {
+        AppLogger.w('PAGE', '写入站点共享罐失败: $e');
+      }
+    }
+  }
+
   AppLogger.i('PAGE', 'WebView → Dio 回流 ${uri.host}: ${cookies.length} 条');
   return cookies.length;
+}
+
+// ==================== 站点共享罐 ====================
+
+/// 站点 Cookie 罐：把「账号罐」与「站点共享罐」合成一个视图交给 CookieManager。
+///
+/// **为什么需要**：人机验证 / 防火墙下发的 cookie 是**客户端级**的（按 IP / UA
+/// 下发），与登录账号无关；而 App 的 Cookie 罐按 `{host}/{账号}` 隔离，游客态还会
+/// 换成游客罐。验证通过后只往「当时活跃的那个罐」里写，重启 / 切账号 / 切站点后
+/// 请求走的是另一只罐，验证 cookie 就丢了，于是反复被挑战。
+///
+/// - **读**：两罐合并；同名时**账号罐优先** —— 保证账号隔离不被共享罐破坏
+/// - **写**：只写账号罐。服务端下发的会话 cookie（`auth` 等）属于当前账号，
+///   绝不能落进共享罐，否则会串号；共享罐只由验证流程显式写入
+///   （见 [syncWebViewCookiesToJar] 的 `sharedJar` 参数）
+class SiteCookieJar implements CookieJar {
+  SiteCookieJar({required this.accountJar, required this.sharedJar});
+
+  /// 当前活跃的账号 / 游客罐
+  final CookieJar accountJar;
+
+  /// 站点级共享罐（客户端级 cookie）
+  final CookieJar sharedJar;
+
+  /// 本视图不参与过期过滤 —— 实际过滤由两个真实罐各自负责
+  @override
+  bool get ignoreExpires => false;
+
+  @override
+  Future<List<Cookie>> loadForRequest(Uri uri) async {
+    final account = await accountJar.loadForRequest(uri);
+    final names = account.map((c) => c.name).toSet();
+    final shared = await sharedJar.loadForRequest(uri);
+    return [...account, ...shared.where((c) => !names.contains(c.name))];
+  }
+
+  @override
+  Future<void> saveFromResponse(Uri uri, List<Cookie> cookies) =>
+      accountJar.saveFromResponse(uri, cookies);
+
+  @override
+  Future<void> delete(Uri uri, [bool withDomainSharedCookie = false]) async {
+    await accountJar.delete(uri, withDomainSharedCookie);
+    await sharedJar.delete(uri, withDomainSharedCookie);
+  }
+
+  @override
+  Future<void> deleteAll() async {
+    await accountJar.deleteAll();
+    await sharedJar.deleteAll();
+  }
 }

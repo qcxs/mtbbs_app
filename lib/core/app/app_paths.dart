@@ -17,6 +17,7 @@ import 'package:mtbbs/config/site_config.dart';
 /// ```
 /// {appDataDir}/                 ← 见 [appDataDir]
 ///   cookies/{host}/              — CookieJar 持久化（游客）
+///   cookies/{host}/_shared/      — 站点共享罐（与账号无关的客户端级 cookie）
 ///   cookies/{host}/{account}/    — CookieJar 持久化（登录用户）
 ///   mtbbs.sembast                — sembast 数据库（纯 Dart，无需原生依赖）
 ///
@@ -71,6 +72,17 @@ class AppPaths {
     String host,
     String account,
   ) async => '${await cookiesDirForHost(host)}/$account';
+
+  /// 站点共享罐的目录名 —— 与账号目录同级，用下划线前缀避免与真实账号名混淆
+  static const String sharedCookieDirName = '_shared';
+
+  /// `{appDataDir}/cookies/{host}/_shared/`
+  ///
+  /// 存放**与账号无关的客户端级 cookie**（人机验证 / 防火墙下发的那些）。
+  /// 与账号罐分开落盘，请求时由 `SiteCookieJar` 合并下发 —— 这样切账号、
+  /// 切游客、重启都不会把验证 cookie 弄丢。
+  static Future<String> sharedCookiesDirForHost(String host) async =>
+      '${await cookiesDirForHost(host)}/$sharedCookieDirName';
 
   // ==================== 剪贴板临时文件 ====================
 

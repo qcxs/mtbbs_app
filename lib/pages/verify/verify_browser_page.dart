@@ -82,9 +82,12 @@ class _VerifyBrowserPageState extends State<VerifyBrowserPage> {
     super.dispose();
   }
 
-  /// 注入当前账号 Cookie —— 与 App 的 API 请求保持同一登录态
+  /// 注入当前账号 Cookie —— 与 App 的 API 请求保持同一登录态。
+  ///
+  /// 用「共享罐 + 账号罐」的合并视图：验证页也带上已有的人机验证 / 防火墙
+  /// cookie，站点认得就直接放行，不必再走一遍挑战。
   Future<void> _injectCookies() async {
-    final jar = ApiService().activeCookieJar;
+    final jar = ApiService().requestCookieJar ?? ApiService().activeCookieJar;
     try {
       if (jar != null) {
         await syncJarCookiesToWebView(
