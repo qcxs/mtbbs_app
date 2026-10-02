@@ -60,10 +60,15 @@ extension on _WebLoginPageState {
 
     try {
       final forumCookies = await CookieManager.instance().getCookies(url: url);
-      final allCookies = [
-        ...baseCookies,
-        ...forumCookies,
-      ].map((c) => '${c.name}=${c.value}').join('; ');
+      // 登录态只存**核心 cookie**：临时 cookie（防护类）有效期极短，存进去会在
+      // 每次启动 / 切账号 / 导入导出时"复活"一条过期值，服务端便只肯回挑战页
+      // （见 docs/07 #73 与 cookie_sync.dart「核心 / 临时 Cookie」）
+      final cookies = [...baseCookies, ...forumCookies];
+      final prefix = inferCookiePrefix(cookies.map((c) => c.name));
+      final allCookies = cookies
+          .where((c) => isCoreCookie(c.name, prefix))
+          .map((c) => '${c.name}=${c.value}')
+          .join('; ');
 
       // 用临时 Dio 调用 userstatus API 验证登录
       final tempDio = Dio(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/services/api_service.dart';
-import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/pagination_bar.dart';
@@ -66,6 +65,16 @@ class _PmTabState extends State<PmTab> {
     _load(p);
   }
 
+  /// 打开与某用户的聊天页
+  void _openChat(Map<String, dynamic> item) {
+    final uid = item['uid'] as String? ?? '';
+    if (uid.isEmpty || uid == '0') return;
+    final username = item['username'] as String? ?? '';
+    context.push(
+      '/pm/chat?touid=$uid&username=${Uri.encodeComponent(username)}',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
@@ -113,7 +122,6 @@ class _PmTabState extends State<PmTab> {
     final lastMessage = item['lastMessage'] as String? ?? '';
     final messageCount = item['messageCount'] as String? ?? '';
     final time = item['time'] as String? ?? '';
-    final replyUrl = item['replyUrl'] as String? ?? '';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
@@ -122,88 +130,85 @@ class _PmTabState extends State<PmTab> {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: cs.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                UserAvatar(uid: uid, radius: 20),
-                if (isNew)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.error,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openChat(item),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        username,
-                        style: TextStyle(
-                          fontWeight: isNew
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          fontSize: 14,
-                          color: cs.onSurface,
+                  UserAvatar(uid: uid, radius: 20),
+                  if (isNew)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.error,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      if (messageCount.isNotEmpty) ...[
-                        const SizedBox(width: 4),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
                         Text(
-                          '$messageCount 条',
+                          username,
+                          style: TextStyle(
+                            fontWeight: isNew
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            fontSize: 14,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        if (messageCount.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            '$messageCount 条',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          time,
                           style: TextStyle(
                             fontSize: 11,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
                       ],
-                      const Spacer(),
-                      Text(
-                        time,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    lastMessage,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurfaceVariant,
-                      height: 1.3,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  if (replyUrl.isNotEmpty)
+                    const SizedBox(height: 4),
+                    Text(
+                      lastMessage,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
-                        onTap: () {
-                          final fullUrl = normalizeUrl(replyUrl);
-                          context.push(
-                            '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
-                          );
-                        },
+                        onTap: () => _openChat(item),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -223,10 +228,11 @@ class _PmTabState extends State<PmTab> {
                         ),
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

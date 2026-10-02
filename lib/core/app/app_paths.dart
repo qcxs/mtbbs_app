@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Directory, Platform;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -17,7 +17,6 @@ import 'package:mtbbs/config/site_config.dart';
 /// ```
 /// {appDataDir}/                 ← 见 [appDataDir]
 ///   cookies/{host}/              — CookieJar 持久化（游客）
-///   cookies/{host}/_shared/      — 站点共享罐（与账号无关的客户端级 cookie）
 ///   cookies/{host}/{account}/    — CookieJar 持久化（登录用户）
 ///   mtbbs.sembast                — sembast 数据库（纯 Dart，无需原生依赖）
 ///
@@ -73,16 +72,29 @@ class AppPaths {
     String account,
   ) async => '${await cookiesDirForHost(host)}/$account';
 
-  /// 站点共享罐的目录名 —— 与账号目录同级，用下划线前缀避免与真实账号名混淆
-  static const String sharedCookieDirName = '_shared';
-
-  /// `{appDataDir}/cookies/{host}/_shared/`
+  /// 列出本站点所有**账号罐**目录（`cookies/{host}/{账号}/`）。
   ///
-  /// 存放**与账号无关的客户端级 cookie**（人机验证 / 防火墙下发的那些）。
-  /// 与账号罐分开落盘，请求时由 `SiteCookieJar` 合并下发 —— 这样切账号、
-  /// 切游客、重启都不会把验证 cookie 弄丢。
-  static Future<String> sharedCookiesDirForHost(String host) async =>
-      '${await cookiesDirForHost(host)}/$sharedCookieDirName';
+  /// 用于把「客户端级 cookie」（人机验证 / 防火墙）补写到每个罐：这类 cookie 与
+  /// 账号无关，而罐按账号隔离 —— 只写活跃罐的话，切账号 / 切游客 / 重启落到别的
+  /// 罐就要重新验证（见 docs/07 #73）。
+  ///
+  /// 游客罐的文件直接写在 `cookies/{host}/` **根上**，账号罐目录里才会再套一层
+  /// `FileStorage` 的存储目录 —— 据此区分两者，无需硬编码存储目录名。
+  static Future<List<String>> accountJarDirsForHost(String host) async {
+    final root = Directory(await cookiesDirForHost(host));
+    if (!await root.exists()) return const [];
+    final dirs = <String>[];
+    await for (final entity in root.list(followLinks: false)) {
+      if (entity is! Directory) continue;
+      await for (final child in entity.list(followLinks: false)) {
+        if (child is Directory) {
+          dirs.add(entity.path);
+          break;
+        }
+      }
+    }
+    return dirs;
+  }
 
   // ==================== 剪贴板临时文件 ====================
 

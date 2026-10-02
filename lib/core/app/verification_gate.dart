@@ -29,6 +29,12 @@ class VerificationGate {
   /// 是否启用 —— 由 main.dart 绑定到设置项（关闭后完全不介入）
   bool Function() isEnabled = () => true;
 
+  /// 当前账号的登录 cookie 串 —— 由 main.dart 绑定到 `AuthProvider`。
+  ///
+  /// 验证页**只注入它**（而不是整个 CookieJar）：罐里可能存着服务端已判过期的
+  /// 防护 cookie，灌进验证页会让挑战继续拿到旧值（见 docs/07 #73）。
+  String Function()? loginCookieString;
+
   /// 失败冷却：用户取消或超时后，短时间内不再弹窗，避免连续骚扰
   static const Duration _failureCooldown = Duration(seconds: 60);
 
@@ -76,6 +82,7 @@ class VerificationGate {
           builder: (_) => VerifyBrowserPage(
             url: _probeUrl,
             userAgent: _probeUserAgent ?? Site.uaPc,
+            cookieString: loginCookieString?.call() ?? '',
             probe: _probePassed,
           ),
         ),
@@ -102,14 +109,14 @@ class VerificationGate {
     final baseUrl = SiteStore.instance.baseUrl;
     if (jar != null) {
       try {
-        // 回流到账号罐（当前会话用），并把「账号罐里没有的」新 cookie 同时写进
-        // 站点共享罐 —— 人机验证 / 防火墙 cookie 与账号无关，只有落进共享罐
-        // 才能在切账号、切游客、重启后继续生效（否则每次重启都要重新验证）。
-        await syncWebViewCookiesToJar(
+        // 回流到活跃罐（当前会话用），并把「活跃罐里原本没有的」新 cookie
+        // 补写到本站点其它罐 —— 人机验证 / 防火墙 cookie 与账号无关，
+        // 只写活跃罐的话，切账号、切游客、重启后就要重新验证。
+        final newCookies = await syncWebViewCookiesToJar(
           jar: jar,
           baseUrl: baseUrl,
-          sharedJar: ApiService().sharedCookieJar,
         );
+        await ApiService().mirrorToAllJarsForHost(newCookies);
       } catch (e) {
         AppLogger.d('PAGE', '探测前回流 cookie 失败: $e');
       }
@@ -120,9 +127,7 @@ class VerificationGate {
       final resp = await ApiService().dio.get<String>(
         _probeUrl,
         options: Options(
-          headers: {
-            if (_probeUserAgent != null) 'User-Agent': _probeUserAgent,
-          },
+          headers: {if (_probeUserAgent != null) 'User-Agent': _probeUserAgent},
           // 标记已处理，避免探测自身再次触发弹窗
           extra: {kInterstitialHandledFlag: true},
         ),
@@ -130,10 +135,10 @@ class VerificationGate {
       if (resp.statusCode != 200) return false;
       final body = resp.data ?? '';
       if (body.isEmpty) return false;
-      return !looksLikeInterstitialPage(
-        body,
-        resp.headers.value('content-type'),
-      );
+      if (looksLikeInterstitialPage(body, resp.headers.value('content-type'))) {
+        return false;
+      }
+      return true;
     } catch (e) {
       AppLogger.d('PAGE', '人机验证探测失败: $e');
       return false;

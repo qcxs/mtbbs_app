@@ -88,15 +88,9 @@ class SiteStore extends ChangeNotifier {
     for (final fid in newForums.keys) {
       if (!newOrder.contains(fid)) newOrder.add(fid);
     }
-    _sites[_currentIndex] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
+    _sites[_currentIndex] = old.copyWith(
       forums: Map.from(newForums),
       defaultForumOrder: newOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
     );
     notifyListeners();
   }

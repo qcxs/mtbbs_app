@@ -100,6 +100,11 @@ void main() async {
   final auth = AuthProvider();
   await auth.tryRestore();
 
+  // 人机验证页只注入登录 cookie 串（而非整个罐）：罐里可能存着服务端已判过期的
+  // 防护 cookie，灌进验证页会让挑战继续拿到旧值，形成"每次冷启动都要验证"的死锁。
+  VerificationGate.instance.loginCookieString =
+      () => auth.currentCookieString ?? '';
+
   // MCP：注入登录态快照（MCP 层不直接依赖 UI Provider），
   // 并后台拉起只读服务——未启用时不会占用端口，不阻塞首帧。
   McpServerController.instance.bindAccountInfo(

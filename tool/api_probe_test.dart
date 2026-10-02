@@ -66,6 +66,7 @@ void main() {
       'authorid': const String.fromEnvironment('authorid'),
       'uid': const String.fromEnvironment('uid'),
       'username': const String.fromEnvironment('username'),
+      'touid': const String.fromEnvironment('touid'),
       'type': const String.fromEnvironment('type'),
       'message': const String.fromEnvironment('message'),
       'reppid': const String.fromEnvironment('reppid'),

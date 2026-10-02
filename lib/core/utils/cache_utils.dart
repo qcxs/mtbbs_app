@@ -292,11 +292,12 @@ Future<int> cleanupExpiredCaches() async {
           AppLogger.d('AVATAR', 'cleanup expired redirect maps: $cleared');
         }
       }
-      if (result.scanned > 0) {
+      // 只在真的清掉东西时打日志：正常启动 4 个缓存目录各刷一行 "removed 0"，
+      // 属于无信息量的噪音
+      if (result.removed > 0) {
         AppLogger.i(
           'CACHE',
-          'cleanup scan $cacheKey: '
-              '${result.scanned} files, removed ${result.removed}',
+          'cleanup $cacheKey: 扫描 ${result.scanned}，清理 ${result.removed}',
         );
       }
     } catch (e) {

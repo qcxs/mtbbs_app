@@ -7,6 +7,7 @@ import 'package:mtbbs/models/editor_snapshot.dart';
 import 'package:mtbbs/pages/home/home_page.dart';
 import 'package:mtbbs/pages/guide/guide_page.dart';
 import 'package:mtbbs/pages/message/message_page.dart';
+import 'package:mtbbs/pages/message/pm_chat_page.dart';
 import 'package:mtbbs/pages/community/community_page.dart';
 import 'package:mtbbs/pages/user/my_profile_page.dart';
 import 'package:mtbbs/pages/settings/settings_page.dart';
@@ -202,6 +203,17 @@ GoRouter buildRouter({
           GoRoute(
             path: '/online',
             pageBuilder: (_, __) => const NoTransitionPage(child: OnlinePage()),
+          ),
+          GoRoute(
+            path: '/pm/chat',
+            pageBuilder: (_, state) {
+              final touid = state.uri.queryParameters['touid'] ?? '';
+              final username = state.uri.queryParameters['username'];
+              return NoTransitionPage(
+                key: ValueKey('pm_chat_$touid'),
+                child: PmChatPage(touid: touid, username: username),
+              );
+            },
           ),
           GoRoute(
             path: '/friends',

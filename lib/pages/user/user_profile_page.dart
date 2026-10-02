@@ -7,6 +7,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/user_profile.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -134,6 +135,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
         surfaceTintColor: _cs.surface,
         elevation: 0.5,
         actions: [
+          // 给 TA 发私信（看自己主页时不显示）
+          if (_uidNum != null &&
+              context.select<AuthProvider, String>((a) => a.uid) != widget.uid)
+            IconButton(
+              icon: const Icon(Icons.mail_outline),
+              tooltip: '发消息',
+              onPressed: () {
+                final nickname = _profile?['nickname'] as String? ?? '';
+                context.push(
+                  '/pm/chat?touid=${widget.uid}'
+                  '&username=${Uri.encodeComponent(nickname)}',
+                );
+              },
+            ),
           // TA 的关注 / 好友入口（仅数值 uid 显示；self 页入口在"我的"页）
           if (_uidNum != null) ...[
             IconButton(

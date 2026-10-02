@@ -76,7 +76,27 @@
 | 修改评论 | `post.edit tid=18 pid=62 message=修改后…` | 内容更新 + 编辑标记 ✓ |
 | 修改楼主帖 | `post.edit tid=18 pid=55 subject=… message=…` | 标题+内容均更新 ✓ |
 
-## 6. 相关文件
+## 6. 发送私信 — 收件人 touid
+
+| 项 | 值 |
+|---|---|
+| 加载页 | `GET /home.php?mod=spacecp&ac=pm&op=showmsg&touid={touid}`（取 formhash） |
+| 提交端点 | `POST /home.php?mod=spacecp&ac=pm&op=send&touid={touid}&pmsubmit=yes&inajax=1` |
+| 必填参数 | `formhash` `touid` `pmsubmit=true` `message` |
+| 探针场景 | `message.pm.send`（touid、message 必填） |
+| 代码 | `lib/api/home/pm/{http,parse,export}.dart`（`sendPm` / `getPmView`） |
+
+要点：
+
+- **收件人统一走 `touid`**：Discuz 的 `op=send` 对 `touid`（新会话/回复）与 `pmid`（回复某条）分别处理，1:1 私信按对方 uid 归组，二者等价，故只用 `touid` 即可覆盖两种场景（`submitcheck('pmsubmit')` 要求 POST + formhash 匹配）。
+- **`inajax=1` 返回 XML**：`succeedhandle_pmsend('…', '操作成功', {'pmid':…})` / `errorhandle_pmsend('两次发送短消息太快…')`，可直接交给 `parseSubmitResponse`。
+- **formhash 来源**：会话页（`subop=view`）的回复表单里就有；但**会话为空时该表单不渲染**（模板条件 `$touid && $list`），所以 `sendPm` 在未显式传入 formhash 时会拉取 `op=showmsg` 页兜底。
+- **限流**：站点有发送间隔（实测约 60s），过频返回"两次发送短消息太快，请稍候再发送"。
+- **会话详情（只读）**：`GET /home.php?mod=space&do=pm&subop=view&touid={touid}`。`page` 从**最旧页 1** 递增到最新，**不带 page = 最新页**；分页栏 `pmmulti` 只输出「上一页/下一页」链接，故解析结果给 `olderPage`/`newerPage`/`hasOlder` 而非页码总数。正文经 UCenter `uccode` 渲染成 HTML，用 `Html2BBCode` 还原（与帖子同源）。
+- **实时轮询**：Discuz **没有**"增量拉新消息"接口（`op=checknewpm` 只更新 `newpm` 状态位，不返回内容），客户端只能周期重拉最新一页、按 `pmid` 去重后追加（`PmChatPage` 每 5s 一次，前台+页面可见时才跑）。
+- **已读**：加载会话页本身就会清除该会话的未读标记（实测 `message.pm` 的 `isNew` 由 `true` → `false`），无需额外的"标记已读"请求。
+
+## 7. 相关文件
 
 | 文件 | 职责 |
 |---|---|

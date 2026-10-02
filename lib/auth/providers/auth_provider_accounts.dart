@@ -326,6 +326,15 @@ extension AuthAccounts on AuthProvider {
   Future<void> _restoreCookiesForActive() async {
     if (_currentActiveIndex < 0) return;
     final account = _currentAccounts[_currentActiveIndex];
+    // 游客必须回到**真正的游客罐**（cookies/{host}/）。曾经这里对游客也走
+    // switchToAccount('游客')，于是活跃罐变成 cookies/{host}/游客/ 这个**空罐**：
+    // 游客罐里的服务端 cookie（sid、人机验证 / 防火墙 cookie…）全部不可见，
+    // 表现为「上次停在游客态，重启后又弹人机验证、游客会话丢失」。
+    // 是否命中取决于上次活跃的是不是游客 —— 所以现象会随设备/使用历史而不同。
+    if (account.uid == '0') {
+      await ApiService().switchToGuest();
+      return;
+    }
     await ApiService().switchToAccount(account.username);
     await _restoreCookieString(account.cookieString);
   }
@@ -348,14 +357,19 @@ extension AuthAccounts on AuthProvider {
   }
 
   List<Cookie> _parseCookieString(String cookieStr) {
+    // 登录态只认核心 cookie：老账号的 cookieString 里可能混着一条早就过期的临时
+    // cookie（防护类），恢复时写回罐里就会让它"复活"→ 服务端只肯回挑战页
+    // （见 docs/07 #73 与 cookie_sync.dart「核心 / 临时 Cookie」）
+    cookieStr = coreCookiesOf(cookieStr);
     final cookies = <Cookie>[];
     for (final pair in cookieStr.split(';')) {
       final trimmed = pair.trim();
       if (trimmed.isEmpty) continue;
       final eq = trimmed.indexOf('=');
       if (eq <= 0) continue;
+      final name = trimmed.substring(0, eq);
       try {
-        final c = Cookie(trimmed.substring(0, eq), trimmed.substring(eq + 1));
+        final c = Cookie(name, trimmed.substring(eq + 1));
         c.domain = '.${Uri.parse(SiteStore.instance.baseUrl).host}';
         c.path = '/';
         c.maxAge = 86400 * 30;

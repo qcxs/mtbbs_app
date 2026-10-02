@@ -7,6 +7,7 @@ import 'package:mtbbs/api/forum/post/export.dart' as post_api;
 import 'package:mtbbs/api/forum/post/http.dart' as post_http;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as rate_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
+import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'scenario_types.dart';
@@ -325,6 +326,23 @@ final Map<String, ApiScenario> writeScenarios = {
       final favid = a['favid'] ?? '';
       if (favid.isEmpty) throw Exception('缺少必填参数 favid');
       return favorite_api.deleteFavorite(ApiService().dio, favid: favid);
+    },
+  ),
+  'message.pm.send': ApiScenario(
+    desc: '发送私信（写操作！需登录；自动拉取发消息页取 formhash 后提交，touid=收件人 uid）',
+    params: {'touid': '*收件人 uid', 'message': '*内容（BBCode）'},
+    needsLogin: true,
+    run: (a) async {
+      final touid = a['touid'] ?? '';
+      final message = a['message'] ?? '';
+      if (touid.isEmpty) throw Exception('缺少必填参数 touid');
+      if (message.isEmpty) throw Exception('缺少必填参数 message');
+      final r = await pm_api.sendPm(
+        ApiService().dio,
+        touid: touid,
+        message: message,
+      );
+      return {'success': r.success, 'message': r.message};
     },
   ),
 };

@@ -4,6 +4,64 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart' as webview;
 import 'package:mtbbs/core/utils/logger.dart';
 
+// ==================== 核心 / 临时 Cookie ====================
+//
+// Cookie 分两类：
+//   · **核心 cookie** —— 站点自己的会话 / 身份（Discuz 的 `{cookiepre}auth`、`sid`…）
+//   · **临时 cookie** —— 边缘下发的防护 cookie（人机验证、CDN）与站点配置类
+//
+// 只有核心 cookie 会被持久化成"登录态"（`Account.cookieString`）。临时 cookie 有效期
+// 极短（实测 `acw_tc` 只有 1 小时），一旦进了登录态，就会被每次启动 / 切账号 / 导入
+// 导出反复"复活"；服务端收到过期的它只肯回挑战页，于是那条值永远刷不新，形成
+// "每次冷启动都要验证"的死锁（见 docs/07 #73）。临时 cookie 留在 CookieJar 里，
+// 由服务端响应按需刷新即可。
+
+/// 从 cookie 名列表推断**站点核心 cookie 前缀**（Discuz 的 `cookiepre`）。
+///
+/// ① Discuz 用 `{cookiepre}auth` 判定是否登录，所以形如 `cQWy_2132_auth` 的名字去掉
+///    末尾 `auth` 就是前缀——有它时以此为准；
+/// ② 没有 `auth` 时退化为统计：取出现 ≥2 次的"下划线前缀"里最多的那个；
+/// ③ 都推不出则返回空串，此时 [isCoreCookie] 不筛选（保持旧行为）。
+String inferCookiePrefix(Iterable<String> names) {
+  final list = names.where((n) => n.isNotEmpty).toList();
+  const authSuffix = 'auth';
+  for (final n in list) {
+    if (n.length > authSuffix.length && n.endsWith(authSuffix)) {
+      return n.substring(0, n.length - authSuffix.length);
+    }
+  }
+
+  final counts = <String, int>{};
+  for (final n in list) {
+    final i = n.lastIndexOf('_');
+    if (i <= 0) continue;
+    final p = n.substring(0, i + 1);
+    counts[p] = (counts[p] ?? 0) + 1;
+  }
+  if (counts.isEmpty) return '';
+  final best = counts.entries.reduce((a, b) => b.value > a.value ? b : a);
+  return best.value >= 2 ? best.key : '';
+}
+
+/// 该 cookie 名是否属于核心 cookie（`prefix` 为空 = 未识别出前缀，一律视为核心）。
+bool isCoreCookie(String name, String prefix) =>
+    prefix.isEmpty || name.startsWith(prefix);
+
+/// 过滤 cookie 串，只留核心 cookie（用于登录态持久化与注入 WebView）。
+String coreCookiesOf(String cookieStr) {
+  final pairs = cookieStr
+      .split(';')
+      .map((p) => p.trim())
+      .where((p) => p.isNotEmpty)
+      .toList();
+  if (pairs.isEmpty) return cookieStr;
+  final prefix = inferCookiePrefix(pairs.map((p) => p.split('=').first.trim()));
+  if (prefix.isEmpty) return cookieStr;
+  return pairs
+      .where((p) => isCoreCookie(p.split('=').first.trim(), prefix))
+      .join('; ');
+}
+
 // ==================== Dio → WebView ====================
 
 /// 将账号 Cookie 字符串同步到 WebView 原生 CookieManager
@@ -24,7 +82,9 @@ Future<void> syncCookieStringToWebView(
   }
 
   final host = Uri.parse(baseUrl).host;
-  for (final pair in cookieStr.split(';')) {
+  // 只注入核心 cookie：临时 cookie（防护类）由站点自己下发，把手里那条旧值灌回去
+  // 只会让挑战继续基于旧值进行（见 docs/07 #73）
+  for (final pair in coreCookiesOf(cookieStr).split(';')) {
     final trimmed = pair.trim();
     if (trimmed.isEmpty) continue;
     final eq = trimmed.indexOf('=');
@@ -39,44 +99,6 @@ Future<void> syncCookieStringToWebView(
       path: '/',
     );
   }
-}
-
-/// CookieJar → WebView：把 App 当前 Cookie 同步进 WebView。
-///
-/// 供"全局人机验证弹窗"这类**非页面**场景使用——它拿不到 AuthProvider，
-/// 但可以直接读当前活跃的 CookieJar。
-///
-/// 语义是"替换本站点 Cookie"：先清本站点（只清当前站点，见
-/// [clearCookiesForHost]），再按 jar 注入，避免上一轮验证残留的旧 Cookie
-/// 让 WebView 显示出错误的登录态。
-///
-/// 「清理」与「注入」两步互相独立：清理失败只记日志，绝不连累注入
-/// （见 docs/07 #67 静默失败教训）。
-Future<void> syncJarCookiesToWebView({
-  required CookieJar jar,
-  required String baseUrl,
-}) async {
-  final uri = Uri.tryParse(baseUrl);
-  if (uri == null || uri.host.isEmpty) return;
-
-  try {
-    await clearCookiesForHost(baseUrl);
-  } catch (e) {
-    AppLogger.w('PAGE', 'clear webview cookies failed: $e');
-  }
-
-  List<Cookie> cookies;
-  try {
-    cookies = await jar.loadForRequest(uri);
-  } catch (e) {
-    AppLogger.w('PAGE', 'read jar cookies failed: $e');
-    return;
-  }
-  final str = cookies
-      .where((c) => c.name.isNotEmpty)
-      .map((c) => '${c.name}=${c.value}')
-      .join('; ');
-  await syncCookieStringToWebView(str, baseUrl);
 }
 
 /// 清除指定站点的 WebView Cookie，**不影响其他站点**。
@@ -168,12 +190,16 @@ List<String?> _domainCandidates(String? cookieDomain, String host) {
 /// - 单条非法（`dart:io` 的 Cookie 按 RFC 6265 严格校验 name/value，值含 `,`
 ///   会抛 FormatException，见 docs/07 #26）时跳过该条，不让整次回流失败。
 ///
-/// **过期时间只认"确实在将来"的值**，其余一律当作会话 cookie（不带 expires）。
-/// 原因：`cookie_jar` 的 `PersistCookieJar._filterPathEntries` 在**落盘**时会
-/// 无视 `ignoreExpires` 直接丢掉"已过期"条目 —— 而 App 的罐全部用
-/// `ignoreExpires: true`（本就不按过期丢弃 cookie）。一旦 WebView 报出的
-/// `expiresDate` 落在这个陷阱里（Windows 端曾见非毫秒量级的值），这条 cookie
-/// 就会"内存里有、磁盘上没有"，重启后消失、人机验证反复出现。
+/// **一律不带 expires**（当作会话 cookie）。两个原因（见 docs/07 #73）：
+/// - 各端 `expiresDate` 的单位/含义都不可信：Windows 给的是 CDP 的 `expires`
+///   （**秒**）；Android 在支持 `GET_COOKIE_INFO` 时算
+///   `currentTimeMillis() + maxAge`，而 `maxAge` 是**秒**，于是得到
+///   "现在 + N 毫秒"这种瞬时过期值
+/// - App 所有罐都是 `ignoreExpires: true`（本就不按过期丢 cookie），过期值的唯一
+///   实际作用，是让 `cookie_jar` 在**落盘**时静默丢弃该条
+///   （`PersistCookieJar._filterPathEntries` 无视 `ignoreExpires`）
+///
+/// 带上它只会制造"内存有、磁盘没有"的失效 —— 重启后又弹人机验证。
 List<Cookie> toJarCookies(List<webview.Cookie> webCookies, Uri siteUri) {
   final result = <Cookie>[];
   for (final wc in webCookies) {
@@ -184,22 +210,13 @@ List<Cookie> toJarCookies(List<webview.Cookie> webCookies, Uri siteUri) {
           ? '.${siteUri.host}'
           : (rawDomain.startsWith('.') ? rawDomain : '.$rawDomain');
 
-      final cookie = Cookie(wc.name, wc.value)
-        ..domain = domain
-        ..path = wc.path ?? '/'
-        ..secure = wc.isSecure ?? (siteUri.scheme == 'https')
-        ..httpOnly = wc.isHttpOnly ?? false;
-
-      final expires = wc.expiresDate;
-      if (expires != null && expires > 0) {
-        final at = DateTime.fromMillisecondsSinceEpoch(expires);
-        if (at.isAfter(DateTime.now())) {
-          cookie.expires = at;
-        } else {
-          AppLogger.d('PAGE', '忽略异常过期时间 "${wc.name}": $expires（按会话 cookie 处理）');
-        }
-      }
-      result.add(cookie);
+      result.add(
+        Cookie(wc.name, wc.value)
+          ..domain = domain
+          ..path = wc.path ?? '/'
+          ..secure = wc.isSecure ?? (siteUri.scheme == 'https')
+          ..httpOnly = wc.isHttpOnly ?? false,
+      );
     } catch (e) {
       AppLogger.d('PAGE', 'skip invalid cookie "${wc.name}": $e');
     }
@@ -216,114 +233,46 @@ List<Cookie> toJarCookies(List<webview.Cookie> webCookies, Uri siteUri) {
 /// 用 `getCookies(url:)` 而不是 `getAllCookies()`：前者天然按 URL 过滤（只返回
 /// 会发给该 URL 的 Cookie），不依赖 domain 字段（Android 上可能取不到）。
 ///
-/// 传了 [sharedJar] 时，额外把「账号罐里没有的」那部分写进站点共享罐（见
-/// [SiteCookieJar]）——人机验证 / 防火墙下发的 cookie 是客户端级的，只有落进
-/// 共享罐才能在切账号、切游客、重启后继续生效。
-///
-/// 返回实际写回的 Cookie 条数。
-Future<int> syncWebViewCookiesToJar({
+/// **返回本次「账号罐里原本没有」的 Cookie** —— 即验证 / 防火墙新下发的客户端级
+/// cookie。调用方用它们补写到本站点的其它罐（见
+/// `ApiService.mirrorToAllJarsForHost`）：这类 cookie 与账号无关，而罐按
+/// `{host}/{账号}` 隔离，只写活跃罐的话，切账号 / 切游客 / 重启落到别的罐就要
+/// 重新验证。
+Future<List<Cookie>> syncWebViewCookiesToJar({
   required CookieJar jar,
   required String baseUrl,
-  CookieJar? sharedJar,
 }) async {
   final uri = Uri.tryParse(baseUrl);
-  if (uri == null || uri.host.isEmpty) return 0;
+  if (uri == null || uri.host.isEmpty) return const [];
 
   final webCookies = await webview.CookieManager.instance().getCookies(
     url: webview.WebUri(baseUrl),
   );
-  if (webCookies.isEmpty) return 0;
+  if (webCookies.isEmpty) return const [];
 
   final cookies = toJarCookies(webCookies, uri);
-  if (cookies.isEmpty) return 0;
+  if (cookies.isEmpty) return const [];
 
   // 「账号罐里已有哪些名字」必须在写入前取快照：写入之后这些 cookie 也算已有，
   // 差集就永远为空了。
   Set<String>? existingNames;
-  if (sharedJar != null) {
-    try {
-      existingNames = (await jar.loadForRequest(
-        uri,
-      )).map((c) => c.name).toSet();
-    } catch (e) {
-      AppLogger.w('PAGE', '读取账号罐 cookie 失败: $e');
-    }
+  try {
+    existingNames = (await jar.loadForRequest(uri)).map((c) => c.name).toSet();
+  } catch (e) {
+    AppLogger.w('PAGE', '读取账号罐 cookie 失败: $e');
   }
 
   // saveFromResponse 按 (domain, path, name) 覆盖同名条目，不会重复累积
   await jar.saveFromResponse(uri, cookies);
 
-  // 共享罐只收「账号罐里没有的」——即验证 / 防火墙新下发的客户端级 cookie。
-  // 全量写入会把 syncJarCookiesToWebView 注入进 WebView 的账号登录态也灌进去，
-  // 切到其他账号 / 游客时就会串号。
-  if (sharedJar != null && existingNames != null) {
-    final extras = cookies
-        .where((c) => !existingNames!.contains(c.name))
-        .toList();
-    if (extras.isNotEmpty) {
-      try {
-        await sharedJar.saveFromResponse(uri, extras);
-        AppLogger.i(
-          'PAGE',
-          '站点共享罐写入 ${extras.length} 条: ${extras.map((c) => c.name).join(', ')}',
-        );
-      } catch (e) {
-        AppLogger.w('PAGE', '写入站点共享罐失败: $e');
-      }
-    }
-  }
-
-  AppLogger.i('PAGE', 'WebView → Dio 回流 ${uri.host}: ${cookies.length} 条');
-  return cookies.length;
-}
-
-// ==================== 站点共享罐 ====================
-
-/// 站点 Cookie 罐：把「账号罐」与「站点共享罐」合成一个视图交给 CookieManager。
-///
-/// **为什么需要**：人机验证 / 防火墙下发的 cookie 是**客户端级**的（按 IP / UA
-/// 下发），与登录账号无关；而 App 的 Cookie 罐按 `{host}/{账号}` 隔离，游客态还会
-/// 换成游客罐。验证通过后只往「当时活跃的那个罐」里写，重启 / 切账号 / 切站点后
-/// 请求走的是另一只罐，验证 cookie 就丢了，于是反复被挑战。
-///
-/// - **读**：两罐合并；同名时**账号罐优先** —— 保证账号隔离不被共享罐破坏
-/// - **写**：只写账号罐。服务端下发的会话 cookie（`auth` 等）属于当前账号，
-///   绝不能落进共享罐，否则会串号；共享罐只由验证流程显式写入
-///   （见 [syncWebViewCookiesToJar] 的 `sharedJar` 参数）
-class SiteCookieJar implements CookieJar {
-  SiteCookieJar({required this.accountJar, required this.sharedJar});
-
-  /// 当前活跃的账号 / 游客罐
-  final CookieJar accountJar;
-
-  /// 站点级共享罐（客户端级 cookie）
-  final CookieJar sharedJar;
-
-  /// 本视图不参与过期过滤 —— 实际过滤由两个真实罐各自负责
-  @override
-  bool get ignoreExpires => false;
-
-  @override
-  Future<List<Cookie>> loadForRequest(Uri uri) async {
-    final account = await accountJar.loadForRequest(uri);
-    final names = account.map((c) => c.name).toSet();
-    final shared = await sharedJar.loadForRequest(uri);
-    return [...account, ...shared.where((c) => !names.contains(c.name))];
-  }
-
-  @override
-  Future<void> saveFromResponse(Uri uri, List<Cookie> cookies) =>
-      accountJar.saveFromResponse(uri, cookies);
-
-  @override
-  Future<void> delete(Uri uri, [bool withDomainSharedCookie = false]) async {
-    await accountJar.delete(uri, withDomainSharedCookie);
-    await sharedJar.delete(uri, withDomainSharedCookie);
-  }
-
-  @override
-  Future<void> deleteAll() async {
-    await accountJar.deleteAll();
-    await sharedJar.deleteAll();
-  }
+  // 快照失败时不补写：宁可不扩散，也不能把整份（含账号登录态）灌进别的罐
+  final extras = existingNames == null
+      ? const <Cookie>[]
+      : cookies.where((c) => !existingNames!.contains(c.name)).toList();
+  AppLogger.i(
+    'PAGE',
+    'WebView → Dio 回流 ${uri.host}: ${cookies.length} 条'
+        '${extras.isEmpty ? '' : '（新增 ${extras.length}: ${extras.map((c) => c.name).join(', ')}）'}',
+  );
+  return extras;
 }

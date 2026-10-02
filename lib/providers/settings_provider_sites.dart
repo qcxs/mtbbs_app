@@ -35,16 +35,7 @@ extension SettingsSites on SettingsProvider {
     final idx = _currentSiteIndex;
     if (idx < 0 || idx >= _sites.length) return;
     final old = _sites[idx];
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: old.forums,
-      defaultForumOrder: old.defaultForumOrder,
-      userAgent: userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
+    _sites[idx] = old.copyWith(userAgent: userAgent);
     SiteStore.instance.switchTo(idx);
     await _persistSites();
     _notify();
@@ -54,17 +45,10 @@ extension SettingsSites on SettingsProvider {
   Future<void> setSiteAvatarTemplate(String template) async {
     final idx = _currentSiteIndex;
     if (idx < 0 || idx >= _sites.length) return;
-    final old = _sites[idx];
     final t = template.trim();
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: old.forums,
-      defaultForumOrder: old.defaultForumOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: t.isEmpty ? null : t,
+    _sites[idx] = _sites[idx].copyWith(
+      avatarTemplate: t,
+      clearAvatarTemplate: t.isEmpty,
     );
     SiteStore.instance.switchTo(idx);
     await _persistSites();
@@ -97,15 +81,13 @@ extension SettingsSites on SettingsProvider {
         }
       }
       if (def == null) continue;
-      _sites[i] = Site(
+      _sites[i] = current.copyWith(
         name: def.name,
-        baseUrl: def.baseUrl,
         cdn: def.cdn,
         loginPagePath: def.loginPagePath,
-        forums: current.forums,
-        defaultForumOrder: current.defaultForumOrder,
         userAgent: def.userAgent,
         avatarTemplate: def.avatarTemplate,
+        clearAvatarTemplate: def.avatarTemplate == null,
       );
       count++;
     }
@@ -140,16 +122,7 @@ extension SettingsSites on SettingsProvider {
     final old = _sites[idx];
     final newForums = Map<String, String>.from(old.forums)..[fid] = name;
     final newOrder = List<String>.from(old.defaultForumOrder)..add(fid);
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: newForums,
-      defaultForumOrder: newOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
+    _sites[idx] = old.copyWith(forums: newForums, defaultForumOrder: newOrder);
     await _persistSites();
   }
 
@@ -159,16 +132,7 @@ extension SettingsSites on SettingsProvider {
     final old = _sites[idx];
     final newForums = Map<String, String>.from(old.forums)..remove(fid);
     final newOrder = List<String>.from(old.defaultForumOrder)..remove(fid);
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
-      forums: newForums,
-      defaultForumOrder: newOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
-    );
+    _sites[idx] = old.copyWith(forums: newForums, defaultForumOrder: newOrder);
     await _persistSites();
     _notify();
   }
@@ -181,16 +145,7 @@ extension SettingsSites on SettingsProvider {
     if (newIndex < 0 || newIndex >= order.length) return;
     final moved = order.removeAt(oldIndex);
     order.insert(newIndex, moved);
-    _sites[idx] = Site(
-      name: _sites[idx].name,
-      baseUrl: _sites[idx].baseUrl,
-      cdn: _sites[idx].cdn,
-      loginPagePath: _sites[idx].loginPagePath,
-      forums: _sites[idx].forums,
-      defaultForumOrder: order,
-      userAgent: _sites[idx].userAgent,
-      avatarTemplate: _sites[idx].avatarTemplate,
-    );
+    _sites[idx] = _sites[idx].copyWith(defaultForumOrder: order);
     await _persistSites();
     _notify();
   }
@@ -200,15 +155,9 @@ extension SettingsSites on SettingsProvider {
     if (idx < 0 || idx >= _sites.length) return;
     final old = _sites[idx];
     final newForums = Map<String, String>.from(old.forums)..[fid] = newName;
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
+    _sites[idx] = old.copyWith(
       forums: newForums,
       defaultForumOrder: List.from(old.defaultForumOrder),
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
     );
     await _persistSites();
   }
@@ -223,15 +172,9 @@ extension SettingsSites on SettingsProvider {
     for (final fid in newForums.keys) {
       if (!newOrder.contains(fid)) newOrder.add(fid);
     }
-    _sites[idx] = Site(
-      name: old.name,
-      baseUrl: old.baseUrl,
-      cdn: old.cdn,
-      loginPagePath: old.loginPagePath,
+    _sites[idx] = old.copyWith(
       forums: Map.from(newForums),
       defaultForumOrder: newOrder,
-      userAgent: old.userAgent,
-      avatarTemplate: old.avatarTemplate,
     );
     await _persistSites();
   }

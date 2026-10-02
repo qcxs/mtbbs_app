@@ -147,6 +147,23 @@ final Map<String, ApiScenario> readScenarios = {
     needsLogin: true,
     run: (a) => pm_api.getPmList(ApiService().dio, page: intArg(a, 'page', 1)),
   ),
+  'message.pm.view': ApiScenario(
+    desc: '私信会话详情（与某用户的消息列表；需登录）',
+    params: {
+      'touid': '*对方 uid（message.pm 返回项里的 uid）',
+      'page': '页码（默认 0=最新一页；1=最旧一页，Discuz 从最旧页起算）',
+    },
+    needsLogin: true,
+    run: (a) {
+      final touid = a['touid'] ?? '';
+      if (touid.isEmpty) throw Exception('缺少必填参数 touid');
+      return pm_api.getPmView(
+        ApiService().dio,
+        touid: touid,
+        page: intArg(a, 'page', 0),
+      );
+    },
+  ),
   'message.mypost': ApiScenario(
     desc: '帖子提醒列表（需登录）',
     params: {'type': 'post/at（默认 post）', 'page': '页码（默认 1）'},

@@ -1,6 +1,3 @@
-import 'dart:io' as io;
-
-import 'package:cookie_jar/cookie_jar.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
@@ -42,25 +39,34 @@ void main() {
       expect(cookies.first.secure, true);
     });
 
-    test('过期时间按毫秒转换为 DateTime', () {
+    test('一律按会话 cookie：不携带 expires（各端 expiresDate 单位都不可信）', () {
       final ms = DateTime(2030, 1, 2).millisecondsSinceEpoch;
       final cookies = toJarCookies([
-        Cookie(name: 'a', value: 'b', expiresDate: ms),
+        Cookie(name: 'future_ms', value: 'a', expiresDate: ms), // 将来（毫秒）
+        Cookie(
+          name: 'seconds',
+          value: 'b',
+          expiresDate: ms ~/ 1000,
+        ), // Windows：秒
+        // Android：currentTimeMillis() + maxAge，而 maxAge 是秒 → "现在 + N 毫秒"
+        Cookie(
+          name: 'android_maxage',
+          value: 'c',
+          expiresDate: DateTime.now().millisecondsSinceEpoch + 1800,
+        ),
+        Cookie(name: 'session', value: 'd'), // 无过期时间
       ], siteUri);
-      expect(cookies.first.expires?.millisecondsSinceEpoch, ms);
-    });
 
-    test('过期时间不在将来（如按秒返回）→ 按会话 cookie 处理，避免落盘被丢弃', () {
-      final ms = DateTime(2030, 1, 2).millisecondsSinceEpoch;
-      final cookies = toJarCookies([
-        // 秒级时间戳：按毫秒解释会落到 1970，落盘过滤器会当成"已过期"静默丢掉
-        Cookie(name: 'acw_sc__v2', value: 'x', expiresDate: ms ~/ 1000),
-        Cookie(name: 'auth', value: 'y', expiresDate: ms),
-      ], siteUri);
-
-      final byName = {for (final c in cookies) c.name: c};
-      expect(byName['acw_sc__v2']!.expires, isNull); // 不带 expires → 不会被过滤
-      expect(byName['auth']!.expires, isNotNull); // 真正的将来时间照常保留
+      expect(cookies.map((c) => c.name).toList(), [
+        'future_ms',
+        'seconds',
+        'android_maxage',
+        'session',
+      ]);
+      // 带上 expires 只会在落盘时被 cookie_jar 静默丢弃（见 docs/07 #73）
+      for (final c in cookies) {
+        expect(c.expires, isNull);
+      }
     });
 
     test('非法条目（值含逗号，dart:io 按 RFC 6265 拒绝）被跳过，不影响其余条目', () {
@@ -77,47 +83,37 @@ void main() {
     });
   });
 
-  group('站点共享罐合并（SiteCookieJar）', () {
-    io.Cookie c(String name, String value) => io.Cookie(name, value)
-      ..domain = '.bbs.binmt.cc'
-      ..path = '/';
-
-    test('读取合并两罐；同名时账号罐优先，共享罐独有的客户端级 Cookie 参与下发', () async {
-      final account = CookieJar();
-      final shared = CookieJar();
-      await account.saveFromResponse(siteUri, [
-        c('auth', 'mine'),
-        c('sid', 's1'),
-      ]);
-      await shared.saveFromResponse(siteUri, [
-        c('auth', 'leaked'),
-        c('acw_sc__v2', 'waf'),
-      ]);
-
-      final merged = await SiteCookieJar(
-        accountJar: account,
-        sharedJar: shared,
-      ).loadForRequest(siteUri);
-      final byName = {for (final x in merged) x.name: x.value};
-
-      expect(byName['auth'], 'mine'); // 共享罐里的同名声不覆盖账号罐 → 不串号
-      expect(byName['sid'], 's1');
-      expect(byName['acw_sc__v2'], 'waf');
-      expect(merged, hasLength(3));
+  group('核心 / 临时 Cookie 分类', () {
+    test('前缀优先取自 Discuz 判定登录的 {prefix}auth', () {
+      expect(
+        inferCookiePrefix(['acw_tc', 'cQWy_2132_auth', 'cQWy_2132_sid']),
+        'cQWy_2132_',
+      );
     });
 
-    test('写入只落账号罐，不污染共享罐', () async {
-      final account = CookieJar();
-      final shared = CookieJar();
-      final view = SiteCookieJar(accountJar: account, sharedJar: shared);
+    test('没有 auth 时按统计取出现 ≥2 次的下划线前缀，否则不筛', () {
+      expect(
+        inferCookiePrefix(['cQWy_2132_sid', 'cQWy_2132_lastvisit', 'acw_tc']),
+        'cQWy_2132_',
+      );
+      expect(inferCookiePrefix(['a', 'b']), '');
+    });
 
-      await view.saveFromResponse(siteUri, [c('auth', 'mine')]);
+    test('前缀为空 = 未识别，一律视为核心（不筛选）', () {
+      expect(isCoreCookie('acw_tc', ''), isTrue);
+      expect(isCoreCookie('acw_tc', 'cQWy_2132_'), isFalse);
+      expect(isCoreCookie('cQWy_2132_sid', 'cQWy_2132_'), isTrue);
+    });
+
+    test('登录态串只留核心 cookie，防护 cookie 被剔除', () {
+      const raw =
+          'acw_tc=74b1fe99x; cdn_sec_tc=74b1fe99x; acw_sc__v2=6abf106bx; '
+          'cQWy_2132_auth=abc; cQWy_2132_saltkey=x8AMbtEO';
 
       expect(
-        (await account.loadForRequest(siteUri)).map((x) => x.name),
-        contains('auth'),
+        coreCookiesOf(raw),
+        'cQWy_2132_auth=abc; cQWy_2132_saltkey=x8AMbtEO',
       );
-      expect(await shared.loadForRequest(siteUri), isEmpty);
     });
   });
 }

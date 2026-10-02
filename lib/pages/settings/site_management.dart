@@ -284,15 +284,14 @@ class _EditSiteDialogState extends State<_EditSiteDialog> {
     final cdn = cdnText.isNotEmpty ? cdnText : null;
     await widget.settings.updateSite(
       widget.index,
-      Site(
+      widget.site.copyWith(
         name: name,
         baseUrl: url,
         cdn: cdn,
+        clearCdn: cdn == null,
         loginPagePath: loginPath,
-        forums: widget.site.forums,
-        defaultForumOrder: widget.site.defaultForumOrder,
-        userAgent: widget.site.userAgent,
-        avatarTemplate: avatarTemplate.isEmpty ? null : avatarTemplate,
+        avatarTemplate: avatarTemplate,
+        clearAvatarTemplate: avatarTemplate.isEmpty,
       ),
     );
     if (!mounted) return;

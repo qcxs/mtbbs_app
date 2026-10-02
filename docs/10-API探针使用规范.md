@@ -70,8 +70,10 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `favorite.list` | 收藏列表（含 favid，供删除用） | 是 |
 | `message.system` | 系统提醒列表 | 是 |
 | `message.pm` | 私人消息列表 | 是 |
+| `message.pm.view` | 私信会话详情，`touid=*`；`page` 空=最新页，`1`=最旧页 | 是 |
 | `message.mypost` | 帖子提醒列表，`type=post/at` | 是 |
 | `my.threads` | 我的主题列表（默认移动端 UA） | 是 |
+| `message.pm.send` | 发送私信（写操作），`touid=*`、`message=*` | 是 |
 | `debug.http` | 调试：GET 指定路径，输出状态码/响应头/原始正文（携带当前会话 Cookie） | 否 |
 
 > 完整参数与说明以 `cmd=help` 实时输出为准（本表可能滞后）。

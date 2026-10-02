@@ -5,7 +5,6 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
-import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 人机验证弹窗页（全屏模态，由根导航器全局弹出，与当前所在页面无关）。
@@ -23,6 +22,7 @@ class VerifyBrowserPage extends StatefulWidget {
     super.key,
     required this.url,
     required this.userAgent,
+    required this.cookieString,
     required this.probe,
     this.probeInterval = const Duration(seconds: 5),
     this.timeout = const Duration(seconds: 90),
@@ -34,6 +34,14 @@ class VerifyBrowserPage extends StatefulWidget {
   /// WebView 使用的 UA —— 与失败请求保持一致，确保验证拿到的 cookie
   /// 对后续 API 请求同样有效
   final String userAgent;
+
+  /// 当前账号的登录 cookie 串（游客传空串）。
+  ///
+  /// **只注入它，不注入整个 CookieJar**：罐里可能存着服务端已判过期的防护
+  /// cookie（人机验证 / 防火墙，如 `acw_tc` 带 `Max-Age=3600`），把它们灌进
+  /// 验证页只会让挑战继续拿到旧值，挑战产生的新值又与旧值同名并存，形成
+  /// "每次冷启动都要验证"的死锁（见 docs/07 #73）。
+  final String cookieString;
 
   /// 探测是否已通过（由 `VerificationGate` 提供）
   final Future<bool> Function() probe;
@@ -82,21 +90,24 @@ class _VerifyBrowserPageState extends State<VerifyBrowserPage> {
     super.dispose();
   }
 
-  /// 注入当前账号 Cookie —— 与 App 的 API 请求保持同一登录态。
+  /// 准备验证页的 cookie：**先清空，再只注入登录串**。
   ///
-  /// 用「共享罐 + 账号罐」的合并视图：验证页也带上已有的人机验证 / 防火墙
-  /// cookie，站点认得就直接放行，不必再走一遍挑战。
+  /// 清空用 `deleteAllCookies()`：按域逐条删在 Android 上删不干净，实测旧的
+  /// `acw_sc__v2` 会跨会话存活（docs/07 #71 的坑）。验证页是一次性全屏模态，
+  /// 清空 WebView 级 cookie 的代价只是内置浏览器下次打开要重新同步。
   Future<void> _injectCookies() async {
-    final jar = ApiService().requestCookieJar ?? ApiService().activeCookieJar;
     try {
-      if (jar != null) {
-        await syncJarCookiesToWebView(
-          jar: jar,
-          baseUrl: SiteStore.instance.baseUrl,
-        );
-      }
+      await CookieManager.instance().deleteAllCookies();
     } catch (e) {
-      AppLogger.w('PAGE', '验证浏览器注入 cookie 失败: $e');
+      AppLogger.w('PAGE', '清空验证浏览器 cookie 失败: $e');
+    }
+    try {
+      await syncCookieStringToWebView(
+        widget.cookieString,
+        SiteStore.instance.baseUrl,
+      );
+    } catch (e) {
+      AppLogger.w('PAGE', '验证浏览器注入登录 cookie 失败: $e');
     }
     if (mounted) setState(() => _cookiesReady = true);
   }

@@ -42,6 +42,33 @@ void main() {
       final result = UrlRouter.parse('https://example.com/thread-1-1-1.html');
       expect(result.isOtherSite, isTrue);
     });
+
+    test('私信会话 home.php?mod=space&do=pm&subop=view&touid → /pm/chat', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&do=pm&subop=view&touid=152009#last',
+        ).appPath,
+        '/pm/chat?touid=152009',
+      );
+    });
+
+    test('私信列表 home.php?mod=space&do=pm → /message', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&do=pm',
+        ).appPath,
+        '/message',
+      );
+    });
+
+    test('发私信页 home.php?mod=spacecp&ac=pm&op=showmsg&touid → /pm/chat', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=spacecp&ac=pm&op=showmsg&touid=88062',
+        ).appPath,
+        '/pm/chat?touid=88062',
+      );
+    });
   });
 
   group('resolveTarget - 唯一决策点', () {

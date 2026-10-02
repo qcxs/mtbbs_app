@@ -58,6 +58,35 @@ class Site {
     return baseUrl;
   }
 
+  /// 复制并覆盖字段；不传（null）= 保持不变。显式清空 [avatarTemplate] 用
+  /// [clearAvatarTemplate]。
+  ///
+  /// 站点列表在设置页各处都是"改一个字段、重建整只 [Site]"，手抄字段很容易漏掉
+  /// 新加的，统一走这里。
+  Site copyWith({
+    String? name,
+    String? baseUrl,
+    String? cdn,
+    String? loginPagePath,
+    Map<String, String>? forums,
+    List<String>? defaultForumOrder,
+    String? userAgent,
+    String? avatarTemplate,
+    bool clearCdn = false,
+    bool clearAvatarTemplate = false,
+  }) => Site(
+    name: name ?? this.name,
+    baseUrl: baseUrl ?? this.baseUrl,
+    cdn: clearCdn ? null : (cdn ?? this.cdn),
+    loginPagePath: loginPagePath ?? this.loginPagePath,
+    forums: forums ?? this.forums,
+    defaultForumOrder: defaultForumOrder ?? this.defaultForumOrder,
+    userAgent: userAgent ?? this.userAgent,
+    avatarTemplate: clearAvatarTemplate
+        ? null
+        : (avatarTemplate ?? this.avatarTemplate),
+  );
+
   Map<String, dynamic> toJson() => {
     'name': name,
     'baseUrl': baseUrl,

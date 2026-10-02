@@ -6,6 +6,7 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/cookie_sync.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;

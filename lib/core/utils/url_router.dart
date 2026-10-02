@@ -251,6 +251,25 @@ class UrlRouter {
             siteName: otherSiteName,
           );
         }
+        // 私人消息：home.php?mod=space&do=pm[&subop=view&touid=X]
+        // 会话详情 → 聊天页；消息列表（无 subop）→ 消息 Tab
+        if (query['do'] == 'pm') {
+          final touid = query['touid'];
+          if (query['subop'] == 'view' && touid != null && touid.isNotEmpty) {
+            return UrlRouteResult(
+              label: '私信会话',
+              appPath: '/pm/chat?touid=$touid',
+              siteHost: otherSiteHost,
+              siteName: otherSiteName,
+            );
+          }
+          return UrlRouteResult(
+            label: '我的消息',
+            appPath: '/message',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
         // home.php?mod=space&do=profile — 当前用户个人资料页（无 uid）
         if (query['do'] == 'profile') {
           return UrlRouteResult(
@@ -266,6 +285,18 @@ class UrlRouter {
           siteHost: otherSiteHost,
           siteName: otherSiteName,
         );
+      }
+      // 发私信页：home.php?mod=spacecp&ac=pm&op=showmsg&touid=X → 聊天页
+      if (mod == 'spacecp' && query['ac'] == 'pm' && query['op'] == 'showmsg') {
+        final touid = query['touid'];
+        if (touid != null && touid.isNotEmpty) {
+          return UrlRouteResult(
+            label: '发私信',
+            appPath: '/pm/chat?touid=$touid',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
       }
     }
 
