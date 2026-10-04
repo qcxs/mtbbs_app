@@ -44,6 +44,12 @@ Future<void> showManagedListDialog({
   Future<bool> Function(String id)? onDelete,
   void Function(int from, int to)? onReorder,
   void Function(String id)? onToggleVisibility,
+
+  /// 逐项判断是否可删除（默认全部可删）。用于「内置项不可删、自定义项可删」。
+  bool Function(ManagedItem item)? canDelete,
+
+  /// 逐项判断是否可编辑（默认全部可编辑）。
+  bool Function(ManagedItem item)? canEdit,
   String emptyHint = '暂无数据',
   Widget Function(ManagedItem item, bool isVisible)? itemBuilder,
 
@@ -77,6 +83,8 @@ Future<void> showManagedListDialog({
       onDelete: onDelete,
       onReorder: onReorder,
       onToggleVisibility: onToggleVisibility,
+      canDelete: canDelete,
+      canEdit: canEdit,
       emptyHint: emptyHint,
       itemBuilder: itemBuilder,
       titleActions: titleActions,
@@ -98,6 +106,8 @@ class _ManagedListSheetContent extends StatefulWidget {
   final Future<bool> Function(String id)? onDelete;
   final void Function(int from, int to)? onReorder;
   final void Function(String id)? onToggleVisibility;
+  final bool Function(ManagedItem item)? canDelete;
+  final bool Function(ManagedItem item)? canEdit;
   final String emptyHint;
   final Widget Function(ManagedItem item, bool isVisible)? itemBuilder;
   final List<Widget>? titleActions;
@@ -116,6 +126,8 @@ class _ManagedListSheetContent extends StatefulWidget {
     this.onDelete,
     this.onReorder,
     this.onToggleVisibility,
+    this.canDelete,
+    this.canEdit,
     required this.emptyHint,
     this.itemBuilder,
     this.titleActions,
@@ -311,7 +323,8 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
                                   ? null
                                   : () => _handleToggleVisibility(i),
                             ),
-                          if (widget.allowEdit)
+                          if (widget.allowEdit &&
+                              (widget.canEdit?.call(item) ?? true))
                             IconButton(
                               icon: const Icon(Icons.edit_outlined, size: 18),
                               padding: EdgeInsets.zero,
@@ -322,7 +335,8 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
                               tooltip: '编辑',
                               onPressed: _loading ? null : () => _handleEdit(i),
                             ),
-                          if (widget.allowDelete)
+                          if (widget.allowDelete &&
+                              (widget.canDelete?.call(item) ?? true))
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 18),
                               padding: EdgeInsets.zero,

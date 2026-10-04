@@ -204,8 +204,9 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     }
   }
 
-  Future<void> _loadCommentPage(int page) async {
-    if (_commentPages.containsKey(page) || _pageLoading) return;
+  Future<void> _loadCommentPage(int page, {bool force = false}) async {
+    if (_pageLoading) return;
+    if (!force && _commentPages.containsKey(page)) return;
     setState(() {
       _pageLoading = true;
     });
@@ -299,15 +300,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   }
 
   Future<void> _onRefresh() async {
-    if (_loading || _pageLoading) return;
     AppLogger.i('PAGE', 'refresh: page1 + page$_currentPage');
-    if (_currentPage == 1) {
-      _commentPages.remove(1);
-      await _loadInitial();
-      return;
-    }
-    _commentPages.remove(1);
-    _data = null;
+    // 先请求第 1 页（主帖 + 第 1 页评论），成功才整体替换，失败保留旧内容
     try {
       await EmojiService().load();
       final raw = await detail_api.getThreadDetail(
@@ -316,17 +310,25 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         page: 1,
         authorid: widget.authorid,
       );
-      if (raw['success'] == true && mounted) {
-        final d = ThreadViewData.fromMap(raw, widget.tid);
-        if (!mounted) return;
+      if (raw['success'] != true) {
+        throw Exception(raw['message']?.toString() ?? '加载失败');
+      }
+      if (!mounted) return;
+      final d = ThreadViewData.fromMap(raw, widget.tid);
+      setState(() {
         _commentPages[1] = List<PostItem>.from(d.posts);
         _totalPages = d.totalPages;
         _data = d;
         _liked = d.mainPost?.isLiked ?? false;
-      }
-    } catch (_) {}
-    _commentPages.remove(_currentPage);
-    if (mounted) await _loadCommentPage(_currentPage);
+      });
+      AppLogger.i('PAGE', 'refresh page1 ok (${d.posts.length} posts)');
+    } catch (e) {
+      AppLogger.w('PAGE', 'refresh page1 failed: $e');
+    }
+    // 当前不在第 1 页时，强制刷新当前评论页（需要时由 _loadCommentPage 自行合并）
+    if (_currentPage != 1 && mounted) {
+      await _loadCommentPage(_currentPage, force: true);
+    }
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {

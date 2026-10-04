@@ -28,8 +28,8 @@ class BBCodeToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // 末尾固定追加「设置」按钮，因此即使所有项都被隐藏，工具栏仍会渲染
     final visibleItems = items.where((e) => e.visible).toList();
-    if (visibleItems.isEmpty) return const SizedBox.shrink();
 
     return Container(
       decoration: BoxDecoration(

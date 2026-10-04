@@ -246,10 +246,9 @@ extension on _ThreadViewPageState {
     });
   }
 
-  /// 刷新当前评论页
+  /// 刷新当前评论页（失败保留原有评论，不清空）
   Future<void> _refreshCurrentPage() async {
-    _commentPages.remove(_currentPage);
-    await _loadCommentPage(_currentPage);
+    await _loadCommentPage(_currentPage, force: true);
   }
 
   /// 打开编辑器并处理发布结果

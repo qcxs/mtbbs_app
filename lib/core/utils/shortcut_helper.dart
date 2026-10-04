@@ -30,7 +30,7 @@ class SwitchTabPrevIntent extends Intent {}
 
 class ShortcutHelper {
   /// 默认快捷键配置
-  /// 优先从 [DefaultConfig] 加载（对应 defaults.json），失败时用内嵌默认值。
+  /// 优先从 [DefaultConfig] 加载（对应 shortcuts.json），失败时用内嵌默认值。
   static Map<String, String> get defaults {
     final fromConfig = DefaultConfig.instance.globalShortcuts;
     if (fromConfig.isNotEmpty) return fromConfig;

@@ -60,7 +60,7 @@ extension SettingsSites on SettingsProvider {
     await _persistSites();
   }
 
-  /// 从默认配置（defaults.json）同步站点列表。
+  /// 从默认配置（sites.json）同步站点列表。
   ///
   /// - 已存在（按 [Site.baseUrl] 匹配）的站点：覆盖为默认配置，保留 forums / defaultForumOrder
   /// - 缺失的内置站点：追加到列表末尾（例如应用更新后新增的默认站点）

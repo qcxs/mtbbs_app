@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/config/toolbar_config.dart';
 
 /// 支持 BBCode 标签插入/包裹的 TextEditingController
 ///
@@ -44,6 +45,43 @@ class BBCodeController extends TextEditingController {
     final txt = text;
     final pos = sel.isValid ? sel.start : txt.length;
     _replaceAndSelect(pos, pos, '$openTag${content.trim()}$closeTag');
+  }
+
+  /// 应用文本模板：把模板里的 [kSelectTextToken]（`${selectText}`）替换为选中文本。
+  ///
+  /// - 有选中：以替换后的模板整体替换选区，光标落在替换内容之后
+  /// - 无选中：占位符置空，光标落在原占位符处（如 `[b]|[/b]`）
+  ///
+  /// 返回 true 表示有选中并按选区替换。
+  bool applyTemplate(String template) {
+    if (template.isEmpty) return false;
+    final sel = selection;
+    final txt = text;
+
+    final hasSel =
+        sel.isValid &&
+        !sel.isCollapsed &&
+        txt.substring(sel.start, sel.end).trim().isNotEmpty;
+
+    if (hasSel) {
+      final selected = txt.substring(sel.start, sel.end);
+      final trimmed = selected.trim();
+      final trimStart = selected.indexOf(trimmed);
+      final trimEnd = trimStart + trimmed.length;
+      final filled = template.replaceAll(kSelectTextToken, trimmed);
+      _replaceAndSelect(sel.start + trimStart, sel.start + trimEnd, filled);
+      return true;
+    }
+
+    final pos = sel.isValid ? sel.start : txt.length;
+    final placeholderAt = template.indexOf(kSelectTextToken);
+    final inserted = template.replaceAll(kSelectTextToken, '');
+    final cursor = pos + (placeholderAt >= 0 ? placeholderAt : inserted.length);
+    value = TextEditingValue(
+      text: txt.replaceRange(pos, pos, inserted),
+      selection: TextSelection.collapsed(offset: cursor),
+    );
+    return false;
   }
 
   /// 包裹块级标签

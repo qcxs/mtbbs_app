@@ -19,9 +19,7 @@ extension on _EditorPageState {
       if (keyStr.isEmpty) continue;
       final activator = ShortcutHelper.parse(keyStr);
       if (activator == null) continue;
-      final action = resolveToolbarAction(item.id);
-      if (action == null) continue;
-      editorShortcuts[activator] = EditorToolbarIntent(action);
+      editorShortcuts[activator] = EditorToolbarIntent(item.id);
     }
     // 有未保存内容时拦截 Esc，先确认再退出
     if (_hasUnsavedChanges) {
@@ -38,7 +36,7 @@ extension on _EditorPageState {
         actions: {
           EditorToolbarIntent: CallbackAction<EditorToolbarIntent>(
             onInvoke: (intent) {
-              _handleToolbarAction(intent.action);
+              _handleToolbarItem(intent.id);
               return null;
             },
           ),

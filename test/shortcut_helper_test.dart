@@ -7,7 +7,7 @@ import 'package:mtbbs/core/utils/shortcut_helper.dart';
 
 /// 快捷键解析与"默认值一致性"测试。
 ///
-/// 背景：默认快捷键曾在 `assets/config/defaults.json` 与
+/// 背景：默认快捷键曾在 `assets/config/toolbar.json` 与
 /// `toolbar_config.dart` 两处各写一份（后者是 JSON 读取失败时的兜底），
 /// 而 `DefaultConfig` 又是「不可识别的主键静默回退成 Escape」——
 /// 于是 `Ctrl+\` 实际绑到了 `Ctrl+Escape` 上，且没人发现。
@@ -75,7 +75,7 @@ void main() {
   group('默认值与 Typora 对齐', () {
     /// Typora（Windows）官方默认表里、本 app 有对应能力的项。
     ///
-    /// 来源见 `assets/config/defaults.json` 的 `_toolbarNote`。
+    /// 来源见 docs/05「默认快捷键与 Typora 对齐」。
     const typoraDefaults = <String, String>{
       'bold': 'Ctrl+B',
       'italic': 'Ctrl+I',
@@ -112,7 +112,7 @@ void main() {
       }
     });
 
-    test('defaults.json 与 toolbar_config.dart 的兜底值必须一致', () {
+    test('toolbar.json 与 toolbar_config.dart 的兜底值必须一致', () {
       final fromJson = defaultToolbarShortcuts();
       final fromCode = {
         for (final c in allToolbarItemConfigs)
@@ -121,13 +121,13 @@ void main() {
       expect(fromJson, fromCode, reason: '两处默认值漂移过（导致快捷键实际绑错），必须逐字相同');
     });
 
-    test('defaults.json 与 toolbar_config.dart 的项集合一致', () {
+    test('toolbar.json 与 toolbar_config.dart 的项集合一致', () {
       final jsonIds = defaultToolbarItems().map((e) => e.id).toSet();
       final codeIds = allToolbarItemConfigs.map((e) => e.id).toSet();
       expect(
         jsonIds,
         codeIds,
-        reason: 'defaults.json 里没有的项拿不到 ToolbarAction，按钮点了没反应',
+        reason: 'toolbar.json 里没有的项拿不到 ToolbarAction，按钮点了没反应',
       );
     });
   });

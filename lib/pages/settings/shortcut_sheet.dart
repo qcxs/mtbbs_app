@@ -27,7 +27,7 @@ class _ShortcutSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
-    final models = shortcutSettings();
+    final models = shortcutSettings(settings);
 
     return Column(
       children: [

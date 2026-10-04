@@ -50,7 +50,7 @@ void main() async {
   // Android 折叠屏/自由窗口/分屏尺寸检测（原生侧缓存物理最大屏）
   await MaxScreenSize.init();
 
-  // 加载默认配置（从 assets/config/defaults.json）
+  // 加载默认配置（从 assets/config/ 下按域拆分的 JSON）
   await DefaultConfig.instance.load();
 
   // 初始化站点配置默认值

@@ -34,7 +34,7 @@ extension SettingsPersistence on SettingsProvider {
     _spaceSource = (await _db.getSetting('spaceSource')) ?? '';
     space_api.applySpaceSourceOverride(_spaceSource);
     _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
-    // 缓存过期天数（默认取自 defaults.json，无配置或 JSON 错误时为 1 天）
+    // 缓存过期天数（默认取自 cache.json，无配置或 JSON 错误时为 1 天）
     final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
     _avatarCacheDays =
         (await _db.getSettingInt('avatarCacheDays')) ?? cacheDefaults.avatar;
@@ -171,7 +171,12 @@ extension SettingsPersistence on SettingsProvider {
       try {
         final parsed = jsonDecode(tbShortcutsJson) as Map<String, dynamic>;
         _toolbarShortcuts = parsed.map((k, v) => MapEntry(k, v.toString()));
-        _toolbarShortcuts.removeWhere((key, _) => !isValidToolbarItemId(key));
+        // 剪掉无效 id 的快捷键；用户自定义模板项的 id 也保留
+        _toolbarShortcuts.removeWhere(
+          (key, _) =>
+              !isValidToolbarItemId(key) &&
+              !_toolbarItems.any((e) => e.id == key),
+        );
       } catch (_) {}
     }
 

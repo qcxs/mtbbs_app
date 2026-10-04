@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/key_recorder_dialog.dart';
 
 /// 快捷键组设置项：直接列出全部快捷键（全局 + 编辑器工具栏），点击录制。
 /// 工具栏项隐藏时其快捷键自动失效（副标题提示"已隐藏"）。
-List<SettingsModel> shortcutSettings() => [
+///
+/// 工具栏部分遍历**实际** `settings.toolbarItems`（含用户自定义模板项），
+/// 因此自定义模板也能绑定快捷键。
+List<SettingsModel> shortcutSettings(SettingsProvider s) => [
   const HeaderSetting(title: '全局快捷键'),
   for (final action in ShortcutHelper.labels.keys) _globalShortcutItem(action),
   const HeaderSetting(title: '编辑器工具栏快捷键', subtitle: '隐藏的工具栏项其快捷键自动失效'),
-  for (final config in allToolbarItemConfigs) _toolbarShortcutItem(config),
+  for (final item in s.toolbarItems) _toolbarShortcutItem(item.id, item.name),
   const HeaderSetting(title: '提示：修改后立即生效，无需重启'),
 ];
 
@@ -34,28 +37,25 @@ NormalSetting _globalShortcutItem(String action) {
   );
 }
 
-NormalSetting _toolbarShortcutItem(ToolbarItemConfig config) {
+NormalSetting _toolbarShortcutItem(String id, String name) {
   return NormalSetting(
-    title: config.name,
+    title: name,
     icon: Icons.keyboard,
     subtitleBuilder: (s) {
       final visible = s.toolbarItems
-          .where((e) => e.id == config.id)
+          .where((e) => e.id == id)
           .firstOrNull
           ?.visible;
       return visible == false ? '已隐藏' : null;
     },
-    trailingBuilder: (ctx, s) => _keyBadge(ctx, s.toolbarShortcut(config.id)),
+    trailingBuilder: (ctx, s) => _keyBadge(ctx, s.toolbarShortcut(id)),
     onTap: (ctx, s) => _recordShortcut(
       ctx,
-      initial: s.toolbarShortcut(config.id),
+      initial: s.toolbarShortcut(id),
       onSave: (v) async {
-        await s.setToolbarShortcut(config.id, v);
+        await s.setToolbarShortcut(id, v);
         if (ctx.mounted) {
-          showToast(
-            '${config.name} 已设置为 $v',
-            duration: const Duration(seconds: 1),
-          );
+          showToast('$name 已设置为 $v', duration: const Duration(seconds: 1));
         }
       },
     ),

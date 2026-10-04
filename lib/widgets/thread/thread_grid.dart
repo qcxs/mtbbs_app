@@ -55,7 +55,7 @@ class _ThreadGridState extends State<ThreadGrid>
     with AutomaticKeepAliveClientMixin {
   bool _everLoaded = false;
   final ScrollController _scrollController = ScrollController();
-  int _lastItemCount = 0;
+  List<ThreadItem>? _lastItems;
   int _lastPage = 1;
   LoadState _lastState = LoadState.initial;
 
@@ -106,12 +106,13 @@ class _ThreadGridState extends State<ThreadGrid>
   void _onStateChanged() {
     if (!mounted) return;
     final ctrl = widget.controller;
-    // 数据或状态任一变化时触发重建，避免空数据时 state 变化被忽略
-    if (ctrl.items.length == _lastItemCount &&
+    // 数据或状态任一变化时触发重建。列表用「对象身份」判断而非条数：
+    // 刷新后新数据条数可能完全相同，只比条数会漏判 → UI 保留旧内容。
+    if (identical(ctrl.items, _lastItems) &&
         ctrl.page == _lastPage &&
         ctrl.state == _lastState)
       return;
-    _lastItemCount = ctrl.items.length;
+    _lastItems = ctrl.items;
     _lastPage = ctrl.page;
     _lastState = ctrl.state;
     setState(() {});

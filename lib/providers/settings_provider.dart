@@ -62,7 +62,7 @@ class SettingsProvider extends ChangeNotifier {
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;
 
-  /// 头像缓存天数（-1 表示永不过期），默认取自 defaults.json
+  /// 头像缓存天数（-1 表示永不过期），默认取自 cache.json
   int _avatarCacheDays = DefaultConfig.instance.cacheExpireDays.avatar;
 
   /// 表情缓存天数（-1 表示永不过期）

@@ -113,7 +113,10 @@ class _FollowPageState extends State<FollowPage> {
       if (!mounted) return;
       if (result['success'] != true) {
         setState(() {
-          _error = result['message'] as String? ?? '加载失败';
+          // 已有内容时保留旧列表（刷新失败不切错误页），无内容才报错
+          if (_items.isEmpty) {
+            _error = result['message'] as String? ?? '加载失败';
+          }
           _isLoading = false;
         });
         return;
@@ -128,23 +131,22 @@ class _FollowPageState extends State<FollowPage> {
           );
         _page = (result['currentPage'] as num?)?.toInt() ?? page;
         _totalPages = (result['totalPages'] as num?)?.toInt() ?? 1;
+        _error = null;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       AppLogger.w('PAGE', 'FollowPage error: $e');
       setState(() {
-        _error = e.toString();
+        if (_items.isEmpty) _error = e.toString();
         _isLoading = false;
       });
     }
   }
 
   Future<void> _onRefresh() async {
-    setState(() {
-      _account = null;
-      _items.clear();
-    });
+    // 不清空 _items：刷新失败时保留旧内容
+    setState(() => _account = null);
     await _load();
   }
 

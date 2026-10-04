@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:mtbbs/config/toolbar_config.dart';
+import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/pages/settings/shortcut_sheet.dart';
 import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
+import 'package:mtbbs/widgets/dialog/toolbar_template_dialog.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
@@ -171,25 +174,35 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
     );
   }
 
-  void _showToolbarDialog(BuildContext context, SettingsProvider settings) {
-    showManagedListDialog(
+  Future<void> _showToolbarDialog(
+    BuildContext context,
+    SettingsProvider settings,
+  ) async {
+    await showManagedListDialog(
       context: context,
       title: '工具栏排序',
       items: settings.toolbarItems,
-      allowAdd: false,
-      allowDelete: false,
-      allowEdit: false,
-      allowReorder: true,
-      allowToggleVisibility: true,
+      allowAdd: true,
+      allowDelete: true,
+      allowEdit: true,
+      // 内置项不可删（会被下次同步还原）；仅模板项可编辑（复杂项由代码实现）
+      canDelete: isCustomToolbarItem,
+      canEdit: (item) => toolbarTemplateOf(item) != null,
+      onAdd: () => _editToolbarTemplate(context, settings, null),
+      onEdit: (item) => _editToolbarTemplate(context, settings, item),
+      onDelete: (id) async {
+        await settings.deleteToolbarItem(id);
+        return true;
+      },
       onReorder: (from, to) => settings.moveToolbarItem(from, to),
       onToggleVisibility: (id) => settings.toggleToolbarItem(id),
       emptyHint: '工具栏为空',
       titleActions: [
         IconButton(
           icon: const Icon(Icons.restart_alt, size: 22),
-          // 重置的是「顺序 + 显隐 + 快捷键」三项（resetToolbarItems），
+          // 重置的是「顺序 + 显隐 + 模板 + 快捷键」四项（resetToolbarItems），
           // 文案不能只说排序——否则用户找不到"恢复默认快捷键"的入口
-          tooltip: '重置工具栏与快捷键为默认',
+          tooltip: '重置工具栏与快捷键为默认（保留自定义模板）',
           onPressed: () async {
             await settings.resetToolbarItems();
             if (context.mounted) {
@@ -199,6 +212,28 @@ class _EditorSettingsPageState extends State<EditorSettingsPage> {
         ),
       ],
     );
+  }
+
+  /// 新增 / 编辑模板项；完成后重开工具栏面板（保证始终只有一层浮层）
+  Future<ManagedItem?> _editToolbarTemplate(
+    BuildContext context,
+    SettingsProvider settings,
+    ManagedItem? initial,
+  ) async {
+    final result = await showToolbarTemplateDialog(context, initial: initial);
+    if (result == null || !context.mounted) return null;
+
+    if (initial == null) {
+      await settings.addToolbarItem(result);
+      if (context.mounted) {
+        showToast('已新增「${result.name}」', duration: const Duration(seconds: 1));
+      }
+    } else {
+      await settings.updateToolbarItem(initial.id, result);
+    }
+
+    if (context.mounted) await _showToolbarDialog(context, settings);
+    return result;
   }
 
   Future<void> _confirmClearHistory(

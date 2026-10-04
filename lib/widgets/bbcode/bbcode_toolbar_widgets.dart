@@ -1,8 +1,11 @@
 part of 'bbcode_toolbar.dart';
 
-/// 工具栏回调控制器 — 所有操作通过 [onAction] 派发
+/// 工具栏回调控制器 — 所有操作按工具栏项 id 派发
+///
+/// 派发 id 而非 [ToolbarAction]：模板项（`[b]${selectText}[/b]` 这类）
+/// 不是枚举成员，只有 id；编辑器侧据 id 决定走模板还是复杂动作。
 class BBCodeToolbarController {
-  final void Function(ToolbarAction) onAction;
+  final void Function(String id) onAction;
 
   const BBCodeToolbarController({required this.onAction});
 }

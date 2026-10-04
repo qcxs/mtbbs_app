@@ -117,7 +117,11 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/config/defaults.json
+    # 默认配置按域拆分：站点 / 工具栏 / 全局快捷键 / 缓存策略
+    - assets/config/sites.json
+    - assets/config/toolbar.json
+    - assets/config/shortcuts.json
+    - assets/config/cache.json
     - assets/config/thanks.json
     # 关于页展示的应用图标，由 mipmap-xxxhdpi/ic_launcher.png 复制而来
     - assets/icon/app_icon.png

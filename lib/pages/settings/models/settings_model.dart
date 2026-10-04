@@ -90,6 +90,96 @@ class SwitchSetting extends SettingsModel {
   }
 }
 
+/// 可展开的开关行 —— 点按行展开/折叠，开关本身负责启用/停用。
+///
+/// 用于"一个开关管一组能力"的场景（如 MCP 能力开关）：展开后展示该组的具体内容，
+/// 让用户看得见开关背后到底管着什么。
+class ExpandableSwitchSetting extends SettingsModel {
+  const ExpandableSwitchSetting({
+    required super.title,
+    super.subtitle,
+    required super.icon,
+    required this.value,
+    required this.onChanged,
+    this.detailBuilder,
+  });
+
+  final bool Function(SettingsProvider) value;
+  final void Function(BuildContext context, SettingsProvider settings, bool v)
+  onChanged;
+
+  /// 展开后显示的内容；为 null 时该行不可展开（等价于普通开关行）
+  final Widget Function(BuildContext context, SettingsProvider settings)?
+  detailBuilder;
+
+  @override
+  Widget build(BuildContext context, SettingsProvider settings) =>
+      _ExpandableSwitchTile(model: this, settings: settings);
+}
+
+class _ExpandableSwitchTile extends StatefulWidget {
+  final ExpandableSwitchSetting model;
+  final SettingsProvider settings;
+  const _ExpandableSwitchTile({required this.model, required this.settings});
+
+  @override
+  State<_ExpandableSwitchTile> createState() => _ExpandableSwitchTileState();
+}
+
+class _ExpandableSwitchTileState extends State<_ExpandableSwitchTile> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.model;
+    final canExpand = m.detailBuilder != null;
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        ListTile(
+          leading: settingIcon(context, m.icon),
+          title: Text(m.title),
+          subtitle: m.subtitle == null ? null : Text(m.subtitle!),
+          // 点整行 = 展开/折叠；开关自行处理启用状态，两者互不冲突
+          onTap: canExpand
+              ? () => setState(() => _expanded = !_expanded)
+              : null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Switch(
+                value: m.value(widget.settings),
+                onChanged: (v) => m.onChanged(context, widget.settings, v),
+              ),
+              if (canExpand)
+                AnimatedRotation(
+                  turns: _expanded ? 0 : -0.25,
+                  duration: const Duration(milliseconds: 150),
+                  child: Icon(Icons.expand_more, color: cs.onSurfaceVariant),
+                ),
+            ],
+          ),
+        ),
+        if (canExpand && _expanded)
+          Padding(
+            // 左边缘对齐标题文字（ListTile 标题在 56），面板右缘对齐列表内边距，
+            // 形成"父行 → 子面板"的清晰层级
+            padding: const EdgeInsets.fromLTRB(56, 0, 16, 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: m.detailBuilder!(context, widget.settings),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// 只读信息行（无点击、无箭头）——展示状态、记录等不可操作内容
 class InfoSetting extends SettingsModel {
   const InfoSetting({

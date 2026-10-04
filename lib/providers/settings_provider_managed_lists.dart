@@ -16,10 +16,22 @@ extension SettingsManagedLists on SettingsProvider {
       final loaded = ManagedItem.decodeList(jsonStr);
       final loadedIds = loaded.map((e) => e.id).toSet();
 
-      final synced = loaded.where((e) => canonicalIds.contains(e.id)).map((e) {
-        final canonicalItem = canonical.firstWhere((c) => c.id == e.id);
-        return e.copyWith(name: canonicalItem.name);
-      }).toList();
+      final synced = <ManagedItem>[];
+      for (final e in loaded) {
+        if (canonicalIds.contains(e.id)) {
+          final canonicalItem = canonical.firstWhere((c) => c.id == e.id);
+          // 内置项：以 JSON 的模板/标签/分组为默认值（兼容旧版无 data 的持久化），
+          // 用持久化里的同名字段覆盖（用户改过的模板得以保留）
+          final merged = <String, dynamic>{
+            ...?canonicalItem.data,
+            ...?e.data,
+          };
+          synced.add(e.copyWith(name: canonicalItem.name, data: merged));
+        } else if (isCustomToolbarItem(e)) {
+          // 用户自定义模板项：原样保留
+          synced.add(e);
+        }
+      }
 
       for (final item in canonical) {
         if (!loadedIds.contains(item.id)) {
@@ -34,6 +46,7 @@ extension SettingsManagedLists on SettingsProvider {
 
   Future<void> _persistToolbar() async {
     await _db.setToolbarItemsRaw(ManagedItem.encodeList(_toolbarItems));
+    await _db.setToolbarShortcutsRaw(jsonEncode(_toolbarShortcuts));
     _notify();
   }
 
@@ -47,12 +60,37 @@ extension SettingsManagedLists on SettingsProvider {
     await _persistToolbar();
   }
 
+  /// 新增用户自定义模板项
+  Future<void> addToolbarItem(ManagedItem item) async {
+    _toolbarItems.add(item);
+    await _persistToolbar();
+  }
+
+  /// 更新工具栏项（自定义模板改名/改模板，或内置项改模板）
+  Future<void> updateToolbarItem(String id, ManagedItem newValue) async {
+    final i = _toolbarItems.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    _toolbarItems[i] = newValue;
+    await _persistToolbar();
+  }
+
+  /// 删除用户自定义模板项（内置项不允许删除，会被下次同步还原）
+  Future<void> deleteToolbarItem(String id) async {
+    _toolbarItems.removeWhere((e) => e.id == id);
+    _toolbarShortcuts.remove(id);
+    await _persistToolbar();
+  }
+
   Future<void> resetToolbarItems() async {
-    _toolbarItems = defaultToolbarItems();
-    _toolbarShortcuts = defaultToolbarShortcuts();
-    await _db.setToolbarItemsRaw(ManagedItem.encodeList(_toolbarItems));
-    await _db.setToolbarShortcutsRaw(jsonEncode(_toolbarShortcuts));
-    _notify();
+    // 恢复内置项的默认顺序/显隐/模板/快捷键，但保留用户自定义模板项
+    final custom = _toolbarItems.where(isCustomToolbarItem).toList();
+    final customIds = custom.map((e) => e.id).toSet();
+    final customShortcuts = Map<String, String>.fromEntries(
+      _toolbarShortcuts.entries.where((e) => customIds.contains(e.key)),
+    );
+    _toolbarItems = [...defaultToolbarItems(), ...custom];
+    _toolbarShortcuts = {...defaultToolbarShortcuts(), ...customShortcuts};
+    await _persistToolbar();
   }
 
   // ==================== 快捷链接 CRUD ====================

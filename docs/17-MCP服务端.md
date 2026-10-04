@@ -43,7 +43,7 @@ lib/mcp/
     └── mcp_tools_{app,forum,saved,editor,user}.dart  各能力分组的工具（user 承载 list_user_threads / list_user_friends / list_user_follows）
 ```
 
-设置侧：`lib/pages/settings/models/mcp_settings.dart`（分组声明）、`lib/pages/settings/mcp_token_dialogs.dart`（令牌创建/详情）。快捷开关：`lib/widgets/dialog/mcp_quick_dialog.dart`（`showMcpQuickDialog()`，入口见「平台集成」）。
+设置侧：`lib/pages/settings/models/mcp_settings.dart`（分组声明）、`lib/pages/settings/mcp_token_dialogs.dart`（令牌创建/详情）、`lib/pages/settings/mcp_help_sheet.dart`（使用帮助面板：三步接入 + 可复制配置片段 + 排障）。「能力开关」用通用模型 `ExpandableSwitchSetting`（`models/settings_model.dart`）——点按整行展开看该组具体工具名/描述，开关本身负责启停。快捷开关：`lib/widgets/dialog/mcp_quick_dialog.dart`（`showMcpQuickDialog()`，入口见「平台集成」）。
 
 ## 安全模型（四层，缺一层都不够）
 
@@ -62,7 +62,9 @@ lib/mcp/
 | 账号相关数据 | **关** | `list_my_favorites` |
 | 本地浏览记录 | **关** | `get_browse_history` |
 
-> `help` 是所有工具里唯一"教 AI 怎么用"的入口：返回能力清单、四类典型任务（总结最近帖子 / 总结某账号 / 读编辑器草稿）的工具组合、参数约定与注意事项。同时 `McpServerOptions.instructions` 在连接时就会提醒"第一次先调 help"。
+> `help` 是所有工具里唯一"教 AI 怎么用"的入口：返回能力清单、四类典型任务（总结最近帖子 / 总结某个账号 / 读编辑器草稿）的工具组合、参数约定与注意事项。同时 `McpServerOptions.instructions` 在连接时就会提醒"第一次先调 help"。
+>
+> 面向用户侧的完整工具清单就在「能力开关」里：点按任一分组行可展开，看到该组的每个工具名与描述——用于回答"这个开关到底管什么"以及"为什么我的调用被拒绝了"。
 
 ### 与 API 探针（`tool/api_probe_test.dart`）的覆盖对照
 
@@ -133,6 +135,9 @@ curl -i -X POST http://127.0.0.1:8765/mcp -H "Content-Type: application/json" \
 设置页 →「MCP 服务」→「开始测试」会在本机真实走一遍协议（列工具 + 调一次）。
 
 ## 客户端配置
+
+同一份说明也内置在 App 里：设置 →「MCP 服务」→ 顶部「使用帮助」（`showMcpHelpSheet()`），
+会按当前状态提示"下一步做什么"，并提供**一键复制**的配置片段（已有令牌时直接替换为真实值）。
 
 ```json
 { "mcpServers": { "mtbbs": {

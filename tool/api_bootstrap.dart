@@ -29,7 +29,7 @@ class WindowsCertOverride extends HttpOverrides {
 /// 模拟 App 初始化序列（复刻 main.dart，去掉 UI 与数据库层）
 ///
 /// 顺序：
-/// 1. 初始化测试绑定（rootBundle 可用，defaults.json 可加载）
+/// 1. 初始化测试绑定（rootBundle 可用，配置文件可加载）
 /// 2. 恢复真实网络（flutter_test 默认 mock 掉 HttpClient 返回 400）
 ///    + 套用 Windows 证书补丁
 /// 3. 加载默认配置 → 初始化站点 → 初始化 ApiService（复用 App 的 Cookie 目录）
@@ -60,7 +60,7 @@ Future<void> bootstrap({
 
   await DefaultConfig.instance.load();
   if (baseUrl.isNotEmpty) {
-    // 动态站点：替换为单站列表（测试站不在 defaults.json 中）
+    // 动态站点：替换为单站列表（测试站不在 sites.json 中）
     SiteStore.instance.replaceSites([
       Site(
         name: siteName.isNotEmpty ? siteName : Uri.parse(baseUrl).host,

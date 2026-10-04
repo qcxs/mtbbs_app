@@ -120,7 +120,7 @@ class SiteManagement {
     );
   }
 
-  /// 重置站点配置确认框：从 defaults.json 恢复内置站点配置
+  /// 重置站点配置确认框：从 sites.json 恢复内置站点配置
   static void _confirmReset(
     BuildContext context,
     SettingsProvider settings,

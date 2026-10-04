@@ -1,14 +1,44 @@
 part of 'editor_page.dart';
 
-/// 表格模板：Discuz 的表格要手写 `[table][tr][td]` 且必须对齐，
-/// 这里给一份可直接改文字的骨架，不做网格编辑（成本与收益不成比例）。
-const _kTableTemplate =
-    '[table][tr][td]表头1[/td][td]表头2[/td][/tr]\n'
-    '[tr][td]内容[/td][td]内容[/td][/tr][/table]';
-
 /// 工具栏动作分发与剪贴板粘贴。
 extension on _EditorPageState {
-  /// 处理工具栏动作（BBCode 包裹/弹窗/选择面板）
+  /// 处理工具栏项点击 / 快捷键
+  ///
+  /// - 模板项（带 `template`）：按 `${selectText}` 应用文本模板
+  /// - 复杂项：转交 [_handleToolbarAction]（弹窗/面板/上传）
+  void _handleToolbarItem(String id) {
+    if (id == kImageLongPressId) {
+      _handleToolbarAction(ToolbarAction.imageLongPress);
+      return;
+    }
+    // 末尾固定追加的「设置」按钮：进编辑器设置页
+    if (id == kEditorSettingsId) {
+      context.push('/settings/editor');
+      return;
+    }
+
+    final items = context.read<SettingsProvider>().toolbarItems;
+    final index = items.indexWhere((e) => e.id == id);
+    if (index >= 0) {
+      final item = items[index];
+      final template = toolbarTemplateOf(item);
+      if (template != null) {
+        // 无占位符的块级模板（[hr]、表格骨架）按块级插入；其余走统一模板应用
+        if (toolbarIsBlockOf(item) && !template.contains(kSelectTextToken)) {
+          _contentCtl.insertBlockTag(template);
+        } else {
+          _contentCtl.applyTemplate(template);
+        }
+        _focusContent();
+        return;
+      }
+    }
+
+    final action = resolveToolbarAction(id);
+    if (action != null) _handleToolbarAction(action);
+  }
+
+  /// 处理复杂工具栏动作（需要弹窗 / 选择面板 / 上传的项）
   void _handleToolbarAction(ToolbarAction action) {
     switch (action) {
       case ToolbarAction.undo:
@@ -16,76 +46,6 @@ extension on _EditorPageState {
         _focusContent();
       case ToolbarAction.redo:
         _undoController.redo();
-        _focusContent();
-      case ToolbarAction.bold:
-        if (!_contentCtl.wrapSelection('[b]', '[/b]')) {
-          showInlineInputDialog(
-            context,
-            '[b]',
-            '[/b]',
-            '加粗',
-            '输入要加粗的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.italic:
-        if (!_contentCtl.wrapSelection('[i]', '[/i]')) {
-          showInlineInputDialog(
-            context,
-            '[i]',
-            '[/i]',
-            '斜体',
-            '输入要设置为斜体的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.underline:
-        if (!_contentCtl.wrapSelection('[u]', '[/u]')) {
-          showInlineInputDialog(
-            context,
-            '[u]',
-            '[/u]',
-            '下划线',
-            '输入要添加下划线的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.strikethrough:
-        if (!_contentCtl.wrapSelection('[s]', '[/s]')) {
-          showInlineInputDialog(
-            context,
-            '[s]',
-            '[/s]',
-            '删除线',
-            '输入要添加删除线的文字',
-            _contentCtl,
-            _focusContent,
-          );
-        }
-        _focusContent();
-      case ToolbarAction.quote:
-        _contentCtl.wrapBlock('[quote]', '[/quote]');
-        _focusContent();
-      case ToolbarAction.hide:
-        _contentCtl.wrapBlock('[hide]', '[/hide]');
-        _focusContent();
-      case ToolbarAction.free:
-        _contentCtl.wrapBlock('[free]', '[/free]');
-        _focusContent();
-      case ToolbarAction.code:
-        _contentCtl.wrapBlock('[code]', '[/code]');
-        _focusContent();
-      case ToolbarAction.table:
-        _contentCtl.insertBlockTag(_kTableTemplate);
-        _focusContent();
-      case ToolbarAction.hr:
-        _contentCtl.insertBlockTag('[hr]');
         _focusContent();
       case ToolbarAction.link:
         final sel = _contentCtl.selection;
@@ -165,21 +125,6 @@ extension on _EditorPageState {
           _focusContent,
           isBackcolor: true,
         );
-      case ToolbarAction.alignLeft:
-        _contentCtl.wrapParam('align', 'left', '[/align]');
-        _focusContent();
-      case ToolbarAction.alignCenter:
-        _contentCtl.wrapParam('align', 'center', '[/align]');
-        _focusContent();
-      case ToolbarAction.alignRight:
-        _contentCtl.wrapParam('align', 'right', '[/align]');
-        _focusContent();
-      case ToolbarAction.listUl:
-        _contentCtl.wrapParam('list', '', '[/list]');
-        _focusContent();
-      case ToolbarAction.listOl:
-        _contentCtl.wrapParam('list', '1', '[/list]');
-        _focusContent();
       case ToolbarAction.select:
         _contentCtl.selectTag();
         _focusContent();
@@ -187,6 +132,10 @@ extension on _EditorPageState {
         showFontSizePicker(context, _contentCtl, _focusContent);
       case ToolbarAction.history:
         _showHistoryDialog();
+      case ToolbarAction.editHistory:
+        _openHistoryPage();
+      case ToolbarAction.mdImport:
+        _openMdImportSheet();
       case ToolbarAction.mtImage:
         _showMtImageDialog();
       case ToolbarAction.clearStyles:

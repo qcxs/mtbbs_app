@@ -1,0 +1,8 @@
+{
+  "global": {
+    "refresh": "F5",
+    "goBack": "Escape",
+    "switchTabNext": "Ctrl+Tab",
+    "switchTabPrev": "Ctrl+Shift+Tab"
+  }
+}

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mtbbs/mcp/mcp.dart';
+import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
+import 'package:mtbbs/mcp/tools/mcp_tool_registry.dart';
+import 'package:mtbbs/pages/settings/mcp_help_sheet.dart';
 import 'package:mtbbs/pages/settings/mcp_token_dialogs.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
@@ -13,7 +16,20 @@ import 'package:mtbbs/widgets/common/toast_utils.dart';
 /// 不用静态字符串 —— 分组模型由分组页每次构建时重新生成。
 List<SettingsModel> mcpSettings() {
   final c = McpServerController.instance;
+  // 各能力分组的工具（名/描述），供「能力开关」展开时展示
+  final tools = McpToolRegistry.buildTools(() => const McpAccountInfo.guest());
+  final toolsByGroup = <McpToolGroup, List<McpToolDefinition>>{};
+  for (final tool in tools) {
+    toolsByGroup.putIfAbsent(tool.group, () => []).add(tool);
+  }
   return [
+    // 帮助放最前：第一次来的用户先知道"怎么配置"，再往下逐项操作
+    NormalSetting(
+      title: '使用帮助',
+      icon: Icons.help_outline,
+      subtitle: '三步接入 Trae / Claude / Cursor，含可复制的配置片段',
+      onTap: (ctx, s) => showMcpHelpSheet(ctx, c),
+    ),
     HeaderSetting(title: '服务', subtitle: '只读；仅监听本机 127.0.0.1，并要求访问令牌'),
     SwitchSetting(
       title: '启用 MCP 服务',
@@ -116,12 +132,19 @@ List<SettingsModel> mcpSettings() {
       subtitle: '关闭后 AI 仍能看到工具，但调用会被拒绝（工具列表保持稳定，无需重连）',
     ),
     for (final group in McpToolGroup.values)
-      SwitchSetting(
+      ExpandableSwitchSetting(
         title: group.label,
-        subtitle: group.description,
+        subtitle:
+            '${group.description}（${toolsByGroup[group]?.length ?? 0} 个工具）',
         icon: _groupIcon(group),
         value: (s) => c.isGroupEnabled(group),
         onChanged: (ctx, s, v) => c.setGroupEnabled(group, v),
+        // 点按行展开：列出该组的具体工具，让开关"看得见管什么"
+        detailBuilder: (ctx, s) => _groupTools(
+          ctx,
+          toolsByGroup[group] ?? const <McpToolDefinition>[],
+          c.isGroupEnabled(group),
+        ),
       ),
 
     HeaderSetting(
@@ -172,6 +195,40 @@ IconData _groupIcon(McpToolGroup group) => switch (group) {
   McpToolGroup.accountData => Icons.bookmark_border,
   McpToolGroup.localData => Icons.history,
 };
+
+/// 「能力开关」展开后显示的工具清单（名称 + 描述）
+Widget _groupTools(
+  BuildContext context,
+  List<McpToolDefinition> tools,
+  bool enabled,
+) {
+  final cs = Theme.of(context).colorScheme;
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (var i = 0; i < tools.length; i++) ...[
+        if (i > 0) const SizedBox(height: 10),
+        Text(
+          tools[i].name,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: enabled ? cs.onSurface : cs.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          tools[i].description,
+          style: TextStyle(
+            fontSize: 11,
+            height: 1.4,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
+    ],
+  );
+}
 
 String _statusLabel(McpServerController c) => switch (c.status) {
   McpServerStatus.running => '运行中 · ${c.endpointUrl}',

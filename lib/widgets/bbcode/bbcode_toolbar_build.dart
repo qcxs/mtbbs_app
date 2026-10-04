@@ -3,62 +3,58 @@ part of 'bbcode_toolbar.dart';
 extension _BBCodeToolbarBuild on BBCodeToolbar {
   List<Widget> _buildButtons(List<ManagedItem> visibleItems, ColorScheme cs) {
     final widgets = <Widget>[];
-    for (int i = 0; i < visibleItems.length; i++) {
-      final item = visibleItems[i];
-      final action = resolveToolbarAction(item.id);
-      if (action == null) continue;
+    String? lastGroup;
+    for (final item in visibleItems) {
+      final template = toolbarTemplateOf(item);
+      final action = template == null ? resolveToolbarAction(item.id) : null;
+      // 既不是模板项、也不是已知复杂项 → 跳过（脏数据保护）
+      if (template == null && action == null) continue;
 
-      if (i > 0) {
-        final prevAction = resolveToolbarAction(visibleItems[i - 1].id);
-        if (prevAction != null && _shouldAddSeparator(action, prevAction)) {
-          widgets.add(_separator(cs));
-        }
+      final group = toolbarGroupOf(item);
+      if (lastGroup != null && group != lastGroup) {
+        widgets.add(_separator(cs));
       }
+      lastGroup = group;
 
-      widgets.add(_buildButton(action, item, cs));
+      widgets.add(
+        template != null
+            ? _buildTemplateButton(item, cs)
+            : _buildButton(action!, item, cs),
+      );
     }
+
+    // 固定末尾：设置按钮（不受工具栏设置影响，始终渲染）
+    if (widgets.isNotEmpty) widgets.add(_separator(cs));
+    widgets.add(_buildSettingsButton(cs));
     return widgets;
   }
 
-  /// 判断两组间是否需要分隔线
-  bool _shouldAddSeparator(ToolbarAction current, ToolbarAction prev) {
-    const groups = [
-      {ToolbarAction.undo, ToolbarAction.redo},
-      {
-        ToolbarAction.bold,
-        ToolbarAction.italic,
-        ToolbarAction.underline,
-        ToolbarAction.strikethrough,
-      },
-      {ToolbarAction.color, ToolbarAction.backcolor},
-      {
-        ToolbarAction.quote,
-        ToolbarAction.hide,
-        ToolbarAction.free,
-        ToolbarAction.code,
-      },
-      {
-        ToolbarAction.alignLeft,
-        ToolbarAction.alignCenter,
-        ToolbarAction.alignRight,
-      },
-      {ToolbarAction.listUl, ToolbarAction.listOl},
-      {ToolbarAction.link, ToolbarAction.image, ToolbarAction.hr},
-      {ToolbarAction.emoji},
-      {ToolbarAction.select, ToolbarAction.fontSize},
-      {ToolbarAction.history},
-    ];
-    for (final group in groups) {
-      if (group.contains(prev) && group.contains(current)) return false;
-    }
-    return true;
+  /// 固定追加在工具栏末尾的「设置」按钮（打开编辑器设置页）
+  Widget _buildSettingsButton(ColorScheme cs) {
+    return _toolBtn(
+      icon: Icons.settings_outlined,
+      tooltip: '编辑器设置',
+      id: kEditorSettingsId,
+      name: '设置',
+      cs: cs,
+    );
+  }
+
+  /// 模板项按钮：显示 label（用户文字标签），tooltip 带完整名称与快捷键
+  Widget _buildTemplateButton(ManagedItem item, ColorScheme cs) {
+    final label = toolbarLabelOf(item);
+    return _toolBtn(
+      label: label,
+      tooltip: _tooltip(item),
+      id: item.id,
+      // label 与名称相同时不重复显示副标题
+      name: label == item.name ? '' : item.name,
+      cs: cs,
+    );
   }
 
   Widget _buildButton(ToolbarAction action, ManagedItem item, ColorScheme cs) {
-    final shortcut = shortcuts[item.id] ?? '';
-    final tooltip = shortcut.isNotEmpty
-        ? '${item.name} ($shortcut)'
-        : item.name;
+    final tooltip = _tooltip(item);
     final enabled = _isEnabled(action);
 
     switch (action) {
@@ -66,7 +62,7 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
         return _toolBtn(
           icon: Icons.undo,
           tooltip: tooltip,
-          action: action,
+          id: item.id,
           enabled: enabled && canUndo,
           name: item.name,
           cs: cs,
@@ -75,173 +71,8 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
         return _toolBtn(
           icon: Icons.redo,
           tooltip: tooltip,
-          action: action,
+          id: item.id,
           enabled: enabled && canRedo,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.bold:
-        return _toolBtn(
-          label: 'B',
-          tooltip: tooltip,
-          action: action,
-          bold: true,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.italic:
-        return _toolBtn(
-          label: 'I',
-          tooltip: tooltip,
-          action: action,
-          italic: true,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.underline:
-        return _toolBtn(
-          label: 'U',
-          tooltip: tooltip,
-          action: action,
-          underline: true,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.strikethrough:
-        return _toolBtn(
-          label: 'S',
-          tooltip: tooltip,
-          action: action,
-          strike: true,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.color:
-        return _toolBtn(
-          icon: Icons.palette_outlined,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.backcolor:
-        return _toolBtn(
-          icon: Icons.format_color_fill,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.quote:
-        return _toolBtn(
-          icon: Icons.format_quote,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.hide:
-        return _toolBtn(
-          icon: Icons.visibility_off,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.free:
-        return _toolBtn(
-          icon: Icons.card_giftcard,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.code:
-        return _toolBtn(
-          icon: Icons.code,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.table:
-        return _toolBtn(
-          icon: Icons.table_chart_outlined,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.alignLeft:
-        return _toolBtn(
-          icon: Icons.format_align_left,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.alignCenter:
-        return _toolBtn(
-          icon: Icons.format_align_center,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.alignRight:
-        return _toolBtn(
-          icon: Icons.format_align_right,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.listUl:
-        return _toolBtn(
-          icon: Icons.format_list_bulleted,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.listOl:
-        return _toolBtn(
-          icon: Icons.format_list_numbered,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.link:
-        return _toolBtn(
-          icon: Icons.link,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.image:
-        return _toolBtn(
-          icon: Icons.image,
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          onLongPress: () => controller.onAction(ToolbarAction.imageLongPress),
-          cs: cs,
-        );
-      case ToolbarAction.hr:
-        return _toolBtn(
-          label: 'HR',
-          tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.emoji:
-        return _toolBtn(
-          icon: Icons.emoji_emotions,
-          tooltip: tooltip,
-          action: action,
           name: item.name,
           cs: cs,
         );
@@ -249,7 +80,56 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
         return _toolBtn(
           icon: Icons.near_me,
           tooltip: tooltip,
-          action: action,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
+      case ToolbarAction.clearStyles:
+        return _toolBtn(
+          icon: Icons.cleaning_services_outlined,
+          tooltip: tooltip,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
+      case ToolbarAction.link:
+        return _toolBtn(
+          icon: Icons.link,
+          tooltip: tooltip,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
+      case ToolbarAction.image:
+        return _toolBtn(
+          icon: Icons.image,
+          tooltip: tooltip,
+          id: item.id,
+          name: item.name,
+          onLongPress: () => controller.onAction(kImageLongPressId),
+          cs: cs,
+        );
+      case ToolbarAction.emoji:
+        return _toolBtn(
+          icon: Icons.emoji_emotions,
+          tooltip: tooltip,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
+      case ToolbarAction.color:
+        return _toolBtn(
+          icon: Icons.palette_outlined,
+          tooltip: tooltip,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
+      case ToolbarAction.backcolor:
+        return _toolBtn(
+          icon: Icons.format_color_fill,
+          tooltip: tooltip,
+          id: item.id,
           name: item.name,
           cs: cs,
         );
@@ -257,7 +137,7 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
         return _toolBtn(
           icon: Icons.format_size,
           tooltip: tooltip,
-          action: action,
+          id: item.id,
           name: item.name,
           cs: cs,
         );
@@ -265,7 +145,23 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
         return _toolBtn(
           icon: Icons.history,
           tooltip: tooltip,
-          action: action,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
+      case ToolbarAction.editHistory:
+        return _toolBtn(
+          icon: Icons.manage_history,
+          tooltip: tooltip,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
+      case ToolbarAction.mdImport:
+        return _toolBtn(
+          icon: Icons.article_outlined,
+          tooltip: tooltip,
+          id: item.id,
           name: item.name,
           cs: cs,
         );
@@ -273,17 +169,7 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
         return _toolBtn(
           icon: Icons.cloud_upload_outlined,
           tooltip: tooltip,
-          action: action,
-          name: item.name,
-          cs: cs,
-        );
-      case ToolbarAction.imageLongPress:
-        return const SizedBox.shrink(); // 仅用作长按触发，不渲染按钮
-      case ToolbarAction.clearStyles:
-        return _toolBtn(
-          icon: Icons.cleaning_services_outlined,
-          tooltip: tooltip,
-          action: action,
+          id: item.id,
           name: item.name,
           cs: cs,
         );
@@ -291,11 +177,18 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
         return _toolBtn(
           icon: Icons.attach_file_outlined,
           tooltip: tooltip,
-          action: action,
+          id: item.id,
           name: item.name,
           cs: cs,
         );
+      case ToolbarAction.imageLongPress:
+        return const SizedBox.shrink(); // 仅用作长按触发，不渲染按钮
     }
+  }
+
+  String _tooltip(ManagedItem item) {
+    final shortcut = shortcuts[item.id] ?? '';
+    return shortcut.isNotEmpty ? '${item.name} ($shortcut)' : item.name;
   }
 
   bool _isEnabled(ToolbarAction action) => true;
@@ -311,7 +204,7 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
     IconData? icon,
     String? label,
     required String tooltip,
-    required ToolbarAction action,
+    required String id,
     bool enabled = true,
     bool bold = false,
     bool italic = false,
@@ -391,7 +284,7 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(4),
-            onTap: enabled ? () => controller.onAction(action) : null,
+            onTap: enabled ? () => controller.onAction(id) : null,
             onLongPress: onLongPress,
             child: Container(
               decoration: BoxDecoration(

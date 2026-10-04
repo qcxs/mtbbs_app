@@ -251,7 +251,7 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
       isReply: _isReply,
     );
 
-    _toolbarCtl = BBCodeToolbarController(onAction: _handleToolbarAction);
+    _toolbarCtl = BBCodeToolbarController(onAction: _handleToolbarItem);
     _titleCtl.addListener(_onContentChanged);
     _contentCtl.addListener(_onContentChanged);
     // 光标/选区变化 → 更新标记槽与（必要时）预览定位
