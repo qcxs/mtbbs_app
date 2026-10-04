@@ -221,6 +221,33 @@ void main() {
       expect(result[1].threadId, 169735);
       expect(result[1].views, 18);
     });
+
+    test('缩略图优先取懒加载地址，并过滤占位图', () {
+      const html =
+          ''
+          '<ul>'
+          '<li class="forumlist_li comiis_znalist">'
+          '<div class="mmlist_li_box cl">'
+          '<h2><a href="https://bbs.binmt.cc/thread-169700-1-1.html">标题</a></h2>'
+          '<div class="comiis_pyqlist_imgs comiis_pyqlist_img2p"><ul>'
+          '<li><img src="https://cdn.binmt.cc/template/comiis_app/pic/none.png" comiis_loadimages="https://cdn.binmt.cc/forum.php?mod=image&aid=1&size=500x480&key=abc"></li>'
+          '<li><img src="https://cdn.example.com/real.jpg"></li>'
+          '<li><img src="https://cdn.binmt.cc/template/comiis_app/pic/none.png"></li>'
+          '</ul></div>'
+          '</div>'
+          '</li>'
+          '</ul>';
+      final result = parseThreadList(html);
+      expect(result.length, 1);
+
+      final images = result[0].images;
+      expect(images, isNotNull);
+      // 懒加载那张取真实地址，纯占位图那张被丢弃
+      expect(images!.length, 2);
+      expect(images[0], contains('aid=1'));
+      expect(images[0], isNot(contains('none.png')));
+      expect(images[1], 'https://cdn.example.com/real.jpg');
+    });
   });
 
   group('Pattern C - 克米模板表格混合（MT论坛 PC 板块）', () {

@@ -32,6 +32,27 @@ import 'package:mtbbs/core/app/thread_parsers/thread_list_parser.dart';
 /// </li>
 /// ```
 class ComiisCardParser implements ThreadListParser {
+  /// 缩略图懒加载属性，按优先级排列。
+  ///
+  /// 克米模板用自定义 `comiis_loadimages` 存放真实地址，`src` 先落
+  /// `template/comiis_app/pic/none.png` 占位图，进入视口后由 JS 换回真实地址；
+  /// 其余为 Discuz 常见懒加载属性，一并兼容。
+  static const _lazyImageAttrs = [
+    'comiis_loadimages',
+    'data-src',
+    'data-original',
+    'file',
+  ];
+
+  /// 占位图特征（文件名片段），命中即视为"没有真实图片"。
+  static const _placeholderMarkers = [
+    'none.png',
+    'nophoto.gif',
+    'nophoto.png',
+    'loading.gif',
+    'loading.png',
+  ];
+
   @override
   bool canParse(dom.Document doc) {
     return doc.querySelector('li.forumlist_li.comiis_znalist') != null;
@@ -133,10 +154,7 @@ class ComiisCardParser implements ThreadListParser {
       final imgs = imgContainer.querySelectorAll('img');
       if (imgs.isNotEmpty) {
         images = imgs
-            .map(
-              (img) =>
-                  img.attributes['src'] ?? img.attributes['data-src'] ?? '',
-            )
+            .map(_resolveImageSrc)
             .where((s) => s.isNotEmpty)
             .map(normalizeUrl)
             .toList();
@@ -165,5 +183,21 @@ class ComiisCardParser implements ThreadListParser {
       views: views,
       images: images,
     );
+  }
+
+  /// 解析缩略图真实地址：懒加载属性优先，`src` 兜底；占位图一律跳过。
+  String _resolveImageSrc(dom.Element img) {
+    for (final attr in _lazyImageAttrs) {
+      final url = (img.attributes[attr] ?? '').trim();
+      if (url.isNotEmpty && !_isPlaceholder(url)) return url;
+    }
+    final src = (img.attributes['src'] ?? '').trim();
+    if (src.isNotEmpty && !_isPlaceholder(src)) return src;
+    return '';
+  }
+
+  bool _isPlaceholder(String url) {
+    final lower = url.toLowerCase();
+    return _placeholderMarkers.any(lower.contains);
   }
 }

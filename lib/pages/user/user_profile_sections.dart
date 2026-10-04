@@ -23,7 +23,7 @@ extension on _UserProfilePageState {
       ],
     ].join(' ');
 
-    // 关注/粉丝/人气/私信 —— 置于头部右侧空白区（窄屏换行右对齐）
+    // 私信 —— 置于头部右侧空白区（人气/关注/粉丝已并入下方统计瓦片）
     final actions = _headerActions();
     final avatar = UserAvatar(
       uid: uid,
@@ -116,7 +116,7 @@ extension on _UserProfilePageState {
 
   // ==================== 积分与活跃卡片（统一自适应） ====================
 
-  /// 统一的信息块 — 圆形浅色图标 + 数值 + 标签（可点项标签带下划线）
+  /// 统一的信息块 — 图标 + 标签 + 数值（无图标背景色）
   Widget _infoTile({
     required IconData icon,
     required String label,
@@ -127,31 +127,14 @@ extension on _UserProfilePageState {
     final clickable = onTap != null;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 18, color: color),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 2),
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 3),
             Container(
               decoration: clickable
                   ? BoxDecoration(
@@ -167,6 +150,14 @@ extension on _UserProfilePageState {
               child: Text(
                 label,
                 style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
               ),
             ),
           ],

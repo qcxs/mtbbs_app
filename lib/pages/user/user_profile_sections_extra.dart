@@ -8,7 +8,14 @@ extension on _UserProfilePageState {
   Widget _buildPointsSection() {
     final points = _profile!['points'] as Map<String, dynamic>?;
     final stats = _profile!['stats'] as Map<String, dynamic>?;
-    if (points == null && stats == null) return const SizedBox.shrink();
+    // 人气为移动模板独有：资料行（profile）或统计行（stats）任一处提供
+    final popularity =
+        _profile!['popularity']?.toString() ?? stats?['popularity']?.toString();
+    if (points == null &&
+        stats == null &&
+        (popularity == null || popularity.isEmpty)) {
+      return const SizedBox.shrink();
+    }
 
     final uid = widget.uid;
     final tiles = <Widget>[];
@@ -57,9 +64,18 @@ extension on _UserProfilePageState {
         const Color(0xFF2196F3),
       );
     }
+    // 人气（移动模板独有；PC 无 → 不显示）——由头部右侧移入瓦片区
+    if (popularity != null && popularity.isNotEmpty) {
+      add(
+        '人气',
+        popularity,
+        Icons.local_fire_department_outlined,
+        const Color(0xFFE53935),
+      );
+    }
     if (stats != null) {
       // 按数据源差异渲染：PC 模板提供「好友/回帖/主题/分享」，
-      // 克米移动模板提供「好友/回复/帖子」（人气已在头部右侧，不再重复）——
+      // 克米移动模板提供「好友/回复/帖子」（人气已并入上方瓦片）——
       // 缺哪个就不渲染哪个。
       if (stats['friends'] != null) {
         add(
@@ -130,24 +146,17 @@ extension on _UserProfilePageState {
     );
   }
 
-  // ==================== 人气 / 私信（头部右侧） ====================
+  // ==================== 私信（头部右侧） ====================
 
-  /// 人气 / 私信 —— 置于头部右侧空白区（关注/粉丝已并入下方统计瓦片）。
+  /// 私信 —— 置于头部右侧空白区（人气/关注/粉丝已并入下方统计瓦片）。
   ///
-  /// 人气为移动独有（PC 没有 → 不显示）；私信仅他人视角（自己主页入口在「我的」页）。
+  /// 人气为移动独有（已并入瓦片）；私信仅他人视角（自己主页入口在「我的」页）。
   List<Widget> _headerActions() {
     if (_uidNum == null) return const [];
     final isSelf =
         context.select<AuthProvider, String>((a) => a.uid) == widget.uid;
-    final popularity = _profile!['popularity']?.toString();
 
     return [
-      if (popularity != null && popularity.isNotEmpty)
-        _actionItem(
-          icon: Icons.local_fire_department_outlined,
-          label: '人气',
-          count: popularity,
-        ),
       if (!isSelf)
         _actionItem(
           icon: Icons.mail_outline,
