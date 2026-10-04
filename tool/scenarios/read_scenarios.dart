@@ -8,6 +8,7 @@ import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
 import 'package:mtbbs/api/forum/search/export.dart' as search_api;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as thread_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
+import 'package:mtbbs/api/group/groupindex/export.dart' as group_api;
 import 'package:mtbbs/api/home/friend/export.dart' as friend_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
@@ -72,6 +73,20 @@ final Map<String, ApiScenario> readScenarios = {
       fid: a['fid'] ?? '',
       orderby: a['orderby'] ?? '',
       filter: a['filter'] ?? '',
+      page: intArg(a, 'page', 1),
+    ),
+  ),
+  'group.index': ApiScenario(
+    desc: '圈子首页（推荐圈子 + 圈子分类 gid + 积分排行；桌面 UA，游客可访问）',
+    params: {},
+    run: (a) => group_api.fetchGroupIndex(ApiService().dio),
+  ),
+  'group.category': ApiScenario(
+    desc: '圈子分类下的圈子列表（分页；gid 来自 group.index 的 categories）',
+    params: {'gid': '*分类 ID', 'page': '页码（默认 1）'},
+    run: (a) => group_api.fetchCategoryGroups(
+      ApiService().dio,
+      gid: a['gid'] ?? '',
       page: intArg(a, 'page', 1),
     ),
   ),

@@ -144,6 +144,13 @@ class ProfilePage extends StatelessWidget {
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(
+                  leading: const Icon(Icons.groups_outlined),
+                  title: const Text('圈子'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/groups'),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
                   leading: const Icon(Icons.settings_outlined),
                   title: const Text('设置'),
                   trailing: const Icon(Icons.chevron_right),

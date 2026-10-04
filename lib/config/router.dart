@@ -10,6 +10,8 @@ import 'package:mtbbs/pages/guide/guide_page.dart';
 import 'package:mtbbs/pages/message/message_page.dart';
 import 'package:mtbbs/pages/message/pm_chat_page.dart';
 import 'package:mtbbs/pages/community/community_page.dart';
+import 'package:mtbbs/pages/group/group_index_page.dart';
+import 'package:mtbbs/pages/group/group_category_page.dart';
 import 'package:mtbbs/pages/user/my_profile_page.dart';
 import 'package:mtbbs/pages/settings/settings_page.dart';
 import 'package:mtbbs/pages/settings/settings_search_page.dart';
@@ -79,6 +81,40 @@ GoRouter buildRouter({
             pageBuilder: (_, state) => NoTransitionPage(
               child: CommunityPage(fid: state.uri.queryParameters['fid'] ?? ''),
             ),
+          ),
+          GoRoute(
+            path: '/groups',
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: GroupIndexPage()),
+          ),
+          GoRoute(
+            path: '/groups/category',
+            pageBuilder: (_, state) {
+              final q = state.uri.queryParameters;
+              return NoTransitionPage(
+                key: ValueKey('group_category_${q['gid'] ?? ''}'),
+                child: GroupCategoryPage(
+                  gid: q['gid'] ?? '',
+                  name: q['name'] ?? '',
+                  initialPage: int.tryParse(q['page'] ?? '') ?? 1,
+                ),
+              );
+            },
+          ),
+          // 圈子内容（只读）：圈子的「讨论区」就是 forumdisplay&fid={gid}
+          GoRoute(
+            path: '/groups/content',
+            pageBuilder: (_, state) {
+              final q = state.uri.queryParameters;
+              return NoTransitionPage(
+                key: ValueKey('group_content_${q['gid'] ?? ''}'),
+                child: CommunityPage(
+                  fid: q['gid'] ?? '',
+                  title: q['name'] ?? '',
+                  readOnly: true,
+                ),
+              );
+            },
           ),
           GoRoute(
             path: '/settings',

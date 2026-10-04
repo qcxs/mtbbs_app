@@ -14,10 +14,23 @@ import 'package:mtbbs/widgets/layout/tab_page_layout.dart';
 /// 路径: /forum?fid=xxx
 /// - 带 fid：显示对应版块的帖子列表，标题为版块名
 /// - 不带 fid：显示所有版块标签页（仅通过直接导航访问）
+///
+/// 圈子只读复用（/groups/content?gid=&name=）：圈子的「讨论区」就是
+/// `forumdisplay&fid={gid}`，故传 [title] 覆盖标题（gid 不在本地板块表里）、
+/// [readOnly] 隐藏发帖入口。
 class CommunityPage extends StatefulWidget {
   final String fid;
+  final String title;
 
-  const CommunityPage({super.key, this.fid = ''});
+  /// 只读模式：隐藏发帖入口（圈子只读复用）
+  final bool readOnly;
+
+  const CommunityPage({
+    super.key,
+    this.fid = '',
+    this.title = '',
+    this.readOnly = false,
+  });
 
   @override
   State<CommunityPage> createState() => _CommunityPageState();
@@ -203,11 +216,13 @@ class _CommunityPageState extends State<CommunityPage> {
     // 带 fid 时使用单版块模式
     if (widget.fid.isNotEmpty) {
       final ctrl = _ctrlMap[widget.fid];
+      final title = widget.title.isNotEmpty
+          ? widget.title
+          : (SiteStore.instance.forums[widget.fid] ??
+                (widget.readOnly ? '圈子' : '未知板块（${widget.fid}）'));
       return Scaffold(
         appBar: AppBar(
-          title: Text(
-            SiteStore.instance.forums[widget.fid] ?? '未知板块（${widget.fid}）',
-          ),
+          title: Text(title),
           surfaceTintColor: cs.surface,
           elevation: 0.5,
           actions: [
@@ -222,12 +237,13 @@ class _CommunityPageState extends State<CommunityPage> {
               tooltip: '筛选排序',
               onPressed: _showFilterDialog,
             ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              tooltip: '发帖',
-              onPressed: () =>
-                  context.push('/editor?type=post&fid=${widget.fid}'),
-            ),
+            if (!widget.readOnly)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                tooltip: '发帖',
+                onPressed: () =>
+                    context.push('/editor?type=post&fid=${widget.fid}'),
+              ),
           ],
         ),
         body: _buildSingleForum(),

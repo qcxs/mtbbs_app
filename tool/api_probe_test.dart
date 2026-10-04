@@ -57,6 +57,7 @@ void main() {
       'view': const String.fromEnvironment('view'),
       'page': const String.fromEnvironment('page'),
       'fid': const String.fromEnvironment('fid'),
+      'gid': const String.fromEnvironment('gid'),
       'orderby': const String.fromEnvironment('orderby'),
       'filter': const String.fromEnvironment('filter'),
       'kw': const String.fromEnvironment('kw'),

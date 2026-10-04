@@ -69,6 +69,27 @@ void main() {
         '/pm/chat?touid=88062',
       );
     });
+
+    test('圈子首页 group.php → /groups', () {
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/group.php?hot=yes').appPath,
+        '/groups',
+      );
+    });
+
+    test('圈子分类 group.php?gid → /groups/category', () {
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/group.php?gid=3').appPath,
+        '/groups/category?gid=3',
+      );
+    });
+
+    test('圈子内容伪静态 group-{gid}-1.html → /groups/content', () {
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/group-57-1.html').appPath,
+        '/groups/content?gid=57',
+      );
+    });
   });
 
   group('resolveTarget - 唯一决策点', () {

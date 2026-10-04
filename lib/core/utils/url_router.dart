@@ -184,6 +184,26 @@ class UrlRouter {
       }
     }
 
+    // ==================== 圈子（群组） ====================
+
+    if (path.endsWith('/group.php') || path.endsWith('group.php')) {
+      final gid = query['gid'];
+      if (gid != null && gid.isNotEmpty) {
+        return UrlRouteResult(
+          label: '圈子分类',
+          appPath: '/groups/category?gid=$gid',
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
+      return UrlRouteResult(
+        label: '圈子',
+        appPath: '/groups',
+        siteHost: otherSiteHost,
+        siteName: otherSiteName,
+      );
+    }
+
     // ==================== 用户主页 ====================
 
     if (path.endsWith('/home.php') || path.endsWith('home.php')) {
@@ -367,6 +387,18 @@ class UrlRouter {
       return UrlRouteResult(
         label: '板块',
         appPath: '/forum?fid=$fid',
+        siteHost: otherSiteHost,
+        siteName: otherSiteName,
+      );
+    }
+
+    // group-{gid}-{page}.html（圈子内容，只读讨论区）
+    final groupMatch = RegExp(r'group-(\d+)').firstMatch(url);
+    if (groupMatch != null) {
+      final gid = groupMatch.group(1)!;
+      return UrlRouteResult(
+        label: '圈子',
+        appPath: '/groups/content?gid=$gid',
         siteHost: otherSiteHost,
         siteName: otherSiteName,
       );
