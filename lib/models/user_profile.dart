@@ -14,14 +14,23 @@ class UserProfile {
   final String signature;
   final String customTitle;
 
+  /// 等级文本（如 `Lv.8`）——克米移动模板独有，PC 模板为空
+  final String level;
+
   // === 勋章 ===
   final List<Medal> medals;
 
   // === 统计概览 ===
-  final int friends;
-  final int replies;
-  final int threads;
-  final int shares;
+  // 可空：null = 当前数据源未提供该字段，供"按数据源差异渲染"用（0 是合法值）
+  final int? friends;
+  final int? replies;
+  final int? threads;
+  final int? shares;
+
+  // === 社交（克米移动模板独有）===
+  final int? following;
+  final int? followers;
+  final int? popularity;
 
   // === 详细资料 ===
   final String qq;
@@ -60,11 +69,15 @@ class UserProfile {
     this.emailVerified = false,
     this.signature = '',
     this.customTitle = '',
+    this.level = '',
     this.medals = const [],
-    this.friends = 0,
-    this.replies = 0,
-    this.threads = 0,
-    this.shares = 0,
+    this.friends,
+    this.replies,
+    this.threads,
+    this.shares,
+    this.following,
+    this.followers,
+    this.popularity,
     this.qq = '',
     this.gender = '',
     this.birthday = '',
@@ -106,13 +119,17 @@ class UserProfile {
       emailVerified: p['emailVerified'] as bool? ?? false,
       signature: _s(p['signature']),
       customTitle: _s(p['customTitle']),
+      level: _s(p['level']),
       medals: medalsList
           .map((m) => Medal.fromMap(m as Map<String, dynamic>))
           .toList(),
-      friends: _i(stats['friends']),
-      replies: _i(stats['replies']),
-      threads: _i(stats['threads']),
-      shares: _i(stats['shares']),
+      friends: _iOpt(stats['friends']),
+      replies: _iOpt(stats['replies']),
+      threads: _iOpt(stats['threads']),
+      shares: _iOpt(stats['shares']),
+      following: _iOpt(p['following'] ?? stats['following']),
+      followers: _iOpt(p['followers'] ?? stats['followers']),
+      popularity: _iOpt(p['popularity'] ?? stats['popularity']),
       qq: _s(details['qq']),
       gender: _s(details['gender']),
       birthday: _s(details['birthday']),
@@ -147,6 +164,7 @@ class UserProfile {
     'emailVerified': emailVerified,
     'signature': signature,
     'customTitle': customTitle,
+    'level': level,
     'medals': medals.map((m) => m.toMap()).toList(),
     'stats': {
       'friends': friends,
@@ -154,6 +172,9 @@ class UserProfile {
       'threads': threads,
       'shares': shares,
     },
+    'following': following,
+    'followers': followers,
+    'popularity': popularity,
     'details': {
       'qq': qq,
       'gender': gender,
@@ -189,6 +210,15 @@ class UserProfile {
     if (v == null) return 0;
     if (v is int) return v;
     return parseIntWithComma(v);
+  }
+
+  /// 可空整型：字段缺失/空串 → null（区别于合法值 0）
+  static int? _iOpt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    final s = v.toString().trim();
+    if (s.isEmpty) return null;
+    return parseIntWithComma(s);
   }
 }
 

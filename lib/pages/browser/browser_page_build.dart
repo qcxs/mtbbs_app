@@ -82,6 +82,8 @@ extension _BrowserPageBuild on _BrowserPageState {
                     _copyUrl();
                   case 'openExternal':
                     _openInExternalBrowser();
+                  case 'exit':
+                    _closeBrowser();
                 }
               },
               itemBuilder: (_) => [
@@ -127,6 +129,17 @@ extension _BrowserPageBuild on _BrowserPageState {
                       Icon(Icons.open_in_new, size: 18),
                       SizedBox(width: 8),
                       Text('外部浏览器打开'),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'exit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.exit_to_app, size: 18),
+                      SizedBox(width: 8),
+                      Text('退出浏览器'),
                     ],
                   ),
                 ),

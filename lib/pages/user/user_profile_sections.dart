@@ -13,81 +13,127 @@ extension on _UserProfilePageState {
     final online = p['online'] as bool? ?? false;
     final userGroup = _getNested(p, ['activity', 'userGroup']) as String?;
     final adminGroup = _getNested(p, ['activity', 'adminGroup']) as String?;
-    final group = adminGroup ?? userGroup;
+    // 等级（Lv.x）仅克米移动模板提供，与用户组拼在一起展示
+    final level = p['level'] as String?;
+    final group = [
+      if (level != null && level.isNotEmpty) level,
+      if (adminGroup != null && adminGroup.isNotEmpty) adminGroup,
+      if (adminGroup == null || adminGroup.isEmpty) ...[
+        if (userGroup != null && userGroup.isNotEmpty) userGroup,
+      ],
+    ].join(' ');
+
+    // 关注/粉丝/人气/私信 —— 置于头部右侧空白区（窄屏换行右对齐）
+    final actions = _headerActions();
+    final avatar = UserAvatar(
+      uid: uid,
+      nickname: nickname,
+      radius: 32,
+      tapAction: AvatarTapAction.viewAvatar,
+    );
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              nickname,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            if (online)
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: onlineColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '在线',
+                  style: TextStyle(fontSize: 11, color: onlineColor),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'UID: $uid',
+          style: TextStyle(fontSize: 13, color: _cs.onSurfaceVariant),
+        ),
+        if (group.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: levelColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              group,
+              style: const TextStyle(
+                fontSize: 12,
+                color: levelColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
 
     return Container(
       padding: const EdgeInsets.all(20),
       color: _cs.surface,
-      child: Row(
-        children: [
-          UserAvatar(
-            uid: uid,
-            nickname: nickname,
-            radius: 32,
-            tapAction: AvatarTapAction.viewAvatar,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // 宽屏：操作项放头部右侧空白；窄屏：换到下方右对齐，避免挤压昵称
+          if (actions.isNotEmpty && constraints.maxWidth >= 480) {
+            return Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      nickname,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (online)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: onlineColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '在线',
-                          style: TextStyle(fontSize: 11, color: onlineColor),
-                        ),
-                      ),
-                  ],
+                avatar,
+                const SizedBox(width: 16),
+                Expanded(child: info),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 220,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'UID: $uid',
-                  style: TextStyle(fontSize: 13, color: _cs.onSurfaceVariant),
-                ),
-                if (group != null && group.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: levelColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      group,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: levelColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  avatar,
+                  const SizedBox(width: 16),
+                  Expanded(child: info),
+                ],
+              ),
+              if (actions.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    width: 220,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: actions,
                     ),
                   ),
-                ],
+                ),
               ],
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

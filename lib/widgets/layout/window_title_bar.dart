@@ -153,10 +153,11 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
   }
 }
 
-/// MCP 运行状态徽章 —— 只在服务真正在跑时显示
+/// MCP 运行状态徽章 —— 常驻显示，开启/关闭两态都可见
 ///
 /// 可点击：打开 MCP 快捷开关弹窗（与 Android 常驻通知、 「我的」页快捷开关
-/// 共用同一实现，见 `showMcpQuickDialog`）。
+/// 共用同一实现，见 `showMcpQuickDialog`）——开启态用于快速关闭，关闭态用于
+/// 快速开启，因此关闭时不能隐藏，否则无处点击开启。
 class _McpBadge extends StatelessWidget {
   const _McpBadge();
 
@@ -167,9 +168,12 @@ class _McpBadge extends StatelessWidget {
       listenable: McpServerController.instance,
       builder: (context, _) {
         final running = McpServerController.instance.isRunning;
-        if (!running) return const SizedBox.shrink();
+        final bg = running
+            ? cs.secondaryContainer
+            : cs.surfaceContainerHighest;
+        final fg = running ? cs.onSecondaryContainer : cs.onSurfaceVariant;
         return Tooltip(
-          message: 'MCP 服务运行中，点击查看 / 快捷关闭',
+          message: running ? 'MCP 服务运行中，点击查看 / 快捷关闭' : 'MCP 服务已关闭，点击开启',
           waitDuration: const Duration(milliseconds: 600),
           child: InkWell(
             onTap: showMcpQuickDialog,
@@ -177,12 +181,12 @@ class _McpBadge extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: cs.secondaryContainer,
+                color: bg,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                'MCP 已开启',
-                style: TextStyle(fontSize: 11, color: cs.onSecondaryContainer),
+                running ? 'MCP 已开启' : 'MCP 已关闭',
+                style: TextStyle(fontSize: 11, color: fg),
               ),
             ),
           ),

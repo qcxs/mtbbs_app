@@ -5,6 +5,7 @@ import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
+import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -54,6 +55,9 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 终极降级：App 整体退化为内置浏览器（逃生阀）
   bool _browserOnlyMode = false;
+
+  /// 个人空间页数据源覆盖（'' = 跟随「浏览模式」；'mobile'/'desktop' = 本页强制）
+  String _spaceSource = '';
 
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;
@@ -197,6 +201,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get autoDetectUrls => _autoDetectUrls;
   int get historyMaxCount => _historyMaxCount;
   bool get editorStartupCheck => _editorStartupCheck;
+
+  /// 个人空间页数据源覆盖（'' = 跟随「浏览模式」）
+  String get spaceSource => _spaceSource;
 
   List<ManagedItem> get toolbarItems => List.unmodifiable(_toolbarItems);
 

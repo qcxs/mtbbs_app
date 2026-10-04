@@ -6,7 +6,12 @@ import 'package:mtbbs/core/utils/logger.dart';
 
 /// 用户空间个人资料响应解析
 ///
-/// 从 home.php?mod=space&uid={uid}&do=profile 的 HTML 中提取用户信息。
+/// 支持两套模板（由请求 UA 决定，见 http.dart）：
+/// - **克米移动模板**：`body.pg_space` / `.comiis_space_info`（含关注/粉丝/人气）
+/// - **标准 Discuz PC 模板**：`#uhd` / `.u_profile` / `#pbbs` / `#psts`
+///
+/// 两套结构差异较大，这里按 DOM 特征分流，输出统一的 profile 结构，
+/// 由渲染层按字段是否存在条件渲染。
 
 Map<String, dynamic> parseResponse(String body, int statusCode) {
   final pre = prepareDoc(body, statusCode);
@@ -15,24 +20,29 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
 
   final profile = <String, dynamic>{};
 
-  // 尝试标准解析（MT论坛结构的 #uhd + .u_profile）
-  _parseHeader(doc, profile);
-  _parseProfileSection(doc, profile);
+  // 按模板分流：克米移动 ↔ 标准 Discuz PC
+  if (doc.querySelector('.comiis_space_info') != null) {
+    _parseComiisProfile(doc, profile);
+  } else {
+    // 标准解析（#uhd + .u_profile）
+    _parseHeader(doc, profile);
+    _parseProfileSection(doc, profile);
 
-  // 如果标准解析没拿到昵称，尝试从 h2 直接提取（部分模板）
-  if ((profile['nickname'] == null || profile['nickname'] == '') &&
-      profile['uid'] != null) {
-    _parseNicknameFallback(doc, profile);
+    // 如果标准解析没拿到昵称，尝试从 h2 直接提取（部分模板）
+    if ((profile['nickname'] == null || profile['nickname'] == '') &&
+        profile['uid'] != null) {
+      _parseNicknameFallback(doc, profile);
+    }
+
+    _parseActivitySection(doc, profile);
+    _parseStatsSection(doc, profile);
   }
-
-  // 无论如何都继续解析剩余字段
-  _parseActivitySection(doc, profile);
-  _parseStatsSection(doc, profile);
 
   // 必要内容校验：昵称和 uid 都没有，且页面上无用户内容 DOM → 判定无效
   if ((profile['nickname'] == null || profile['nickname'] == '') &&
       (profile['uid'] == null || profile['uid'] == '')) {
-    final hasUserContent = doc.querySelector('#uhd, .u_profile') != null;
+    final hasUserContent =
+        doc.querySelector('#uhd, .u_profile, .comiis_space_info') != null;
     if (!hasUserContent) {
       AppLogger.w('PARSE', 'space: no user content');
       return {'success': false, 'message': '页面不可用或用户不存在'};
@@ -40,6 +50,200 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   }
 
   return {'success': true, 'profile': profile};
+}
+
+/// 解析克米移动模板（`body.pg_space` 下的 `.comiis_space_info`）
+///
+/// 移动模板独有：关注数 / 粉丝数 / 人气 / 等级（Lv.x）；资料、统计、积分的
+/// 标签名与 PC 不同（如「帖子/回复」对应 PC 的「主题/回帖」）。
+void _parseComiisProfile(dom.Document doc, Map<String, dynamic> profile) {
+  // --- 头像 / 昵称 ---
+  final avatarImg = doc.querySelector('.comiis_space_info .user_img img');
+  if (avatarImg != null) profile['avatar'] = avatarImg.attributes['src'];
+
+  final nameEl = doc.querySelector('.comiis_space_info h2');
+  if (nameEl != null) {
+    final name = sanitizeText(nameEl.text);
+    if (name.isNotEmpty) profile['nickname'] = name;
+  }
+
+  // --- 信息行：人气 / 关注 / 粉丝 ---
+  for (final span in doc.querySelectorAll(
+    '.comiis_space_info .comiis_space_tx > p > span',
+  )) {
+    final text = sanitizeText(span.text);
+    final m = RegExp(r'([\d,]+)\s*(人气|关注|粉丝)').firstMatch(text);
+    if (m == null) continue;
+    final num = m.group(1)!.replaceAll(',', '');
+    switch (m.group(2)) {
+      case '人气':
+        profile['popularity'] = num;
+        break;
+      case '关注':
+        profile['following'] = num;
+        break;
+      case '粉丝':
+        profile['followers'] = num;
+        break;
+    }
+  }
+
+  // --- 等级 + 用户组（PC 无等级，移动有 Lv.x）---
+  final levelEl = doc.querySelector('.comiis_space_tx .kmlevs.bg_0');
+  if (levelEl != null) {
+    final lv = sanitizeText(levelEl.text);
+    if (lv.isNotEmpty) profile['level'] = lv;
+  }
+  final activity = <String, dynamic>{};
+  final groupEl = doc.querySelector('.comiis_space_tx .kmlev');
+  if (groupEl != null) {
+    final group = sanitizeText(groupEl.text);
+    if (group.isNotEmpty) activity['userGroup'] = group;
+  }
+
+  // --- 勋章（swiper 内 img[alt]，alt 即勋章名）---
+  final medalImgs = doc.querySelectorAll('#comiis_medal img[alt]');
+  final medals = medalImgs
+      .map(
+        (img) => {
+          'name': img.attributes['alt'] ?? '',
+          'icon': img.attributes['src'] ?? '',
+        },
+      )
+      .where((m) => (m['name'] as String).isNotEmpty)
+      .toList();
+  if (medals.isNotEmpty) profile['medals'] = medals;
+
+  // --- 个性签名（HTML → BBCode）---
+  final sigEl = _comiisRowValue(doc, '个人签名');
+  if (sigEl != null) {
+    final bbcode = Html2BBCode().convertElementContent(sigEl);
+    if (bbcode.isNotEmpty) profile['signature'] = bbcode;
+  }
+
+  // --- 自定义头衔（值同样落在 .profile_r，故按标签文案定位）---
+  final titleEl = _comiisRowValue(doc, '自定头衔');
+  if (titleEl != null) {
+    final title = sanitizeText(titleEl.text);
+    if (title.isNotEmpty) profile['customTitle'] = title;
+  }
+
+  // --- 详细资料 / 活跃（li：div.profile_rs 为值，span 为标签）---
+  final details = <String, dynamic>{};
+  for (final li in doc.querySelectorAll('.comiis_space_profile li')) {
+    final labelEl = li.querySelector('span');
+    final valueEl = li.querySelector('.profile_rs');
+    if (labelEl == null || valueEl == null) continue;
+    final label = sanitizeText(labelEl.text);
+    final value = sanitizeText(valueEl.text);
+    if (value.isEmpty) continue;
+    switch (label) {
+      case '用户ID':
+        profile['uid'] = value;
+        break;
+      case 'QQ':
+        details['qq'] = value;
+        break;
+      case '职业':
+        details['occupation'] = value;
+        break;
+      case '居住地':
+        details['residence'] = value;
+        break;
+      case '真实姓名':
+        details['realName'] = value;
+        break;
+      case '出生地':
+        details['birthplace'] = value;
+        break;
+      case '生日':
+        details['birthday'] = value;
+        break;
+      case '性别':
+        details['gender'] = value;
+        break;
+      case '在线时间':
+        activity['onlineTime'] = value;
+        break;
+      case '注册时间':
+        activity['registerTime'] = value;
+        break;
+      case '最后访问':
+        activity['lastVisit'] = value;
+        break;
+    }
+  }
+  if (details.isNotEmpty) profile['details'] = details;
+  if (activity.isNotEmpty) profile['activity'] = activity;
+
+  // --- 统计行（帖子 / 回复 / 好友 / 粉丝 / 人气）---
+  final stats = <String, dynamic>{};
+  for (final span in doc.querySelectorAll(
+    '.comiis_space_profileico li a span',
+  )) {
+    final text = sanitizeText(span.text);
+    final m = RegExp(r'^(帖子|回复|好友|粉丝|人气)\s*([\d,]+)$').firstMatch(text);
+    if (m == null) continue;
+    final num = m.group(2)!.replaceAll(',', '');
+    switch (m.group(1)) {
+      case '帖子':
+        stats['threads'] = num;
+        break;
+      case '回复':
+        stats['replies'] = num;
+        break;
+      case '好友':
+        stats['friends'] = num;
+        break;
+      case '粉丝':
+        stats['followers'] = num;
+        break;
+      case '人气':
+        stats['popularity'] = num;
+        break;
+    }
+  }
+  if (stats.isNotEmpty) profile['stats'] = stats;
+
+  // --- 积分行（积分 / 好评 / 金币 / 信誉；li 的裸文本为标签，span 为值）---
+  final points = <String, dynamic>{};
+  for (final li in doc.querySelectorAll('.comiis_space_profilejf li')) {
+    final valueEl = li.querySelector('span');
+    if (valueEl == null) continue;
+    final value = sanitizeText(valueEl.text);
+    final clone = li.clone(true);
+    clone.querySelector('span')?.remove();
+    final label = sanitizeText(clone.text);
+    if (label.isEmpty || value.isEmpty) continue;
+    switch (label) {
+      case '积分':
+        points['credits'] = value.replaceAll(',', '');
+        break;
+      case '好评':
+        points['reputation'] = value;
+        break;
+      case '金币':
+        points['goldCoins'] = value;
+        break;
+      case '信誉':
+        points['credit'] = value;
+        break;
+    }
+  }
+  if (points.isNotEmpty) profile['points'] = points;
+}
+
+/// 按标签文案定位克米资料行，返回其值元素（`.profile_r` 或 `.profile_rs`）。
+///
+/// 签名行与自定义头衔行的值都用 `.profile_r`（同为 `profile_face` 类），
+/// 只靠类名区分不开，必须按行内 `span` 的标签文案定位。
+dom.Element? _comiisRowValue(dom.Document doc, String label) {
+  for (final span in doc.querySelectorAll('.comiis_space_profile li span')) {
+    if (sanitizeText(span.text) == label) {
+      return span.parent?.querySelector('.profile_r, .profile_rs');
+    }
+  }
+  return null;
 }
 
 /// 解析头部区域：#uhd 中的头像、昵称、空间链接

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -64,7 +65,7 @@ class IgnoreCacheFileService extends FileService {
     };
 
     try {
-      final response = await http.get(Uri.parse(url), headers: reqHeaders);
+      final response = await _getWithWafChallenge(url, reqHeaders);
       // 非 200 也算 CDN 不可用（404/403/5xx），与网络异常走同一条回退分支
       if (response.statusCode != 200) {
         throw HttpException('HTTP ${response.statusCode}', uri: Uri.parse(url));
@@ -83,13 +84,106 @@ class IgnoreCacheFileService extends FileService {
       }
       AppLogger.w('CACHE', 'CDN 失败，回退原站重试: ${_shortenUrl(origin)}');
       try {
-        final retry = await http.get(Uri.parse(origin), headers: reqHeaders);
+        final retry = await _getWithWafChallenge(origin, reqHeaders);
         return IgnoreCacheResponse(retry, stalePeriod, url);
       } catch (e2) {
         AppLogger.w('CACHE', '回退原站仍失败: $e2');
         // 原站也失败：抛出最初的失败（保持原有错误语义）
         Error.throwWithStackTrace(e, s);
       }
+    }
+  }
+}
+
+// ==================== WAF（阿里云 ESA）挑战处理 ====================
+
+/// 图片下载专用 [HttpClient]（与论坛 Dio 分离：第三方图床域不兼容其请求头）。
+final HttpClient _imageHttpClient = HttpClient()
+  ..connectionTimeout = const Duration(seconds: 10);
+
+/// 手动跟随跳转的最大次数（与 `package:http` 默认值一致）。
+const int _kMaxRedirects = 5;
+
+/// 按 host 缓存的挑战 Cookie（进程内，不持久化）。
+///
+/// 部分图片域（如 `icdn.binmt.cc`）由阿里云 ESA WAF 保护：直接请求返回
+/// `307 Temporary Redirect` + `X-Tengine-Error: denied by http_custom`，并在
+/// `Set-Cookie` 里下发 `acw_sc__v2` / `acw_tc` 挑战 Cookie；客户端**必须回传该
+/// Cookie** 再请求同一地址，才会拿到图片（实测同一 UA 下有 Cookie → 200 PNG，
+/// 无 Cookie → 无限 307）。浏览器能加载、刷新后能加载，正是因为浏览器自带
+/// Cookie 罐而 `http`/`HttpClient` 跟随跳转时**不保留 Cookie**。
+///
+/// 每次冷启动首个请求多一个往返，代价可忽略，故不做持久化。
+final Map<String, Map<String, String>> _hostCookies = {};
+
+/// 带 WAF 挑战处理的 GET：手动跟随 3xx 跳转，并在跳转间保留 / 回放 Set-Cookie。
+///
+/// 用 [HttpClient] 而非 `http.get` 的原因：`package:http` 会把多条 `set-cookie`
+/// 用 `,` 合并成一个字符串，而 Cookie 值本身可能含逗号（见 docs/07 #26）；
+/// `dart:io` 的 [HttpHeaders] 原样保留多条，解析更可靠。
+Future<http.Response> _getWithWafChallenge(
+  String url,
+  Map<String, String> headers,
+) async {
+  var uri = Uri.parse(url);
+  for (var hop = 0; hop <= _kMaxRedirects; hop++) {
+    final request = await _imageHttpClient.getUrl(uri);
+    // 手动跟随：自动跟随不带 Cookie，会陷入 WAF 的 307 循环
+    request.followRedirects = false;
+    headers.forEach(request.headers.set);
+    final cookie = _cookieHeaderFor(uri.host);
+    if (cookie.isNotEmpty) {
+      request.headers.set(HttpHeaders.cookieHeader, cookie);
+    }
+    final response = await request.close();
+    _storeSetCookies(uri.host, response.headers['set-cookie']);
+
+    final code = response.statusCode;
+    if (code >= 300 && code < 400) {
+      final location = response.headers.value(HttpHeaders.locationHeader);
+      // 必须读完响应体才能复用连接
+      await response.drain<void>();
+      if (location == null) {
+        throw HttpException('重定向缺少 Location', uri: uri);
+      }
+      uri = uri.resolve(location);
+      continue;
+    }
+
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in response) {
+      builder.add(chunk);
+    }
+    return http.Response.bytes(builder.takeBytes(), code);
+  }
+  throw HttpException('重定向次数过多（$_kMaxRedirects）', uri: uri);
+}
+
+/// 拼接指定 host 的 Cookie 请求头（无则返回空串）。
+String _cookieHeaderFor(String host) {
+  final jar = _hostCookies[host];
+  if (jar == null || jar.isEmpty) return '';
+  return jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
+}
+
+/// 把响应里的 `Set-Cookie` 存入对应 host 的 Cookie 表。
+///
+/// 只取 `name=value`（忽略 Path/Domain/Max-Age 等属性，挑战 Cookie 均为 `path=/`）；
+/// `value` 为空（含 `Max-Age=0` 的删除指令）时移除该条。
+void _storeSetCookies(String host, List<String>? rawCookies) {
+  if (rawCookies == null || rawCookies.isEmpty) return;
+  final jar = _hostCookies.putIfAbsent(host, () => <String, String>{});
+  for (final raw in rawCookies) {
+    final semi = raw.indexOf(';');
+    final pair = (semi >= 0 ? raw.substring(0, semi) : raw).trim();
+    final eq = pair.indexOf('=');
+    if (eq <= 0) continue;
+    final name = pair.substring(0, eq).trim();
+    final value = pair.substring(eq + 1).trim();
+    if (value.isEmpty) {
+      jar.remove(name);
+    } else {
+      jar[name] = value;
     }
   }
 }

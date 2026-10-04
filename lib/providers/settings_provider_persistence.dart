@@ -30,6 +30,9 @@ extension SettingsPersistence on SettingsProvider {
     // 终极降级开关（逃生阀）：默认关
     _browserOnlyMode = (await _db.getSettingBool('browserOnlyMode')) ?? false;
     applyBrowserOnlyMode(_browserOnlyMode);
+    // 个人空间页数据源覆盖（'' = 跟随浏览模式），请求发起前登记
+    _spaceSource = (await _db.getSetting('spaceSource')) ?? '';
+    space_api.applySpaceSourceOverride(_spaceSource);
     _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
     // 缓存过期天数（默认取自 defaults.json，无配置或 JSON 错误时为 1 天）
     final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
@@ -248,6 +251,14 @@ extension SettingsPersistence on SettingsProvider {
     _browserOnlyMode = enabled;
     applyBrowserOnlyMode(enabled);
     await _db.setSettingBool('browserOnlyMode', enabled);
+    _notify();
+  }
+
+  /// 设置个人空间页数据源：'' 跟随浏览模式 / 'mobile' / 'desktop'
+  Future<void> setSpaceSource(String value) async {
+    _spaceSource = value;
+    space_api.applySpaceSourceOverride(value);
+    await _db.setSetting('spaceSource', value);
     _notify();
   }
 

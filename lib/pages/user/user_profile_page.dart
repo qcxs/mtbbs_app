@@ -117,6 +117,29 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
+  /// 数据源菜单行：图标 + 文案 + 勾选
+  Widget _sourceMenuRow({
+    required IconData icon,
+    required String label,
+    required bool selected,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 8),
+        Text(label),
+        const Spacer(),
+        if (selected) const Icon(Icons.check, size: 16),
+      ],
+    );
+  }
+
+  /// 设置本页数据源并重新加载（'' = 跟随浏览模式 / 'mobile' / 'desktop'）
+  Future<void> _setSpaceSource(String value) async {
+    await context.read<SettingsProvider>().setSpaceSource(value);
+    if (mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = _cs;
@@ -135,35 +158,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
         surfaceTintColor: _cs.surface,
         elevation: 0.5,
         actions: [
-          // 给 TA 发私信（看自己主页时不显示）
-          if (_uidNum != null &&
-              context.select<AuthProvider, String>((a) => a.uid) != widget.uid)
-            IconButton(
-              icon: const Icon(Icons.mail_outline),
-              tooltip: '发消息',
-              onPressed: () {
-                final nickname = _profile?['nickname'] as String? ?? '';
-                context.push(
-                  '/pm/chat?touid=${widget.uid}'
-                  '&username=${Uri.encodeComponent(nickname)}',
-                );
-              },
-            ),
-          // TA 的关注 / 好友入口（仅数值 uid 显示；self 页入口在"我的"页）
-          if (_uidNum != null) ...[
-            IconButton(
-              icon: const Icon(Icons.visibility_outlined),
-              tooltip: 'TA的关注',
-              onPressed: () =>
-                  context.push('/follow?type=following&uid=${widget.uid}'),
-            ),
-            IconButton(
-              icon: const Icon(Icons.people_outline),
-              tooltip: 'TA的粉丝',
-              onPressed: () =>
-                  context.push('/follow?type=follower&uid=${widget.uid}'),
-            ),
-          ],
           PageActions(
             url:
                 '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
@@ -171,7 +165,33 @@ class _UserProfilePageState extends State<UserProfilePage> {
             loading: _loading,
             copyLabel: '复制个人主页链接',
             extraItems: [
+              // 本页数据源（仅个人空间生效）：移动版社交数据全，桌面版资料更全
+              PopupMenuItem<String>(
+                value: 'src_follow',
+                child: _sourceMenuRow(
+                  icon: Icons.sync,
+                  label: '跟随浏览模式',
+                  selected: space_api.spaceSourceOverride.isEmpty,
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'src_mobile',
+                child: _sourceMenuRow(
+                  icon: Icons.smartphone_outlined,
+                  label: '移动版',
+                  selected: space_api.spaceSourceOverride == 'mobile',
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'src_desktop',
+                child: _sourceMenuRow(
+                  icon: Icons.desktop_windows_outlined,
+                  label: '桌面版',
+                  selected: space_api.spaceSourceOverride == 'desktop',
+                ),
+              ),
               if (uidNum != null) ...[
+                const PopupMenuDivider(),
                 PopupMenuItem<String>(
                   value: 'prev_user',
                   enabled: uidNum > 1,
@@ -203,6 +223,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ],
             onExtraSelected: (action) {
               switch (action) {
+                case 'src_follow':
+                  _setSpaceSource('');
+                case 'src_mobile':
+                  _setSpaceSource('mobile');
+                case 'src_desktop':
+                  _setSpaceSource('desktop');
                 case 'prev_user':
                   if (uidNum != null && uidNum > 1) {
                     _navigateToUid(uidNum - 1);

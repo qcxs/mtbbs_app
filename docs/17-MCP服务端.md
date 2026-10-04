@@ -112,7 +112,7 @@ lib/mcp/
 | 入口 | 说明 |
 |------|------|
 | Android 常驻通知 | 点通知 → `EXTRA_TAP` → `MainActivity` → 通道 `onNotificationTap` → 弹窗 |
-| Windows 标题栏徽章 | `_McpBadge` 可点（Tooltip 提示"点击查看 / 快捷关闭"） |
+| Windows 标题栏徽章 | `_McpBadge` **常驻显示**（开/关两态分别为「MCP 已开启」「MCP 已关闭」），可点开弹窗快捷开关（关闭态也能点，用于快速开启） |
 | 「我的」页顶部按钮 | 主题模式左侧，**一键直接开/关**（不走弹窗，toast 反馈） |
 
 **为什么弹窗必须走 `rootNavigatorKey` 而不是调用方 context**：点通知可能发生在**冷启动首帧之前**，那时任何页面的 context 都不存在。故弹窗只用根 Overlay（与 `showToast` 同一套思路），根未就绪时先等一帧再取一次。
