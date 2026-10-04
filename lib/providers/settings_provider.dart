@@ -189,6 +189,12 @@ class SettingsProvider extends ChangeNotifier {
   /// 编辑器启动自检（默认开启，关闭后跳过启动报错，无条件进入编辑器）
   bool _editorStartupCheck = true;
 
+  /// 启动时自动检查更新（仅正式版生效，见 UpdateService.isSupported）
+  bool _autoCheckUpdate = true;
+
+  /// 用户跳过的新版本 tag（自动检查不再提示；'' = 未跳过）
+  String _skippedUpdateVersion = '';
+
   // ==================== 留在类体内的成员 ====================
   //
   // 部分设置项 model（如 content_settings.dart / shortcut_settings.dart）

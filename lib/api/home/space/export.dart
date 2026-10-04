@@ -9,11 +9,18 @@ export 'http.dart' show spaceSourceOverride, applySpaceSourceOverride;
 /// 用户空间 API 导出
 ///
 /// 查询优先级：[uid] > [username] > 当前登录用户自己
+/// [options] 可追加请求级配置（站点 UA 由 http 层写入）
 Future<Map<String, dynamic>> getUserProfile(
   Dio dio, {
   String uid = '',
   String username = '',
+  Options? options,
 }) async {
-  final resp = await http.getUserProfile(dio, uid: uid, username: username);
+  final resp = await http.getUserProfile(
+    dio,
+    uid: uid,
+    username: username,
+    options: options,
+  );
   return parseWithLog(resp, parse.parseResponse);
 }

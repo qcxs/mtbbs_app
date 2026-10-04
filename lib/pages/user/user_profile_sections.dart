@@ -36,9 +36,15 @@ extension on _UserProfilePageState {
       children: [
         Row(
           children: [
-            Text(
-              nickname,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Flexible(
+              child: Text(
+                nickname,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             if (online)
               Container(
@@ -84,63 +90,33 @@ extension on _UserProfilePageState {
     return Container(
       padding: const EdgeInsets.all(20),
       color: _cs.surface,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // 宽屏：操作项放头部右侧空白；窄屏：换到下方右对齐，避免挤压昵称
-          if (actions.isNotEmpty && constraints.maxWidth >= 480) {
-            return Row(
+      child: Row(
+        children: [
+          avatar,
+          const SizedBox(width: 16),
+          Expanded(child: info),
+          // 操作项固定在头像同一行的右侧（竖排，最省横向空间，窄屏也不换行）
+          if (actions.isNotEmpty) ...[
+            const SizedBox(width: 12),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                avatar,
-                const SizedBox(width: 16),
-                Expanded(child: info),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 220,
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: actions,
-                  ),
-                ),
-              ],
-            );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  avatar,
-                  const SizedBox(width: 16),
-                  Expanded(child: info),
+                for (var i = 0; i < actions.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 6),
+                  actions[i],
                 ],
-              ),
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: 220,
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: actions,
-                    ),
-                  ),
-                ),
               ],
-            ],
-          );
-        },
+            ),
+          ],
+        ],
       ),
     );
   }
 
   // ==================== 积分与活跃卡片（统一自适应） ====================
 
-  /// 统一的信息块 — 图标 + 标签 + 数值
+  /// 统一的信息块 — 圆形浅色图标 + 数值 + 标签（可点项标签带下划线）
   Widget _infoTile({
     required IconData icon,
     required String label,
@@ -151,14 +127,31 @@ extension on _UserProfilePageState {
     final clickable = onTap != null;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(height: 3),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 18, color: color),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
             Container(
               decoration: clickable
                   ? BoxDecoration(
@@ -174,14 +167,6 @@ extension on _UserProfilePageState {
               child: Text(
                 label,
                 style: TextStyle(fontSize: 11, color: _cs.onSurfaceVariant),
-              ),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
               ),
             ),
           ],

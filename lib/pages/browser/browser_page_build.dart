@@ -19,11 +19,11 @@ extension _BrowserPageBuild on _BrowserPageState {
       child: Scaffold(
         appBar: AppBar(
           surfaceTintColor: cs.surface,
+          // 退出浏览器（后退/前进在底栏，故此处固定为退出，不再兼作后退）
           leading: IconButton(
-            icon: Icon(_canGoBack ? Icons.arrow_back : Icons.close),
-            tooltip: _canGoBack ? '后退' : '关闭',
-            onPressed: () =>
-                _canGoBack ? _controller?.goBack() : _closeBrowser(),
+            icon: const Icon(Icons.close),
+            tooltip: '退出浏览器',
+            onPressed: _closeBrowser,
           ),
           title: GestureDetector(
             onTap: _showUrlEditor,
@@ -39,13 +39,6 @@ extension _BrowserPageBuild on _BrowserPageState {
             ),
           ),
           actions: [
-            // 设置入口 —— 必须常驻：开启「全部改用内置浏览器」后浏览器即首屏，
-            // 没有这个入口用户会被锁死在浏览器里，无法关回开关。
-            IconButton(
-              icon: const Icon(Icons.settings_outlined, size: 20),
-              tooltip: '设置',
-              onPressed: () => context.push('/settings'),
-            ),
             // 刷新
             IconButton(
               icon: const Icon(Icons.refresh, size: 20),
@@ -68,6 +61,8 @@ extension _BrowserPageBuild on _BrowserPageState {
               padding: EdgeInsets.zero,
               onSelected: (v) {
                 switch (v) {
+                  case 'settings':
+                    context.push('/settings');
                   case 'desktopMode':
                     _setState(() => _desktopMode = !_desktopMode);
                     _controller?.setSettings(
@@ -87,6 +82,7 @@ extension _BrowserPageBuild on _BrowserPageState {
                 }
               },
               itemBuilder: (_) => [
+                // —— 当前页视图 ——
                 PopupMenuItem(
                   value: 'desktopMode',
                   child: Row(
@@ -101,17 +97,7 @@ extension _BrowserPageBuild on _BrowserPageState {
                   ),
                 ),
                 const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'clearCache',
-                  child: Row(
-                    children: [
-                      Icon(Icons.cached, size: 18),
-                      SizedBox(width: 8),
-                      Text('清除缓存'),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
+                // —— 当前页操作 ——
                 const PopupMenuItem(
                   value: 'copyUrl',
                   child: Row(
@@ -133,6 +119,31 @@ extension _BrowserPageBuild on _BrowserPageState {
                   ),
                 ),
                 const PopupMenuDivider(),
+                // —— 数据 ——
+                const PopupMenuItem(
+                  value: 'clearCache',
+                  child: Row(
+                    children: [
+                      Icon(Icons.cached, size: 18),
+                      SizedBox(width: 8),
+                      Text('清除缓存'),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                // —— 应用 ——
+                // 设置入口必须常驻菜单：开启「全部改用内置浏览器」后浏览器即首屏，
+                // 没有这个入口用户会被锁死在浏览器里，无法关回开关。
+                const PopupMenuItem(
+                  value: 'settings',
+                  child: Row(
+                    children: [
+                      Icon(Icons.settings_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('设置'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'exit',
                   child: Row(

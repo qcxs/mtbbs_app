@@ -98,6 +98,29 @@ extension on _UserProfilePageState {
       }
     }
 
+    // 关注 / 粉丝（由头部移入统计区）：移动模板给出计数；PC 模板无计数时
+    // 值显示「—」，入口仍保留（点进对应列表）。
+    final following = _profile!['following']?.toString();
+    final followers = _profile!['followers']?.toString();
+    if (_uidNum != null || following != null) {
+      add(
+        '关注',
+        following ?? '—',
+        Icons.visibility_outlined,
+        const Color(0xFF3F51B5),
+        onTap: () => context.push('/follow?type=following&uid=$uid'),
+      );
+    }
+    if (_uidNum != null || followers != null) {
+      add(
+        '粉丝',
+        followers ?? '—',
+        Icons.people_outline,
+        const Color(0xFF00897B),
+        onTap: () => context.push('/follow?type=follower&uid=$uid'),
+      );
+    }
+
     if (tiles.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -107,34 +130,18 @@ extension on _UserProfilePageState {
     );
   }
 
-  // ==================== 关注 / 粉丝 / 人气 / 私信（头部右侧） ====================
+  // ==================== 人气 / 私信（头部右侧） ====================
 
-  /// 关注 / 粉丝 / 人气 / 私信 —— 由顶栏移入头部右侧空白区。
+  /// 人气 / 私信 —— 置于头部右侧空白区（关注/粉丝已并入下方统计瓦片）。
   ///
-  /// 计数按数据源差异渲染：克米移动模板给出关注/粉丝/人气计数；PC 模板无计数
-  /// 则只保留图标 + 文案。人气为移动独有（PC 没有 → 不显示）；私信仅他人视角
-  /// （自己主页入口在「我的」页）。
+  /// 人气为移动独有（PC 没有 → 不显示）；私信仅他人视角（自己主页入口在「我的」页）。
   List<Widget> _headerActions() {
     if (_uidNum == null) return const [];
     final isSelf =
         context.select<AuthProvider, String>((a) => a.uid) == widget.uid;
-    final following = _profile!['following']?.toString();
-    final followers = _profile!['followers']?.toString();
     final popularity = _profile!['popularity']?.toString();
 
     return [
-      _actionItem(
-        icon: Icons.visibility_outlined,
-        label: '关注',
-        count: following,
-        onTap: () => context.push('/follow?type=following&uid=${widget.uid}'),
-      ),
-      _actionItem(
-        icon: Icons.people_outline,
-        label: '粉丝',
-        count: followers,
-        onTap: () => context.push('/follow?type=follower&uid=${widget.uid}'),
-      ),
       if (popularity != null && popularity.isNotEmpty)
         _actionItem(
           icon: Icons.local_fire_department_outlined,

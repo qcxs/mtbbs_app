@@ -41,16 +41,18 @@ String _resolvedUserAgent() {
 /// - [uid] 不为空 → 按 uid 查询
 /// - [username] 不为空 → 按用户名查询
 /// - 两者都为空 → 返回当前登录用户自己的资料
+///
+/// [options] 由调用方追加请求级配置（如 `extra` 标记），站点 UA 仍由本函数写入。
 Future<Response<String>> getUserProfile(
   Dio dio, {
   String uid = '',
   String username = '',
+  Options? options,
 }) {
   final path = _buildPath(uid, username);
-  return dio.get<String>(
-    path,
-    options: Options(headers: {'User-Agent': _resolvedUserAgent()}),
-  );
+  final opts = options ?? Options();
+  opts.headers = {...?opts.headers, 'User-Agent': _resolvedUserAgent()};
+  return dio.get<String>(path, options: opts);
 }
 
 String _buildPath(String uid, String username) {

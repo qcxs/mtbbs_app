@@ -115,8 +115,12 @@ class _SearchPageState extends State<SearchPage> {
     await _addHistory(query);
     if (!mounted) return;
     final domain = Uri.tryParse(SiteStore.instance.baseUrl)?.host ?? '';
-    final url =
-        'https://www.bing.com/search?q=${Uri.encodeComponent('$query site:$domain')}';
+    // `form=QBRE` 是 Bing 搜索框表单的固定参数，必须带上：Bing 据此判断"用户是从
+    // 搜索框提交的"，才会正确解析 `site:` 限定。缺了它，直连 URL 会被 Bing 当作
+    // 外部跳转改写查询（URL 追加 rdr=1），`site:` 被静默丢弃——品牌词（如「MT管理器」）
+    // 必现，返回全网结果；这是"结果不准"的根因。
+    final q = Uri.encodeComponent('$query site:$domain');
+    final url = 'https://www.bing.com/search?q=$q&form=QBRE';
     context.push('/browser?url=${Uri.encodeComponent(url)}');
   }
 

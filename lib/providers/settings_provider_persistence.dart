@@ -208,6 +208,11 @@ extension SettingsPersistence on SettingsProvider {
     _editorStartupCheck =
         (await _db.getSettingBool('editorStartupCheck')) ?? true;
 
+    // 启动时自动检查更新
+    _autoCheckUpdate = (await _db.getSettingBool('autoCheckUpdate')) ?? true;
+    _skippedUpdateVersion =
+        (await _db.getSetting('skippedUpdateVersion')) ?? '';
+
     _notify();
   }
 
@@ -225,6 +230,20 @@ extension SettingsPersistence on SettingsProvider {
   Future<void> setInterstitialAutoVerify(bool enabled) async {
     _interstitialAutoVerify = enabled;
     await _db.setSettingBool('interstitialAutoVerify', enabled);
+    _notify();
+  }
+
+  /// 开关"启动时自动检查更新"（仅正式版生效）
+  Future<void> setAutoCheckUpdate(bool enabled) async {
+    _autoCheckUpdate = enabled;
+    await _db.setSettingBool('autoCheckUpdate', enabled);
+    _notify();
+  }
+
+  /// 设置跳过的版本 tag（'' = 取消跳过）
+  Future<void> setSkippedUpdateVersion(String tag) async {
+    _skippedUpdateVersion = tag;
+    await _db.setSetting('skippedUpdateVersion', tag);
     _notify();
   }
 

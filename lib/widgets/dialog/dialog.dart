@@ -9,3 +9,4 @@ export 'managed_list_dialog.dart';
 export 'mcp_quick_dialog.dart';
 export 'page_jump_dialog.dart';
 export 'rate_dialog.dart';
+export 'update_dialog.dart';

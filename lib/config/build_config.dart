@@ -29,4 +29,19 @@ abstract final class BuildConfig {
     'mtbbs.time',
     defaultValue: 0,
   );
+
+  /// 是否为 beta 形态（独立应用）。
+  ///
+  /// beta 也是 `--release` 编译，故更新检查不能只判 `kReleaseMode`；这里两条
+  /// 来源都覆盖：Android beta 传了 `--dart-define=BETA=true`，Windows beta 无该
+  /// define 但版本名固定为 `1.0.0-beta`（见 scripts/version.ps1）。
+  static bool get isBeta =>
+      const bool.fromEnvironment('BETA') || versionName.contains('-beta');
+
+  /// 开源仓库地址（应用内各处引用，唯一事实源）
+  static const String repoUrl = 'https://github.com/qcxs/mtbbs_app';
+
+  /// GitHub Releases API（应用内更新检查）
+  static const String releasesApiUrl =
+      'https://api.github.com/repos/qcxs/mtbbs_app/releases';
 }

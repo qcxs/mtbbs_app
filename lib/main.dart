@@ -30,6 +30,7 @@ import 'package:mtbbs/core/utils/max_screen_size.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/mcp_quick_dialog.dart';
+import 'package:mtbbs/widgets/dialog/update_dialog.dart';
 import 'package:mtbbs/auth/widgets/login_sheet.dart';
 
 /// 全局 ScaffoldMessenger key — 非 Widget 层（事件订阅）也能弹 SnackBar
@@ -102,8 +103,8 @@ void main() async {
 
   // 人机验证页只注入登录 cookie 串（而非整个罐）：罐里可能存着服务端已判过期的
   // 防护 cookie，灌进验证页会让挑战继续拿到旧值，形成"每次冷启动都要验证"的死锁。
-  VerificationGate.instance.loginCookieString =
-      () => auth.currentCookieString ?? '';
+  VerificationGate.instance.loginCookieString = () =>
+      auth.currentCookieString ?? '';
 
   // MCP：注入登录态快照（MCP 层不直接依赖 UI Provider），
   // 并后台拉起只读服务——未启用时不会占用端口，不阻塞首帧。
@@ -188,6 +189,9 @@ void main() async {
     router,
   );
   runApp(Platform.isWindows ? WindowStateSaver(child: app) : app);
+
+  // 应用内更新检查：仅正式版 + 开关开启时，延迟几秒后台检查（不阻塞首帧）
+  scheduleAutoUpdateCheck(settings);
 
   // Android：点常驻通知 → 弹 MCP 快捷开关（与 Windows 标题栏徽章、
   // 「我的」页开关共用同一实现）。放在 runApp 之后：需要在交出事件循环前

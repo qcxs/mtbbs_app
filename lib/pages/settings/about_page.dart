@@ -1,32 +1,39 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/config/build_config.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
+import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/models/special_thanks.dart';
+import 'package:mtbbs/models/user_profile.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/services/update_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/dialog/update_dialog.dart';
 
 /// 关于页 — 应用标识、作者、相关链接、版本信息与特别鸣谢。
 ///
 /// 鸣谢名单来自 `assets/config/thanks.json`，改内容不需要动代码；
-/// 其余条目是稳定信息（作者、仓库、介绍帖），直接写在常量里。
+/// 作者资料按 [authorUid] 从站点动态获取（首次取到后持久化，之后只读缓存）。
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
 
-  /// 开发者
-  static const String authorName = '青春向上';
+  /// 开发者 UID（唯一硬编码项，其余资料按它动态获取）
   static const String authorUid = '88062';
-  static const String authorLevel = 'Lv.7 博士生';
-  static const String authorSignature = '年少不知号贵，猥琐升级，勿浪！';
-  static const String authorSpaceUrl =
-      'https://bbs.binmt.cc/home.php?mod=space&uid=88062&do=profile';
 
   /// 开源仓库
-  static const String repoUrl = 'https://github.com/qcxs/mtbbs_app';
+  static const String repoUrl = BuildConfig.repoUrl;
 
   /// 应用介绍帖
   static const String introUrl = 'https://bbs.binmt.cc/thread-169295-1-1.html';
@@ -46,15 +53,94 @@ class _AboutPageState extends State<AboutPage> {
   double _turns = 0;
   final math.Random _random = math.Random();
 
+  /// 手动检查更新进行中（用于禁用入口并显示进度）
+  bool _checking = false;
+
+  /// 开发者资料（首次从站点获取后持久化，之后读缓存）
+  UserProfile? _author;
+
+  /// 开发者空间地址（跟随当前站点）
+  String get _authorSpaceUrl =>
+      '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${AboutPage.authorUid}&do=profile';
+
+  /// 等级展示文本：优先「等级 + 头衔」，都为空时退回用户组
+  String get _authorLevelText {
+    final a = _author;
+    if (a == null) return '';
+    final parts = [
+      a.level,
+      a.customTitle,
+    ].where((s) => s.trim().isNotEmpty).toList();
+    return parts.isNotEmpty ? parts.join(' ') : a.userGroup;
+  }
+
+  /// 签名展示文本：签名是 BBCode，这里去掉标记只留纯文本（卡片仅两行）
+  String get _authorSignatureText {
+    final a = _author;
+    if (a == null) return '';
+    return a.signature.replaceAll(RegExp(r'\[[^\[\]]*\]'), '').trim();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAuthor();
+  }
+
+  /// 加载开发者资料：先读持久化缓存，缺失时按 UID 抓取一次并写回
+  Future<void> _loadAuthor() async {
+    final key = 'aboutAuthorProfile_${SiteStore.instance.host}';
+    final cached = await DatabaseHelper.instance.getSetting(key);
+    if (cached != null && cached.isNotEmpty) {
+      try {
+        final map = jsonDecode(cached) as Map<String, dynamic>;
+        if (mounted) setState(() => _author = UserProfile.fromMap(map));
+        return;
+      } catch (_) {
+        // 缓存损坏则走网络重新获取
+      }
+    }
+    try {
+      final raw = await space_api.getUserProfile(
+        ApiService().dio,
+        uid: AboutPage.authorUid,
+        // 作者资料是「进入关于页」附带的非关键请求：命中人机验证 / 防火墙时
+        // 不能弹全局验证页（会盖在关于页上、且此请求并非用户主动发起）。
+        // 打上「已处理」标记，让拦截器直接返回原响应，静默失败保留占位即可。
+        options: Options(extra: {kInterstitialHandledFlag: true}),
+      );
+      if (raw['success'] != true || raw['profile'] == null) return;
+      final profile = UserProfile.fromMap(
+        (raw['profile'] as Map).cast<String, dynamic>(),
+      );
+      await DatabaseHelper.instance.setSetting(
+        key,
+        jsonEncode(profile.toMap()),
+      );
+      if (mounted) setState(() => _author = profile);
+    } catch (e) {
+      AppLogger.w('ABOUT', '作者信息获取失败: $e');
+    }
+  }
+
   /// 随机方向转 0.5~1.5 圈
   void _spinIcon() {
     final delta = 0.5 + _random.nextDouble();
     setState(() => _turns += _random.nextBool() ? delta : -delta);
   }
 
+  /// 手动检查更新
+  Future<void> _manualCheck(SettingsProvider settings) async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    await checkForUpdate(context, isAuto: false, settings: settings);
+    if (mounted) setState(() => _checking = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final settings = context.watch<SettingsProvider>();
     final hash = BuildConfig.commitHash;
     final shortHash = hash.length > 7 ? hash.substring(0, 7) : hash;
     // 未注入时 buildTime 为 0，显示占位而非 1970
@@ -118,10 +204,19 @@ class _AboutPageState extends State<AboutPage> {
 
           _sectionTitle('版本信息'),
           _card([
-            _infoTile('版本名', BuildConfig.versionName),
+            _infoTile('当前版本', BuildConfig.versionName),
+            // 最新版本来自检测更新：有值即表示检测成功（失败保持原样）
+            _latestVersionTile(),
             _infoTile('构建号', '${BuildConfig.versionCode}'),
             _infoTile('构建提交', shortHash),
             _infoTile('构建时间', buildTime),
+            const Divider(height: 1, indent: 16),
+            // 自动检查仅正式版提供（debug / beta 隐藏）；手动检查任何构建都可用
+            if (UpdateService.instance.isSupported) ...[
+              _autoUpdateSwitch(settings),
+              const Divider(height: 1, indent: 16),
+            ],
+            _updateTile(cs, settings),
           ]),
 
           FutureBuilder<List<SpecialThanks>>(
@@ -180,19 +275,24 @@ class _AboutPageState extends State<AboutPage> {
   }
 
   /// 作者卡片：头像 + 昵称 + 等级，点击进入论坛个人空间
+  ///
+  /// 资料来自 `_author`（按 UID 动态获取并持久化）；未取到时只显示头像与占位。
   Widget _authorCard(ColorScheme cs) {
+    final nickname = _author?.nickname ?? '';
+    final level = _authorLevelText;
+    final signature = _authorSignatureText;
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _openLink(AboutPage.authorSpaceUrl),
+        onTap: () => _openLink(_authorSpaceUrl),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               UserAvatar(
                 uid: AboutPage.authorUid,
-                nickname: AboutPage.authorName,
+                nickname: nickname,
                 radius: 28,
                 tapAction: AvatarTapAction.none,
               ),
@@ -206,7 +306,7 @@ class _AboutPageState extends State<AboutPage> {
                       children: [
                         Flexible(
                           child: Text(
-                            AboutPage.authorName,
+                            nickname.isEmpty ? '—' : nickname,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -215,37 +315,41 @@ class _AboutPageState extends State<AboutPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cs.secondaryContainer,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            AboutPage.authorLevel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: cs.onSecondaryContainer,
+                        if (level.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.secondaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              level,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSecondaryContainer,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      AboutPage.authorSignature,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurfaceVariant,
+                    if (signature.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        signature,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -401,6 +505,45 @@ class _AboutPageState extends State<AboutPage> {
       dense: true,
       title: Text(label, style: const TextStyle(fontSize: 13)),
       trailing: SelectableText(value, style: const TextStyle(fontSize: 13)),
+    );
+  }
+
+  /// 最新版本行 —— 取值来自检测更新结果，未检测到 / 检测失败时显示占位
+  Widget _latestVersionTile() {
+    return ValueListenableBuilder(
+      valueListenable: UpdateService.instance.latestRelease,
+      builder: (context, latest, _) => _infoTile(
+        '最新版本',
+        latest?.tagName.isNotEmpty == true ? latest!.tagName : '—',
+      ),
+    );
+  }
+
+  /// 启动时自动检查更新开关
+  Widget _autoUpdateSwitch(SettingsProvider settings) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.cloud_download_outlined),
+      title: const Text('自动检查更新'),
+      subtitle: const Text('启动时检查 GitHub 上是否有新版本'),
+      value: settings.autoCheckUpdate,
+      onChanged: settings.setAutoCheckUpdate,
+    );
+  }
+
+  /// 手动检查更新入口（任何构建都可用，便于调试 / 测试）
+  Widget _updateTile(ColorScheme cs, SettingsProvider settings) {
+    return ListTile(
+      leading: const Icon(Icons.system_update_alt),
+      title: const Text('检查更新'),
+      subtitle: const Text('检查 GitHub 上的最新版本'),
+      trailing: _checking
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(Icons.chevron_right, color: cs.outline),
+      onTap: _checking ? null : () => _manualCheck(settings),
     );
   }
 }

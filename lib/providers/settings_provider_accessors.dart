@@ -45,6 +45,12 @@ extension SettingsAccessors on SettingsProvider {
   AvatarSizeMode get avatarSizeMode => _avatarSizeMode;
   int get maxImageWidth => _maxImageWidth;
 
+  /// 启动时是否自动检查更新（仅正式版生效）
+  bool get autoCheckUpdate => _autoCheckUpdate;
+
+  /// 用户已跳过的新版本 tag（'' = 未跳过）
+  String get skippedUpdateVersion => _skippedUpdateVersion;
+
   String get creditFormula => _creditFormula;
 
   List<ManagedItem> get shortcutLinks =>
