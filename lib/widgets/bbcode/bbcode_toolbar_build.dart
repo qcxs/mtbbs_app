@@ -106,6 +106,7 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
           tooltip: tooltip,
           id: item.id,
           name: item.name,
+          badge: badges[item.id] ?? 0,
           onLongPress: () => controller.onAction(kImageLongPressId),
           cs: cs,
         );
@@ -179,6 +180,7 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
           tooltip: tooltip,
           id: item.id,
           name: item.name,
+          badge: badges[item.id] ?? 0,
           cs: cs,
         );
       case ToolbarAction.imageLongPress:
@@ -211,23 +213,30 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
     bool underline = false,
     bool strike = false,
     String name = '',
+    int badge = 0,
     VoidCallback? onLongPress,
     required ColorScheme cs,
   }) {
     final Widget child;
     if (icon != null) {
+      final color = enabled
+          ? cs.onSurfaceVariant
+          : cs.onSurfaceVariant.withValues(alpha: 0.4);
+      final iconWidget = Icon(icon, size: 16, color: color);
       child = Padding(
         padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 16,
-              color: enabled
-                  ? cs.onSurfaceVariant
-                  : cs.onSurfaceVariant.withValues(alpha: 0.4),
-            ),
+            // 有角标时在图标右上角叠一个计数（如已上传的图片/附件数量）
+            if (badge > 0)
+              Badge.count(
+                count: badge,
+                textStyle: const TextStyle(fontSize: 9, height: 1.1),
+                child: iconWidget,
+              )
+            else
+              iconWidget,
             if (name.isNotEmpty)
               Text(
                 name,

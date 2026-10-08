@@ -1,8 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/core/app/default_config.dart';
+import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
+import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 
 void main() {
   const token = kSelectTextToken;
@@ -74,6 +77,55 @@ void main() {
     test('复杂项仍能解析出动作', () {
       expect(resolveToolbarAction('image'), isNotNull);
       expect(resolveToolbarAction('emoji'), isNotNull);
+    });
+  });
+
+  group('BBCodeToolbar 角标（图片 / 附件）', () {
+    // 两项都被用户设为「隐藏」，用于验证角标能否强制显示
+    const hiddenImage = ManagedItem(id: 'image', name: '图片', visible: false);
+    const hiddenAttach = ManagedItem(id: 'attach', name: '附件', visible: false);
+
+    Future<void> pumpToolbar(
+      WidgetTester tester, {
+      required List<ManagedItem> items,
+      Map<String, int> badges = const {},
+    }) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BBCodeToolbar(
+              controller: BBCodeToolbarController(onAction: (_) {}),
+              items: items,
+              shortcuts: const {},
+              badges: badges,
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('无角标：隐藏设置生效，不渲染', (tester) async {
+      await pumpToolbar(tester, items: const [hiddenImage, hiddenAttach]);
+      expect(find.byTooltip('图片'), findsNothing);
+      expect(find.byTooltip('附件'), findsNothing);
+    });
+
+    testWidgets('有角标：忽略隐藏设置强制显示，并画出计数', (tester) async {
+      await pumpToolbar(
+        tester,
+        items: const [hiddenImage, hiddenAttach],
+        badges: const {'image': 2, 'attach': 1},
+      );
+      expect(find.byTooltip('图片'), findsOneWidget);
+      expect(find.byTooltip('附件'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      expect(find.byType(Badge), findsNWidgets(2));
+    });
+
+    testWidgets('设置按钮固定存在（即使所有项被隐藏）', (tester) async {
+      await pumpToolbar(tester, items: const [hiddenImage]);
+      expect(find.byTooltip('编辑器设置'), findsOneWidget);
     });
   });
 }

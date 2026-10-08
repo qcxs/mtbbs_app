@@ -7,8 +7,8 @@ import 'package:mtbbs/api/home/smiley/parse.dart' as parse;
 /// 获取论坛表情数据
 ///
 /// 内部流程：
-/// 1. GET {cdnUrl}/data/cache/common_smilies_var.js
-/// 2. 解析 JS 为结构化数据（图片 URL 基于 CDN 构建）
+/// 1. GET {baseUrl}/data/cache/common_smilies_var.js
+/// 2. 解析 JS 为结构化数据（图片 URL 基于自动识别的 CDN 构建）
 ///
 /// 返回包含：
 /// - groups: 分组列表（用于表情选择器 UI）

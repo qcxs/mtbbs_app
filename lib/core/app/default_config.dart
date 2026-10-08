@@ -52,7 +52,6 @@ class DefaultConfig {
       Site(
         name: 'MT论坛',
         baseUrl: 'https://bbs.binmt.cc',
-        cdn: 'https://cdn-bbs.mt2.cn',
         loginPagePath: '/member.php?mod=logging&action=login',
         forums: {},
         defaultForumOrder: [],
@@ -60,7 +59,6 @@ class DefaultConfig {
       Site(
         name: '吾爱破解',
         baseUrl: 'https://www.52pojie.cn',
-        cdn: 'https://static.52pojie.cn/',
         loginPagePath: '/member.php?mod=logging&action=login',
         forums: {},
         defaultForumOrder: [],

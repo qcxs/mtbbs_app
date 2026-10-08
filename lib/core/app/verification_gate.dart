@@ -10,6 +10,7 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/pages/verify/verify_browser_page.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/layout/window_title_bar.dart';
 
 /// 全局人机验证守门器 —— "站点返回的不是论坛页"时的统一恢复入口。
 ///
@@ -79,11 +80,13 @@ class VerificationGate {
       final result = await nav.push<bool>(
         MaterialPageRoute<bool>(
           fullscreenDialog: true,
-          builder: (_) => VerifyBrowserPage(
-            url: _probeUrl,
-            userAgent: _probeUserAgent ?? Site.uaPc,
-            cookieString: loginCookieString?.call() ?? '',
-            probe: _probePassed,
+          builder: (_) => WindowChrome(
+            child: VerifyBrowserPage(
+              url: _probeUrl,
+              userAgent: _probeUserAgent ?? Site.uaPc,
+              cookieString: loginCookieString?.call() ?? '',
+              probe: _probePassed,
+            ),
           ),
         ),
       );

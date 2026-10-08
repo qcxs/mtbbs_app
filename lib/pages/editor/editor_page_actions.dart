@@ -46,6 +46,42 @@ extension on _EditorPageState {
       return;
     }
 
+    // —— 发布前本地预校验（不改动服务端逻辑） ——
+
+    // 一、不兼容 Emoji（4 字节字符）提交后会被站点截断：拦下本次提交，
+    //     并提供一键删除；删除走 controller.value（整篇替换），因此可「撤销」反悔。
+    final emojiCount = countIncompatibleEmoji(content);
+    if (emojiCount > 0) {
+      final remove = await showIncompatibleEmojiDialog(context, emojiCount);
+      if (!mounted) return;
+      if (remove) {
+        final cleaned = stripIncompatibleEmoji(_contentCtl.text);
+        _contentCtl.value = TextEditingValue(
+          text: cleaned,
+          selection: TextSelection.collapsed(offset: cleaned.length),
+        );
+        _focusContent();
+        showToast('已删除 $emojiCount 个 Emoji，可用「撤销」恢复');
+      }
+      return;
+    }
+
+    // 二、已上传但未插入正文的图片/附件会被追加到正文末尾：先告知用户，确认后才发布
+    final pending = uninsertedMedia(
+      content: content,
+      imageAids: _imageList.map((i) => i['aid']?.toString() ?? ''),
+      attachmentAids: _attachmentList.map((i) => i['aid']?.toString() ?? ''),
+    );
+    final appendAids = {...pending.images, ...pending.attachments};
+    if (appendAids.isNotEmpty) {
+      final go = await showUninsertedMediaDialog(
+        context,
+        imageCount: pending.images.length,
+        attachCount: pending.attachments.length,
+      );
+      if (!mounted || !go) return;
+    }
+
     _setState(() => _isSubmitting = true);
 
     AppLogger.i(
@@ -61,7 +97,12 @@ extension on _EditorPageState {
     );
 
     try {
-      final result = await _submitHelper.submit(_pageData, title, content);
+      final result = await _submitHelper.submit(
+        _pageData,
+        title,
+        content,
+        appendAids: appendAids,
+      );
       if (!mounted) return;
       if (result.success) {
         final msg = result.needsApproval ? '需要审核' : '操作成功';

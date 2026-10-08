@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/config/build_config.dart';
 import 'package:mtbbs/core/utils/screen_size_ext.dart';
+import 'package:mtbbs/pages/settings/about_page.dart';
 import 'package:mtbbs/pages/settings/models/about_settings.dart';
 import 'package:mtbbs/pages/settings/models/content_settings.dart';
 import 'package:mtbbs/pages/settings/models/data_settings.dart';
@@ -90,8 +92,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildLandscape(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final settings = context.watch<SettingsProvider>();
-    final group = _groups[_currentIndex];
+    // _groups.length 这一档代表「关于」：它不是分组（竖屏是列表底部单独一行），
+    // 但宽屏下同样作为右栏内容展示，避免"其他都右侧、只有它跳新页"的不一致
+    final isAbout = _currentIndex >= _groups.length;
     return Row(
       children: [
         // 左栏固定宽度，避免占太多空间
@@ -111,7 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         index: i,
                       ),
                     const Divider(height: 8),
-                    for (final m in aboutSettings()) m.build(context, settings),
+                    _aboutTile(context, selected: isAbout),
                   ],
                 ),
               ),
@@ -121,11 +124,13 @@ class _SettingsPageState extends State<SettingsPage> {
         VerticalDivider(width: 1, color: cs.outlineVariant),
         Expanded(
           flex: 1,
-          child: SettingsGroupPage(
-            title: group.title,
-            modelsBuilder: group.models,
-            showAppBar: false,
-          ),
+          child: isAbout
+              ? const AboutPage(showAppBar: false)
+              : SettingsGroupPage(
+                  title: _groups[_currentIndex].title,
+                  modelsBuilder: _groups[_currentIndex].models,
+                  showAppBar: false,
+                ),
         ),
       ],
     );
@@ -158,6 +163,23 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ),
+    );
+  }
+
+  /// 宽屏左栏的「关于」行 —— 与分组行同款，选中后在右栏展示
+  /// （竖屏仍走 `/settings/about` 路由，见 [_buildPortrait]）
+  Widget _aboutTile(BuildContext context, {required bool selected}) {
+    final cs = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: settingIcon(context, Icons.info_outline),
+      title: const Text('关于'),
+      subtitle: Text(
+        'MTBBS v${BuildConfig.versionName}+${BuildConfig.versionCode}',
+      ),
+      trailing: Icon(Icons.chevron_right, color: cs.outline),
+      selected: selected,
+      selectedTileColor: cs.secondaryContainer,
+      onTap: () => setState(() => _currentIndex = _groups.length),
     );
   }
 

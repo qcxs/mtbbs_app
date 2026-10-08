@@ -59,20 +59,19 @@ class _SearchPageState extends State<SearchPage> {
         text.contains('space-uid');
   }
 
-  /// 输入是否匹配用户搜索条件：纯数字（uid）或合法用户名
+  /// 输入是否可能是某个用户（UID 或用户名）—— 搜索建议用的**宽松判定**。
+  ///
+  /// 刻意不套用 [UsernameValidator]：那是**注册**规则（3~15 字符、仅汉字/字母/数字/
+  /// 下划线），而论坛里真实存在的用户名可能更短、更长，或是一串数字（如手机号）；
+  /// 按注册规则过滤会让这些用户"搜不到"。这里只排除明显不像用户名的输入：
+  /// 带空白（Discuz 用户名不允许空格）或过长（多半是一句话 / 关键词）。
   bool _hasUserMatch(String text) {
-    if (text.isEmpty) return false;
-    if (UsernameValidator.isNumeric(text)) return true;
-    return UsernameValidator.validate(text).isValid;
+    if (text.isEmpty || text.length > 30) return false;
+    return !text.contains(RegExp(r'\s'));
   }
 
-  /// 用户搜索建议的显示文字
-  String _userSearchLabel(String text) {
-    if (UsernameValidator.isNumeric(text)) {
-      return '查看用户 (UID: $text)';
-    }
-    return '查看用户 "$text"';
-  }
+  /// 用户搜索建议的显示文字（不区分 UID / 用户名——数字也可能是用户名）
+  String _userSearchLabel(String text) => '查看用户 "$text"';
 
   // ==================== 动作 ====================
 
@@ -139,31 +138,35 @@ class _SearchPageState extends State<SearchPage> {
     } catch (_) {}
   }
 
-  /// 通过 uid 或用户名查找用户并跳转
+  /// 按 uid 或用户名查一次用户，命中则返回其 uid
+  Future<String?> _resolveUid({String? uid, String? username}) async {
+    try {
+      final raw = await space_api.getUserProfile(
+        ApiService().dio,
+        uid: uid ?? '',
+        username: username ?? '',
+      );
+      if (raw['success'] != true || raw['profile'] == null) return null;
+      final profile = UserProfile.fromMap(
+        raw['profile'] as Map<String, dynamic>,
+      );
+      return profile.uid.isNotEmpty ? profile.uid : uid;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 通过 UID 或用户名查找用户并跳转。
+  ///
+  /// 纯数字**不能直接当 UID**：论坛里「用户名就是一串数字（如手机号）」真实存在，
+  /// 因此数字输入先按 UID 查、查不到再按用户名查一次，都失败才提示未找到。
   Future<void> _lookupUser(String input) async {
     await _addHistory(input);
     if (!mounted) return;
 
-    final isNum = UsernameValidator.isNumeric(input);
-    String? uid;
-
-    if (isNum) {
-      uid = input; // 纯数字直接当 uid 用
-    } else {
-      // 按用户名查询，获取 uid
-      try {
-        final raw = await space_api.getUserProfile(
-          ApiService().dio,
-          username: input,
-        );
-        final profile = raw['success'] == true && raw['profile'] != null
-            ? UserProfile.fromMap(raw['profile'] as Map<String, dynamic>)
-            : null;
-        uid = profile?.uid;
-      } catch (_) {
-        uid = null;
-      }
-    }
+    final uid = UsernameValidator.isNumeric(input)
+        ? (await _resolveUid(uid: input) ?? await _resolveUid(username: input))
+        : await _resolveUid(username: input);
 
     if (!mounted) return;
 
@@ -328,7 +331,8 @@ class _SearchPageState extends State<SearchPage> {
           ),
           const Divider(height: 16),
         ],
-        if (_hasUserMatch(text)) ...[
+        // 链接输入交给上面的「打开页面 / 浏览器」建议，不再当作用户名
+        if (_hasUserMatch(text) && !_isUrl) ...[
           _suggestionCard(
             icon: Icons.person,
             iconColor: cs.onSurfaceVariant,

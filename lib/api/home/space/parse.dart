@@ -237,10 +237,22 @@ void _parseComiisProfile(dom.Document doc, Map<String, dynamic> profile) {
 ///
 /// 签名行与自定义头衔行的值都用 `.profile_r`（同为 `profile_face` 类），
 /// 只靠类名区分不开，必须按行内 `span` 的标签文案定位。
+///
+/// 克米的行是**值在前、标签在后**，且标签的包裹层级逐行不同：
+///   - 用户ID：`<li><div class="profile_rs">14330</div><span>用户ID</span></li>`
+///   - 个人签名：`<li>…<strong><font><span>个人签名</span></font></strong></li>`
+///   - 自定头衔：`<li><a><div class="profile_r">…</div><span>自定头衔</span></a></li>`
+/// 所以**不能**只看 `span.parent`（那只是标签自己的包裹元素，取值必然落空），
+/// 要从标签**向上**找到所在行 `<li>`，再取行内的值元素。
 dom.Element? _comiisRowValue(dom.Document doc, String label) {
   for (final span in doc.querySelectorAll('.comiis_space_profile li span')) {
-    if (sanitizeText(span.text) == label) {
-      return span.parent?.querySelector('.profile_r, .profile_rs');
+    if (sanitizeText(span.text) != label) continue;
+    dom.Element? node = span.parent;
+    while (node != null) {
+      final value = node.querySelector('.profile_r, .profile_rs');
+      if (value != null) return value;
+      if (node.localName == 'li') break;
+      node = node.parent;
     }
   }
   return null;

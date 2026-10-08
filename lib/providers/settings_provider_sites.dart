@@ -83,7 +83,6 @@ extension SettingsSites on SettingsProvider {
       if (def == null) continue;
       _sites[i] = current.copyWith(
         name: def.name,
-        cdn: def.cdn,
         loginPagePath: def.loginPagePath,
         userAgent: def.userAgent,
         avatarTemplate: def.avatarTemplate,
@@ -99,7 +98,6 @@ extension SettingsSites on SettingsProvider {
         Site(
           name: d.name,
           baseUrl: d.baseUrl,
-          cdn: d.cdn,
           loginPagePath: d.loginPagePath,
           forums: {},
           defaultForumOrder: [],

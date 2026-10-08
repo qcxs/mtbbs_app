@@ -2,7 +2,6 @@ import 'package:dio/dio.dart' show DioException;
 import 'package:mtbbs/config/build_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
-import 'package:mtbbs/mcp/mcp_sanitizer.dart';
 import 'package:mtbbs/mcp/mcp_types.dart';
 
 /// 出站数据结构组装 —— 工具层所有响应的唯一出口。
@@ -12,8 +11,14 @@ import 'package:mtbbs/mcp/mcp_types.dart';
 class McpPayloads {
   McpPayloads._();
 
-  /// 单条帖子正文的截断上限（字符）
+  /// 单条帖子正文的**默认**分片上限（字符）
+  ///
+  /// 超长楼层不再"一截了之"：调用方可用 `bbcode_offset` 续读同一层，
+  /// 见 [post] 返回的 `bbcodeTotalChars` / `bbcodeNextOffset`。
   static const int maxBbcodeChars = 6000;
+
+  /// `max_bbcode_chars` 参数允许的上限（调用方按需调大）
+  static const int maxBbcodeCharsLimit = 50000;
 
   /// 默认返回的楼层数上限
   static const int defaultMaxPosts = 10;
@@ -154,16 +159,52 @@ class McpPayloads {
   /// 帖子详情：标题 + 楼层正文，按 [maxPosts] 截断
   ///
   /// [fullBbcode] 为 false（默认）时正文剔除纯样式标签，省 AI 上下文。
+  /// 单层正文按 [bbcodeOffset] + [maxChars] 分片，超长楼层可用偏移量续读。
   static Map<String, dynamic> threadDetail(
     Map<String, dynamic> result, {
     required String tid,
     required int maxPosts,
     bool fullBbcode = false,
+    int bbcodeOffset = 0,
+    int maxChars = maxBbcodeChars,
   }) {
     final rawPosts = result['posts'];
     final all = rawPosts is List ? rawPosts : const <dynamic>[];
     final sliced = all.take(maxPosts).toList();
     final mainPost = result['mainPost'];
+
+    var bodyTruncated = false;
+    Map<String, dynamic> buildPost(Map p) {
+      final out = post(
+        p,
+        fullBbcode: fullBbcode,
+        offset: bbcodeOffset,
+        maxChars: maxChars,
+      );
+      if (out['bbcodeNextOffset'] != null) bodyTruncated = true;
+      return out;
+    }
+
+    final mainOut = mainPost is Map ? buildPost(mainPost) : null;
+    final posts = [
+      for (final p in sliced)
+        if (p is Map) buildPost(p),
+    ];
+
+    final notes = <String>[];
+    if (all.length > sliced.length) {
+      notes.add(
+        '本页共 ${all.length} 层，已按 max_posts=$maxPosts 截断；'
+        '需要后续楼层请提高 max_posts 或继续翻页。',
+      );
+    }
+    if (bodyTruncated) {
+      notes.add(
+        '部分楼层正文超出 max_bbcode_chars=$maxChars，已分片返回：'
+        '各层带 bbcodeNextOffset，用它作为 bbcode_offset 可续读同一层'
+        '（可同时提高 max_bbcode_chars，上限 $maxBbcodeCharsLimit）。',
+      );
+    }
 
     return _dropNulls({
       'tid': result['tid'] ?? tid,
@@ -172,18 +213,13 @@ class McpPayloads {
       'title': result['title'],
       'currentPage': result['currentPage'],
       'totalPages': result['totalPages'],
-      if (mainPost is Map) 'mainPost': post(mainPost, fullBbcode: fullBbcode),
-      'posts': [
-        for (final p in sliced)
-          if (p is Map) post(p, fullBbcode: fullBbcode),
-      ],
-      'returnedPosts': sliced.length,
+      'mainPost': mainOut,
+      'posts': posts,
+      'returnedPosts': posts.length,
       'totalPostsOnPage': all.length,
       'truncated': all.length > sliced.length,
-      'note': all.length > sliced.length
-          ? '本页共 ${all.length} 层，已按 max_posts=$maxPosts 截断；'
-                '需要后续楼层请提高 max_posts 或继续翻页。'
-          : null,
+      'bbcodeMode': fullBbcode ? 'full' : 'slim',
+      'note': notes.isEmpty ? null : notes.join(' '),
     });
   }
 
@@ -206,12 +242,27 @@ class McpPayloads {
     });
   }
 
-  /// 楼层字段白名单（正文按 [maxBbcodeChars] 截断）
+  /// 楼层字段白名单（正文按 [offset] + [maxChars] 分片返回）
   ///
   /// [fullBbcode] 为 false（默认）时剔除纯样式标签（加粗/颜色/字号…），
   /// 只保留有语义的内容标签；需要完整原文时传 true。
-  static Map<String, dynamic> post(Map post, {bool fullBbcode = false}) {
+  ///
+  /// **分片语义**：偏移量作用于"输出后的文本"（精简与完整两种形态长度不同），
+  /// 续读时必须沿用同一 `full_bbcode`，故响应回显 `bbcodeMode` 供 AI 对齐。
+  static Map<String, dynamic> post(
+    Map post, {
+    bool fullBbcode = false,
+    int offset = 0,
+    int maxChars = maxBbcodeChars,
+  }) {
     final raw = post['bbcode']?.toString() ?? '';
+    final text = bbcodeForAi(raw, full: fullBbcode);
+    final total = text.length;
+    final start = offset.clamp(0, total);
+    final end = (start + maxChars).clamp(start, total);
+    final hasMore = end < total;
+    final segment = text.substring(start, end);
+
     return _dropNulls({
       'pid': post['pid'],
       'floor': post['floor'],
@@ -222,10 +273,12 @@ class McpPayloads {
       'usergroup': post['usergroup'],
       'postTime': post['postTime'],
       'source': post['source'],
-      'bbcode': McpSanitizer.clampText(
-        bbcodeForAi(raw, full: fullBbcode),
-        maxBbcodeChars,
-      ),
+      'bbcode': hasMore
+          ? '$segment\n…（本层正文共 $total 字，本次返回第 $start-$end 字；'
+                '继续读取请传 bbcode_offset=$end）'
+          : segment,
+      'bbcodeTotalChars': total,
+      if (hasMore) 'bbcodeNextOffset': end,
       'rating': post['rating'],
     });
   }

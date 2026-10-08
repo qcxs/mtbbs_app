@@ -16,6 +16,13 @@ class BBCodeToolbar extends StatelessWidget {
   final List<ManagedItem> items;
   final Map<String, String> shortcuts;
 
+  /// 角标：item id → 数量（如「图片」「附件」已上传的数量）。
+  ///
+  /// 有角标的项**无视用户的隐藏设置强制显示**：既然已经上传过图片/附件，
+  /// 入口就应当可见（否则用户既看不到提示、也进不去管理面板）。
+  /// 无角标时隐藏设置照常生效。
+  final Map<String, int> badges;
+
   const BBCodeToolbar({
     super.key,
     required this.controller,
@@ -23,13 +30,17 @@ class BBCodeToolbar extends StatelessWidget {
     this.canRedo = false,
     required this.items,
     required this.shortcuts,
+    this.badges = const {},
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // 末尾固定追加「设置」按钮，因此即使所有项都被隐藏，工具栏仍会渲染
-    final visibleItems = items.where((e) => e.visible).toList();
+    // 末尾固定追加「设置」按钮，因此即使所有项都被隐藏，工具栏仍会渲染；
+    // 带角标的项（已上传图片/附件）同样强制显示。
+    final visibleItems = items
+        .where((e) => e.visible || (badges[e.id] ?? 0) > 0)
+        .toList();
 
     return Container(
       decoration: BoxDecoration(

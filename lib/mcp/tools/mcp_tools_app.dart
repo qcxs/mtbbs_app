@@ -104,7 +104,8 @@ Map<String, dynamic> _help() => {
     '分页统一用 page（从 1 开始），返回里有 currentPage / totalPages / hasMore。'
         '例外：search_forum_threads 翻页要回传 search_id（仅传 page 不生效）。',
     'get_thread_detail 默认只回前 10 层、正文精简；用 max_posts 调层数、'
-        'full_bbcode=true 取逐字原文。',
+        'full_bbcode=true 取逐字原文。单层正文超长会分片：该层带 bbcodeNextOffset，'
+        '用它作为 bbcode_offset 再次调用即可续读同一层（full_bbcode 要保持一致）。',
   ],
   'groups': [
     for (final g in McpToolGroup.values)

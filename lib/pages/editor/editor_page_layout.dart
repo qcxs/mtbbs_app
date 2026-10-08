@@ -282,6 +282,12 @@ extension on _EditorPageState {
               canRedo: undoVal.canRedo,
               items: items,
               shortcuts: shortcutsMap,
+              // 「图片」「附件」角标＝当前已上传的数量；有角标时该项强制显示
+              // （即使被用户在工具栏设置里隐藏），用来提示"你上传过东西"。
+              badges: {
+                if (_imageList.isNotEmpty) 'image': _imageList.length,
+                if (_attachmentList.isNotEmpty) 'attach': _attachmentList.length,
+              },
             );
           },
         ),

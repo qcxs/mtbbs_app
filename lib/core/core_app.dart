@@ -5,6 +5,7 @@ export 'app/cookie_sync.dart';
 export 'app/emoji_loader.dart';
 export 'app/event_bus.dart';
 export 'app/page_helper.dart';
+export 'app/site_cdn.dart';
 export 'app/site_store.dart';
 export 'app/stagger_queue.dart';
 export 'app/thread_parsers/comiis_card_parser.dart';

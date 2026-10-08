@@ -27,6 +27,7 @@
 | 加载页 | `GET /forum.php?mod=post&action=newthread&fid={fid}` |
 | 提交端点 | `POST /forum.php?mod=post&action=newthread&fid={fid}&topicsubmit=yes&inajax=1` |
 | 必填参数 | `formhash` `posttime` `topicsubmit=yes` `subject`(标题) `message`(内容) |
+| 可选参数 | `attachnew[{aid}][description]`（可多个）：把**已上传的附件**绑定到帖子。**正文 `message` 里没有引用到的附件，会被展示在正文末尾**；不传则附件不绑定，帖子页完全看不到（实测：同一文件，带/不带 attachnew 两帖，前者有文件名、后者没有）。见 `parseAttachNew` |
 | 探针场景 | `post.new`（fid、subject、message 必填） |
 
 成功响应：`非常感谢，您的主题已发布…`，返回新 `tid`。

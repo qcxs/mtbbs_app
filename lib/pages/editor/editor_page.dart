@@ -34,6 +34,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/quoted_post_card.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
+import 'package:mtbbs/pages/editor/editor_precheck.dart';
 import 'package:mtbbs/pages/editor/editor_submit.dart';
 import 'package:mtbbs/pages/editor/editor_dialogs.dart';
 import 'package:mtbbs/pages/editor/editor_intents.dart';

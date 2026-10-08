@@ -15,6 +15,8 @@ import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
 import 'package:mtbbs/core/app/app_link.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/site_cdn.dart';
+import 'package:mtbbs/core/app/acw_solver.dart';
 import 'package:mtbbs/core/app/verification_gate.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
@@ -59,6 +61,9 @@ void main() async {
   final settings = SettingsProvider();
   await settings.load(); // 加载持久化站点列表覆盖默认值
 
+  // 恢复上次自动识别的站点 CDN（供 SiteStore.cdnUrl 同步读取）
+  await SiteCdnStore.instance.loadIfNeeded();
+
   // 桌面窗口初始化：最小尺寸 + 恢复上次窗口尺寸/位置/最大化状态
   // （依赖 settings.themeMode，故放在 settings 加载后）
   await initDesktopWindow(brightness: windowBrightnessFor(settings.themeMode));
@@ -92,10 +97,16 @@ void main() async {
   ApiService().interstitialHandler = VerificationGate.instance.handle;
   VerificationGate.instance.isEnabled = () => settings.interstitialAutoVerify;
 
+  // 设置项「人机验证改用网页完成」：打开后跳过 L1 本地自解，强制走 WebView，
+  // 用于排查验证页本身的问题（L1 上线后 L2 平时不会被触发）。
+  AcwSolver.instance.skipLocalSolve = () => settings.acwForceWebview;
+
   // 订阅站点切换事件 — ApiService 已就绪，可安全调用 switchSite
-  EventBus.stream.where((e) => e is SiteChangedEvent).listen((_) {
+  EventBus.stream.where((e) => e is SiteChangedEvent).listen((_) async {
     ApiService().switchSite();
-    EmojiService().load();
+    // CDN 按站点识别：先探测再加载表情（表情图片 URL 依赖 CDN）
+    await detectSiteCdn(host: SiteStore.instance.host);
+    await EmojiService().load();
   });
 
   final auth = AuthProvider();
@@ -230,6 +241,12 @@ Future<void> _runSettingsGuard(SettingsProvider settings) async {
 
   final guards =
       <({bool Function() needsRefresh, Future<void> Function() refresh})>[
+        // 站点 CDN 排在表情之前：表情图片 URL 依赖识别结果
+        (
+          needsRefresh: () =>
+              SiteCdnStore.instance.needsDetect(SiteStore.instance.host),
+          refresh: () => detectSiteCdn(host: SiteStore.instance.host),
+        ),
         (
           needsRefresh: () => !EmojiService().isLoaded,
           refresh: () => EmojiService().load(),
@@ -292,6 +309,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: SiteStore.instance),
+        // 自动识别的站点 CDN（设置页「CDN 检测」行订阅它刷新）
+        ChangeNotifierProvider.value(value: SiteCdnStore.instance),
         // MCP 服务状态（设置分组页订阅它刷新）
         ChangeNotifierProvider.value(value: McpServerController.instance),
         ChangeNotifierProvider.value(value: auth),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/event_bus.dart';
+import 'package:mtbbs/core/app/site_cdn.dart';
 
 /// 站点状态存储 — 可观察的 ChangeNotifier
 ///
@@ -36,7 +37,9 @@ class SiteStore extends ChangeNotifier {
   String get baseUrl => current.baseUrl;
 
   /// 当前站点 CDN URL
-  String get cdnUrl => current.cdnUrl;
+  ///
+  /// 取自动识别的结果（[SiteCdnStore]），未识别到时回退站点 baseUrl。
+  String get cdnUrl => SiteCdnStore.instance.cdnFor(host) ?? baseUrl;
 
   /// 当前站点登录页路径
   String get loginPagePath => current.loginPagePath;

@@ -28,6 +28,12 @@ extension SettingsAccessors on SettingsProvider {
   bool get simulateBrowserHeaders => _simulateBrowserHeaders;
   bool get interstitialAutoVerify => _interstitialAutoVerify;
 
+  /// 跳过本地自解，强制走内置浏览器完成人机验证
+  bool get acwForceWebview => _acwForceWebview;
+
+  /// 开发者选项是否已解锁
+  bool get developerMode => _developerMode;
+
   /// 该页面是否仍由 App 接管（false = 已改为走内置浏览器）
   bool isAppPageEnabled(String id) => appPageEnabled(id);
 

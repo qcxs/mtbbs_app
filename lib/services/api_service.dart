@@ -5,6 +5,7 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:charset/charset.dart';
 import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/acw_solver.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -383,13 +384,16 @@ class ApiService {
 
   /// 命中"非论坛页"（人机验证 / 防火墙拦截页）时尝试自动恢复。
   ///
+  /// 两级恢复：
+  /// 1. **本地自解**——阿里云 ESA 的 `acw_sc__v2` 挑战页脚本丢进内嵌 JS 引擎跑，
+  ///    拿到 cookie 写回罐即可，用户完全无感（见 [AcwSolver]）；
+  /// 2. **人工验证弹窗**——自解不了（滑块 / 点选等交互式验证、脚本结构变化）才
+  ///    弹出内置浏览器让用户完成（[VerificationGate]）。
+  ///
   /// 返回 true 表示**已通过验证且可以重放本次请求**（打了重放标记）。
   /// 仅 GET 自动重放：写操作（发帖/评论）重放有重复提交风险，验证通过后
-  /// 交给用户手动重试。POST 命中时同样会触发验证弹窗，只是不自动重放。
+  /// 交给用户手动重试。
   Future<bool> _recoverFromInterstitial(Response<dynamic> response) async {
-    final recover = interstitialHandler;
-    if (recover == null) return false;
-
     final options = response.requestOptions;
     if (options.extra[kInterstitialHandledFlag] == true) return false;
     if (response.statusCode != 200) return false;
@@ -410,6 +414,21 @@ class ApiService {
     }
 
     AppLogger.w('DIO', '${options.path} 命中非论坛页（${body.length}B），尝试自动恢复');
+
+    // ① 本地自解（JS 引擎执行挑战页脚本）：成功即与浏览器一样无感
+    if (await _solveAcwLocally(body)) {
+      if (options.method != 'GET') {
+        AppLogger.i('DIO', '${options.path} 已本地自解验证，但非 GET 请求不自动重放');
+        return false;
+      }
+      AppLogger.i('DIO', '${options.path} 已本地自解 acw_sc__v2，重放请求');
+      options.extra[kInterstitialHandledFlag] = true;
+      return true;
+    }
+
+    // ② 自解不了（交互式验证 / 结构变化）→ 交给人工验证弹窗
+    final recover = interstitialHandler;
+    if (recover == null) return false;
     final recovered = await recover(options);
     if (!recovered) {
       AppLogger.w('DIO', '${options.path} 未通过人机验证，按原样返回');
@@ -422,6 +441,34 @@ class ApiService {
     AppLogger.i('DIO', '${options.path} 已通过验证，重放请求');
     options.extra[kInterstitialHandledFlag] = true;
     return true;
+  }
+
+  /// 本地自解 ESA 挑战，并把 `acw_sc__v2` 写进当前活跃罐。
+  ///
+  /// 同一响应的 `Set-Cookie` 已由 `CookieManager` 落罐（`acw_tc` / `cdn_sec_tc`），
+  /// 三者必须配对，因此这里只补 `acw_sc__v2`。
+  ///
+  /// **刻意不做跨罐镜像**：`acw_sc__v2` 与"本轮下发的 arg1"绑定，复制到别的罐会
+  /// 与那边的 `acw_tc` 错配；其它罐下次被挑战时会各自静默自解，用户同样无感。
+  Future<bool> _solveAcwLocally(String body) async {
+    final value = AcwSolver.instance.solve(body);
+    if (value == null) return false;
+
+    final uri = Uri.tryParse(SiteStore.instance.baseUrl);
+    final jar = activeCookieJar;
+    if (uri == null || uri.host.isEmpty || jar == null) return false;
+
+    try {
+      await jar.saveFromResponse(uri, [
+        Cookie('acw_sc__v2', value)
+          ..domain = '.${uri.host}'
+          ..path = '/',
+      ]);
+      return true;
+    } catch (e) {
+      AppLogger.w('DIO', 'acw 自解 cookie 写入失败: $e');
+      return false;
+    }
   }
 }
 

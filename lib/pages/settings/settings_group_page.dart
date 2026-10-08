@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/core/app/site_cdn.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -23,6 +25,9 @@ class SettingsGroupPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    // 站点 / 自动识别的 CDN 变化时刷新「当前站点」「CDN 检测」的副标题
+    context.watch<SiteStore>();
+    context.watch<SiteCdnStore>();
     // MCP 设置项直接读 McpServerController（不经 SettingsProvider），
     // 这里订阅它，保证开关 / 状态 / 自检结果变化时本页跟着刷新
     context.watch<McpServerController>();

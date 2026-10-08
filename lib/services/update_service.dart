@@ -85,6 +85,12 @@ class UpdateService {
     null,
   );
 
+  /// 是否正在检查更新 —— 供 UI 显示进度。
+  ///
+  /// 放在服务层而不是某个页面的 State：手动检查的入口有两个（关于页、设置搜索），
+  /// 状态跟着服务走才能两处一致。
+  final ValueNotifier<bool> checking = ValueNotifier<bool>(false);
+
   bool _inFlight = false;
 
   /// 仅正式版支持：release 编译且非 beta
@@ -94,6 +100,7 @@ class UpdateService {
   Future<UpdateCheckResult> check() async {
     if (_inFlight) return const UpdateCheckFailed('正在检查');
     _inFlight = true;
+    checking.value = true;
     try {
       final resp = await http.get(
         Uri.parse(BuildConfig.releasesApiUrl),
@@ -134,6 +141,7 @@ class UpdateService {
       return UpdateCheckFailed('$e');
     } finally {
       _inFlight = false;
+      checking.value = false;
     }
   }
 

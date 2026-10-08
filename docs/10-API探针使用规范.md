@@ -15,7 +15,8 @@
   docs/10-API探针使用规范.md（本文件）→ 架构、上手引导、踩坑记录
 
 实现层（Dart，复杂逻辑全部在此，shell 只做转发）
-  tool/api_bootstrap.dart  模拟 App 初始化序列（真实 HttpOverrides + Windows 证书 + 站点 + Cookie）
+  tool/api_bootstrap.dart  模拟 App 初始化序列（真实 HttpOverrides + Windows 证书 + 站点 + Cookie + 人机验证自解）
+  tool/acw_challenge.dart  阿里云 ESA `acw_sc__v2` 挑战的自解算法（纯 Dart，无 JS 引擎）
   tool/api_scenarios.dart  场景聚合器（合并 scenarios/ 下三个子模块，对外接口不变）
   tool/scenarios/scenario_types.dart   ApiScenario 类型定义
   tool/scenarios/read_scenarios.dart   只读场景（含 Cookie 目录扫描）
@@ -49,7 +50,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `site` | 站点（索引数字或名称，空 = 第一个站点），如 `site=1` 切到吾爱破解 |
 | `baseUrl` | 指定任意站点 URL（测试站等不在默认列表中的站点）；传入时站点列表替换为单站，Cookie 目录自动跟随 host |
 | `siteName` | 与 `baseUrl` 配合的站点名（空则用域名） |
-| `cookie` | 临时注入 Cookie，格式 `k=v,k2=v2`（也兼容浏览器复制出来的 `k=v; k2=v2`）。写入**当前账号**的 CookieJar，用于绕过人机验证 / 防盗链，如 `cookie=acw_sc__v2=<40位hex>` |
+| `cookie` | 临时注入 Cookie，格式 `k=v,k2=v2`（也兼容浏览器复制出来的 `k=v; k2=v2`）。写入**当前账号**的 CookieJar，用于防盗链 / 站点特定 Cookie；**人机验证不需要它**（探针会自动自解，见 5.1） |
 | `header` | 临时注入请求头，格式 `Name:Value,Name2:Value2`，加进 Dio 默认头，如 `header=Referer:https://bbs.binmt.cc/` |
 | `log` | `off` / `info` / `debug`（默认 `info`；`off` 只输出协议 JSON，`debug` 输出 PARSE 明细） |
 | 其余键 | 透传给场景的 `params`（见 help 中每个场景的 `params` 字段） |
@@ -60,6 +61,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 |---|---|---|
 | `session.list` | 查看本机 Cookie 目录（游客 + 各账号） | 否 |
 | `session.status` | 当前会话用户状态（uid/用户名/积分/用户组） | 否 |
+| `site.cdn` | 自动识别站点 CDN（读 PC 帮助页内联的 `STATICURL`，失败回退首页） | 否 |
 | `guide.list` | 导读列表（默认移动端 UA），`view=newthread/newreply/digest` | 否 |
 | `forum.list` | 版块帖子列表，`fid=*`（必填） | 否 |
 | `search.list` | 站内搜索帖子列表，`kw=*`、`page`、`searchid`（翻页） | 否 |
@@ -90,20 +92,19 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
   ```
 - **登录态复用**：探针读取 `%APPDATA%\qcxs\mtbbs_debug\cookies\{host}`（与 App 共享目录）。首次使用前先运行一次 App（`flutter run -d windows`）并登录生成 Cookie；无 Cookie 时 `needsLogin` 场景会自动拦截并提示。
 
-### 5.1 站点开启人机验证 / 防火墙时
+### 5.1 站点开启人机验证 / 防火墙时（探针自动自解，无需人工）
 
-探针**无法自行通过**人机验证，两条路都堵死：**没有 JS 引擎**（挑战页如阿里云 ESA 的 `acw_sc__v2` 靠 JS 计算并写入 Cookie，Dart 侧执行不了）；**没有界面**（`VerificationGate` 在无 UI 上下文时直接放弃，不会弹浏览器）。
+挑战机制、两级恢复设计与硬约束见 `docs/20-人机验证与站点防护.md`；这里只说**探针侧表现**：
 
-表现：请求返回 200 但正文是"非论坛页"（几 KB 的挑战页，而非论坛 HTML）。探针会检测到并：日志打 `[DIO] … 命中非论坛页（人机验证/防火墙拦截）`；输出协议里追加 `reminder`，写明补救步骤。
-
-出路是**复用已通过验证的浏览器里的那个 Cookie**：
-
-```bash
-# 浏览器已过验证 → F12 → Application → Cookies → 复制 acw_sc__v2 的值
-flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=cookie=acw_sc__v2=<40位hex>
-```
-
-该 Cookie 会写进当前账号的 CookieJar（与 App 共用），有效期内后续探测不用重复传。也可先正常跑一次 App（走弹窗验证，见 docs/01「Referer 模拟策略」旁的验证流程），让 Cookie 自动回流后再跑探针。
+- **正常**：日志出现 `命中人机验证，已自算 acw_sc__v2 并重放（第 1 次）`，输出多一个
+  `acwSolved` 字段（本次自解次数），请求照常拿到真页；自解得到的 token 落盘复用。
+- **失败**：连续自解 3 次仍被拦（或挑战结构变化、认不出 `arg1`）才在输出里带 `reminder`，
+  此时按提示核对 [tool/acw_challenge.dart](../tool/acw_challenge.dart)。
+- `cookie=acw_sc__v2=<值>` 手动注入**已不需要**：该值只与服务端**本轮**下发的 `arg1` 配对，
+  跨轮次 / 跨客户端复制过来的必然失效（见下方踩坑表）。
+- 探针跑的是 App 完整链路，`ApiService` 内还有一层**内嵌 JS 引擎自解**
+  （`lib/core/app/acw_solver.dart`）。引擎可用时挑战先被它解掉，`acwSolved` 会是 0
+  （探针的纯 Dart 兜底未被动用），属正常；引擎不可用时日志打 `acw 自解失败` 再走纯 Dart。
 
 ## 6. 踩坑记录（历史教训，勿重蹈）
 
@@ -116,7 +117,8 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | PowerShell 5.1 中文注释编码 | 无 BOM UTF-8 按 ANSI 解码，脚本解析失败 | ps1 已移除；如需脚本保持纯 ASCII |
 | flutter_test 自动装 mock HttpOverrides | 所有请求返回 400 | bootstrap 里用真实 `HttpOverrides.global` 覆盖 |
 | Dio 对 Map 数据不自动加 Content-Type | PHP 收不到 `$_POST`，表单校验失败 | 显式 `Headers.formUrlEncodedContentType` |
-| 站点开了人机验证，探针"请求成功却解析不出内容" | 200 + 几 KB 非论坛页（如阿里云 JS 挑战页） | 探针检测并给 `reminder`；用 `cookie=acw_sc__v2=<值>` 补凭证（见 5.1） |
+| 站点开了人机验证，探针"请求成功却解析不出内容" | 200 + 几 KB 非论坛页（阿里云 ESA 的 `acw_sc__v2` 挑战） | 探针已自动自解并重放（见 5.1）；输出 `acwSolved` 即自解次数 |
+| 手工复制浏览器里的 `acw_sc__v2` 给探针却仍被拦 | 该值只与服务端**本轮**为同一 `acw_tc` 下发的 `arg1` 配对，换客户端 / 换轮次即失效 | 不要复制；交给探针自解（见 5.1） |
 | 注入 Cookie 不生效 | cookie_jar 按 `domain` 归档，`dart:io` 的 `Cookie` 默认无 domain | 注入时显式 `..domain='.{host}'`（与 `cookie_sync.dart` 同款） |
 | `cookie` 值含非法字符导致整次探测失败 | `dart:io` 的 `Cookie` 按 RFC 6265 严格校验（值含 `,` 会抛） | 单条 try/catch 跳过并记 WARN，不影响其余（见 docs/07 #26） |
 
@@ -144,6 +146,7 @@ debug.http 拿原始响应（含登录态 Cookie） → 对照 Chrome MCP 渲染
 | `tool/scenarios/read_scenarios.dart` | 只读场景 + Cookie 目录扫描 |
 | `tool/scenarios/write_scenarios.dart` | 写操作场景 |
 | `tool/scenarios/debug_scenarios.dart` | 调试场景（`debug.http`） |
-| `tool/api_bootstrap.dart` | 初始化序列（真实网络 + Windows 证书 + 站点 + Cookie 切换 + 临时 cookie/header 注入 + 拦截页探测） |
+| `tool/api_bootstrap.dart` | 初始化序列（真实网络 + Windows 证书 + 站点 + Cookie 切换 + 临时 cookie/header 注入 + 拦截页探测与自解） |
+| `tool/acw_challenge.dart` | 人机验证（阿里云 ESA `acw_sc__v2`）自解算法：`extractAcwArg1` / `acwScV2` |
 | `lib/api/**/export.dart` | 被测 API 层（http 请求 + parse 解析） |
 | `lib/core/app/app_paths.dart` | Cookie 目录定位（Windows 分支） |

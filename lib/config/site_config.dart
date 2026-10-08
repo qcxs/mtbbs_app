@@ -15,7 +15,6 @@ class SiteConfig {
 class Site {
   final String name;
   final String baseUrl;
-  final String? cdn;
   final String loginPagePath;
   final Map<String, String> forums;
   final List<String> defaultForumOrder;
@@ -31,7 +30,6 @@ class Site {
   const Site({
     required this.name,
     required this.baseUrl,
-    this.cdn,
     required this.loginPagePath,
     required this.forums,
     required this.defaultForumOrder,
@@ -47,17 +45,6 @@ class Site {
   /// 是否使用移动端 UA（含 "Mobile" 关键字）
   bool get isMobileUA => effectiveUserAgent.contains('Mobile');
 
-  /// CDN 地址，为空时回退到 [baseUrl]
-  String get cdnUrl {
-    if (cdn != null && cdn!.isNotEmpty) return cdn!;
-    final def = SiteConfig.defaultSites().cast<Site?>().firstWhere(
-      (d) => d?.baseUrl == baseUrl && (d?.cdn?.isNotEmpty == true),
-      orElse: () => null,
-    );
-    if (def != null) return def.cdn!;
-    return baseUrl;
-  }
-
   /// 复制并覆盖字段；不传（null）= 保持不变。显式清空 [avatarTemplate] 用
   /// [clearAvatarTemplate]。
   ///
@@ -66,18 +53,15 @@ class Site {
   Site copyWith({
     String? name,
     String? baseUrl,
-    String? cdn,
     String? loginPagePath,
     Map<String, String>? forums,
     List<String>? defaultForumOrder,
     String? userAgent,
     String? avatarTemplate,
-    bool clearCdn = false,
     bool clearAvatarTemplate = false,
   }) => Site(
     name: name ?? this.name,
     baseUrl: baseUrl ?? this.baseUrl,
-    cdn: clearCdn ? null : (cdn ?? this.cdn),
     loginPagePath: loginPagePath ?? this.loginPagePath,
     forums: forums ?? this.forums,
     defaultForumOrder: defaultForumOrder ?? this.defaultForumOrder,
@@ -90,7 +74,6 @@ class Site {
   Map<String, dynamic> toJson() => {
     'name': name,
     'baseUrl': baseUrl,
-    if (cdn != null && cdn!.isNotEmpty) 'cdn': cdn,
     'loginPagePath': loginPagePath,
     'forums': forums,
     'defaultForumOrder': defaultForumOrder,
@@ -102,7 +85,6 @@ class Site {
   factory Site.fromJson(Map<String, dynamic> json) => Site(
     name: json['name']?.toString() ?? '',
     baseUrl: json['baseUrl']?.toString() ?? '',
-    cdn: json['cdn']?.toString(),
     loginPagePath:
         json['loginPagePath']?.toString() ??
         '/member.php?mod=logging&action=login',

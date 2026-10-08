@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/pages/settings/models/about_settings.dart';
 import 'package:mtbbs/pages/settings/models/content_settings.dart';
 import 'package:mtbbs/pages/settings/models/data_settings.dart';
+import 'package:mtbbs/pages/settings/models/developer_settings.dart';
 import 'package:mtbbs/pages/settings/models/display_settings.dart';
 import 'package:mtbbs/pages/settings/models/editor_settings.dart';
 import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
@@ -39,7 +40,9 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
     (group: '存储与工具', models: dataSettings),
     (group: '页面接管', models: pageGateSettings),
     (group: 'MCP 服务', models: mcpSettings),
-    (group: '关于', models: aboutSettings),
+    // 「关于」组额外索引关于页内的项（如「检查更新」）—— 与关于页渲染同一份
+    // aboutPageSettings()，改一处两边都跟着变，不存在两套清单（见 docs/07 #51）
+    (group: '关于', models: () => [...aboutSettings(), ...aboutPageSettings()]),
   ];
 
   List<({String group, List<SettingsModel> items})> _results(
@@ -47,8 +50,13 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
   ) {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return const [];
+    // 开发者选项只在解锁后参与检索（未解锁时不该被搜出来）
+    final all = [
+      ..._all,
+      if (settings.developerMode) (group: '开发者选项', models: developerSettings),
+    ];
     final results = <({String group, List<SettingsModel> items})>[];
-    for (final entry in _all) {
+    for (final entry in all) {
       final matched = entry
           .models()
           .where((m) => _matches(m, q, settings))

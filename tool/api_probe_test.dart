@@ -206,6 +206,7 @@ Future<Map<String, dynamic>> runProbe({
       'account': ApiService().activeAccount ?? '(游客)',
       'result': compactJson(result, maxStr: scenario.raw ? 100000 : 160),
       'usage': scenario.desc,
+      if (probeAcwSolved > 0) 'acwSolved': probeAcwSolved,
       if (probeInterstitialHit) 'reminder': _interstitialReminder,
     };
   } catch (e) {
@@ -220,6 +221,7 @@ Future<Map<String, dynamic>> runProbe({
           'message': e.message.isNotEmpty ? e.message : '操作失败',
         },
         'runtimeMs': sw.elapsedMilliseconds,
+        if (probeAcwSolved > 0) 'acwSolved': probeAcwSolved,
         if (probeInterstitialHit) 'reminder': _interstitialReminder,
       };
     }
@@ -228,22 +230,21 @@ Future<Map<String, dynamic>> runProbe({
       'cmd': cmd,
       'error': '$e',
       'runtimeMs': sw.elapsedMilliseconds,
+      if (probeAcwSolved > 0) 'acwSolved': probeAcwSolved,
       if (probeInterstitialHit) 'reminder': _interstitialReminder,
     };
   }
 }
 
-/// 命中"非论坛页"时的提示。
+/// 自解失败时的提示。
 ///
-/// 探针**无法自行通过**人机验证：没有 JS 引擎（挑战页靠 JS 算 Cookie），
-/// 也没有界面（`VerificationGate` 在无 UI 上下文时直接放弃）。
-/// 唯一出路是复用已通过验证的浏览器里的那个 Cookie。
+/// 正常情况下探针会自算 `acw_sc__v2` 并自动重放（见 `api_bootstrap.dart` 的
+/// `_installInterstitialProbe`），不会走到这里；只有挑战结构变化或算法失效
+/// （阿里云换了实现）才需要人工介入。
 const String _interstitialReminder =
-    '站点返回了人机验证 / 防火墙拦截页（非论坛页），探针无法自行通过'
-    '（无 JS 引擎、无界面）。解决：在已通过验证的浏览器里打开 F12 → '
-    'Application → Cookies，复制 acw_sc__v2 的值，追加 '
-    '--dart-define=cookie=acw_sc__v2=<值> 重试。该 Cookie 会写入当前账号的 '
-    'CookieJar，有效期内后续探测无需重复传入。';
+    '站点返回了人机验证 / 防火墙拦截页，且探针未能自动通过（挑战结构异常或算法已'
+    '变更）。先用 --dart-define=log=info 看「命中人机验证，已自算 acw_sc__v2」'
+    '日志；若始终失败，对照挑战页正文核对 tool/acw_challenge.dart 里的算法。';
 
 /// 生成完整使用说明（自描述，无需读源码即可上手）
 Map<String, dynamic> _buildHelp() {
@@ -263,8 +264,8 @@ Map<String, dynamic> _buildHelp() {
       'siteName': 'baseUrl 指定站点的显示名（空=域名）',
       'cookie':
           '临时注入的 Cookie，格式 k=v,k2=v2（也兼容 k=v; k2=v2）。'
-          '写入当前账号的 CookieJar，用于绕过人机验证 / 防盗链，'
-          '如 cookie=acw_sc__v2=<40位hex>',
+          '写入当前账号的 CookieJar，用于防盗链 / 站点特定 Cookie；'
+          '人机验证无需它（探针会自动自解）',
       'header':
           '临时注入的请求头，格式 Name:Value,Name2:Value2，加到 Dio 默认头，'
           '如 header=Referer:https://bbs.binmt.cc/',
@@ -285,15 +286,14 @@ Map<String, dynamic> _buildHelp() {
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=thread.detail --dart-define=tid=170313        # 帖子详情',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=debug.http --dart-define=path=/forum.php --dart-define=q=mod=guide,index=1',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=session.status --dart-define=site=1 --dart-define=account=qcxs  # 跨站点账号',
-      r'flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=cookie=acw_sc__v2=<40位hex>   # 站点开了人机验证时补凭证',
+      r'flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=log=info   # 人机验证会自解，日志可见「已自算 acw_sc__v2」',
     ],
     'tips': [
       '首次使用：先运行一次 App（flutter run -d windows）并登录，生成 Cookie；'
           '或先跑 cmd=session.list 确认本机登录状态',
       '需要登录的命令返回 blocked=true 时，追加 account=<账号名> 重试',
-      '站点开启人机验证 / 防火墙时，返回体会是"非论坛页"（如阿里云的 JS 挑战页），'
-          '结果里会带 reminder。探针没有 JS 引擎也没有界面，无法自行过验证：'
-          '请在已通过验证的浏览器里复制 acw_sc__v2，用 cookie= 传入后重试',
+      '站点开启人机验证（阿里云 ESA 的 acw_sc__v2 挑战）时，探针会自动自解'
+          '并重放请求，无需人工介入；输出里的 acwSolved 表示本次自解次数',
       'debug.http 的额外 query 参数用 q=k1=v1,k2=v2 逗号分隔'
           '（URL 中的 & 会被 PowerShell→cmd 拆散，禁止直接传完整 URL）',
       '参数值不要包含 & | ; " 空格 等特殊字符',

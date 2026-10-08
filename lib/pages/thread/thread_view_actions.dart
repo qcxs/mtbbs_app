@@ -269,9 +269,16 @@ extension on _ThreadViewPageState {
       return;
     }
     if (result.needsApproval || result.pid.isEmpty) return;
-    await _appendPost(result.pid);
+    // 主帖含"回复可见"占位时，本次回复的目的就是解锁隐藏内容，
+    // 此时不滚动定位到刚发出的回复，把视野留给即将解锁的主帖
+    final unlocking = _mainPostHasLockedContent();
+    await _appendPost(result.pid, scroll: !unlocking);
     await _reloadMainPostIfLocked();
   }
+
+  /// 主帖正文是否含"回复可见"占位（未回复时的 🔒 提示）
+  bool _mainPostHasLockedContent() =>
+      _lockedAppdataRe.hasMatch(_data?.mainPost?.bbcode ?? '');
 
   /// 回复成功后重取主帖以解锁"回复可见"内容
   ///
@@ -281,9 +288,7 @@ extension on _ThreadViewPageState {
   ///
   /// 只在主帖确实存在 locked 占位时才重取，普通帖子回复不产生额外请求。
   Future<void> _reloadMainPostIfLocked() async {
-    final mainPost = _data?.mainPost;
-    if (mainPost == null) return;
-    if (!_lockedAppdataRe.hasMatch(mainPost.bbcode)) return;
+    if (!_mainPostHasLockedContent()) return;
 
     final ok = await _reloadMainPost();
     if (!mounted || !ok) return;
@@ -325,14 +330,14 @@ extension on _ThreadViewPageState {
     return 0;
   }
 
-  /// 把新楼追加到当前评论页末尾并滚动过去（按 pid 去重）
-  Future<void> _appendPost(String pid) async {
+  /// 把新楼追加到当前评论页末尾（按 pid 去重）；[scroll] 为 true 时滚动过去
+  Future<void> _appendPost(String pid, {bool scroll = true}) async {
     final post = await _fetchPost(pid);
     if (post == null || !mounted) return;
     final posts = _commentPages[_currentPage] ??= <PostItem>[];
     if (posts.any((p) => p.pid == post.pid)) return;
     _setState(() => posts.add(post));
-    _scrollToPost(post.pid);
+    if (scroll) _scrollToPost(post.pid);
   }
 
   /// 用取回的内容原地覆盖指定楼层（编辑成功后使用）

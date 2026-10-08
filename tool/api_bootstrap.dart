@@ -7,11 +7,21 @@ import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'acw_challenge.dart';
 
 /// 本次探测是否命中"非论坛页"（人机验证 / 防火墙拦截页）。
 ///
 /// 入口层据此追加 `reminder`，告诉调用方"怎么过验证"，而不是丢一堆挑战页 HTML。
 bool probeInterstitialHit = false;
+
+/// 本次探测里成功自解人机验证的次数（入口层输出，用于量化"会不会反复验证"）
+int probeAcwSolved = 0;
+
+/// 自解在请求上的标记位（值为已尝试次数），防止无解时无限重放
+const String _kAcwSolveFlag = 'probeAcwSolveAttempts';
+
+/// 单次请求最多自解重放几次 —— 正常一次即过；连续失败说明算法/接口已变
+const int _kAcwMaxAttempts = 3;
 
 /// Windows 证书补丁（与 main.dart 的 _WindowsCertOverride 同款）
 ///
@@ -53,6 +63,7 @@ Future<void> bootstrap({
   String header = '',
 }) async {
   probeInterstitialHit = false;
+  probeAcwSolved = 0;
   TestWidgetsFlutterBinding.ensureInitialized();
   // flutter_test 会安装 _MockHttpOverrides（所有请求返回 400），
   // 必须用真实 HttpOverrides 覆盖才能发真实网络请求。
@@ -166,29 +177,87 @@ Map<String, String> parseHeaderPairs(String raw) {
   return out;
 }
 
-/// 挂一个"非论坛页"探测器
+/// 挂一个「非论坛页」探测器，并**尝试自解人机验证**。
 ///
-/// 探针没有 JS 引擎、也没有界面，过不了人机验证；但至少要**说清楚**：
-/// 命中时标记 [probeInterstitialHit]，由入口层给出"复制 acw_sc__v2 重试"的提示，
-/// 而不是让调用方对着一堆挑战页 HTML 猜。
+/// 站点（MT 论坛）前置阿里云 ESA：未过挑战时返回 200 + 几 KB 挑战页（内含
+/// `arg1`），浏览器靠页面 JS 算出 `acw_sc__v2` 写 Cookie 后重载。探针没有 JS
+/// 引擎，但该算法是固定的，Dart 侧可原样复现（见 [acwScV2]）——于是：
+///
+/// 1. 命中挑战页 → 从正文取 `arg1`，算出 `acw_sc__v2` 写进当前罐
+///    （同一响应的 `Set-Cookie` 已由 CookieManager 把 `acw_tc`/`cdn_sec_tc`
+///    落罐，三者必须配对，且必须都是**本客户端**这一轮拿到的）；
+/// 2. 原样重放该请求 → 正常拿到真页，对上层场景完全透明。
+///
+/// 自解失败（认不出 `arg1`、或连解 [_kAcwMaxAttempts] 次仍被拦）才置
+/// [probeInterstitialHit]，由入口层给出人工处理提示。
 void _installInterstitialProbe() {
-  ApiService().dio.interceptors.add(
+  final dio = ApiService().dio;
+  dio.interceptors.add(
     InterceptorsWrapper(
-      onResponse: (response, handler) {
+      onResponse: (response, handler) async {
         final body = response.data;
-        if (body is String &&
-            looksLikeInterstitialPage(
+        if (body is! String ||
+            !looksLikeInterstitialPage(
               body,
               response.headers.value('content-type'),
             )) {
+          handler.next(response);
+          return;
+        }
+
+        final options = response.requestOptions;
+        final attempts = (options.extra[_kAcwSolveFlag] as int?) ?? 0;
+        final arg1 = extractAcwArg1(body);
+        if (arg1 == null || attempts >= _kAcwMaxAttempts) {
           probeInterstitialHit = true;
           AppLogger.w(
             'DIO',
-            '${response.requestOptions.path} 命中非论坛页（人机验证/防火墙拦截）',
+            arg1 == null
+                ? '${options.path} 命中非论坛页（非 acw 类挑战，无法自解）'
+                : '${options.path} 自解 $attempts 次仍被拦，放弃',
           );
+          handler.next(response);
+          return;
         }
-        handler.next(response);
+
+        final value = acwScV2(arg1);
+        await _saveProbeCookies({'acw_sc__v2': value});
+        probeAcwSolved++;
+        options.extra[_kAcwSolveFlag] = attempts + 1;
+        AppLogger.i(
+          'DIO',
+          '${options.path} 命中人机验证，已自算 acw_sc__v2 并重放（第 ${attempts + 1} 次）',
+        );
+        try {
+          handler.resolve(await dio.fetch<void>(options));
+        } catch (e) {
+          AppLogger.w('DIO', '${options.path} 自解后重放失败: $e');
+          handler.next(response);
+        }
       },
     ),
   );
+}
+
+/// 把若干 cookie 写进当前活跃罐（与 [_applyProbeExtras] 同款：显式带前导点号
+/// 的 domain，否则 `cookie_jar` 按 domain 归档时不会随请求发出）
+Future<void> _saveProbeCookies(Map<String, String> pairs) async {
+  final jar = ApiService().activeCookieJar;
+  if (jar == null) return;
+  final uri = Uri.tryParse(SiteStore.instance.baseUrl);
+  if (uri == null || uri.host.isEmpty) return;
+  final list = <Cookie>[];
+  for (final e in pairs.entries) {
+    try {
+      list.add(
+        Cookie(e.key, e.value)
+          ..domain = '.${uri.host}'
+          ..path = '/',
+      );
+    } catch (err) {
+      AppLogger.w('DIO', '自解 cookie「${e.key}」写入被跳过: $err');
+    }
+  }
+  if (list.isEmpty) return;
+  await jar.saveFromResponse(uri, list);
 }

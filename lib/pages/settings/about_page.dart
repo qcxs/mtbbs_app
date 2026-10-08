@@ -15,19 +15,22 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/models/special_thanks.dart';
 import 'package:mtbbs/models/user_profile.dart';
+import 'package:mtbbs/pages/settings/models/about_settings.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/services/update_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
-import 'package:mtbbs/widgets/dialog/update_dialog.dart';
 
 /// 关于页 — 应用标识、作者、相关链接、版本信息与特别鸣谢。
 ///
 /// 鸣谢名单来自 `assets/config/thanks.json`，改内容不需要动代码；
 /// 作者资料按 [authorUid] 从站点动态获取（首次取到后持久化，之后只读缓存）。
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key});
+  const AboutPage({super.key, this.showAppBar = true});
+
+  /// 宽屏设置页把本页放进右栏时传 false（外层已有自己的框架）
+  final bool showAppBar;
 
   /// 开发者 UID（唯一硬编码项，其余资料按它动态获取）
   static const String authorUid = '88062';
@@ -53,8 +56,10 @@ class _AboutPageState extends State<AboutPage> {
   double _turns = 0;
   final math.Random _random = math.Random();
 
-  /// 手动检查更新进行中（用于禁用入口并显示进度）
-  bool _checking = false;
+  /// 开发者选项解锁手势：未解锁时连点 [_unlockNeedTaps] 次（相邻间隔 ≤2s）解锁
+  static const int _unlockNeedTaps = 7;
+  int _unlockTaps = 0;
+  DateTime? _lastUnlockTapAt;
 
   /// 开发者资料（首次从站点获取后持久化，之后读缓存）
   UserProfile? _author;
@@ -129,12 +134,30 @@ class _AboutPageState extends State<AboutPage> {
     setState(() => _turns += _random.nextBool() ? delta : -delta);
   }
 
-  /// 手动检查更新
-  Future<void> _manualCheck(SettingsProvider settings) async {
-    if (_checking) return;
-    setState(() => _checking = true);
-    await checkForUpdate(context, isAuto: false, settings: settings);
-    if (mounted) setState(() => _checking = false);
+  /// 图标点击：已解锁开发者选项 → 直接进入；未解锁 → 转个圈并累计次数，满
+  /// [_unlockNeedTaps] 次解锁（相邻两次超过 2 秒则重新计数）。
+  void _onIconTap() {
+    final settings = context.read<SettingsProvider>();
+    if (settings.developerMode) {
+      context.push('/settings/developer');
+      return;
+    }
+    _spinIcon();
+    final now = DateTime.now();
+    if (_lastUnlockTapAt == null ||
+        now.difference(_lastUnlockTapAt!) > const Duration(seconds: 2)) {
+      _unlockTaps = 0;
+    }
+    _lastUnlockTapAt = now;
+    _unlockTaps++;
+    final left = _unlockNeedTaps - _unlockTaps;
+    if (left > 0) {
+      showToast('再点击 $left 次进入开发者选项');
+    } else {
+      _unlockTaps = 0;
+      settings.setDeveloperMode(true);
+      showToast('已解锁开发者选项，再次点击图标即可进入');
+    }
   }
 
   @override
@@ -154,7 +177,9 @@ class _AboutPageState extends State<AboutPage> {
         : 'N/A';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('关于'), centerTitle: true),
+      appBar: widget.showAppBar
+          ? AppBar(title: const Text('关于'), centerTitle: true)
+          : null,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
@@ -210,13 +235,12 @@ class _AboutPageState extends State<AboutPage> {
             _infoTile('构建号', '${BuildConfig.versionCode}'),
             _infoTile('构建提交', shortHash),
             _infoTile('构建时间', buildTime),
-            const Divider(height: 1, indent: 16),
-            // 自动检查仅正式版提供（debug / beta 隐藏）；手动检查任何构建都可用
-            if (UpdateService.instance.isSupported) ...[
-              _autoUpdateSwitch(settings),
+            // 更新相关项来自 aboutPageSettings() —— 与设置搜索的索引**同一份数据源**：
+            // 新增/改文案只动一处，不会再出现「页面里有、搜索却搜不到」（见 docs/07 #51）
+            for (final item in aboutPageSettings()) ...[
               const Divider(height: 1, indent: 16),
+              item.build(context, settings),
             ],
-            _updateTile(cs, settings),
           ]),
 
           FutureBuilder<List<SpecialThanks>>(
@@ -238,9 +262,10 @@ class _AboutPageState extends State<AboutPage> {
       padding: const EdgeInsets.only(top: 24, bottom: 4),
       child: Column(
         children: [
-          // 图标位图自带圆角与透明角，无需再裁切或描边；点一下随机转个角度
+          // 图标位图自带圆角与透明角，无需再裁切或描边；点一下随机转个角度；
+          // 连点 7 次解锁开发者选项，解锁后单击即进入（见 _onIconTap）
           GestureDetector(
-            onTap: _spinIcon,
+            onTap: _onIconTap,
             behavior: HitTestBehavior.opaque,
             child: AnimatedRotation(
               turns: _turns,
@@ -516,34 +541,6 @@ class _AboutPageState extends State<AboutPage> {
         '最新版本',
         latest?.tagName.isNotEmpty == true ? latest!.tagName : '—',
       ),
-    );
-  }
-
-  /// 启动时自动检查更新开关
-  Widget _autoUpdateSwitch(SettingsProvider settings) {
-    return SwitchListTile(
-      secondary: const Icon(Icons.cloud_download_outlined),
-      title: const Text('自动检查更新'),
-      subtitle: const Text('启动时检查 GitHub 上是否有新版本'),
-      value: settings.autoCheckUpdate,
-      onChanged: settings.setAutoCheckUpdate,
-    );
-  }
-
-  /// 手动检查更新入口（任何构建都可用，便于调试 / 测试）
-  Widget _updateTile(ColorScheme cs, SettingsProvider settings) {
-    return ListTile(
-      leading: const Icon(Icons.system_update_alt),
-      title: const Text('检查更新'),
-      subtitle: const Text('检查 GitHub 上的最新版本'),
-      trailing: _checking
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(Icons.chevron_right, color: cs.outline),
-      onTap: _checking ? null : () => _manualCheck(settings),
     );
   }
 }

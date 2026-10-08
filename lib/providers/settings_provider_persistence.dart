@@ -18,6 +18,8 @@ extension SettingsPersistence on SettingsProvider {
     applyBrowserHeaders(_simulateBrowserHeaders);
     _interstitialAutoVerify =
         (await _db.getSettingBool('interstitialAutoVerify')) ?? true;
+    _acwForceWebview = (await _db.getSettingBool('acwForceWebview')) ?? false;
+    _developerMode = (await _db.getSettingBool('developerMode')) ?? false;
     // 页面接管：被关闭的页面 id（JSON 数组），默认空 = 全部走 App 页
     final fallbackJson = await _db.getSetting('browserFallbackPages');
     if (fallbackJson != null && fallbackJson.isNotEmpty) {
@@ -235,6 +237,20 @@ extension SettingsPersistence on SettingsProvider {
   Future<void> setInterstitialAutoVerify(bool enabled) async {
     _interstitialAutoVerify = enabled;
     await _db.setSettingBool('interstitialAutoVerify', enabled);
+    _notify();
+  }
+
+  /// 开关"跳过本地自解，改用内置浏览器完成人机验证"
+  Future<void> setAcwForceWebview(bool enabled) async {
+    _acwForceWebview = enabled;
+    await _db.setSettingBool('acwForceWebview', enabled);
+    _notify();
+  }
+
+  /// 开关"开发者选项已解锁"（关于页图标连点解锁 / 页面内关闭）
+  Future<void> setDeveloperMode(bool enabled) async {
+    _developerMode = enabled;
+    await _db.setSettingBool('developerMode', enabled);
     _notify();
   }
 

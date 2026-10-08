@@ -108,8 +108,15 @@ class EditorSubmitHelper {
     }
   }
 
-  /// 从内容中提取 [attachimg]{aid}[/attachimg] + [attach]{aid}[/attach] + 面板活跃 AID
-  Map<String, String> parseAttachNew(String content) {
+  /// 从内容中提取 [attachimg]{aid}[/attachimg] + [attach]{aid}[/attach] + 面板活跃 AID，
+  /// 以及调用方额外补充的 aid（[extraAids]，用于"已上传但未插入正文"的项）。
+  ///
+  /// 这些 aid 会以 `attachnew[aid][description]` 提交，Discuz 据此把附件绑定到帖子，
+  /// **未在正文中引用到的会被展示在正文末尾**。
+  Map<String, String> parseAttachNew(
+    String content, {
+    Set<String> extraAids = const {},
+  }) {
     final aids = RegExp(
       r'\[attachimg\](\d+)\[/attachimg\]',
     ).allMatches(content).map((m) => m.group(1)!).toSet();
@@ -120,6 +127,7 @@ class EditorSubmitHelper {
       ).allMatches(content).map((m) => m.group(1)!),
     );
     aids.addAll(contentCtl.pendingAids);
+    aids.addAll(extraAids);
     if (aids.isEmpty) return const {};
     return {for (final aid in aids) 'attachnew[$aid][description]': ''};
   }
@@ -227,12 +235,16 @@ class EditorSubmitHelper {
   }
 
   /// 统一提交入口
+  ///
+  /// [appendAids]：已上传但未插入正文的图片/附件 aid，一并按 `attachnew` 提交
+  /// （Discuz 会把这些未引用的附件展示在正文末尾）。
   Future<SubmitResult> submit(
     PageFormData pageData,
     String title,
-    String content,
-  ) async {
-    final attachNew = parseAttachNew(content);
+    String content, {
+    Set<String> appendAids = const {},
+  }) async {
+    final attachNew = parseAttachNew(content, extraAids: appendAids);
 
     AppLogger.i(
       'EDITOR',

@@ -128,7 +128,10 @@ List<McpToolDefinition> forumTools() => [
         '读取帖子详情：标题 + 楼层正文。正文默认返回**精简 BBCode**——'
         '已剔除加粗/斜体/下划线/颜色/字号/字体/背景色/对齐等纯样式标签（保留删除线，'
         '因其带语义），省上下文。需要逐字原文（如样式、引用格式）时传 full_bbcode=true。'
-        '默认只返回前 ${McpPayloads.defaultMaxPosts} 层，正文超长会被截断。',
+        '默认只返回前 ${McpPayloads.defaultMaxPosts} 层（更多请提高 max_posts 或翻页）。'
+        '单层正文超过 max_bbcode_chars（默认 ${McpPayloads.maxBbcodeChars} 字，上限 '
+        '${McpPayloads.maxBbcodeCharsLimit}）时分片返回，该层会带 bbcodeNextOffset，'
+        '用它作为 bbcode_offset 再次调用即可续读同一层（务必沿用相同的 full_bbcode）。',
     properties: {
       'tid': JsonSchema.string(description: '帖子 ID（tid）'),
       'page': JsonSchema.integer(
@@ -144,6 +147,20 @@ List<McpToolDefinition> forumTools() => [
       'full_bbcode': JsonSchema.boolean(
         description: '是否返回完整 BBCode（含样式标签）。默认 false，精简版更省上下文。',
       ),
+      'bbcode_offset': JsonSchema.integer(
+        minimum: 0,
+        maximum: 10000000,
+        description:
+            '正文起始字符偏移，默认 0。用于续读超长楼层——'
+            '取上一次响应中该层的 bbcodeNextOffset。',
+      ),
+      'max_bbcode_chars': JsonSchema.integer(
+        minimum: 1,
+        maximum: McpPayloads.maxBbcodeCharsLimit,
+        description:
+            '每层正文最多返回多少字，默认 ${McpPayloads.maxBbcodeChars}，'
+            '上限 ${McpPayloads.maxBbcodeCharsLimit}',
+      ),
     },
     requiredArgs: const ['tid'],
     run: (args) async {
@@ -157,6 +174,20 @@ List<McpToolDefinition> forumTools() => [
         max: 50,
       );
       final fullBbcode = McpArgs.boolean(args, 'full_bbcode');
+      final bbcodeOffset = McpArgs.integer(
+        args,
+        'bbcode_offset',
+        fallback: 0,
+        min: 0,
+        max: 10000000,
+      );
+      final maxChars = McpArgs.integer(
+        args,
+        'max_bbcode_chars',
+        fallback: McpPayloads.maxBbcodeChars,
+        min: 1,
+        max: McpPayloads.maxBbcodeCharsLimit,
+      );
       final result = await viewthread.getThreadDetail(
         ApiService().dio,
         tid: tid,
@@ -167,6 +198,8 @@ List<McpToolDefinition> forumTools() => [
         tid: tid,
         maxPosts: maxPosts,
         fullBbcode: fullBbcode,
+        bbcodeOffset: bbcodeOffset,
+        maxChars: maxChars,
       );
     },
   ),

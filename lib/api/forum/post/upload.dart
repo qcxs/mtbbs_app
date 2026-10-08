@@ -201,7 +201,11 @@ Future<Map<String, dynamic>> uploadAttachment(
     'hash': uploadHash,
   });
 
-  var url = '/misc.php?mod=swfupload&action=swfupload&operation=upload';
+  // `simple=2` 必须带：服务端按它决定响应格式（`forum_upload.php`）——
+  //   带 simple=2 → `DISCUZUPLOAD|type|status|aid|isimage|file|name|err`
+  //   不带       → 只回一个裸 aid（`echo $this->aid`），下面的 `|` 解析必然失败
+  var url =
+      '/misc.php?mod=swfupload&action=swfupload&operation=upload&simple=2';
   if (fid.isNotEmpty) url += '&fid=$fid';
 
   final resp = await dio.post<String>(

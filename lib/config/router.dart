@@ -19,6 +19,7 @@ import 'package:mtbbs/pages/settings/about_page.dart';
 import 'package:mtbbs/pages/settings/cache_settings_page.dart';
 import 'package:mtbbs/pages/settings/editor_settings_page.dart';
 import 'package:mtbbs/pages/settings/history_format_page.dart';
+import 'package:mtbbs/pages/settings/models/developer_settings.dart';
 import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
 import 'package:mtbbs/pages/settings/settings_group_page.dart';
 import 'package:mtbbs/pages/thread/thread_view_page.dart';
@@ -148,6 +149,16 @@ GoRouter buildRouter({
               child: SettingsGroupPage(
                 title: 'MCP 服务',
                 modelsBuilder: mcpSettings,
+              ),
+            ),
+          ),
+          // 开发者选项 —— 入口是「关于页图标连点 7 次」，所以不做成设置页的分组行
+          GoRoute(
+            path: '/settings/developer',
+            pageBuilder: (_, __) => NoTransitionPage(
+              child: SettingsGroupPage(
+                title: '开发者选项',
+                modelsBuilder: developerSettings,
               ),
             ),
           ),

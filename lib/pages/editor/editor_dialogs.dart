@@ -146,3 +146,90 @@ void showRawBbcodeDialog(BuildContext context, String bbcode) {
     ),
   );
 }
+
+/// 发布前拦下「不兼容 Emoji」（4 字节字符）。
+///
+/// 返回 true = 用户选择删除 Emoji。注意：**本次提交一律被阻止**，删除后由用户
+/// 自行再次发布（内容已改动，可通过「撤销」反悔）。
+Future<bool> showIncompatibleEmojiDialog(
+  BuildContext context,
+  int emojiCount,
+) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      constraints: const BoxConstraints(maxWidth: 400),
+      title: const Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '包含不兼容的 Emoji',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+      content: Text(
+        '正文里有 $emojiCount 个 Emoji，提交后可能被站点截断。\n\n'
+        '可以先删除它们再发布，删除后可用「撤销」恢复。',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('先不改'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text('删除 $emojiCount 个 Emoji'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
+/// 发布前提醒「已上传但未插入正文」的图片 / 附件。
+///
+/// 返回 true = 继续发布（这些内容会由 `attachnew` 追加到正文末尾）。
+Future<bool> showUninsertedMediaDialog(
+  BuildContext context, {
+  required int imageCount,
+  required int attachCount,
+}) async {
+  final parts = [
+    if (imageCount > 0) '$imageCount 张图片',
+    if (attachCount > 0) '$attachCount 个附件',
+  ].join('、');
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      constraints: const BoxConstraints(maxWidth: 400),
+      title: const Row(
+        children: [
+          Icon(Icons.attachment_outlined, size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '有内容未插入正文',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+      content: Text('$parts 还没有插入到正文。继续发布的话，它们会被自动追加到正文末尾。'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('返回插入'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('追加并发布'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}

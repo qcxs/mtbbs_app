@@ -18,6 +18,7 @@ import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/api/home/system/export.dart' as system_api;
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
+import 'package:mtbbs/api/site/cdn/export.dart' as cdn_api;
 import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
@@ -47,6 +48,11 @@ final Map<String, ApiScenario> readScenarios = {
       r['account'] = ApiService().activeAccount ?? '(游客)';
       return r;
     },
+  ),
+  'site.cdn': ApiScenario(
+    desc: '自动识别站点 CDN（读 PC 帮助页内联的 STATICURL；失败回退论坛首页）',
+    params: {},
+    run: (a) => cdn_api.fetchSiteCdn(ApiService().dio),
   ),
   'guide.list': ApiScenario(
     desc: '导读列表（默认移动端 UA）',

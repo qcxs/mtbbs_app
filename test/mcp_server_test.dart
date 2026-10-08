@@ -324,4 +324,70 @@ void main() {
       expect(out['bbcode'], source);
     });
   });
+
+  group('超长正文分片（可续读）', () {
+    test('超出 maxChars：返回片段 + 总长 + bbcodeNextOffset', () {
+      final source = 'a' * 100;
+      final out = McpPayloads.post({'bbcode': source}, maxChars: 30);
+      expect(out['bbcodeTotalChars'], 100);
+      expect(out['bbcodeNextOffset'], 30);
+      expect(out['bbcode'], startsWith('a' * 30));
+      expect(out['bbcode'], contains('bbcode_offset=30'));
+    });
+
+    test('带 offset 续读拿到后续片段，末片无 bbcodeNextOffset', () {
+      const source = 'abcdefghij';
+      final mid = McpPayloads.post({'bbcode': source}, offset: 4, maxChars: 3);
+      expect(mid['bbcode'], startsWith('efg'));
+      expect(mid['bbcodeNextOffset'], 7);
+      final last = McpPayloads.post({'bbcode': source}, offset: 7, maxChars: 3);
+      expect(last['bbcode'], 'hij');
+      expect(last.containsKey('bbcodeNextOffset'), isFalse);
+    });
+
+    test('offset 超出总长：返回空片段且不报错', () {
+      final out = McpPayloads.post({'bbcode': 'abc'}, offset: 99, maxChars: 10);
+      expect(out['bbcode'], '');
+      expect(out.containsKey('bbcodeNextOffset'), isFalse);
+    });
+
+    test('偏移量作用于精简后的文本（与 full_bbcode 口径一致）', () {
+      const source = '[b]ab[/b]cd'; // 精简后为 abcd
+      final out = McpPayloads.post({'bbcode': source}, offset: 2, maxChars: 10);
+      expect(out['bbcode'], 'cd');
+      expect(out['bbcodeTotalChars'], 4);
+    });
+  });
+
+  group('帖子详情：分片续读指引', () {
+    test('楼层正文被分片时，note 给出 bbcode_offset 续读方法', () {
+      final result = {
+        'tid': '1',
+        'posts': [
+          {'pid': 'p1', 'bbcode': 'x' * 50},
+        ],
+      };
+      final out = McpPayloads.threadDetail(
+        result,
+        tid: '1',
+        maxPosts: 10,
+        maxChars: 20,
+      );
+      expect(out['bbcodeMode'], 'slim');
+      expect(out['note'], contains('bbcode_offset'));
+    });
+
+    test('楼层数被截断时，note 仍指引 max_posts / 翻页', () {
+      final result = {
+        'tid': '1',
+        'posts': [
+          {'pid': 'p1', 'bbcode': 'short'},
+          {'pid': 'p2', 'bbcode': 'short'},
+        ],
+      };
+      final out = McpPayloads.threadDetail(result, tid: '1', maxPosts: 1);
+      expect(out['truncated'], isTrue);
+      expect(out['note'], contains('max_posts'));
+    });
+  });
 }

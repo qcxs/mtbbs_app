@@ -50,9 +50,6 @@ class SiteManagement {
               children: List.generate(SiteStore.instance.sites.length, (i) {
                 final site = SiteStore.instance.sites[i];
                 final subtitle = StringBuffer(site.baseUrl);
-                if (site.cdn != null && site.cdn!.isNotEmpty) {
-                  subtitle.write('\nCDN: ${site.cdn}');
-                }
                 if (site.avatarTemplate != null &&
                     site.avatarTemplate!.isNotEmpty) {
                   subtitle.write('\n头像: 自定义模板');
@@ -206,11 +203,8 @@ class SiteManagement {
     final site = SiteStore.instance.sites[index];
     showDialog(
       context: context,
-      builder: (_) => _EditSiteDialog(
-        settings: settings,
-        index: index,
-        site: site,
-      ),
+      builder: (_) =>
+          _EditSiteDialog(settings: settings, index: index, site: site),
     );
   }
 
@@ -251,9 +245,6 @@ class _EditSiteDialogState extends State<_EditSiteDialog> {
   late final TextEditingController _urlCtl = TextEditingController(
     text: widget.site.baseUrl,
   );
-  late final TextEditingController _cdnCtl = TextEditingController(
-    text: widget.site.cdn ?? '',
-  );
   late final TextEditingController _loginPathCtl = TextEditingController(
     text: widget.site.loginPagePath,
   );
@@ -265,7 +256,6 @@ class _EditSiteDialogState extends State<_EditSiteDialog> {
   void dispose() {
     _nameCtl.dispose();
     _urlCtl.dispose();
-    _cdnCtl.dispose();
     _loginPathCtl.dispose();
     _avatarCtl.dispose();
     super.dispose();
@@ -274,21 +264,17 @@ class _EditSiteDialogState extends State<_EditSiteDialog> {
   Future<void> _save() async {
     final name = _nameCtl.text.trim();
     var url = _urlCtl.text.trim();
-    final cdnText = _cdnCtl.text.trim();
     final loginPath = _loginPathCtl.text.trim();
     final avatarTemplate = _avatarCtl.text.trim();
     if (name.isEmpty || url.isEmpty) return;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://$url';
     }
-    final cdn = cdnText.isNotEmpty ? cdnText : null;
     await widget.settings.updateSite(
       widget.index,
       widget.site.copyWith(
         name: name,
         baseUrl: url,
-        cdn: cdn,
-        clearCdn: cdn == null,
         loginPagePath: loginPath,
         avatarTemplate: avatarTemplate,
         clearAvatarTemplate: avatarTemplate.isEmpty,
@@ -321,17 +307,6 @@ class _EditSiteDialogState extends State<_EditSiteDialog> {
               controller: _urlCtl,
               decoration: const InputDecoration(
                 labelText: '站点地址',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: TextInputType.url,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _cdnCtl,
-              decoration: const InputDecoration(
-                labelText: 'CDN 地址（可选）',
-                hintText: '留空则使用站点地址',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),

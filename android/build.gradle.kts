@@ -31,6 +31,24 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// flutter_js 0.8.7 属旧式插件：android/build.gradle 里写死 kotlinOptions.jvmTarget = 1.8，
+// 与 AGP 9 给 Java 编译任务的默认目标（11）不一致，Gradle 9 会直接报
+// "Inconsistent JVM Target Compatibility Between Java and Kotlin Tasks" 而构建失败。
+// 这里把它的 Kotlin jvmTarget 对齐到 11（仅作用于该插件，其余插件不受影响）。
+subprojects {
+    if (name == "flutter_js") {
+        afterEvaluate {
+            tasks
+                .withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java)
+                .configureEach {
+                    compilerOptions.jvmTarget.set(
+                        org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11,
+                    )
+                }
+        }
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

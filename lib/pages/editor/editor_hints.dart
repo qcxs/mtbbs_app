@@ -16,12 +16,10 @@ extension on _EditorPageState {
   }
 
   /// 检测内容是否包含不兼容的 Emoji（4 字节 UTF-8 字符）
-  bool _checkIncompatibleEmoji(String text) {
-    for (final rune in text.runes) {
-      if (rune > 0xFFFF) return true;
-    }
-    return false;
-  }
+  ///
+  /// 与「发布前拦截」共用同一份判定（`editor_precheck.dart`）。
+  bool _checkIncompatibleEmoji(String text) =>
+      countIncompatibleEmoji(text) > 0;
 
   /// 更新 Emoji 警告提示状态
   void _updateEmojiWarning() {

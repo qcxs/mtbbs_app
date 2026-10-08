@@ -50,6 +50,12 @@ class SettingsProvider extends ChangeNotifier {
   /// 站点返回"非论坛页"（人机验证 / 防火墙）时，自动弹浏览器让用户通过验证
   bool _interstitialAutoVerify = true;
 
+  /// 跳过本地自解，强制用内置浏览器完成人机验证（排查验证页异常时用，默认关）
+  bool _acwForceWebview = false;
+
+  /// 开发者选项是否已解锁（关于页图标连点解锁）。解锁后关于页图标单击即进入
+  bool _developerMode = false;
+
   /// 关闭 App 接管、改用内置浏览器打开的页面 id（空 = 全部走 App 页）
   Set<String> _browserFallbackPages = <String>{};
 
