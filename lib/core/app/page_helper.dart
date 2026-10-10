@@ -192,6 +192,10 @@ Map<String, int> extractPagination(dom.Document doc) {
 /// ```
 /// 通过 "下一页" 判断还有更多页。
 ///
+/// **必须排除正文/楼层区内的链接**：用户发的帖子可能引用别的帖子
+/// （如 `...?tid=174230&page=2`），若把这类链接也算进分页，单页帖子会被
+/// 误判成多页（见下方 [_isInsidePostContent]）。
+///
 /// 返回 `{currentPage: int, totalPages: int}`。
 Map<String, int> extractPaginationFromLinks(dom.Document doc) {
   const defaults = <String, int>{'currentPage': 1, 'totalPages': 1};
@@ -207,6 +211,8 @@ Map<String, int> extractPaginationFromLinks(dom.Document doc) {
   int? nextPage; // "下一页" 指向的页码
 
   for (final a in pageLinks) {
+    // 正文/楼层里的链接是用户内容（可能带 page=N），不属于分页
+    if (_isInsidePostContent(a)) continue;
     final href = a.attributes['href'] ?? '';
     final text = a.text.trim();
     int? p;
@@ -240,6 +246,23 @@ Map<String, int> extractPaginationFromLinks(dom.Document doc) {
   final totalPages = currentPage < maxPage ? maxPage : currentPage;
 
   return {'currentPage': currentPage, 'totalPages': totalPages};
+}
+
+/// 判断链接是否位于帖子正文 / 楼层区内（用户内容）。
+///
+/// 帖子页里这两处都可能出现带 `page=N` 的链接（引用其它帖子、跳转按钮），
+/// 它们是"内容"而非"分页栏"，必须排除，否则单页帖子会被误判成多页：
+/// - `#postlist`：楼层表格容器（标准 Discuz 与克米模板共用）
+/// - `td.t_f` / `.t_fsz`：楼层正文单元格
+bool _isInsidePostContent(dom.Element a) {
+  var node = a.parent;
+  while (node != null) {
+    if (node.id == 'postlist') return true;
+    final cls = node.className;
+    if (cls == 't_f' || cls == 't_fsz') return true;
+    node = node.parent;
+  }
+  return false;
 }
 
 /// 从 Discuz 帖子 URL 中提取 tid 和 page。

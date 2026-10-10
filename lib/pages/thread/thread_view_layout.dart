@@ -34,50 +34,45 @@ extension on _ThreadViewPageState {
         !_pageLoading) {
       return const EmptyView(text: '暂无数据');
     }
-    return NotificationListener<ScrollNotification>(
-      onNotification: _handleScrollNotification,
-      child: RefreshIndicator(
-        onRefresh: _onRefresh,
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            if (_data!.title.isNotEmpty)
-              SliverToBoxAdapter(child: _buildTitleSection()),
-            if (_data!.mainPost != null) ...[
-              SliverToBoxAdapter(child: _buildMainPostSection()),
-              SliverToBoxAdapter(child: const Divider(height: 1)),
-              // 评论区锚点 — 窄屏"滚动到评论区"的目标
-              SliverToBoxAdapter(
-                child: SizedBox(key: _commentAnchorKey, height: 1),
-              ),
-            ],
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: CommentHeaderDelegate(
-                child: CommentSection.buildHeader(
-                  context: context,
-                  currentPage: _currentPage,
-                  totalPages: _totalPages,
-                  pageLoading: _pageLoading,
-                  onPrev: _currentPage > 1
-                      ? () => _goToPage(_currentPage - 1)
-                      : null,
-                  onNext: _currentPage < _totalPages
-                      ? () => _goToPage(_currentPage + 1)
-                      : null,
-                  onPageTap: _showPagePicker,
-                  onRefresh: _refreshCurrentPage,
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(child: _buildCommentContent()),
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          if (_data!.title.isNotEmpty)
+            SliverToBoxAdapter(child: _buildTitleSection()),
+          if (_data!.mainPost != null) ...[
+            SliverToBoxAdapter(child: _buildMainPostSection()),
+            SliverToBoxAdapter(child: const Divider(height: 1)),
+            // 评论区锚点 — 窄屏"滚动到评论区"的目标
             SliverToBoxAdapter(
-              child: SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 60,
-              ),
+              child: SizedBox(key: _commentAnchorKey, height: 1),
             ),
           ],
-        ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: CommentHeaderDelegate(
+              child: CommentSection.buildHeader(
+                context: context,
+                currentPage: _currentPage,
+                totalPages: _totalPages,
+                pageLoading: _pageLoading,
+                onPrev: _currentPage > 1
+                    ? () => _goToPage(_currentPage - 1)
+                    : null,
+                onNext: _currentPage < _totalPages
+                    ? () => _goToPage(_currentPage + 1)
+                    : null,
+                onPageTap: _showPagePicker,
+                onRefresh: _refreshCurrentPage,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(child: _buildCommentContent()),
+          SliverToBoxAdapter(
+            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 60),
+          ),
+        ],
       ),
     );
   }
@@ -101,7 +96,6 @@ extension on _ThreadViewPageState {
       tid: widget.tid,
       opUid: _data?.mainPost?.uid ?? '',
       globalDisableStyle: _globalDisableStyle,
-      onScrollNotification: _handleScrollNotification,
       onReply: (post) =>
           _openEditor('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}'),
       onRecommend: _handleRecommend,
@@ -136,12 +130,7 @@ extension on _ThreadViewPageState {
           onRefresh: _refreshCurrentPage,
         ),
         const Divider(height: 1),
-        Expanded(
-          child: NotificationListener<ScrollNotification>(
-            onNotification: _handleScrollNotification,
-            child: SingleChildScrollView(child: _buildCommentContent()),
-          ),
-        ),
+        Expanded(child: SingleChildScrollView(child: _buildCommentContent())),
       ],
     );
   }

@@ -74,9 +74,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   int _totalPages = 1;
   bool _pageLoading = false;
 
-  // ---- 预加载 ----
-  bool _preloading = false;
-
   // ---- 滚动 ----
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _commentAnchorKey = GlobalKey();
@@ -239,44 +236,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       });
   }
 
-  void _preloadAdjacentPages() {
-    if (_preloading) return;
-    final next = _currentPage + 1;
-    if (next <= _totalPages && !_commentPages.containsKey(next)) {
-      _doPreload(next);
-      return;
-    }
-    final prev = _currentPage - 1;
-    if (prev >= 1 && !_commentPages.containsKey(prev)) _doPreload(prev);
-  }
-
-  void _doPreload(int page) {
-    _preloading = true;
-    // 先确保表情已加载，预加载的帖子内容才能还原表情（不会固化坏缓存）
-    EmojiService()
-        .load()
-        .then(
-          (_) => detail_api.getThreadDetail(
-            ApiService().dio,
-            tid: widget.tid,
-            page: page,
-            authorid: widget.authorid,
-          ),
-        )
-        .then((raw) {
-          if (raw['success'] == true && mounted) {
-            final data = ThreadViewData.fromMap(raw, widget.tid);
-            if (!mounted) return;
-            _commentPages[data.currentPage] = List<PostItem>.from(data.posts);
-            if (mounted) setState(() {});
-          }
-          _preloading = false;
-        })
-        .catchError((_) {
-          _preloading = false;
-        });
-  }
-
   void _goToPage(int page) {
     if (page < 1 || page > _totalPages || page == _currentPage) return;
     setState(() {
@@ -329,17 +288,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     if (_currentPage != 1 && mounted) {
       await _loadCommentPage(_currentPage, force: true);
     }
-  }
-
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollEndNotification) {
-      final metrics = notification.metrics;
-      if (metrics.maxScrollExtent > 0 &&
-          metrics.pixels >= metrics.maxScrollExtent - 280) {
-        _preloadAdjacentPages();
-      }
-    }
-    return false;
   }
 
   // ==================== Build ====================

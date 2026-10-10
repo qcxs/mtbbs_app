@@ -43,10 +43,6 @@ class CommentSection extends StatelessWidget {
   final String opUid;
 
   // 回调
-  final void Function(int page)? onPrevPage;
-  final void Function(int page)? onNextPage;
-  final VoidCallback? onShowPagePicker;
-  final void Function(ScrollNotification) onScrollNotification;
   final void Function(PostItem post)? onReply;
   final void Function(PostItem post)? onRecommend;
   final void Function(PostCardAction action, PostItem post)? onPopupAction;
@@ -63,10 +59,6 @@ class CommentSection extends StatelessWidget {
     required this.pageLoading,
     required this.tid,
     this.opUid = '',
-    this.onPrevPage,
-    this.onNextPage,
-    this.onShowPagePicker,
-    required this.onScrollNotification,
     this.onReply,
     this.onRecommend,
     this.onPopupAction,
