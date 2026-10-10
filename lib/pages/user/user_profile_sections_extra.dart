@@ -38,6 +38,12 @@ extension on _UserProfilePageState {
     }
 
     if (points != null) {
+      // 积分记录入口（仅自己）：好评/金币/信誉 → 对应类型的积分记录页
+      // （`spacecp&ac=credit&op=log` 只能查看当前登录用户，故仅在本人空间可点）
+      final isSelf =
+          widget.uid == 'self' ||
+          context.select<AuthProvider, String>((a) => a.uid) == widget.uid;
+
       add(
         '积分',
         points['credits']?.toString() ?? '0',
@@ -50,18 +56,21 @@ extension on _UserProfilePageState {
         points['reputation']?.toString() ?? '0',
         Icons.thumb_up_outlined,
         const Color(0xFF4CAF50),
+        onTap: isSelf ? () => context.push('/credit-log?exttype=1') : null,
       );
       add(
         '金币',
         points['goldCoins']?.toString() ?? '0',
         Icons.workspace_premium_outlined,
         const Color(0xFFFFC107),
+        onTap: isSelf ? () => context.push('/credit-log?exttype=2') : null,
       );
       add(
         '信誉',
         points['credit']?.toString() ?? '0',
         Icons.verified_outlined,
         const Color(0xFF2196F3),
+        onTap: isSelf ? () => context.push('/credit-log?exttype=3') : null,
       );
     }
     // 人气（移动模板独有；PC 无 → 不显示）——由头部右侧移入瓦片区

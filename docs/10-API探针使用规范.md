@@ -67,10 +67,12 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `search.list` | 站内搜索帖子列表，`kw=*`、`page`、`searchid`（翻页） | 否 |
 | `thread.detail` | 帖子详情（楼主 + 楼层，自动截断），`tid=*` | 否 |
 | `post.byPid` | 按 pid 取单个楼层（viewpid 接口），`tid=*`/`pid=*` | 否 |
+| `post.findTid` | 按 pid 解析所在帖子 tid（findpost 301 跳转，供 App 内帖子页定位），`pid=*` | 否 |
 | `user.info` | 用户空间信息，`uid`/`username` 二选一，空则查自己 | 否 |
 | `friend.list` | 好友列表，`uid`（空=自己） | 否 |
 | `follow.list` | 关注/粉丝列表，`type=*`（following/follower），`uid`（空=自己） | 否 |
 | `favorite.list` | 收藏列表（含 favid，供删除用） | 是 |
+| `credit.log` | 积分记录（当前登录用户的积分变更记录，`page` 分页，可按 `exttype`/`income`/`optype`/`starttime`/`endtime` 筛选） | 是 |
 | `message.system` | 系统提醒列表 | 是 |
 | `message.pm` | 私人消息列表 | 是 |
 | `message.pm.view` | 私信会话详情，`touid=*`；`page` 空=最新页，`1`=最旧页 | 是 |

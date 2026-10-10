@@ -38,6 +38,15 @@ void main() {
       );
     });
 
+    test('定位回复 findpost(ptid+pid) → /thread/{tid}?pid=', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/forum.php?mod=redirect&goto=findpost&pid=11933888&ptid=174303',
+        ).appPath,
+        '/thread/174303?pid=11933888',
+      );
+    });
+
     test('其他站点的链接会被标记为他站', () {
       final result = UrlRouter.parse('https://example.com/thread-1-1-1.html');
       expect(result.isOtherSite, isTrue);
@@ -67,6 +76,33 @@ void main() {
           'https://bbs.binmt.cc/home.php?mod=spacecp&ac=pm&op=showmsg&touid=88062',
         ).appPath,
         '/pm/chat?touid=88062',
+      );
+    });
+
+    test('积分记录 home.php?mod=spacecp&ac=credit&op=log → /credit-log', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=spacecp&ac=credit&op=log&page=2',
+        ).appPath,
+        '/credit-log',
+      );
+    });
+
+    test('积分记录带类型筛选 exttype → /credit-log?exttype=', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=spacecp&ac=credit&op=log&exttype=2',
+        ).appPath,
+        '/credit-log?exttype=2',
+      );
+    });
+
+    test('积分记录带操作筛选 optype → /credit-log?optype=', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=spacecp&ac=credit&op=log&optype=PRC',
+        ).appPath,
+        '/credit-log?optype=PRC',
       );
     });
 

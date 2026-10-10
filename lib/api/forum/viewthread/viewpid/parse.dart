@@ -29,3 +29,21 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     'raw_type': 'xml_cdata',
   };
 }
+
+/// 解析「按 pid 定位回复」的 301 跳转目标，提取 tid / page。
+///
+/// [location] 形如 `forum.php?mod=viewthread&tid=174303&page=1#pid11933888`
+/// （可能是相对路径，用 [Uri.parse] 取 query 即可，无需判断 host）。
+Map<String, dynamic> parseFindpostLocation(String location, int statusCode) {
+  final href = location.trim();
+  if (href.isEmpty) {
+    return {'success': false, 'message': '无重定向地址（HTTP $statusCode）'};
+  }
+  final query = Uri.parse(href).queryParameters;
+  final tid = query['tid'] ?? '';
+  if (tid.isEmpty) {
+    return {'success': false, 'message': '重定向地址未含 tid（HTTP $statusCode）'};
+  }
+  final page = int.tryParse(query['page'] ?? '') ?? 1;
+  return {'success': true, 'tid': tid, 'page': page};
+}

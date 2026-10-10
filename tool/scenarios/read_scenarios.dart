@@ -10,6 +10,7 @@ import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as thread_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/api/group/groupindex/export.dart' as group_api;
 import 'package:mtbbs/api/home/friend/export.dart' as friend_api;
+import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
 import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
@@ -129,6 +130,15 @@ final Map<String, ApiScenario> readScenarios = {
       viewpid: a['pid'] ?? '',
     ),
   ),
+  'post.findTid': ApiScenario(
+    desc: '按 pid 解析所在帖子 tid（findpost 跳转；供 App 内帖子页定位）',
+    params: {'pid': '*楼层 ID'},
+    run: (a) {
+      final pid = a['pid'] ?? '';
+      if (pid.isEmpty) throw Exception('缺少必填参数 pid');
+      return viewpid_api.resolveTidByPid(ApiService().dio, pid: pid);
+    },
+  ),
   'user.info': ApiScenario(
     desc: '用户空间信息（uid/用户名 二选一，空则查自己）',
     params: {'uid': '用户 ID（可空）', 'username': '用户名（可空）'},
@@ -168,6 +178,27 @@ final Map<String, ApiScenario> readScenarios = {
     run: (a) => favorite_api.fetchFavorites(
       ApiService().dio,
       page: intArg(a, 'page', 1),
+    ),
+  ),
+  'credit.log': ApiScenario(
+    desc: '积分记录（当前登录用户的积分变更记录，需登录）',
+    params: {
+      'page': '页码（默认 1，从最新一页起算）',
+      'exttype': '积分类型（1=好评 / 2=金币 / 3=信誉，空/0=不限）',
+      'income': '收支（1=收入 / -1=支出，空/0=不限）',
+      'optype': '操作类型（如 PRC=帖子被评分 / RSC=帖子评分，空=不限）',
+      'starttime': '起始日期（YYYY-MM-DD，可空）',
+      'endtime': '结束日期（YYYY-MM-DD，可空）',
+    },
+    needsLogin: true,
+    run: (a) => credit_api.fetchCreditLog(
+      ApiService().dio,
+      page: intArg(a, 'page', 1),
+      exttype: (a['exttype'] ?? '').isEmpty ? '0' : a['exttype']!,
+      income: (a['income'] ?? '').isEmpty ? '0' : a['income']!,
+      optype: a['optype'] ?? '',
+      starttime: a['starttime'] ?? '',
+      endtime: a['endtime'] ?? '',
     ),
   ),
   'message.system': ApiScenario(

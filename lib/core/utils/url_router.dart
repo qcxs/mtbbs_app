@@ -318,6 +318,25 @@ class UrlRouter {
           );
         }
       }
+      // 积分记录：home.php?mod=spacecp&ac=credit&op=log[&exttype=N][&optype=CODE]
+      // exttype：1=好评 / 2=金币 / 3=信誉（0/缺省=不限）；optype 为操作类型代码
+      if (mod == 'spacecp' && query['ac'] == 'credit' && query['op'] == 'log') {
+        final exttype = query['exttype'] ?? '';
+        final optype = query['optype'] ?? '';
+        final params = <String, String>{
+          if (exttype.isNotEmpty && exttype != '0') 'exttype': exttype,
+          if (optype.isNotEmpty) 'optype': optype,
+        };
+        final qs = params.isEmpty
+            ? ''
+            : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+        return UrlRouteResult(
+          label: '积分记录',
+          appPath: '/credit-log$qs',
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
     }
 
     // ==================== 伪静态格式 ====================

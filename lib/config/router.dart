@@ -27,6 +27,7 @@ import 'package:mtbbs/pages/editor/editor_page.dart';
 import 'package:mtbbs/pages/editor/editor_history_page.dart';
 import 'package:mtbbs/pages/user/user_profile_page.dart';
 import 'package:mtbbs/pages/user/my_thread_page.dart';
+import 'package:mtbbs/pages/user/credit_log_page.dart';
 import 'package:mtbbs/pages/browser/browser_page.dart';
 import 'package:mtbbs/pages/search/search_page.dart';
 import 'package:mtbbs/pages/search/search_result_page.dart';
@@ -306,6 +307,21 @@ GoRouter buildRouter({
             path: '/favorite',
             pageBuilder: (_, __) =>
                 const NoTransitionPage(child: FavoritePage()),
+          ),
+          GoRoute(
+            path: '/credit-log',
+            pageBuilder: (_, state) {
+              final q = state.uri.queryParameters;
+              final exttype = q['exttype'] ?? '0';
+              final optype = q['optype'] ?? '';
+              return NoTransitionPage(
+                key: ValueKey('credit_log_${exttype}_$optype'),
+                child: CreditLogPage(
+                  initialExttype: exttype,
+                  initialOptype: optype,
+                ),
+              );
+            },
           ),
           GoRoute(
             path: '/my-threads',

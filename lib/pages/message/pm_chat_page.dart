@@ -503,21 +503,34 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
     // 按时间顺序（旧 → 新）合并：服务端消息 + 本地待发消息
     final all = <Map<String, dynamic>>[..._items, ..._pending];
 
-    // reverse：以底部（最新）为锚点，向上加载旧消息不会顶动可视区
-    return ListView.builder(
-      controller: _scrollCtl,
-      reverse: true,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      itemCount: all.length + 1,
-      itemBuilder: (context, index) {
-        // reverse 下 index 0 在视觉最底部 → 最新消息；末尾是"加载更早"头部
-        if (index == all.length) return _buildOlderHeader();
-        final item = all[all.length - 1 - index];
-        return _MessageBubble(
-          item: item,
-          onFailedTap: item['_status'] == 'failed'
-              ? () => _showFailedActions(item)
-              : null,
+    // reverse：以底部（最新）为锚点，向上加载旧消息不会顶动可视区。
+    // 外层用 ConstrainedBox 撑满视口高度，使消息不足一屏时像微信那样**顶部对齐**
+    // （纯 reverse ListView 在内容不足时会贴底，空出上方大片空白）。
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          controller: _scrollCtl,
+          reverse: true,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 视觉顶部：加载更早消息 / "没有更早的消息了"
+                  _buildOlderHeader(),
+                  for (final item in all)
+                    _MessageBubble(
+                      item: item,
+                      onFailedTap: item['_status'] == 'failed'
+                          ? () => _showFailedActions(item)
+                          : null,
+                    ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
