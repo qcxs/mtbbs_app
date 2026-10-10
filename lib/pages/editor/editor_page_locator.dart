@@ -5,7 +5,7 @@ part of 'editor_page.dart';
 /// ## 对应关系从哪来
 ///
 /// 不来自坐标，来自**锚点身份**：两边都用 [_anchors] 这一份表（
-/// `bbAnchors(_contentCtl.text)`）。表里第 i 项在两个区指的是同一个结构
+/// `bbAnchors(_session.contentCtl.text)`）。表里第 i 项在两个区指的是同一个结构
 /// （第 i 个段落 / 图片 / 引用块…）。于是：
 ///
 /// * 光标偏移 → 锚点 = 锚点表上的二分查找（`bbAnchorIndexAt`）
@@ -31,15 +31,15 @@ extension on _EditorPageState {
   // ==================== 光标/选区变化 ====================
 
   void _onEditingChanged() {
-    final changed = _contentCtl.text != _lastSeenText;
+    final changed = _session.contentCtl.text != _lastSeenText;
     if (changed) {
-      _lastSeenText = _contentCtl.text;
+      _lastSeenText = _session.contentCtl.text;
       // 结构变了才重算锚点表
       _anchors = bbAnchors(_lastSeenText);
     }
 
     // 只更新"当前锚点"（两个标记槽的箭头）
-    final anchor = bbAnchorIndexAt(_anchors, _contentCtl.selection.baseOffset);
+    final anchor = bbAnchorIndexAt(_anchors, _session.contentCtl.selection.baseOffset);
     if (anchor >= 0 && anchor != _activeAnchor) {
       _setState(() => _activeAnchor = anchor);
     }
@@ -85,7 +85,7 @@ extension on _EditorPageState {
     final metrics = EditorLineMetrics.measure(
       container: box,
       editableRoot: box,
-      lines: bbcodeSourceLines(_contentCtl.text),
+      lines: bbcodeSourceLines(_session.contentCtl.text),
     );
     return [
       for (final a in _anchors)
@@ -102,7 +102,7 @@ extension on _EditorPageState {
   void _onEditorGutterTap(int id) {
     final anchor = _anchorOf(id);
     if (anchor == null) return;
-    _contentCtl.selection = TextSelection.collapsed(offset: anchor.start);
+    _session.contentCtl.selection = TextSelection.collapsed(offset: anchor.start);
     _setState(() {
       _activeAnchor = id;
       if (!_isSplitView) _showPreview = true;
@@ -119,7 +119,7 @@ extension on _EditorPageState {
   void _onPreviewGutterTap(int id) {
     final anchor = _anchorOf(id);
     if (anchor == null) return;
-    _contentCtl.selection = TextSelection.collapsed(offset: anchor.start);
+    _session.contentCtl.selection = TextSelection.collapsed(offset: anchor.start);
     _setState(() {
       _activeAnchor = id;
       if (!_isSplitView) _showPreview = false;

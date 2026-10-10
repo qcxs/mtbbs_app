@@ -17,7 +17,6 @@ import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 /// 封装 fetchPage, fetchQuotedPost, submit, submitEdit, parseAttachNew。
 /// 注意：pageData 在每次调用 submit/submitEdit 时传入，不保存在构造函数中。
 class EditorSubmitHelper {
-  final BuildContext context;
   final EditorType editorType;
   final String widgetFid;
   final String widgetTid;
@@ -29,7 +28,6 @@ class EditorSubmitHelper {
   final bool isReply;
 
   EditorSubmitHelper({
-    required this.context,
     required this.editorType,
     required this.widgetFid,
     required this.widgetTid,

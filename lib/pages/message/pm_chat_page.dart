@@ -5,15 +5,20 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/services/mt_image_hosting.dart';
+import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
+import 'package:mtbbs/widgets/editor/mini_editor_bar.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 
@@ -57,7 +62,8 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
   /// 本地乐观发送的消息（服务端尚未确认），渲染在列表末尾。
   /// 每条含 `_localId` / `_status`(sending|sent|failed) / `isMine` / `bbcode` / `time` / `_error`。
   final _pending = <Map<String, dynamic>>[];
-  final _inputCtl = TextEditingController();
+  final _inputCtl = BBCodeController();
+  final _mtImageHosting = MtImageHosting();
   final _scrollCtl = ScrollController();
 
   String _username = '';
@@ -572,46 +578,29 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
   }
 
   Widget _buildInputBar() {
-    final cs = Theme.of(context).colorScheme;
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          border: Border(top: BorderSide(color: cs.outlineVariant)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _inputCtl,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.newline,
-                decoration: InputDecoration(
-                  hintText: '发送消息（支持 BBCode）',
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.send),
-              color: cs.primary,
-              tooltip: '发送',
-              onPressed: _send,
-            ),
-          ],
-        ),
+    // 迷你编辑器：与帖子页共用同一套内核/动作分发；私信无标题、无附件，
+    // 图片走 MT 图床（工具栏默认项见 kMiniToolbarDefaults[pm]）。
+    return MiniEditorBar(
+      contentCtl: _inputCtl,
+      toolbarContext: MiniToolbarContext.pm,
+      hintText: '发送消息（支持 BBCode）',
+      onSubmit: _send,
+      onMtImage: _showMtImage,
+    );
+  }
+
+  /// 私信图片：直接插入 MT 图床外链 `[img]`（私信无论坛附件上传）
+  void _showMtImage() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (_) => MtImageSheet(
+        hosting: _mtImageHosting,
+        onInsert: (bbcode) => _inputCtl.wrapInline('', '', ' $bbcode '),
       ),
     );
   }

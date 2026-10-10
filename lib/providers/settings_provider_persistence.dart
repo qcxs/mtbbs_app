@@ -182,6 +182,17 @@ extension SettingsPersistence on SettingsProvider {
       } catch (_) {}
     }
 
+    // 帖子页是否使用内嵌迷你编辑器（默认开启）
+    _threadMiniEditor = (await _db.getSettingBool('threadMiniEditor')) ?? true;
+
+    // 帖子迷你编辑器常用语（允许为空列表，故只判 JSON 字符串非空）
+    final quickRepliesJson = await _db.getSetting('quickReplies');
+    if (quickRepliesJson != null && quickRepliesJson.isNotEmpty) {
+      try {
+        _quickReplies = ManagedItem.decodeList(quickRepliesJson);
+      } catch (_) {}
+    }
+
     // 主题模式
     final themeModeStr = await _db.getSetting('themeMode');
     if (themeModeStr != null) {
@@ -215,6 +226,10 @@ extension SettingsPersistence on SettingsProvider {
     _editorStartupCheck =
         (await _db.getSettingBool('editorStartupCheck')) ?? true;
 
+    // 工具栏项被隐藏时其快捷键是否仍然生效（默认开启）
+    _toolbarShortcutWhenHidden =
+        (await _db.getSettingBool('toolbarShortcutWhenHidden')) ?? true;
+
     // 启动时自动检查更新
     _autoCheckUpdate = (await _db.getSettingBool('autoCheckUpdate')) ?? true;
     _skippedUpdateVersion =
@@ -224,6 +239,13 @@ extension SettingsPersistence on SettingsProvider {
   }
 
   // ==================== 通用设置写入 ====================
+
+  /// 开关"帖子页使用内嵌迷你编辑器"（关闭退回原全屏编辑器）
+  Future<void> setThreadMiniEditorEnabled(bool enabled) async {
+    _threadMiniEditor = enabled;
+    await _db.setSettingBool('threadMiniEditor', enabled);
+    _notify();
+  }
 
   /// 开关浏览器仿真头（Referer / Accept），立即作用于后续请求
   Future<void> setSimulateBrowserHeaders(bool enabled) async {

@@ -59,8 +59,8 @@ extension on _EditorPageState {
   /// 刷新图片列表（合并页面已有 + 已上传未绑定的图片）
   Future<void> _refreshImageList() async {
     try {
-      final fid = _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid;
-      final tid = _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid;
+      final fid = _session.pageData.fid.isNotEmpty ? _session.pageData.fid : widget.fid;
+      final tid = _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid;
 
       AppLogger.i(
         'EDITOR',
@@ -119,9 +119,9 @@ extension on _EditorPageState {
   Future<void> _handleImageUpload() async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) return;
-    if (_pageData.uploadHash.isEmpty) return;
+    if (_session.pageData.uploadHash.isEmpty) return;
 
-    final imgExts = _pageData.imageExtensions;
+    final imgExts = _session.pageData.imageExtensions;
     final result = await FilePicker.platform.pickFiles(
       type: imgExts.isNotEmpty ? FileType.custom : FileType.image,
       allowedExtensions: imgExts.isNotEmpty ? imgExts : null,
@@ -146,7 +146,7 @@ extension on _EditorPageState {
           ApiService().dio,
           file: file,
           uid: auth.uid,
-          uploadHash: _pageData.uploadHash,
+          uploadHash: _session.pageData.uploadHash,
         );
         if (!mounted) return;
         if (uploadResult['success'] == true) {
@@ -199,9 +199,9 @@ extension on _EditorPageState {
   Future<void> _handleImageDelete(String aid) async {
     final ok = await upload_api.deleteUnusedImage(
       ApiService().dio,
-      formhash: _pageData.formhash,
-      tid: _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid,
-      pid: _pageData.pid.isNotEmpty ? _pageData.pid : widget.pid,
+      formhash: _session.pageData.formhash,
+      tid: _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid,
+      pid: _session.pageData.pid.isNotEmpty ? _session.pageData.pid : widget.pid,
       aid: aid,
     );
     if (!mounted) return;
@@ -245,7 +245,7 @@ extension on _EditorPageState {
 
   /// 同步活跃 AID 到 BBCodeController
   void _syncPendingAids() {
-    _contentCtl.pendingAids
+    _session.contentCtl.pendingAids
       ..clear()
       ..addAll(_activeAids);
   }
@@ -275,8 +275,8 @@ extension on _EditorPageState {
   /// 刷新附件列表
   Future<void> _refreshAttachmentList() async {
     try {
-      final fid = _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid;
-      final tid = _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid;
+      final fid = _session.pageData.fid.isNotEmpty ? _session.pageData.fid : widget.fid;
+      final tid = _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid;
 
       AppLogger.i(
         'EDITOR',
@@ -343,9 +343,9 @@ extension on _EditorPageState {
   Future<void> _handleAttachmentUpload() async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) return;
-    if (_pageData.uploadHash.isEmpty) return;
+    if (_session.pageData.uploadHash.isEmpty) return;
 
-    final attExts = _pageData.attachmentExtensions;
+    final attExts = _session.pageData.attachmentExtensions;
     final result = await FilePicker.platform.pickFiles(
       type: attExts.isNotEmpty ? FileType.custom : FileType.any,
       allowedExtensions: attExts.isNotEmpty ? attExts : null,
@@ -370,8 +370,8 @@ extension on _EditorPageState {
           ApiService().dio,
           file: file,
           uid: auth.uid,
-          uploadHash: _pageData.uploadHash,
-          fid: _pageData.fid.isNotEmpty ? _pageData.fid : widget.fid,
+          uploadHash: _session.pageData.uploadHash,
+          fid: _session.pageData.fid.isNotEmpty ? _session.pageData.fid : widget.fid,
         );
         if (!mounted) return;
         if (uploadResult['success'] == true) {
@@ -419,9 +419,9 @@ extension on _EditorPageState {
   Future<void> _handleAttachmentDelete(String aid) async {
     final ok = await upload_api.deleteUnusedImage(
       ApiService().dio,
-      formhash: _pageData.formhash,
-      tid: _pageData.tid.isNotEmpty ? _pageData.tid : widget.tid,
-      pid: _pageData.pid.isNotEmpty ? _pageData.pid : widget.pid,
+      formhash: _session.pageData.formhash,
+      tid: _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid,
+      pid: _session.pageData.pid.isNotEmpty ? _session.pageData.pid : widget.pid,
       aid: aid,
     );
     if (!mounted) return;
@@ -452,7 +452,7 @@ extension on _EditorPageState {
   /// 上传图片到论坛（默认上传），成功后插入 [attachimg]
   Future<void> _uploadDefaultImage(File file) async {
     final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn || _pageData.uploadHash.isEmpty) {
+    if (!auth.isLoggedIn || _session.pageData.uploadHash.isEmpty) {
       if (mounted) showToast('未登录或无上传权限');
       return;
     }
@@ -462,7 +462,7 @@ extension on _EditorPageState {
         ApiService().dio,
         file: file,
         uid: auth.uid,
-        uploadHash: _pageData.uploadHash,
+        uploadHash: _session.pageData.uploadHash,
       );
       if (!mounted) return;
       if (uploadResult['success'] == true) {
@@ -480,7 +480,7 @@ extension on _EditorPageState {
             _aidToSrc[aid] = src;
           });
           _syncImagesNotifier();
-          _contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
+          _session.contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
           _focusContent();
         }
         if (mounted) showToast('剪贴板图片已上传');

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mtbbs/core/app/site_store.dart';
 
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/parser/page_fetcher.dart';
@@ -22,21 +21,22 @@ import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
-import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 import 'package:mtbbs/widgets/common/history_picker.dart';
-import 'package:mtbbs/widgets/dialog/emoji_picker_sheet.dart';
 import 'package:mtbbs/widgets/dialog/image_picker_sheet.dart';
 import 'package:mtbbs/widgets/dialog/attachment_picker_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/quick_reply_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/quoted_post_card.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/pages/editor/editor_precheck.dart';
-import 'package:mtbbs/pages/editor/editor_submit.dart';
+import 'package:mtbbs/pages/editor/editor_session.dart';
 import 'package:mtbbs/pages/editor/editor_dialogs.dart';
+import 'package:mtbbs/pages/editor/editor_draft_handoff.dart';
+import 'package:mtbbs/pages/editor/editor_interactions.dart';
 import 'package:mtbbs/pages/editor/editor_intents.dart';
 import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
 import 'package:mtbbs/pages/editor/md_import_sheet.dart';
@@ -105,9 +105,14 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
 
   /// 窗口关闭处理进行中（防重复弹确认框/重复 close）
   bool _windowCloseInProgress = false;
+  // ==================== 共享内核 ====================
+  //
+  // 内容/标题控制器、页面数据、引用帖、快照 key、提交协议都收敛到
+  // [EditorSession]，完整版与迷你版共用（见 docs/06）。界面侧直接读写
+  // `_session.xxx`，不再保留转发层。
+  late final EditorSession _session;
+
   // ==================== 核心控制器 ====================
-  final _titleCtl = TextEditingController();
-  final _contentCtl = BBCodeController();
   final _contentFocusNode = FocusNode();
   final _undoController = UndoHistoryController();
 
@@ -143,7 +148,6 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
 
   /// 最近一次测量时的窗口宽度（用于宽度变化后重算标记位置）
   double? _lastGutterWidth;
-  Map<String, String> _emojiMap = {};
   bool _showPreview = false;
   Timer? _previewDebounce;
   final ValueNotifier<EditorPreviewData> _previewData = ValueNotifier(
@@ -153,9 +157,6 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   bool _loadingPage = false;
   String? _pageError;
 
-  /// 从绑定的 Discuz 页面提取的会话数据
-  PageFormData _pageData = const PageFormData();
-  Map<String, dynamic>? _quotedPost;
   bool _loadingQuoted = false;
   String? _quotedError;
 
@@ -185,10 +186,8 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
 
   late final BBCodeToolbarController _toolbarCtl;
   final MtImageHosting _mtImageHosting = MtImageHosting();
-  late final EditorSubmitHelper _submitHelper;
 
   // ==================== 快照相关 ====================
-  late final String _sessionKey;
   String _initialTitle = '';
   String _initialContent = '';
   Set<String> _initialPendingAids = {};
@@ -210,54 +209,37 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   bool get _isEdit =>
       widget.type == EditorType.editPost || widget.type == EditorType.editReply;
 
-  String get _pageTitle {
-    switch (widget.type) {
-      case EditorType.post:
-        final name =
-            SiteStore.instance.forums[widget.fid] ?? '版块 ${widget.fid}';
-        return '发帖 - $name';
-      case EditorType.editPost:
-        return '编辑帖子';
-      case EditorType.comment:
-        return '评论';
-      case EditorType.editReply:
-        return '编辑评论';
-      case EditorType.reply:
-        return '回复评论';
-    }
-  }
+  String get _pageTitle => _session.pageTitle;
 
   @override
   void initState() {
     super.initState();
-    _sessionKey = EditorHistoryProvider.generateKey(
-      widget.type,
+    _session = EditorSession(
+      editorType: widget.type,
+      fid: widget.fid,
+      tid: widget.tid,
+      pid: widget.pid,
+    )..emojiMap = Map<String, String>.from(EmojiService().map);
+
+    // 迷你编辑器「展开为完整版」的内存草稿交接（调用方已先写快照保底）
+    final draft = EditorDraftHandoff.take(
+      type: widget.type,
       tid: widget.tid,
       pid: widget.pid,
     );
-
-    // 初始化表情映射
-    _emojiMap = Map<String, String>.from(EmojiService().map);
-
-    _submitHelper = EditorSubmitHelper(
-      context: context,
-      editorType: widget.type,
-      widgetFid: widget.fid,
-      widgetTid: widget.tid,
-      widgetPid: widget.pid,
-      titleCtl: _titleCtl,
-      contentCtl: _contentCtl,
-      isEdit: _isEdit,
-      isPost: _isPost,
-      isReply: _isReply,
-    );
+    if (draft != null && draft.isNotEmpty) {
+      _session.contentCtl.text = draft;
+      _session.contentCtl.selection = TextSelection.collapsed(
+        offset: draft.length,
+      );
+    }
 
     _toolbarCtl = BBCodeToolbarController(onAction: _handleToolbarItem);
-    _titleCtl.addListener(_onContentChanged);
-    _contentCtl.addListener(_onContentChanged);
+    _session.titleCtl.addListener(_onContentChanged);
+    _session.contentCtl.addListener(_onContentChanged);
     // 光标/选区变化 → 更新标记槽与（必要时）预览定位
-    _contentCtl.addListener(_onEditingChanged);
-    _lastSeenText = _contentCtl.text;
+    _session.contentCtl.addListener(_onEditingChanged);
+    _lastSeenText = _session.contentCtl.text;
     _anchors = bbAnchors(_lastSeenText);
 
     _doFetchPage();
@@ -277,7 +259,7 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final historyProv = context.read<EditorHistoryProvider>();
-      if (historyProv.hasSession(_sessionKey)) {
+      if (historyProv.hasSession(_session.sessionKey)) {
         _addHint('unexpected_close', '上次编辑器意外关闭，可在编辑历史中恢复');
       }
     });
@@ -293,11 +275,10 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
 
   @override
   void dispose() {
-    _titleCtl.removeListener(_onContentChanged);
-    _contentCtl.removeListener(_onContentChanged);
-    _contentCtl.removeListener(_onEditingChanged);
-    _titleCtl.dispose();
-    _contentCtl.dispose();
+    _session.titleCtl.removeListener(_onContentChanged);
+    _session.contentCtl.removeListener(_onContentChanged);
+    _session.contentCtl.removeListener(_onEditingChanged);
+    _session.dispose();
     _contentFocusNode.dispose();
     _undoController.dispose();
     _editorScrollCtl.dispose();

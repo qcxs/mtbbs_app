@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "id": "qr_thanks", "text": "感谢分享" },
+    { "id": "qr_hidden", "text": "看看隐藏" },
+    { "id": "qr_awesome", "text": "论坛有你更精彩" }
+  ]
+}

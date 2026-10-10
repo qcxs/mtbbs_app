@@ -23,6 +23,13 @@ class BBCodeToolbar extends StatelessWidget {
   /// 无角标时隐藏设置照常生效。
   final Map<String, int> badges;
 
+  /// 是否在末尾固定追加「设置」按钮。迷你编辑器不需要（设为 false）。
+  final bool showSettingsButton;
+
+  /// 是否自带底色与下边框。迷你编辑器把工具栏与目标芯片/操作按钮放在同一行，
+  /// 外框由宿主提供，故设为 false（只留按钮本身）。
+  final bool showContainer;
+
   const BBCodeToolbar({
     super.key,
     required this.controller,
@@ -31,6 +38,8 @@ class BBCodeToolbar extends StatelessWidget {
     required this.items,
     required this.shortcuts,
     this.badges = const {},
+    this.showSettingsButton = true,
+    this.showContainer = true,
   });
 
   @override
@@ -39,8 +48,17 @@ class BBCodeToolbar extends StatelessWidget {
     // 末尾固定追加「设置」按钮，因此即使所有项都被隐藏，工具栏仍会渲染；
     // 带角标的项（已上传图片/附件）同样强制显示。
     final visibleItems = items
-        .where((e) => e.visible || (badges[e.id] ?? 0) > 0)
+        .where((e) => toolbarItemShown(e, badges))
         .toList();
+
+    final wrap = Wrap(
+      spacing: 2,
+      runSpacing: 2,
+      alignment: WrapAlignment.start,
+      children: _buildButtons(visibleItems, cs),
+    );
+
+    if (!showContainer) return wrap;
 
     return Container(
       decoration: BoxDecoration(
@@ -48,12 +66,7 @@ class BBCodeToolbar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: cs.outlineVariant)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Wrap(
-        spacing: 2,
-        runSpacing: 2,
-        alignment: WrapAlignment.start,
-        children: _buildButtons(visibleItems, cs),
-      ),
+      child: wrap,
     );
   }
 }

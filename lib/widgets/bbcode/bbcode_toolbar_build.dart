@@ -24,8 +24,10 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
     }
 
     // 固定末尾：设置按钮（不受工具栏设置影响，始终渲染）
-    if (widgets.isNotEmpty) widgets.add(_separator(cs));
-    widgets.add(_buildSettingsButton(cs));
+    if (showSettingsButton) {
+      if (widgets.isNotEmpty) widgets.add(_separator(cs));
+      widgets.add(_buildSettingsButton(cs));
+    }
     return widgets;
   }
 
@@ -174,6 +176,14 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
           name: item.name,
           cs: cs,
         );
+      case ToolbarAction.quickReply:
+        return _toolBtn(
+          icon: Icons.quickreply_outlined,
+          tooltip: tooltip,
+          id: item.id,
+          name: item.name,
+          cs: cs,
+        );
       case ToolbarAction.attach:
         return _toolBtn(
           icon: Icons.attach_file_outlined,
@@ -295,13 +305,9 @@ extension _BBCodeToolbarBuild on BBCodeToolbar {
             borderRadius: BorderRadius.circular(4),
             onTap: enabled ? () => controller.onAction(id) : null,
             onLongPress: onLongPress,
-            child: Container(
-              decoration: BoxDecoration(
-                color: enabled ? null : cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: child,
-            ),
+            // 不画背景：禁用态只用图标透明度表达（曾给禁用项加底色，
+            // 导致撤销/重做与其它按钮底色不一致）
+            child: child,
           ),
         ),
       ),

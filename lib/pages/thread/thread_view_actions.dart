@@ -213,7 +213,21 @@ extension on _ThreadViewPageState {
 
   void _navigateComment() {
     if (_data == null) return;
-    _openEditor('/editor?type=comment&tid=${widget.tid}');
+    // 「帖子迷你编辑器」关闭时退回原设计（全屏编辑器）
+    if (context.read<SettingsProvider>().threadMiniEditorEnabled) {
+      _startComment();
+    } else {
+      _openEditor('/editor?type=comment&tid=${widget.tid}');
+    }
+  }
+
+  /// 回复某条评论：迷你编辑器开启则内嵌切换目标，否则退回全屏编辑器
+  void _replyToPost(PostItem post) {
+    if (context.read<SettingsProvider>().threadMiniEditorEnabled) {
+      _startReply(post);
+    } else {
+      _openEditor('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}');
+    }
   }
 
   /// 窄屏时滚动到评论区顶部
@@ -258,22 +272,229 @@ extension on _ThreadViewPageState {
   /// - 回复/评论：取回新楼追加到当前评论页末尾（对齐网页追加行为，不整页刷新），
   ///   并检查是否需要重新取一次主帖
   /// - 审核中：不追加（与网页一致，只由编辑器提示）
-  Future<void> _openEditor(String path, {String? editingPid}) async {
+  Future<bool> _openEditor(String path, {String? editingPid}) async {
     final r = await context.push<Map<String, dynamic>>(path);
-    if (!mounted || r == null || r['success'] != true) return;
+    if (!mounted || r == null || r['success'] != true) return false;
     final result = r['result'] as SubmitResult?;
-    if (result == null) return;
+    if (result == null) return false;
 
     if (editingPid != null && editingPid.isNotEmpty) {
       await _replacePost(editingPid);
-      return;
+      return true;
     }
-    if (result.needsApproval || result.pid.isEmpty) return;
+    if (result.needsApproval || result.pid.isEmpty) return true;
     // 主帖含"回复可见"占位时，本次回复的目的就是解锁隐藏内容，
     // 此时不滚动定位到刚发出的回复，把视野留给即将解锁的主帖
     final unlocking = _mainPostHasLockedContent();
     await _appendPost(result.pid, scroll: !unlocking);
     await _reloadMainPostIfLocked();
+    return true;
+  }
+
+  // ==================== 迷你编辑器 ====================
+
+  /// 展开迷你编辑器，目标 = 评论帖子
+  Future<void> _startComment() async {
+    if (_data == null) return;
+    if (!context.read<AuthProvider>().isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    _editorSession.switchTarget(EditorType.comment);
+    _setState(() {
+      _editorExpanded = true;
+      _replyTargetName = null;
+      _replyTargetPid = null;
+    });
+    await _ensureEditorPageData(force: true);
+  }
+
+  /// 展开迷你编辑器，目标 = 回复某条评论
+  Future<void> _startReply(PostItem post) async {
+    if (!context.read<AuthProvider>().isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    _editorSession.switchTarget(
+      EditorType.reply,
+      tid: widget.tid,
+      pid: post.pid,
+    );
+    _setState(() {
+      _editorExpanded = true;
+      _replyTargetName = post.username;
+      _replyTargetPid = post.pid;
+    });
+    await _ensureEditorPageData(force: true);
+    // 预取被回复评论，供"点击目标芯片 → 弹窗预览"
+    final quoted = await _editorSession.fetchQuotedPost();
+    if (mounted && quoted != null) {
+      _editorSession.quotedPost = quoted;
+      _setState(() {});
+    }
+  }
+
+  /// 点击"回复 xxx"芯片：弹窗预览被回复的评论内容
+  Future<void> _showReplyTargetPreview() async {
+    var quoted = _editorSession.quotedPost;
+    if (quoted == null && _replyTargetPid != null) {
+      quoted = await _editorSession.fetchQuotedPost();
+      if (quoted != null) _editorSession.quotedPost = quoted;
+    }
+    if (!mounted) return;
+    final bbcode = quoted?['bbcode']?.toString() ?? '';
+    final author = quoted?['username']?.toString() ?? _replyTargetName ?? '';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 480),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '回复 $author',
+                style: const TextStyle(fontSize: 15),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              onPressed: () => Navigator.of(ctx).pop(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: bbcode.trim().isEmpty
+              ? const Text('（无内容）')
+              : PostHtmlWidget(bbcode: bbcode),
+        ),
+      ),
+    );
+  }
+
+  /// 收起迷你编辑器（= 关闭）；若处于"回复评论"，同时重置回"评论帖子"，
+  /// 避免下次展开时目标不明（回复评论还是回复帖子）。
+  void _collapseEditor() {
+    _editorSession.switchTarget(EditorType.comment);
+    _setState(() {
+      _replyTargetName = null;
+      _replyTargetPid = null;
+      _editorExpanded = false;
+    });
+  }
+
+  /// 抓取当前目标所需的页面数据（formhash / 引用信息），失败给出提示
+  Future<void> _ensureEditorPageData({bool force = false}) async {
+    if (!force && _editorSession.pageData.formhash.isNotEmpty) return;
+    await EmojiService().load();
+    final result = await _editorSession.fetchPage();
+    if (!mounted) return;
+    _editorSession.pageData = result;
+    _setState(() {});
+    if (!result.success) {
+      showToast(result.error ?? '页面数据加载失败');
+    }
+  }
+
+  /// 提交迷你编辑器内容（评论 / 回复某评论）
+  Future<void> _submitMiniEditor() async {
+    final content = _editorSession.contentCtl.text.trim();
+    if (content.isEmpty) {
+      showToast('请输入内容');
+      return;
+    }
+    if (!context.read<AuthProvider>().isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    if (_editorSession.pageData.formhash.isEmpty) {
+      showToast('页面数据未加载，请稍候');
+      return;
+    }
+    _setState(() => _editorSubmitting = true);
+    try {
+      final result = await _editorSession.submit('', content);
+      if (!mounted) return;
+      _setState(() => _editorSubmitting = false);
+      if (!result.success) {
+        showToast(result.message.isNotEmpty ? result.message : '提交失败');
+        return;
+      }
+      _editorSession.contentCtl.clear();
+      showToast(result.message.isNotEmpty ? result.message : '提交成功');
+      // 成功后自动收起（同时重置回复目标，恢复浏览态）
+      _collapseEditor();
+      if (result.needsApproval || result.pid.isEmpty) return;
+      final unlocking = _mainPostHasLockedContent();
+      await _appendPost(result.pid, scroll: !unlocking);
+      await _reloadMainPostIfLocked();
+    } catch (e) {
+      if (!mounted) return;
+      _setState(() => _editorSubmitting = false);
+      showToast('网络错误: $e');
+    }
+  }
+
+  /// 迷你编辑器图片：论坛图片上传（选图→上传→插入 `[attachimg]`）
+  Future<void> _showForumImageUpload() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    await uploadForumImagesQuick(
+      contentCtl: _editorSession.contentCtl,
+      pageData: _editorSession.pageData,
+      uid: auth.uid,
+    );
+  }
+
+  /// 迷你编辑器图片：插入 MT 图床外链（论坛附件上传走「完整版」）
+  void _showMtImage() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (_) => MtImageSheet(
+        hosting: _mtImageHosting,
+        onInsert: (bbcode) =>
+            _editorSession.contentCtl.wrapInline('', '', ' $bbcode '),
+      ),
+    );
+  }
+
+  /// 展开为完整版编辑器：先写快照保底，再内存交接草稿
+  Future<void> _expandToFull() async {
+    try {
+      final history = context.read<EditorHistoryProvider>();
+      await history.addManualSnapshot(
+        _editorSession.buildSnapshot(isManual: true),
+      );
+    } catch (e) {
+      AppLogger.w('PAGE', 'expandToFull snapshot failed: $e');
+    }
+    EditorDraftHandoff.put(
+      type: _editorSession.editorType,
+      tid: _editorSession.tid,
+      pid: _editorSession.pid,
+      content: _editorSession.contentCtl.text,
+    );
+    if (!mounted) return;
+    final type = _editorSession.editorType == EditorType.reply
+        ? 'reply'
+        : 'comment';
+    final pidQ = _editorSession.pid.isNotEmpty
+        ? '&pid=${_editorSession.pid}'
+        : '';
+    final ok = await _openEditor('/editor?type=$type&tid=${widget.tid}$pidQ');
+    if (!mounted) return;
+    if (ok) _editorSession.contentCtl.clear();
+    _collapseEditor();
   }
 
   /// 主帖正文是否含"回复可见"占位（未回复时的 🔒 提示）

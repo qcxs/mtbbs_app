@@ -57,7 +57,7 @@ extension on _EditorPageState {
       builder: (_) => MtImageSheet(
         hosting: _mtImageHosting,
         onInsert: (bbcode) {
-          _contentCtl.wrapInline('', '', ' $bbcode ');
+          _session.contentCtl.wrapInline('', '', ' $bbcode ');
           _focusContent();
         },
       ),
@@ -75,28 +75,8 @@ extension on _EditorPageState {
       final key = m.group(1)!;
       return record.info[key]?.toString() ?? m.group(0)!;
     });
-    _contentCtl.insertLink(url, text: text);
+    _session.contentCtl.insertLink(url, text: text);
     _focusContent();
-  }
-
-  /// 表情选择底部面板
-  void _showEmojiPickerSheet(List<Map<String, dynamic>> groups) {
-    final frequentEmojis = EmojiService().frequentlyUsed;
-    showModalBottomSheet(
-      context: context,
-      constraints: const BoxConstraints(maxWidth: 500, maxHeight: 420),
-      builder: (ctx) => EmojiPickerSheet(
-        groups: groups,
-        frequentEmojis: frequentEmojis,
-        onEmojiPicked: (emoji) {
-          final insertText = emoji['insertText'] as String;
-          final smilieId = emoji['smilieId'] as String;
-          _contentCtl.wrapInline('', '', insertText);
-          EmojiService().recordUsage(smilieId);
-          _focusContent();
-        },
-      ),
-    );
   }
 
   /// 图片管理底部面板
@@ -106,7 +86,7 @@ extension on _EditorPageState {
       showToast('请先登录');
       return;
     }
-    if (_pageData.uploadHash.isEmpty) {
+    if (_session.pageData.uploadHash.isEmpty) {
       showToast('页面数据未加载，无法上传');
       return;
     }
@@ -122,18 +102,18 @@ extension on _EditorPageState {
           images: data.images,
           loading: data.loading,
           ignoredAids: _ignoredAids,
-          contentText: _contentCtl.text,
-          controller: _contentCtl,
+          contentText: _session.contentCtl.text,
+          controller: _session.contentCtl,
           onUpload: _handleImageUpload,
           onDelete: _handleImageDelete,
           onIgnore: _handleImageIgnore,
           onRefresh: _refreshImageList,
           onInsert: (aid) {
-            _contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
+            _session.contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
             _syncPendingAids();
           },
-          allowedExtensions: _pageData.imageExtensions.isNotEmpty
-              ? _pageData.imageExtensions
+          allowedExtensions: _session.pageData.imageExtensions.isNotEmpty
+              ? _session.pageData.imageExtensions
               : null,
         ),
       ),
@@ -147,7 +127,7 @@ extension on _EditorPageState {
       showToast('请先登录');
       return;
     }
-    if (_pageData.uploadHash.isEmpty) {
+    if (_session.pageData.uploadHash.isEmpty) {
       showToast('页面数据未加载，无法上传');
       return;
     }
@@ -160,16 +140,16 @@ extension on _EditorPageState {
         builder: (_, data, __) => AttachmentPickerSheet(
           attachments: data.attachments,
           loading: data.loading,
-          contentText: _contentCtl.text,
-          controller: _contentCtl,
+          contentText: _session.contentCtl.text,
+          controller: _session.contentCtl,
           onUpload: _handleAttachmentUpload,
           onDelete: _handleAttachmentDelete,
           onRefresh: _refreshAttachmentList,
           onInsert: (aid) {
-            _contentCtl.wrapInline('', '', '[attach]$aid[/attach]');
+            _session.contentCtl.wrapInline('', '', '[attach]$aid[/attach]');
           },
-          allowedExtensions: _pageData.attachmentExtensions.isNotEmpty
-              ? _pageData.attachmentExtensions
+          allowedExtensions: _session.pageData.attachmentExtensions.isNotEmpty
+              ? _session.pageData.attachmentExtensions
               : null,
         ),
       ),

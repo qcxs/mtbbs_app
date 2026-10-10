@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/shortcut_sheet.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 
 /// 编辑与快捷键组设置项
 List<SettingsModel> editorSettings() => [
@@ -17,6 +18,20 @@ List<SettingsModel> editorSettings() => [
     icon: Icons.auto_fix_high,
     value: (s) => s.editorStartupCheck,
     onChanged: (ctx, s, v) => s.setEditorStartupCheck(v),
+  ),
+  SwitchSetting(
+    title: '隐藏项快捷键可用',
+    subtitle: '工具栏中被隐藏的选项，其快捷键仍然生效',
+    icon: Icons.keyboard_hide,
+    value: (s) => s.toolbarShortcutWhenHidden,
+    onChanged: (ctx, s, v) => s.setToolbarShortcutWhenHidden(v),
+  ),
+  SwitchSetting(
+    title: '帖子页迷你编辑器',
+    subtitle: '关闭后帖子页评论/回复退回全屏编辑器（原设计）',
+    icon: Icons.edit_note,
+    value: (s) => s.threadMiniEditorEnabled,
+    onChanged: (ctx, s, v) => s.setThreadMiniEditorEnabled(v),
   ),
   NormalSetting(
     title: '插入格式',

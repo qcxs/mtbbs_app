@@ -92,6 +92,12 @@ class SettingsProvider extends ChangeNotifier {
   /// 工具栏快捷键（与 toolbarItems 分离持久化，key = item id）
   Map<String, String> _toolbarShortcuts = defaultToolbarShortcuts();
 
+  /// 帖子页是否使用内嵌迷你编辑器（关闭则退回原全屏编辑器）
+  bool _threadMiniEditor = true;
+
+  /// 帖子迷你编辑器「常用语」（可增删排序；内容限 100 字）
+  List<ManagedItem> _quickReplies = defaultQuickReplies();
+
   // ==================== 编辑器配置 ====================
 
   /// 快照最短字数（低于此不保存）
@@ -195,6 +201,9 @@ class SettingsProvider extends ChangeNotifier {
   /// 编辑器启动自检（默认开启，关闭后跳过启动报错，无条件进入编辑器）
   bool _editorStartupCheck = true;
 
+  /// 工具栏项被隐藏时，其快捷键是否仍然生效（默认开启）
+  bool _toolbarShortcutWhenHidden = true;
+
   /// 启动时自动检查更新（仅正式版生效，见 UpdateService.isSupported）
   bool _autoCheckUpdate = true;
 
@@ -246,6 +255,13 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setEditorStartupCheck(bool value) async {
     _editorStartupCheck = value;
     await _db.setSettingBool('editorStartupCheck', value);
+    notifyListeners();
+  }
+
+  /// 开关"工具栏项被隐藏时其快捷键仍然生效"
+  Future<void> setToolbarShortcutWhenHidden(bool value) async {
+    _toolbarShortcutWhenHidden = value;
+    await _db.setSettingBool('toolbarShortcutWhenHidden', value);
     notifyListeners();
   }
 

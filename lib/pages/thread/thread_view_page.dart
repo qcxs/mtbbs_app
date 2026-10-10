@@ -10,6 +10,7 @@ import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/dialog/page_jump_dialog.dart';
 import 'package:mtbbs/widgets/dialog/rate_dialog.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
@@ -22,7 +23,17 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/models/browse_record.dart';
+import 'package:mtbbs/models/editor_snapshot.dart';
+import 'package:mtbbs/config/toolbar_config.dart';
+import 'package:mtbbs/pages/editor/editor_session.dart';
+import 'package:mtbbs/pages/editor/editor_draft_handoff.dart';
+import 'package:mtbbs/pages/editor/forum_image_upload.dart';
+import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
+import 'package:mtbbs/services/mt_image_hosting.dart';
+import 'package:mtbbs/providers/editor_history_provider.dart';
+import 'package:mtbbs/widgets/editor/mini_editor_bar.dart';
 import 'package:mtbbs/providers/history_provider.dart';
+import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/core/utils/screen_size_ext.dart';
 import 'package:mtbbs/pages/thread/thread_view_comment_section.dart';
@@ -31,6 +42,11 @@ import 'package:mtbbs/pages/thread/thread_favorite_note_dialog.dart';
 
 part 'thread_view_actions.dart';
 part 'thread_view_layout.dart';
+
+/// Esc 在迷你编辑器展开时：先收起编辑器（不退出页面）
+class _CollapseMiniEditorIntent extends Intent {
+  const _CollapseMiniEditorIntent();
+}
 
 /// 帖子浏览页（渲染 BBCode）
 ///
@@ -93,14 +109,30 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   /// 顶栏"全局禁用样式"开关（作用于当前帖子页所有帖子）
   bool _globalDisableStyle = false;
 
+  // ---- 迷你编辑器（评论 / 回复某评论，共享内核） ----
+  late final EditorSession _editorSession;
+  final MtImageHosting _mtImageHosting = MtImageHosting();
+  bool _editorExpanded = false;
+  bool _editorSubmitting = false;
+
+  /// 当前回复目标（null = 评论帖子；非空 = 回复该评论）
+  String? _replyTargetName;
+  String? _replyTargetPid;
+
   @override
   void initState() {
     super.initState();
+    // 默认目标是"评论帖子"；用户点某条评论的"回复"会 switchTarget 到 reply
+    _editorSession = EditorSession(
+      editorType: EditorType.comment,
+      tid: widget.tid,
+    );
     _loadInitial();
   }
 
   @override
   void dispose() {
+    _editorSession.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -302,7 +334,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     // 双栏布局判定统一走 isWide（横屏且足够宽），与全项目语义一致
     final isWide = size.isWide;
     final isNarrow = !isWide;
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         title: GestureDetector(
           onTap: () {
@@ -406,7 +438,42 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
           return _buildNarrowLayout();
         },
       ),
-      bottomNavigationBar: _buildReplyBar(),
+      bottomNavigationBar: _editorExpanded
+          ? _buildMiniEditor()
+          : _buildReplyBar(),
+    );
+    return _wrapBackToCollapse(page);
+  }
+
+  /// 迷你编辑器展开时：Esc / 手机返回**先收起编辑器**，再按才真正返回。
+  ///
+  /// - Esc：页面级 [Shortcuts] 覆盖全局 `GoBackIntent`（最近者优先），收起即可
+  /// - Android 返回：`PopScope(canPop: false)` 拦下本次 pop 并收起
+  /// 未展开时原样返回，交回全局 Esc / GoRouter 默认返回行为。
+  Widget _wrapBackToCollapse(Widget child) {
+    if (!_editorExpanded) return child;
+    return Shortcuts(
+      shortcuts: {
+        SingleActivator(LogicalKeyboardKey.escape):
+            const _CollapseMiniEditorIntent(),
+      },
+      child: Actions(
+        actions: {
+          _CollapseMiniEditorIntent: CallbackAction<_CollapseMiniEditorIntent>(
+            onInvoke: (_) {
+              _collapseEditor();
+              return null;
+            },
+          ),
+        },
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _collapseEditor();
+          },
+          child: child,
+        ),
+      ),
     );
   }
 }

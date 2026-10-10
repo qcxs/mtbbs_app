@@ -7,7 +7,7 @@ extension on _EditorPageState {
       _loadingPage = true;
       _pageError = null;
     });
-    final result = await _submitHelper.fetchPage(
+    final result = await _session.submitHelper.fetchPage(
       preserveContent: preserveContent,
     );
     if (!mounted) return;
@@ -36,7 +36,7 @@ extension on _EditorPageState {
         _setState(() {
           _loadingPage = false;
           _pageError = null;
-          _pageData = const PageFormData(success: true);
+          _session.pageData = const PageFormData(success: true);
         });
         return;
       }
@@ -49,7 +49,7 @@ extension on _EditorPageState {
 
     bool shouldSaveInitial = false;
     _setState(() {
-      _pageData = result;
+      _session.pageData = result;
       _loadingPage = false;
       _pageError = null;
       // 同步填充 AID→URL 映射和图片列表
@@ -87,8 +87,8 @@ extension on _EditorPageState {
           },
       };
       if (_isEdit && !preserveContent) {
-        if (result.title.isNotEmpty) _titleCtl.text = result.title;
-        if (result.content.isNotEmpty) _contentCtl.text = result.content;
+        if (result.title.isNotEmpty) _session.titleCtl.text = result.title;
+        if (result.content.isNotEmpty) _session.contentCtl.text = result.content;
         if (result.title.isNotEmpty || result.content.isNotEmpty) {
           shouldSaveInitial = true;
         }
@@ -97,9 +97,9 @@ extension on _EditorPageState {
     _syncImagesNotifier();
 
     if (!preserveContent) {
-      _initialTitle = _titleCtl.text;
-      _initialContent = _contentCtl.text;
-      _initialPendingAids = Set.from(_contentCtl.pendingAids);
+      _initialTitle = _session.titleCtl.text;
+      _initialContent = _session.contentCtl.text;
+      _initialPendingAids = Set.from(_session.contentCtl.pendingAids);
       _updateHasChanges();
       _updateLastSaved();
     }
@@ -121,11 +121,11 @@ extension on _EditorPageState {
       _loadingQuoted = true;
       _quotedError = null;
     });
-    final post = await _submitHelper.fetchQuotedPost();
+    final post = await _session.submitHelper.fetchQuotedPost();
     if (!mounted) return;
     if (post != null) {
       _setState(() {
-        _quotedPost = post;
+        _session.quotedPost = post;
         _loadingQuoted = false;
       });
     } else {

@@ -71,3 +71,37 @@ void toggleManagedItem(List<ManagedItem> items, String id) {
   if (i < 0) return;
   items[i] = items[i].copyWith(visible: !items[i].visible);
 }
+
+/// 把「只显示可见项」视图里的一次重排，换算成对完整 [items] 的一次移动。
+///
+/// 该视图里只有可见项，[oldVisibleIndex]/[newVisibleIndex] 是**可见子序列**的下标；
+/// 返回值是对完整列表（[reorderManagedItems] 语义）的 `(from, to)`。
+///
+/// 语义：只保证**可见项的相对顺序**与用户操作一致；隐藏项可能随之位移
+/// （它们不可见，用户无感）。无可见项或下标越界返回 null。
+({int from, int to})? reorderVisibleToFull(
+  List<ManagedItem> items,
+  int oldVisibleIndex,
+  int newVisibleIndex,
+) {
+  final visible = items.where((e) => e.visible).toList();
+  if (oldVisibleIndex < 0 || oldVisibleIndex >= visible.length) return null;
+  final moved = visible[oldVisibleIndex];
+  final from = items.indexOf(moved);
+  if (from < 0) return null;
+
+  // 完整列表移除被拖项后，其可见子序列决定插入点
+  final without = List<ManagedItem>.from(items)..removeAt(from);
+  final visibleWithout = without.where((e) => e.visible).toList();
+  final int to;
+  if (newVisibleIndex >= visibleWithout.length) {
+    // 落到可见子序列末尾：插到最后一个可见项之后（无可见项则放末尾）
+    to = visibleWithout.isEmpty
+        ? without.length
+        : without.indexOf(visibleWithout.last) + 1;
+  } else {
+    to = without.indexOf(visibleWithout[newVisibleIndex]);
+  }
+  if (to < 0) return null;
+  return (from: from, to: to);
+}

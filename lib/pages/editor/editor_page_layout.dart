@@ -2,21 +2,36 @@ part of 'editor_page.dart';
 
 /// 页面布局构建 — 整体骨架、宽/窄屏布局、编辑区与预览区。
 extension on _EditorPageState {
+  /// 「图片」「附件」角标＝当前已上传的数量；有角标时该项强制显示
+  /// （即使被用户在工具栏设置里隐藏）。工具栏渲染与快捷键注册共用同一判定。
+  Map<String, int> get _editorBadges => {
+    if (_imageList.isNotEmpty) 'image': _imageList.length,
+    if (_attachmentList.isNotEmpty) 'attach': _attachmentList.length,
+  };
+
   Widget _buildPage(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isWide = MediaQuery.sizeOf(context).isWide;
     final settings = context.watch<SettingsProvider>();
 
-    // 动态生成快捷键绑定：对**所有**有快捷键的工具栏项注册。
+    // 「图片」「附件」角标＝当前已上传的数量；有角标时该项强制显示
+    // （即使被用户在工具栏设置里隐藏）。工具栏渲染与下方快捷键注册共用。
+    final badges = _editorBadges;
+
+    // 动态生成快捷键绑定：默认对**所有**有快捷键的工具栏项注册。
     //
-    // 刻意不看 item.visible：按钮显隐管的是"界面清爽"，快捷键管的是
+    // 默认不看 item.visible：按钮显隐管的是"界面清爽"，快捷键管的是
     // "能力是否可用"，两者解耦后隐藏按钮不会连带废掉快捷键
     // （列表/表格默认不显示按钮，但 Ctrl+Shift+] / Ctrl+T 仍应生效）。
+    // 用户可在「设置 → 编辑与快捷键 → 隐藏项快捷键可用」关闭此行为，
+    // 关闭后隐藏项（且非角标强制显示）的快捷键不再注册。
     // 真要停用某个键，把它的快捷键清空即可。
+    final shortcutWhenHidden = settings.toolbarShortcutWhenHidden;
     final editorShortcuts = <ShortcutActivator, Intent>{};
     for (final item in settings.toolbarItems) {
       final keyStr = settings.toolbarShortcut(item.id);
       if (keyStr.isEmpty) continue;
+      if (!shortcutWhenHidden && !toolbarItemShown(item, badges)) continue;
       final activator = ShortcutHelper.parse(keyStr);
       if (activator == null) continue;
       editorShortcuts[activator] = EditorToolbarIntent(item.id);
@@ -89,16 +104,16 @@ extension on _EditorPageState {
                         await context.push('/settings/editor');
                       case 'info':
                         if (!context.mounted) return;
-                        final curTitle = _titleCtl.text.trim();
-                        final curContent = _contentCtl.text.trim();
+                        final curTitle = _session.titleCtl.text.trim();
+                        final curContent = _session.contentCtl.text.trim();
                         final fields = <String, dynamic>{
                           '类型': _pageTitle,
-                          'URL': _pageData.fetchedUrl,
-                          'formhash': _pageData.formhash,
-                          'posttime': _pageData.posttime,
-                          if (_pageData.fid.isNotEmpty) 'fid': _pageData.fid,
-                          if (_pageData.tid.isNotEmpty) 'tid': _pageData.tid,
-                          if (_pageData.pid.isNotEmpty) 'pid': _pageData.pid,
+                          'URL': _session.pageData.fetchedUrl,
+                          'formhash': _session.pageData.formhash,
+                          'posttime': _session.pageData.posttime,
+                          if (_session.pageData.fid.isNotEmpty) 'fid': _session.pageData.fid,
+                          if (_session.pageData.tid.isNotEmpty) 'tid': _session.pageData.tid,
+                          if (_session.pageData.pid.isNotEmpty) 'pid': _session.pageData.pid,
                           if (curTitle.isNotEmpty)
                             '标题': curTitle.length > 50
                                 ? '${curTitle.substring(0, 50)}...'
@@ -107,8 +122,8 @@ extension on _EditorPageState {
                             '内容(前80字)': curContent.length > 80
                                 ? '${curContent.substring(0, 80)}...'
                                 : curContent,
-                          if (_pageData.uploadHash.isNotEmpty)
-                            'uploadHash': _pageData.uploadHash,
+                          if (_session.pageData.uploadHash.isNotEmpty)
+                            'uploadHash': _session.pageData.uploadHash,
                           if (_imageList.isNotEmpty)
                             '图片': '${_imageList.length} 张',
                           if (_attachmentList.isNotEmpty)
@@ -236,7 +251,7 @@ extension on _EditorPageState {
           QuotedPostCard(
             loading: _loadingQuoted,
             error: _quotedError,
-            quotedPost: _quotedPost,
+            quotedPost: _session.quotedPost,
           ),
         if (_loadingPage)
           const Padding(
@@ -257,7 +272,7 @@ extension on _EditorPageState {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: TextField(
-              controller: _titleCtl,
+              controller: _session.titleCtl,
               decoration: const InputDecoration(
                 hintText: '标题',
                 border: OutlineInputBorder(),
@@ -282,12 +297,7 @@ extension on _EditorPageState {
               canRedo: undoVal.canRedo,
               items: items,
               shortcuts: shortcutsMap,
-              // 「图片」「附件」角标＝当前已上传的数量；有角标时该项强制显示
-              // （即使被用户在工具栏设置里隐藏），用来提示"你上传过东西"。
-              badges: {
-                if (_imageList.isNotEmpty) 'image': _imageList.length,
-                if (_attachmentList.isNotEmpty) 'attach': _attachmentList.length,
-              },
+              badges: _editorBadges,
             );
           },
         ),
@@ -316,7 +326,7 @@ extension on _EditorPageState {
                       },
                       child: TextField(
                         key: _editorContentKey,
-                        controller: _contentCtl,
+                        controller: _session.contentCtl,
                         focusNode: _contentFocusNode,
                         undoController: _undoController,
                         decoration: InputDecoration(
@@ -362,7 +372,7 @@ extension on _EditorPageState {
       data: _previewData,
       activeAnchor: _activeAnchor,
       onTapAnchor: _onPreviewGutterTap,
-      onShowRaw: () => showRawBbcodeDialog(context, _contentCtl.text),
+      onShowRaw: () => showRawBbcodeDialog(context, _session.contentCtl.text),
     );
   }
 }

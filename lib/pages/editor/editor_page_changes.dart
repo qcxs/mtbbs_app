@@ -14,8 +14,8 @@ extension on _EditorPageState {
     _previewDebounce?.cancel();
     _previewDebounce = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      final title = _titleCtl.text.trim();
-      final selection = _contentCtl.selection;
+      final title = _session.titleCtl.text.trim();
+      final selection = _session.contentCtl.selection;
       final color = _previewHighlightColor();
       // 预览与编辑区**共用同一份锚点表**：第 i 个块就是第 i 个锚点。
       // 这里只负责把每个锚点自己的源码切片加工成"渲染用的 BBCode"：
@@ -63,10 +63,10 @@ extension on _EditorPageState {
 
   void _updateHasChanges() {
     final titleChanged =
-        _titleCtl.text != _initialTitle && _titleCtl.text.isNotEmpty;
-    final contentChanged = _contentCtl.text != _initialContent;
+        _session.titleCtl.text != _initialTitle && _session.titleCtl.text.isNotEmpty;
+    final contentChanged = _session.contentCtl.text != _initialContent;
     final aidsChanged = !_setEquals(
-      _contentCtl.pendingAids,
+      _session.contentCtl.pendingAids,
       _initialPendingAids,
     );
     _hasUnsavedChanges = titleChanged || contentChanged || aidsChanged;
@@ -78,16 +78,16 @@ extension on _EditorPageState {
   }
 
   void _updateLastSaved() {
-    _lastSavedTitle = _titleCtl.text;
-    _lastSavedContent = _contentCtl.text;
-    _lastSavedPendingAids = Set.from(_contentCtl.pendingAids);
+    _lastSavedTitle = _session.titleCtl.text;
+    _lastSavedContent = _session.contentCtl.text;
+    _lastSavedPendingAids = Set.from(_session.contentCtl.pendingAids);
   }
 
   bool get _hasChangesSinceLastSave {
-    if (_titleCtl.text != _lastSavedTitle && _titleCtl.text.isNotEmpty)
+    if (_session.titleCtl.text != _lastSavedTitle && _session.titleCtl.text.isNotEmpty)
       return true;
-    if (_contentCtl.text != _lastSavedContent) return true;
-    if (!_setEquals(_contentCtl.pendingAids, _lastSavedPendingAids))
+    if (_session.contentCtl.text != _lastSavedContent) return true;
+    if (!_setEquals(_session.contentCtl.pendingAids, _lastSavedPendingAids))
       return true;
     return false;
   }
@@ -118,23 +118,6 @@ extension on _EditorPageState {
     if (mounted) showToast('已手动保存');
   }
 
-  EditorSnapshot _buildSnapshot({required bool isManual}) {
-    return EditorSnapshot(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      sessionKey: _sessionKey,
-      editorType: widget.type.name,
-      label: _pageTitle,
-      title: _titleCtl.text,
-      content: _contentCtl.text,
-      pendingAids: _contentCtl.pendingAids.toList(),
-      quotedPost: _quotedPost?.map((k, v) => MapEntry(k, v.toString())),
-      createdAt: DateTime.now(),
-      isManual: isManual,
-      tid: widget.tid,
-      pid: widget.pid,
-      fid: widget.fid,
-      pageData: PageFormDataSnapshot.fromPageFormData(_pageData),
-      emojiMap: Map.from(_emojiMap),
-    );
-  }
+  EditorSnapshot _buildSnapshot({required bool isManual}) =>
+      _session.buildSnapshot(isManual: isManual);
 }

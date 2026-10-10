@@ -39,6 +39,11 @@ Future<void> showManagedListDialog({
   bool allowEdit = true,
   bool allowReorder = true,
   bool allowToggleVisibility = true,
+
+  /// 是否提供「只看已显示项」勾选项（标题栏）。用于隐藏项很多时减少干扰
+  /// （尤其迷你工具栏只启用一小部分）。排序仍可用：内部会把可见子序列的
+  /// 重排换算成对完整列表的移动（见 `reorderVisibleToFull`）。
+  bool allowFilterVisible = false,
   Future<ManagedItem?> Function()? onAdd,
   Future<ManagedItem?> Function(ManagedItem item)? onEdit,
   Future<bool> Function(String id)? onDelete,
@@ -50,6 +55,9 @@ Future<void> showManagedListDialog({
 
   /// 逐项判断是否可编辑（默认全部可编辑）。
   bool Function(ManagedItem item)? canEdit,
+
+  /// 逐项判断是否可切换显隐（默认全部可切换）。用于禁用"该上下文不支持"的项。
+  bool Function(ManagedItem item)? canToggleVisibility,
   String emptyHint = '暂无数据',
   Widget Function(ManagedItem item, bool isVisible)? itemBuilder,
 
@@ -78,6 +86,7 @@ Future<void> showManagedListDialog({
       allowEdit: allowEdit,
       allowReorder: allowReorder,
       allowToggleVisibility: allowToggleVisibility,
+      allowFilterVisible: allowFilterVisible,
       onAdd: onAdd,
       onEdit: onEdit,
       onDelete: onDelete,
@@ -85,6 +94,7 @@ Future<void> showManagedListDialog({
       onToggleVisibility: onToggleVisibility,
       canDelete: canDelete,
       canEdit: canEdit,
+      canToggleVisibility: canToggleVisibility,
       emptyHint: emptyHint,
       itemBuilder: itemBuilder,
       titleActions: titleActions,
@@ -100,7 +110,8 @@ class _ManagedListSheetContent extends StatefulWidget {
       allowDelete,
       allowEdit,
       allowReorder,
-      allowToggleVisibility;
+      allowToggleVisibility,
+      allowFilterVisible;
   final Future<ManagedItem?> Function()? onAdd;
   final Future<ManagedItem?> Function(ManagedItem item)? onEdit;
   final Future<bool> Function(String id)? onDelete;
@@ -108,6 +119,7 @@ class _ManagedListSheetContent extends StatefulWidget {
   final void Function(String id)? onToggleVisibility;
   final bool Function(ManagedItem item)? canDelete;
   final bool Function(ManagedItem item)? canEdit;
+  final bool Function(ManagedItem item)? canToggleVisibility;
   final String emptyHint;
   final Widget Function(ManagedItem item, bool isVisible)? itemBuilder;
   final List<Widget>? titleActions;
@@ -121,6 +133,7 @@ class _ManagedListSheetContent extends StatefulWidget {
     required this.allowEdit,
     required this.allowReorder,
     required this.allowToggleVisibility,
+    this.allowFilterVisible = false,
     this.onAdd,
     this.onEdit,
     this.onDelete,
@@ -128,6 +141,7 @@ class _ManagedListSheetContent extends StatefulWidget {
     this.onToggleVisibility,
     this.canDelete,
     this.canEdit,
+    this.canToggleVisibility,
     required this.emptyHint,
     this.itemBuilder,
     this.titleActions,
@@ -141,6 +155,9 @@ class _ManagedListSheetContent extends StatefulWidget {
 class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
   late List<ManagedItem> _items;
   bool _loading = false;
+
+  /// 只看已显示项（勾选后隐藏未启用项，减少干扰；此时禁用排序）
+  bool _onlyVisible = false;
 
   @override
   void initState() {
@@ -160,9 +177,8 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
     }
   }
 
-  Future<void> _handleEdit(int index) async {
+  Future<void> _handleEdit(ManagedItem item) async {
     if (widget.onEdit == null) return;
-    final item = _items[index];
     if (!_isValidId(item.id)) return;
     if (!mounted) return;
     Navigator.of(context).pop(); // 先关主对话框
@@ -172,9 +188,8 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
     }
   }
 
-  Future<void> _handleDelete(int index) async {
+  Future<void> _handleDelete(ManagedItem item) async {
     if (widget.onDelete == null) return;
-    final item = _items[index];
     if (!_isValidId(item.id)) return;
 
     final confirm = await showConfirmDialog(
@@ -190,31 +205,49 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
     try {
       final ok = await widget.onDelete!(item.id);
       if (ok && mounted) {
-        setState(() => _items.removeAt(index));
+        setState(() => _items.removeWhere((e) => e.id == item.id));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _handleToggleVisibility(int index) {
+  void _handleToggleVisibility(ManagedItem item) {
     if (widget.onToggleVisibility == null) return;
-    final item = _items[index];
     if (!_isValidId(item.id)) return;
     widget.onToggleVisibility!(item.id);
     toggleManagedItem(_items, item.id);
     setState(() {});
   }
 
+  /// 重排。
+  ///
+  /// 不过滤时就是对完整列表的一次移动；过滤（只看已显示）时用
+  /// [reorderVisibleToFull] 把可见子序列的重排换算成对完整列表的一次移动，
+  /// 保证可见项相对顺序与用户操作一致（隐藏项可能位移但不可见）。
   void _handleReorder(int oldIndex, int newIndex) {
     if (!widget.allowReorder || widget.onReorder == null) return;
-    reorderManagedItems(_items, oldIndex, newIndex);
-    widget.onReorder!(oldIndex, newIndex);
+    if (!_onlyVisible) {
+      reorderManagedItems(_items, oldIndex, newIndex);
+      widget.onReorder!(oldIndex, newIndex);
+      setState(() {});
+      return;
+    }
+    final r = reorderVisibleToFull(_items, oldIndex, newIndex);
+    if (r == null) return;
+    reorderManagedItems(_items, r.from, r.to);
+    widget.onReorder!(r.from, r.to);
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // 只看已显示项时按可见性过滤（排序仍可用：见 [_handleReorder] 的下标换算）
+    final displayed = _onlyVisible
+        ? _items.where((e) => e.visible).toList()
+        : _items;
+
     return Column(
       children: [
         // 拖拽手柄
@@ -244,6 +277,16 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
                   ),
                 ),
               ),
+              if (widget.allowFilterVisible)
+                IconButton(
+                  icon: Icon(
+                    _onlyVisible ? Icons.filter_alt : Icons.filter_alt_off,
+                    size: 20,
+                  ),
+                  tooltip: _onlyVisible ? '显示全部' : '只看已显示项',
+                  color: _onlyVisible ? cs.primary : null,
+                  onPressed: () => setState(() => _onlyVisible = !_onlyVisible),
+                ),
               if (widget.titleActions != null) ...widget.titleActions!,
               if (widget.allowAdd)
                 IconButton(
@@ -261,12 +304,12 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
         ),
         Divider(height: 1, color: cs.outlineVariant),
         Expanded(
-          child: _items.isEmpty
+          child: displayed.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
                     child: Text(
-                      widget.emptyHint,
+                      _onlyVisible ? '没有已显示的项' : widget.emptyHint,
                       style: TextStyle(color: cs.onSurfaceVariant),
                     ),
                   ),
@@ -274,11 +317,11 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
               : _loading
               ? const Center(child: CircularProgressIndicator())
               : ReorderableListView.builder(
-                  itemCount: _items.length,
+                  itemCount: displayed.length,
                   onReorderItem: _handleReorder,
                   buildDefaultDragHandles: false,
                   itemBuilder: (ctx, i) {
-                    final item = _items[i];
+                    final item = displayed[i];
                     final isVisible = item.visible;
                     return ListTile(
                       key: ValueKey(item.id),
@@ -302,16 +345,15 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (widget.allowToggleVisibility)
+                          if (widget.allowToggleVisibility &&
+                              (widget.canToggleVisibility?.call(item) ?? true))
                             IconButton(
                               icon: Icon(
                                 isVisible
                                     ? Icons.visibility
                                     : Icons.visibility_off,
                                 size: 18,
-                                color: isVisible
-                                    ? cs.onSurfaceVariant
-                                    : cs.onSurfaceVariant,
+                                color: cs.onSurfaceVariant,
                               ),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
@@ -321,7 +363,7 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
                               tooltip: isVisible ? '隐藏' : '显示',
                               onPressed: _loading
                                   ? null
-                                  : () => _handleToggleVisibility(i),
+                                  : () => _handleToggleVisibility(item),
                             ),
                           if (widget.allowEdit &&
                               (widget.canEdit?.call(item) ?? true))
@@ -333,7 +375,9 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
                                 minHeight: 28,
                               ),
                               tooltip: '编辑',
-                              onPressed: _loading ? null : () => _handleEdit(i),
+                              onPressed: _loading
+                                  ? null
+                                  : () => _handleEdit(item),
                             ),
                           if (widget.allowDelete &&
                               (widget.canDelete?.call(item) ?? true))
@@ -348,7 +392,7 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
                               color: cs.error,
                               onPressed: _loading
                                   ? null
-                                  : () => _handleDelete(i),
+                                  : () => _handleDelete(item),
                             ),
                         ],
                       ),

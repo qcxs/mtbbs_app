@@ -24,8 +24,8 @@ extension on _EditorPageState {
   /// 更新 Emoji 警告提示状态
   void _updateEmojiWarning() {
     final hasEmoji =
-        _checkIncompatibleEmoji(_titleCtl.text) ||
-        _checkIncompatibleEmoji(_contentCtl.text);
+        _checkIncompatibleEmoji(_session.titleCtl.text) ||
+        _checkIncompatibleEmoji(_session.contentCtl.text);
     if (hasEmoji != _hasEmojiWarning) {
       _setState(() => _hasEmojiWarning = hasEmoji);
       if (hasEmoji) {
@@ -54,7 +54,7 @@ extension on _EditorPageState {
     // 意外关闭
     if (!_dismissedHints.contains('unexpected_close')) {
       final historyProv = context.read<EditorHistoryProvider>();
-      if (historyProv.hasSession(_sessionKey)) {
+      if (historyProv.hasSession(_session.sessionKey)) {
         hints.add(
           EditorHintData(
             id: 'unexpected_close',

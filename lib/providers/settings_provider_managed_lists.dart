@@ -22,10 +22,7 @@ extension SettingsManagedLists on SettingsProvider {
           final canonicalItem = canonical.firstWhere((c) => c.id == e.id);
           // 内置项：以 JSON 的模板/标签/分组为默认值（兼容旧版无 data 的持久化），
           // 用持久化里的同名字段覆盖（用户改过的模板得以保留）
-          final merged = <String, dynamic>{
-            ...?canonicalItem.data,
-            ...?e.data,
-          };
+          final merged = <String, dynamic>{...?canonicalItem.data, ...?e.data};
           synced.add(e.copyWith(name: canonicalItem.name, data: merged));
         } else if (isCustomToolbarItem(e)) {
           // 用户自定义模板项：原样保留
@@ -91,6 +88,79 @@ extension SettingsManagedLists on SettingsProvider {
     _toolbarItems = [...defaultToolbarItems(), ...custom];
     _toolbarShortcuts = {...defaultToolbarShortcuts(), ...customShortcuts};
     await _persistToolbar();
+  }
+
+  // ==================== 迷你编辑器：上下文可见性 ====================
+
+  /// 设置某工具栏项在指定迷你上下文的可见性。
+  ///
+  /// 完整版与迷你版**共用同一份工具栏与顺序**；这里只改 `data['mini']` 的成员关系，
+  /// 不新增/删除项，也不改顺序（顺序在「完整编辑器工具栏」里统一管理）。
+  Future<void> setToolbarMiniVisible(
+    MiniToolbarContext ctx,
+    String id,
+    bool visible,
+  ) async {
+    if (!miniToolbarSupportsItem(ctx, id)) return;
+    final i = _toolbarItems.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    final item = _toolbarItems[i];
+    _toolbarItems[i] = item.copyWith(data: withMiniVisible(item, ctx, visible));
+    await _persistToolbar();
+  }
+
+  /// 取反某工具栏项在指定迷你上下文的可见性
+  Future<void> toggleToolbarMiniVisible(
+    MiniToolbarContext ctx,
+    String id,
+  ) async {
+    final i = _toolbarItems.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    await setToolbarMiniVisible(
+      ctx,
+      id,
+      !toolbarMiniVisible(_toolbarItems[i], ctx),
+    );
+  }
+
+  // ==================== 帖子迷你编辑器常用语 ====================
+
+  Future<void> _persistQuickReplies() async {
+    await _db.setSetting('quickReplies', ManagedItem.encodeList(_quickReplies));
+    _notify();
+  }
+
+  Future<void> addQuickReply(ManagedItem item) async {
+    _quickReplies.add(item);
+    await _persistQuickReplies();
+  }
+
+  Future<void> updateQuickReply(String id, ManagedItem newValue) async {
+    final i = _quickReplies.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    _quickReplies[i] = newValue;
+    await _persistQuickReplies();
+  }
+
+  Future<void> deleteQuickReply(String id) async {
+    _quickReplies.removeWhere((e) => e.id == id);
+    await _persistQuickReplies();
+  }
+
+  Future<void> moveQuickReply(int from, int to) async {
+    reorderManagedItems(_quickReplies, from, to);
+    await _persistQuickReplies();
+  }
+
+  Future<void> toggleQuickReply(String id) async {
+    toggleManagedItem(_quickReplies, id);
+    await _persistQuickReplies();
+  }
+
+  /// 恢复默认常用语
+  Future<void> resetQuickReplies() async {
+    _quickReplies = defaultQuickReplies();
+    await _persistQuickReplies();
   }
 
   // ==================== 快捷链接 CRUD ====================

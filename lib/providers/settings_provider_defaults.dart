@@ -18,3 +18,21 @@ const List<Map<String, dynamic>> _homeSectionDefaults = [
 final Set<String> _homeSectionIds = {
   for (final d in _homeSectionDefaults) d['id'] as String,
 };
+
+/// 帖子迷你编辑器「常用语」显示文本长度上限（字符数）
+const int kQuickReplyMaxLength = 100;
+
+/// 帖子迷你编辑器「常用语」插入内容长度上限（可含 BBCode，故更宽松）
+const int kQuickReplyInsertMaxLength = 500;
+
+/// 帖子迷你编辑器「常用语」默认项
+/// 优先从 [DefaultConfig]（`assets/config/quick_replies.json`）加载，失败用内嵌兜底。
+List<ManagedItem> defaultQuickReplies() {
+  final fromConfig = DefaultConfig.instance.quickReplies;
+  if (fromConfig.isNotEmpty) return fromConfig;
+  return const [
+    ManagedItem(id: 'qr_thanks', name: '感谢分享'),
+    ManagedItem(id: 'qr_hidden', name: '看看隐藏'),
+    ManagedItem(id: 'qr_awesome', name: '论坛有你更精彩'),
+  ];
+}

@@ -48,6 +48,7 @@ enum ToolbarAction {
   mdImport,
   mtImage,
   attach,
+  quickReply,
 }
 
 /// 工具栏项的默认配置
@@ -71,6 +72,10 @@ class ToolbarItemConfig {
   /// 用于 `[hr]`、表格骨架这类自闭合/骨架模板
   final bool block;
 
+  /// 迷你编辑器**默认可见**的上下文 id（如 `['thread','pm']`）；
+  /// 空表示迷你编辑器默认不显示该项。
+  final List<String> mini;
+
   final String defaultShortcut;
   final bool defaultVisible;
 
@@ -82,6 +87,7 @@ class ToolbarItemConfig {
     this.label = '',
     this.group = 'misc',
     this.block = false,
+    this.mini = const [],
     this.defaultShortcut = '',
     this.defaultVisible = true,
   });
@@ -94,6 +100,7 @@ class ToolbarItemConfig {
     if (label.isNotEmpty) 'label': label,
     'group': group,
     if (block) 'block': true,
+    if (mini.isNotEmpty) 'mini': mini,
   };
 }
 
@@ -113,12 +120,14 @@ const allToolbarItemConfigs = [
     id: 'undo',
     name: '撤销',
     group: 'undo',
+    mini: ['thread', 'pm'],
   ),
   ToolbarItemConfig(
     action: ToolbarAction.redo,
     id: 'redo',
     name: '重做',
     group: 'undo',
+    mini: ['thread', 'pm'],
   ),
   ToolbarItemConfig(
     action: ToolbarAction.select,
@@ -140,6 +149,7 @@ const allToolbarItemConfigs = [
     template: r'[b]${selectText}[/b]',
     label: 'B',
     group: 'style',
+    mini: ['thread', 'pm'],
     defaultShortcut: 'Ctrl+B',
   ),
   ToolbarItemConfig(
@@ -147,6 +157,7 @@ const allToolbarItemConfigs = [
     id: 'link',
     name: '链接',
     group: 'insert',
+    mini: ['thread', 'pm'],
     defaultShortcut: 'Ctrl+K',
   ),
   ToolbarItemConfig(
@@ -154,6 +165,7 @@ const allToolbarItemConfigs = [
     id: 'image',
     name: '图片',
     group: 'insert',
+    mini: ['thread'],
     defaultShortcut: 'Ctrl+Shift+I',
   ),
   ToolbarItemConfig(
@@ -161,6 +173,15 @@ const allToolbarItemConfigs = [
     id: 'emoji',
     name: '表情',
     group: 'emoji',
+    mini: ['thread', 'pm'],
+  ),
+  ToolbarItemConfig(
+    action: ToolbarAction.quickReply,
+    id: 'quickReply',
+    name: '常用语',
+    group: 'quickReply',
+    mini: ['thread'],
+    defaultVisible: false,
   ),
   ToolbarItemConfig(
     id: 'quote',
@@ -168,6 +189,7 @@ const allToolbarItemConfigs = [
     template: r'[quote]${selectText}[/quote]',
     label: '引用',
     group: 'container',
+    mini: ['thread'],
     defaultShortcut: 'Ctrl+Shift+Q',
   ),
   ToolbarItemConfig(
@@ -227,6 +249,7 @@ const allToolbarItemConfigs = [
     id: 'mtImage',
     name: 'MT图床',
     group: 'mtImage',
+    mini: ['thread', 'pm'],
     defaultVisible: true,
   ),
   ToolbarItemConfig(
@@ -368,6 +391,59 @@ Map<String, String> defaultToolbarShortcuts() {
   };
 }
 
+/// 迷你编辑器工具栏的使用上下文
+enum MiniToolbarContext {
+  thread('thread', '帖子页'),
+  pm('pm', '私信页');
+
+  const MiniToolbarContext(this.id, this.label);
+
+  /// 持久化 key 后缀
+  final String id;
+
+  /// 设置页显示名
+  final String label;
+}
+
+/// 迷你编辑器某上下文**不支持**的工具栏项 id（配置里即使有也不渲染/不列出）。
+///
+/// 私信页无论坛图片/附件上传（图片用 MT 图床即 `mtImage`）、也无常用语；
+/// 帖子页迷你版不提供附件上传（走「完整版」）。
+const Map<MiniToolbarContext, Set<String>> kMiniToolbarUnsupported = {
+  MiniToolbarContext.thread: {'attach'},
+  MiniToolbarContext.pm: {'image', 'attach', 'quickReply'},
+};
+
+/// 某上下文是否支持该工具栏项
+bool miniToolbarSupportsItem(MiniToolbarContext ctx, String id) =>
+    !(kMiniToolbarUnsupported[ctx]?.contains(id) ?? false);
+
+/// 工具栏项在指定迷你上下文是否可见（读 `data['mini']`）。
+bool toolbarMiniVisible(ManagedItem item, MiniToolbarContext ctx) {
+  final mini = item.data?['mini'];
+  if (mini is List) return mini.map((e) => e.toString()).contains(ctx.id);
+  return false;
+}
+
+/// 生成"把某上下文的迷你可见性设为 [visible]"后的新 [data]（供持久化写回）。
+Map<String, dynamic> withMiniVisible(
+  ManagedItem item,
+  MiniToolbarContext ctx,
+  bool visible,
+) {
+  final data = Map<String, dynamic>.from(item.data ?? {});
+  final set = <String>{...?(data['mini'] as List?)?.map((e) => e.toString())};
+  if (visible) {
+    set.add(ctx.id);
+  } else {
+    set.remove(ctx.id);
+  }
+  // 始终保留 `mini` 键（即使为空）：合并持久化数据时，空列表才能覆盖默认值，
+  // 否则 `{...canonical, ...persisted}` 会把默认可见性又合并回来（无法隐藏）。
+  data['mini'] = set.toList();
+  return data;
+}
+
 /// 根据 item id 解析对应的 [ToolbarAction]（模板项返回 null）
 ToolbarAction? resolveToolbarAction(String id) {
   for (final config in allToolbarItemConfigs) {
@@ -382,6 +458,13 @@ bool isBuiltinToolbarItemId(String id) =>
 
 /// 检查 id 是否为有效的工具栏项（内置项，用于持久化剪枝）
 bool isValidToolbarItemId(String id) => isBuiltinToolbarItemId(id);
+
+/// 工具栏项在界面上是否**实际可见**：用户设为可见，或带角标（已上传图片/附件）
+/// 被强制显示。
+///
+/// 工具栏渲染与「隐藏项快捷键是否生效」共用此判定，避免两处漂移。
+bool toolbarItemShown(ManagedItem item, Map<String, int> badges) =>
+    item.visible || (badges[item.id] ?? 0) > 0;
 
 /// 取出模板项的内置/自定义模板文本；复杂项返回 null
 String? toolbarTemplateOf(ManagedItem item) {

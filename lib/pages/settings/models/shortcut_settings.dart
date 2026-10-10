@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
+import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/key_recorder_dialog.dart';
 
 /// 快捷键组设置项：直接列出全部快捷键（全局 + 编辑器工具栏），点击录制。
-/// 工具栏项隐藏时其快捷键自动失效（副标题提示"已隐藏"）。
+/// 工具栏项被隐藏时，其快捷键是否生效取决于「隐藏项快捷键可用」设置。
 ///
 /// 工具栏部分遍历**实际** `settings.toolbarItems`（含用户自定义模板项），
 /// 因此自定义模板也能绑定快捷键。
 List<SettingsModel> shortcutSettings(SettingsProvider s) => [
   const HeaderSetting(title: '全局快捷键'),
   for (final action in ShortcutHelper.labels.keys) _globalShortcutItem(action),
-  const HeaderSetting(title: '编辑器工具栏快捷键', subtitle: '隐藏的工具栏项其快捷键自动失效'),
-  for (final item in s.toolbarItems) _toolbarShortcutItem(item.id, item.name),
+  HeaderSetting(
+    title: '编辑器工具栏快捷键',
+    subtitle: s.toolbarShortcutWhenHidden
+        ? '隐藏的工具栏项其快捷键仍然生效'
+        : '隐藏的工具栏项其快捷键已失效',
+  ),
+  for (final item in s.toolbarItems) _toolbarShortcutItem(item),
   const HeaderSetting(title: '提示：修改后立即生效，无需重启'),
 ];
 
@@ -37,25 +43,25 @@ NormalSetting _globalShortcutItem(String action) {
   );
 }
 
-NormalSetting _toolbarShortcutItem(String id, String name) {
+NormalSetting _toolbarShortcutItem(ManagedItem item) {
   return NormalSetting(
-    title: name,
+    title: item.name,
     icon: Icons.keyboard,
     subtitleBuilder: (s) {
-      final visible = s.toolbarItems
-          .where((e) => e.id == id)
-          .firstOrNull
-          ?.visible;
-      return visible == false ? '已隐藏' : null;
+      if (item.visible) return null;
+      return s.toolbarShortcutWhenHidden ? '已隐藏（快捷键仍可用）' : '已隐藏（快捷键已失效）';
     },
-    trailingBuilder: (ctx, s) => _keyBadge(ctx, s.toolbarShortcut(id)),
+    trailingBuilder: (ctx, s) => _keyBadge(ctx, s.toolbarShortcut(item.id)),
     onTap: (ctx, s) => _recordShortcut(
       ctx,
-      initial: s.toolbarShortcut(id),
+      initial: s.toolbarShortcut(item.id),
       onSave: (v) async {
-        await s.setToolbarShortcut(id, v);
+        await s.setToolbarShortcut(item.id, v);
         if (ctx.mounted) {
-          showToast('$name 已设置为 $v', duration: const Duration(seconds: 1));
+          showToast(
+            '${item.name} 已设置为 $v',
+            duration: const Duration(seconds: 1),
+          );
         }
       },
     ),

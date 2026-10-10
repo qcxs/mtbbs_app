@@ -51,6 +51,26 @@ extension SettingsAccessors on SettingsProvider {
   AvatarSizeMode get avatarSizeMode => _avatarSizeMode;
   int get maxImageWidth => _maxImageWidth;
 
+  /// 某上下文的迷你编辑器工具栏项。
+  ///
+  /// 与完整版**共用同一套工具栏**（同一份 `_toolbarItems`，顺序统一），
+  /// 只按该上下文的可见性（`data['mini']`）与该上下文能力过滤。
+  List<ManagedItem> miniToolbarItems(MiniToolbarContext ctx) =>
+      List.unmodifiable([
+        for (final e in _toolbarItems)
+          if (toolbarMiniVisible(e, ctx) && miniToolbarSupportsItem(ctx, e.id))
+            e,
+      ]);
+
+  /// 工具栏项被隐藏时其快捷键是否仍然生效
+  bool get toolbarShortcutWhenHidden => _toolbarShortcutWhenHidden;
+
+  /// 帖子页是否使用内嵌迷你编辑器（false = 退回原全屏编辑器）
+  bool get threadMiniEditorEnabled => _threadMiniEditor;
+
+  /// 帖子迷你编辑器「常用语」（仅可见项按顺序）
+  List<ManagedItem> get quickReplies => List.unmodifiable(_quickReplies);
+
   /// 启动时是否自动检查更新（仅正式版生效）
   bool get autoCheckUpdate => _autoCheckUpdate;
 

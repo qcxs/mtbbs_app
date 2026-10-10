@@ -11,6 +11,7 @@ import 'package:mtbbs/models/managed_item.dart';
 /// | `toolbar.json` | 编辑器工具栏项（含默认快捷键/模板） | `items` |
 /// | `shortcuts.json` | 全局快捷键 | `global` |
 /// | `cache.json` | 图片缓存过期天数 | `expireDays` |
+/// | `quick_replies.json` | 帖子迷你编辑器常用语 | `items` |
 ///
 /// 各文件**独立容错**：加载失败或 JSON 错误只让对应域返回空/默认，不影响其它域。
 /// 只有站点配置带硬编码回退（否则 App 无法启动）。
@@ -22,6 +23,7 @@ class DefaultConfig {
   Map<String, dynamic>? _toolbar;
   Map<String, dynamic>? _shortcuts;
   Map<String, dynamic>? _cache;
+  Map<String, dynamic>? _quickReplies;
 
   /// 从 assets 加载全部默认配置（每个文件独立 try/catch）
   Future<void> load() async {
@@ -29,6 +31,7 @@ class DefaultConfig {
     _toolbar = await _loadJson('assets/config/toolbar.json');
     _shortcuts = await _loadJson('assets/config/shortcuts.json');
     _cache = await _loadJson('assets/config/cache.json');
+    _quickReplies = await _loadJson('assets/config/quick_replies.json');
   }
 
   Future<Map<String, dynamic>?> _loadJson(String path) async {
@@ -113,6 +116,12 @@ class DefaultConfig {
       final group = m['group']?.toString();
       if (group != null && group.isNotEmpty) data['group'] = group;
       if (m['block'] == true) data['block'] = true;
+      // 迷你编辑器默认可见的上下文 id（如 ["thread","pm"]），缺省 = 迷你编辑器不显示
+      final mini = (m['mini'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (mini != null && mini.isNotEmpty) data['mini'] = mini;
       return ManagedItem(
         id: m['id']?.toString() ?? '',
         name: m['name']?.toString() ?? '',
@@ -163,6 +172,30 @@ class DefaultConfig {
       image: dayOf(map['image']),
       medal: dayOf(map['medal']),
     );
+  }
+
+  // ==================== 帖子迷你编辑器常用语（非关键，JSON 失败返回空） ====================
+
+  /// 默认常用语列表（`quick_replies.json` 的 `items`），JSON 失败返回空
+  ///
+  /// `text` = 显示文本（[ManagedItem.name]）；可选 `insert` = 实际插入内容
+  /// （存进 `data['insert']`，留空则插入显示文本），用于"显示 A、插入美化后的 B"。
+  List<ManagedItem> get quickReplies {
+    final list = _quickReplies?['items'] as List<dynamic>?;
+    if (list == null) return [];
+    return list
+        .map((j) {
+          final m = j as Map<String, dynamic>;
+          final text = m['text']?.toString() ?? m['name']?.toString() ?? '';
+          final insert = m['insert']?.toString() ?? '';
+          return ManagedItem(
+            id: m['id']?.toString() ?? '',
+            name: text,
+            data: insert.isEmpty ? null : {'insert': insert},
+          );
+        })
+        .where((e) => e.id.isNotEmpty && e.name.isNotEmpty)
+        .toList();
   }
 
   // ==================== 全局快捷键（非关键，JSON 失败返回空） ====================

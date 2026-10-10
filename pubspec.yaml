@@ -127,6 +127,7 @@ flutter:
     - assets/config/toolbar.json
     - assets/config/shortcuts.json
     - assets/config/cache.json
+    - assets/config/quick_replies.json
     - assets/config/thanks.json
     # 关于页展示的应用图标，由 mipmap-xxxhdpi/ic_launcher.png 复制而来
     - assets/icon/app_icon.png

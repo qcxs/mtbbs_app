@@ -8,7 +8,7 @@ extension on _EditorPageState {
     if (!_hasUnsavedChanges) return true;
     final minWords = context.read<EditorHistoryProvider>().minSnapshotWordCount;
     final totalWords =
-        _titleCtl.text.trim().length + _contentCtl.text.trim().length;
+        _session.titleCtl.text.trim().length + _session.contentCtl.text.trim().length;
     if (totalWords < minWords) return true;
     final shouldPop = await showExitConfirmDialog(context);
     if (shouldPop == 'save') {
@@ -21,8 +21,8 @@ extension on _EditorPageState {
   // ==================== 提交 ====================
 
   Future<void> _submit() async {
-    final title = _titleCtl.text.trim();
-    final content = _contentCtl.text.trim();
+    final title = _session.titleCtl.text.trim();
+    final content = _session.contentCtl.text.trim();
     if (content.isEmpty) {
       if (mounted) showToast('请输入内容');
       return;
@@ -39,7 +39,7 @@ extension on _EditorPageState {
       return;
     }
     if (_isEdit &&
-        (!_pageData.formhash.isNotEmpty || !_pageData.posttime.isNotEmpty)) {
+        (!_session.pageData.formhash.isNotEmpty || !_session.pageData.posttime.isNotEmpty)) {
       if (mounted) {
         showToast('页面数据未加载，请稍后');
       }
@@ -55,8 +55,8 @@ extension on _EditorPageState {
       final remove = await showIncompatibleEmojiDialog(context, emojiCount);
       if (!mounted) return;
       if (remove) {
-        final cleaned = stripIncompatibleEmoji(_contentCtl.text);
-        _contentCtl.value = TextEditingValue(
+        final cleaned = stripIncompatibleEmoji(_session.contentCtl.text);
+        _session.contentCtl.value = TextEditingValue(
           text: cleaned,
           selection: TextSelection.collapsed(offset: cleaned.length),
         );
@@ -91,14 +91,14 @@ extension on _EditorPageState {
         'type': widget.type.name,
         'titleLen': title.length,
         'contentLen': content.length,
-        'formhash': _pageData.formhash.isNotEmpty,
-        'posttime': _pageData.posttime.isNotEmpty,
+        'formhash': _session.pageData.formhash.isNotEmpty,
+        'posttime': _session.pageData.posttime.isNotEmpty,
       }),
     );
 
     try {
-      final result = await _submitHelper.submit(
-        _pageData,
+      final result = await _session.submitHelper.submit(
+        _session.pageData,
         title,
         content,
         appendAids: appendAids,
@@ -118,7 +118,7 @@ extension on _EditorPageState {
         showToast(msg);
         _isLeavingNormally = true;
         _autoSaveTimer?.cancel();
-        context.read<EditorHistoryProvider>().markSubmitted(_sessionKey);
+        context.read<EditorHistoryProvider>().markSubmitted(_session.sessionKey);
 
         // 发帖成功：直接打开新帖，覆盖编辑器路由（返回时回到来源页，编辑器不留在栈里）
         if (widget.type == EditorType.post &&
@@ -160,7 +160,7 @@ extension on _EditorPageState {
 
   Future<void> _openHistoryPage() async {
     final result = await context.push<Map<String, dynamic>>(
-      '/editor/history?key=$_sessionKey',
+      '/editor/history?key=$_session.sessionKey',
     );
     if (result == null || !mounted) return;
     final action = result['action'] as String?;
@@ -189,10 +189,10 @@ extension on _EditorPageState {
     }
 
     _saveManualSnapshot();
-    _titleCtl.text = snapshot.title;
-    _contentCtl.text = snapshot.content;
-    _contentCtl.pendingAids = snapshot.pendingAids.toSet();
-    _pageData = snapshot.pageData.toPageFormData();
+    _session.titleCtl.text = snapshot.title;
+    _session.contentCtl.text = snapshot.content;
+    _session.contentCtl.pendingAids = snapshot.pendingAids.toSet();
+    _session.pageData = snapshot.pageData.toPageFormData();
 
     // 从快照预填充图片/附件映射（供恢复后预览使用，
     // _doFetchPage 后若新页面无这些图片，再兜底合并）
@@ -205,12 +205,12 @@ extension on _EditorPageState {
     }
 
     if (snapshot.quotedPost != null) {
-      _quotedPost = snapshot.quotedPost!.map(
+      _session.quotedPost = snapshot.quotedPost!.map(
         (k, v) => MapEntry(k, v as dynamic),
       );
     }
     if (snapshot.emojiMap.isNotEmpty) {
-      _emojiMap = Map.from(snapshot.emojiMap);
+      _session.emojiMap = Map.from(snapshot.emojiMap);
     }
     _initialTitle = snapshot.title;
     _initialContent = snapshot.content;

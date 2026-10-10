@@ -96,8 +96,7 @@ extension on _ThreadViewPageState {
       tid: widget.tid,
       opUid: _data?.mainPost?.uid ?? '',
       globalDisableStyle: _globalDisableStyle,
-      onReply: (post) =>
-          _openEditor('/editor?type=reply&tid=${widget.tid}&pid=${post.pid}'),
+      onReply: (post) => _replyToPost(post),
       onRecommend: _handleRecommend,
       onPopupAction: (action, post) {
         switch (action) {
@@ -163,6 +162,26 @@ extension on _ThreadViewPageState {
   }
 
   // ==================== 杂项组件 ====================
+
+  // ==================== 迷你编辑器 ====================
+
+  /// 底部内嵌迷你编辑器（评论 / 回复某评论，可收起读帖、可展开为完整版）
+  Widget _buildMiniEditor() {
+    return MiniEditorBar(
+      contentCtl: _editorSession.contentCtl,
+      toolbarContext: MiniToolbarContext.thread,
+      hintText: _replyTargetPid != null ? '回复评论…' : '说点什么…',
+      submitting: _editorSubmitting,
+      autofocus: true,
+      onSubmit: _submitMiniEditor,
+      onImage: _showForumImageUpload,
+      onMtImage: _showMtImage,
+      onCollapse: _collapseEditor,
+      onExpandToFull: _expandToFull,
+      targetLabel: _replyTargetName != null ? '回复 ${_replyTargetName}' : null,
+      onTapTarget: _replyTargetPid != null ? _showReplyTargetPreview : null,
+    );
+  }
 
   Widget _buildReplyBar() {
     final cs = Theme.of(context).colorScheme;
