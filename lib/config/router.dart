@@ -34,6 +34,7 @@ import 'package:mtbbs/pages/search/search_result_page.dart';
 import 'package:mtbbs/pages/history/history_page.dart';
 import 'package:mtbbs/pages/darkroom/darkroom_page.dart';
 import 'package:mtbbs/pages/online/online_page.dart';
+import 'package:mtbbs/pages/ranklist/member_ranklist_page.dart';
 import 'package:mtbbs/pages/favorite/favorite_page.dart';
 import 'package:mtbbs/pages/friend/friend_page.dart';
 import 'package:mtbbs/pages/follow/follow_page.dart';
@@ -268,6 +269,14 @@ GoRouter buildRouter({
           GoRoute(
             path: '/online',
             pageBuilder: (_, __) => const NoTransitionPage(child: OnlinePage()),
+          ),
+          GoRoute(
+            path: '/ranklist',
+            pageBuilder: (_, state) => NoTransitionPage(
+              child: MemberRanklistPage(
+                initialView: state.uri.queryParameters['view'] ?? 'beauty',
+              ),
+            ),
           ),
           GoRoute(
             path: '/pm/chat',

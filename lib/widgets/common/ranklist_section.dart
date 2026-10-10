@@ -54,7 +54,7 @@ class _RanklistSectionState extends State<RanklistSection>
     });
     try {
       final view = _views[tab];
-      final result = await ranklist_api.getRanklist(
+      final result = await ranklist_api.getThreadRanklist(
         ApiService().dio,
         view: view,
         orderby: 'thisweek',

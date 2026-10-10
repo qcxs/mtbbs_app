@@ -46,26 +46,14 @@ class RankItem {
   };
 }
 
-/// 解析排行榜响应
+/// 解析帖子排行榜响应（`type=thread`）
 ///
 /// 响应格式：XML CDATA 包裹的 HTML。
 /// 支持两种模板：
 ///   1. 桌面 PC 模板（MT 论坛）：`<table><tr><td class="icn"><th><td class="frm"><td class="by"><td>`
 ///   2. 移动 App 模板（克米模板）：`<div class="comiis_postphb"><ul><li><div class="postphb_mun"><a class="postphb_tit"><p>`
-Map<String, dynamic> parseResponse(String body, int statusCode) {
-  if (statusCode != 200) {
-    return {'success': false, 'message': 'HTTP $statusCode'};
-  }
-
-  // 解析 XML CDATA
-  final xmlResult = parseInajaxXml(body);
-  if (xmlResult == null || xmlResult.cdataHtml.isEmpty) {
-    AppLogger.w('PARSE', 'ranklist: failed to parse XML CDATA');
-    return {'success': false, 'message': '解析 XML 失败'};
-  }
-
-  final html = xmlResult.cdataHtml;
-  final pre = prepareDoc(html, statusCode);
+Map<String, dynamic> parseThreadResponse(String body, int statusCode) {
+  final pre = _prepareInajax(body, statusCode);
   if (pre.error != null) return pre.error!;
   final doc = pre.doc!;
 
@@ -76,6 +64,26 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   }
 
   return {'success': true, 'items': items.map((e) => e.toMap()).toList()};
+}
+
+/// inajax 排行榜响应统一前置：解出 XML CDATA 的 HTML 再走 [prepareDoc]。
+({dom.Document? doc, Map<String, dynamic>? error}) _prepareInajax(
+  String body,
+  int statusCode,
+) {
+  if (statusCode != 200) {
+    return (
+      doc: null,
+      error: {'success': false, 'message': 'HTTP $statusCode'},
+    );
+  }
+  final xmlResult = parseInajaxXml(body);
+  if (xmlResult == null || xmlResult.cdataHtml.isEmpty) {
+    AppLogger.w('PARSE', 'ranklist: failed to parse XML CDATA');
+    return (doc: null, error: {'success': false, 'message': '解析 XML 失败'});
+  }
+  final pre = prepareDoc(xmlResult.cdataHtml, statusCode);
+  return (doc: pre.doc, error: pre.error);
 }
 
 // ==================== 策略1：桌面 PC 模板（table 结构） ====================
@@ -256,3 +264,202 @@ String _extractCount(String text) {
 }
 
 String _text(dom.Element? el) => el?.text.trim() ?? '';
+
+/// 从 forum URL 提取 fid（en/forum-50-1.html / forum.php?mod=forumdisplay&fid=50）
+String _extractFid(String url) {
+  final m = RegExp(r'forum-(\d+)').firstMatch(url);
+  if (m != null) return m.group(1)!;
+  final uri = Uri.tryParse(url);
+  return uri?.queryParameters['fid'] ?? '';
+}
+
+// ==================== 用户排行（type=member） ====================
+//
+// PC 模板，每项一个 `<dl class="bbda cl">`：
+// <dl class="bbda cl">
+//   <dd class="ranknum"><img src="rank_1.gif" alt="1"></dd>   ← 前三名为图，其余纯数字
+//   <dd class="m avt"><a href="space-uid-14330.html"><img src="avatar.php?uid=…"></a></dd>
+//   <dt class="y">…去串个门/打招呼/发消息/加好友（无数据价值，忽略）…</dt>
+//   <dt><a href="space-uid-14330.html" style="color:#FB7299;">喵喵猫</a>
+//       <img src="ol.gif" alt="online"></dt>
+//   <dd><p><font color="#FB7299">版主</font> 积分数: 63871人气: 23226</p></dd>
+// </dl>
+//
+// 统计行文案随 view 变化（关键：不能写死字段）：
+//   beauty/handsome → `{用户组} 积分数: N 人气: N`
+//   credit          → `{用户组} 积分数: N`
+//   friendnum       → `{用户组}` + 独立 `<p>好友数: N</p>`
+//   invite          → `{用户组} 邀请数: <a>N</a>`
+//   post            → `帖子数: <a>N</a>`（无用户组）
+//   onlinetime      → `{用户组} 在线时间: N 分钟`
+
+/// 用户排行榜条目
+class MemberRankItem {
+  final int rank;
+  final String uid;
+  final String username;
+  final String avatarUrl;
+  final String userGroup; // 用户组（版主/博士生…），无则空
+  final String userGroupColor; // 用户组颜色（如 #FB7299），无则空
+  final bool online;
+  final String statLine; // 统计文案（已去掉用户组前缀），如 "积分数: 63871人气: 23226"
+
+  const MemberRankItem({
+    required this.rank,
+    required this.uid,
+    required this.username,
+    required this.avatarUrl,
+    required this.userGroup,
+    required this.userGroupColor,
+    required this.online,
+    required this.statLine,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'rank': rank,
+    'uid': uid,
+    'username': username,
+    'avatarUrl': avatarUrl,
+    'userGroup': userGroup,
+    'userGroupColor': userGroupColor,
+    'online': online,
+    'statLine': statLine,
+  };
+}
+
+/// 解析用户排行榜响应（`type=member`）
+Map<String, dynamic> parseMemberResponse(String body, int statusCode) {
+  final pre = _prepareInajax(body, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
+
+  final items = <MemberRankItem>[];
+  for (final dl in doc.querySelectorAll('dl.bbda')) {
+    final item = _parseMemberDl(dl);
+    if (item != null) items.add(item);
+  }
+
+  AppLogger.i('PARSE', 'member ranklist: ${items.length} items');
+  return {'success': true, 'items': items.map((e) => e.toMap()).toList()};
+}
+
+MemberRankItem? _parseMemberDl(dom.Element dl) {
+  // 排名
+  final rank = _parseRankFromImg(dl.querySelector('dd.ranknum'));
+
+  // 头像
+  final avatarUrl =
+      dl.querySelector('dd.avt img, dd.m img')?.attributes['src'] ?? '';
+
+  // 用户名 / uid / 在线状态：取非 `.y`（那是操作链接）的 dt
+  dom.Element? nameDt;
+  for (final dt in dl.querySelectorAll('dt')) {
+    if (!dt.classes.contains('y')) {
+      nameDt = dt;
+      break;
+    }
+  }
+  final nameLink = nameDt?.querySelector('a[href*=space-uid-]');
+  final username = _text(nameLink);
+  final uid = _extractUid(nameLink?.attributes['href'] ?? '');
+  final online = nameDt?.querySelector('img[alt=online]') != null;
+
+  // 统计行：最后一个 dd 内所有 <p> 的文本（friendnum 会拆成两个 <p>）
+  final dds = dl.querySelectorAll('dd');
+  final statDd = dds.length >= 3 ? dds.last : null;
+  final fullStats = (statDd?.querySelectorAll('p') ?? const <dom.Element>[])
+      .map((p) => _text(p))
+      .where((t) => t.isNotEmpty)
+      .join(' ');
+
+  // 用户组：优先 <font>（有色用户组）；否则取首段"非标签/非数值"文本（如 onlinetime 的"博士后"）
+  final font = statDd?.querySelector('font');
+  var userGroup = _text(font);
+  final userGroupColor = font?.attributes['color']?.trim() ?? '';
+  if (userGroup.isEmpty && fullStats.isNotEmpty) {
+    final first = fullStats.split(RegExp(r'\s+')).first;
+    if (!first.contains(':') && !RegExp(r'\d').hasMatch(first)) {
+      userGroup = first;
+    }
+  }
+
+  // 统计文案：去掉开头的用户组，避免与用户名行的用户组标签重复
+  var statLine = fullStats;
+  if (userGroup.isNotEmpty && statLine.startsWith(userGroup)) {
+    statLine = statLine.substring(userGroup.length).trim();
+  }
+
+  if (uid.isEmpty && username.isEmpty) return null;
+
+  return MemberRankItem(
+    rank: rank,
+    uid: uid,
+    username: username,
+    avatarUrl: avatarUrl,
+    userGroup: userGroup,
+    userGroupColor: userGroupColor,
+    online: online,
+    statLine: statLine,
+  );
+}
+
+// ==================== 版块排行（type=forum） ====================
+//
+// PC 模板，每项一个 <tr>（表头行的 th 内无 <a>，据此过滤）：
+// <tr>
+//   <td class="icn" height="36"><img src="rank_1.gif" alt="1"></td>
+//   <th><a href="forum-50-1.html">休闲灌水</a></th>
+//   <td>31986</td>
+// </tr>
+
+/// 版块排行榜条目
+class ForumRankItem {
+  final int rank;
+  final String fid;
+  final String forumName;
+  final String forumUrl;
+  final String count;
+
+  const ForumRankItem({
+    required this.rank,
+    required this.fid,
+    required this.forumName,
+    required this.forumUrl,
+    required this.count,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'rank': rank,
+    'fid': fid,
+    'forumName': forumName,
+    'forumUrl': forumUrl,
+    'count': count,
+  };
+}
+
+/// 解析版块排行榜响应（`type=forum`）
+Map<String, dynamic> parseForumResponse(String body, int statusCode) {
+  final pre = _prepareInajax(body, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
+
+  final items = <ForumRankItem>[];
+  for (final row in doc.querySelectorAll('table tr')) {
+    final link = row.querySelector('th a');
+    if (link == null) continue; // 跳过表头行 / 空行
+    final forumUrl = link.attributes['href'] ?? '';
+    final tds = row.querySelectorAll('td');
+    items.add(
+      ForumRankItem(
+        rank: _parseRankFromImg(row.querySelector('td.icn')),
+        fid: _extractFid(forumUrl),
+        forumName: _text(link),
+        forumUrl: forumUrl,
+        count: tds.isEmpty ? '' : _text(tds.last),
+      ),
+    );
+  }
+
+  AppLogger.i('PARSE', 'forum ranklist: ${items.length} items');
+  return {'success': true, 'items': items.map((e) => e.toMap()).toList()};
+}

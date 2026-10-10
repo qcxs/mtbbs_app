@@ -339,6 +339,34 @@ class UrlRouter {
       }
     }
 
+    // ==================== 排行榜 ====================
+
+    // 用户排行：misc.php?mod=ranklist[&type=member][&view=beauty|handsome|credit|
+    //   friendnum|invite|post|onlinetime]
+    // 无 type（排行榜 hub）与 type=member 都落到 App「用户排行」页；
+    // type=thread / type=forum 暂无 App 页面，走内置浏览器。
+    if (path.endsWith('/misc.php') || path.endsWith('misc.php')) {
+      if (query['mod'] == 'ranklist') {
+        final type = query['type'] ?? '';
+        if (type.isEmpty || type == 'member') {
+          final view = query['view'] ?? '';
+          final qs = view.isEmpty ? '' : '?view=$view';
+          return UrlRouteResult(
+            label: '用户排行',
+            appPath: '/ranklist$qs',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
+        return UrlRouteResult(
+          label: '排行榜',
+          appPath: null,
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
+    }
+
     // ==================== 伪静态格式 ====================
 
     // thread-{tid}-{page}-{ordertype}.html

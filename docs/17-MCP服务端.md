@@ -82,13 +82,14 @@ lib/mcp/
 | `follow.list` | `list_user_follows` | 已覆盖，**支持 uid** |
 | `favorite.list` | `list_my_favorites` | 已覆盖（收藏不公开，仅自己） |
 | `session.status` | `get_app_info` | 已覆盖（登录态/用户组） |
+| `ranklist.thread` / `ranklist.member` / `ranklist.forum` | `get_ranklist` | 已覆盖（`type=thread/member/forum`） |
 | `session.list` | — | 有意不覆盖：列本机 Cookie 文件名，对 AI 无意义 |
 | `post.byPid` | — | 有意不覆盖：单楼层用 `get_thread_detail` 定位即可 |
 | `message.system` / `message.pm` / `message.mypost` | — | **待定**：提醒与私信，敏感度高，需单独评估后再决定 |
 | `debug.http` | — | **永不覆盖**：可带登录态取任意路径，等于绕过字段白名单与脱敏 |
 | 写操作（`post.*`、`favorite.add/delete`、`score.*`） | — | **永不覆盖**：MCP 是只读服务，见下方决策 7 |
 
-> MCP 另有探针没有的能力：`get_ranklist`、`get_online_users`、`get_rss_feed`、编辑器草稿、本地浏览记录、`help`——说明两者本就各自演化，"逐条对齐"没有意义。
+> MCP 另有探针没有的能力：`get_online_users`、`get_rss_feed`、编辑器草稿、本地浏览记录、`help`——说明两者本就各自演化，"逐条对齐"没有意义。
 
 资源：`mtbbs://app/info`、`mtbbs://forums`。提示词：`summarize_thread`（总结帖子）。
 

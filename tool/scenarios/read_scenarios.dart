@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:mtbbs/api/forum/forumdisplay/export.dart' as forum_api;
 import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
+import 'package:mtbbs/api/forum/ranklist/export.dart' as ranklist_api;
 import 'package:mtbbs/api/forum/search/export.dart' as search_api;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as thread_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
@@ -81,6 +82,37 @@ final Map<String, ApiScenario> readScenarios = {
       orderby: a['orderby'] ?? '',
       filter: a['filter'] ?? '',
       page: intArg(a, 'page', 1),
+    ),
+  ),
+  'ranklist.thread': ApiScenario(
+    desc: '帖子排行（PC UA；type=thread）',
+    params: {
+      'view': 'replies/views/sharetimes/favtimes/heats（默认 heats）',
+      'orderby': 'thisweek/thismonth/today/all（默认 thisweek）',
+    },
+    run: (a) => ranklist_api.getThreadRanklist(
+      ApiService().dio,
+      view: a['view'] ?? 'heats',
+      orderby: a['orderby'] ?? 'thisweek',
+    ),
+  ),
+  'ranklist.member': ApiScenario(
+    desc: '用户排行（PC UA；type=member）',
+    params: {
+      'view':
+          'beauty/handsome/credit/friendnum/invite/post/onlinetime（默认 beauty）',
+    },
+    run: (a) => ranklist_api.getMemberRanklist(
+      ApiService().dio,
+      view: a['view'] ?? 'beauty',
+    ),
+  ),
+  'ranklist.forum': ApiScenario(
+    desc: '版块排行（PC UA；type=forum）',
+    params: {'view': 'threads/posts/today（默认 threads）'},
+    run: (a) => ranklist_api.getForumRanklist(
+      ApiService().dio,
+      view: a['view'] ?? 'threads',
     ),
   ),
   'group.index': ApiScenario(

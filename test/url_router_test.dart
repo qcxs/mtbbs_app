@@ -126,6 +126,37 @@ void main() {
         '/groups/content?gid=57',
       );
     });
+
+    test('用户排行 misc.php?mod=ranklist&type=member&view → /ranklist?view=', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/misc.php?mod=ranklist&type=member&view=credit',
+        ).appPath,
+        '/ranklist?view=credit',
+      );
+    });
+
+    test('排行榜 hub misc.php?mod=ranklist（无 type）→ /ranklist', () {
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/misc.php?mod=ranklist').appPath,
+        '/ranklist',
+      );
+    });
+
+    test('帖子/版块排行无 App 页面 → 不映射（走内置浏览器）', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/misc.php?mod=ranklist&type=thread&view=heats',
+        ).appPath,
+        isNull,
+      );
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/misc.php?mod=ranklist&type=forum&view=threads',
+        ).appPath,
+        isNull,
+      );
+    });
   });
 
   group('resolveTarget - 唯一决策点', () {

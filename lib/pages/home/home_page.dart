@@ -117,6 +117,14 @@ class _HomePageState extends State<HomePage> {
         tooltip: '管理版块',
         onPressed: () => ForumManagement.showPicker(context, settings),
       ),
+      // 排行区块的入口按钮：跳到独立的「用户排行」页
+      'rank' => IconButton(
+        icon: const Icon(Icons.emoji_events_outlined, size: 18),
+        tooltip: '用户排行榜',
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        onPressed: () => context.push('/ranklist'),
+      ),
       _ => null,
     };
   }

@@ -234,19 +234,29 @@ List<McpToolDefinition> forumTools() => [
   McpToolDefinition(
     name: 'get_ranklist',
     group: McpToolGroup.publicData,
-    description: '获取帖子排行（版块/主题维度）。',
+    description: '获取论坛排行榜：type=thread 帖子 / member 用户 / forum 版块。',
     properties: {
-      'view': JsonSchema.string(
-        description: '排行视图，例如 forum / thread / digest / post',
+      'type': JsonSchema.string(
+        description: '排行类型：thread（帖子）/ member（用户）/ forum（版块），默认 thread',
       ),
-      'orderby': JsonSchema.string(description: '排序方式，默认 thisweek（本周）'),
+      'view': JsonSchema.string(
+        description:
+            '视图。thread: replies/views/sharetimes/favtimes/heats；'
+            'member: beauty/handsome/credit/friendnum/invite/post/onlinetime；'
+            'forum: threads/posts/today',
+      ),
+      'orderby': JsonSchema.string(
+        description: '排序方式（仅 thread 有效）：thisweek/thismonth/today/all，默认 thisweek',
+      ),
     },
     requiredArgs: const ['view'],
     run: (args) async {
+      final type = McpArgs.str(args, 'type', fallback: 'thread');
       final view = McpArgs.requireStr(args, 'view');
       final orderby = McpArgs.str(args, 'orderby', fallback: 'thisweek');
       return ranklist.getRanklist(
         ApiService().dio,
+        type: type,
         view: view,
         orderby: orderby,
       );
