@@ -46,6 +46,55 @@ void main() {
     });
   });
 
+  // ==================== parse 层：src 路径保底匹配（私信等无 smilieid 场景） ====================
+
+  group('parse 层 Html2BBCode 表情 src 保底匹配', () {
+    const urlMap = {'/static/image/smiley/qq/qq057.gif': '[呵呵]'};
+
+    test('smilieid 优先：两者都命中时走 smilieid', () {
+      final converter = Html2BBCode(
+        smilieIdMap: const {'1240': '[微笑]'},
+        smileyUrlMap: urlMap,
+      );
+      const h =
+          '<img smilieid="1240" src="https://bbs.binmt.cc/static/image/smiley/qq/qq057.gif" />';
+      expect(converter.convert(h), '[微笑]');
+    });
+
+    test('无 smilieid：按图片路径反查还原为 [呵呵]', () {
+      final converter = Html2BBCode(smileyUrlMap: urlMap);
+      const h =
+          '<img src="https://bbs.binmt.cc/static/image/smiley/qq/qq057.gif" />';
+      expect(converter.convert(h), '[呵呵]');
+    });
+
+    test('域名不同（CDN / 原站）但路径相同：仍能匹配', () {
+      final converter = Html2BBCode(smileyUrlMap: urlMap);
+      const h =
+          '<img src="https://cdn.binmt.cc/static/image/smiley/qq/qq057.gif" />';
+      expect(converter.convert(h), '[呵呵]');
+    });
+
+    test('非表情图片：路径不在表中，仍为 [img]', () {
+      final converter = Html2BBCode(smileyUrlMap: urlMap);
+      const h = '<img src="https://cdn.binmt.cc/attachments/photo.jpg" />';
+      expect(
+        converter.convert(h),
+        '[img]https://cdn.binmt.cc/attachments/photo.jpg[/img]',
+      );
+    });
+
+    test('保底表为空：无 smilieid 的表情退化为普通图片', () {
+      final converter = Html2BBCode(smileyUrlMap: const {});
+      const h =
+          '<img src="https://bbs.binmt.cc/static/image/smiley/qq/qq057.gif" />';
+      expect(
+        converter.convert(h),
+        '[img]https://bbs.binmt.cc/static/image/smiley/qq/qq057.gif[/img]',
+      );
+    });
+  });
+
   // ==================== parsePostFromTable 集成 ====================
 
   group('parsePostFromTable 表情集成', () {

@@ -189,12 +189,26 @@ class AvatarRedirectStore {
     _scheduleSave(url);
   }
 
-  /// 是否过期：TTL 为 null/非正（永不过期）时不淘汰
+  /// 作废某条映射（下载失败时调用）：视为未知，下次重新 HEAD 解析。
+  ///
+  /// 用于「映射指向的最终地址已失效」时的自愈——典型场景是站点换了头像 CDN，
+  /// 而持久化的映射仍指向旧域名，若继续信任它就会永远下载失效地址（见 docs/07 #87）。
+  /// 与 [clear] 不同，只清这一条。
+  void invalidate(String url) {
+    _map.remove(url);
+    _updatedAt.remove(url);
+    _scheduleDelete(url);
+  }
+
+  /// 是否过期：TTL 为 null/非正（永不过期）时不淘汰。
+  /// 时间戳落在未来（设备时钟回拨 / 异常）时一律视为过期——否则该映射会永远
+  /// 不过期，站点换头像 CDN 后就会一直下载旧地址（实测踩过，见 docs/07 #87）。
   bool _isExpired(DateTime now, int updatedAtMs) {
     final ttl = cacheTtl;
     if (ttl == null || ttl <= Duration.zero) return false;
-    return now.difference(DateTime.fromMillisecondsSinceEpoch(updatedAtMs)) >
-        ttl;
+    final age = now.difference(DateTime.fromMillisecondsSinceEpoch(updatedAtMs));
+    if (age.isNegative) return true;
+    return age > ttl;
   }
 
   void _scheduleSave(String url) {

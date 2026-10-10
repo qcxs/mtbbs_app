@@ -119,6 +119,24 @@ void main() {
     expect(backend.data.containsKey('redirects'), isFalse); // 旧记录已删
   });
 
+  test('invalidate 作废单条映射：lookup 视为未知并触发删除', () async {
+    store.set(url, 'https://cdn.example/x.jpg');
+    expect(store.lookup(url).known, isTrue);
+
+    store.invalidate(url);
+    expect(store.lookup(url).known, isFalse);
+    await store.debugFlush();
+    expect(backend.deleted, contains(url));
+    expect(backend.data.containsKey(url), isFalse);
+  });
+
+  test('时间戳落在未来（时钟异常）也视为过期，避免映射永不过期', () {
+    store.cacheTtl = const Duration(days: 7);
+    store.set(url, 'https://cdn.example/x.jpg');
+    store.debugSetUpdatedAt(url, DateTime.now().add(const Duration(days: 30)));
+    expect(store.lookup(url).known, isFalse);
+  });
+
   test('clear 清空内存与后端全部映射', () async {
     store.set('https://a.example/u1', 'https://cdn/u1');
     store.set('https://a.example/u2', null);

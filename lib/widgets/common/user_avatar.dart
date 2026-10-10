@@ -81,6 +81,9 @@ class _UserAvatarState extends State<UserAvatar> {
   /// 上一次生效的头像尺寸策略（首次构建时为 null，用于检测策略变化）
   AvatarSizeMode? _lastSizeMode;
 
+  /// 是否已因下载失败做过一次「作废映射 + 重解析」，避免失败时无限重试
+  bool _reResolvedAfterError = false;
+
   /// 按当前尺寸策略生成原始头像 URL：站点配置的模板，未配置时回退默认 API 方案
   String _originalUrlFor(AvatarSizeMode mode) => resolveAvatarUrl(
     template: SiteStore.instance.current.avatarTemplate ?? '',
@@ -119,6 +122,7 @@ class _UserAvatarState extends State<UserAvatar> {
       _ready = false;
       _scheduledOnce = false;
       _resolvedUrl = null;
+      _reResolvedAfterError = false;
       _schedule();
     }
   }
@@ -209,6 +213,26 @@ class _UserAvatarState extends State<UserAvatar> {
     _loadTask = enqueueStagger();
     _loadTask!.ready.then((_) {
       if (mounted) setState(() => _ready = true);
+    });
+  }
+
+  /// 图片下载失败时自愈：可能是站点换了头像 CDN，而持久化的重定向映射仍指向
+  /// 已失效的旧地址（[AvatarRedirectStore] 会跳过 HEAD 直接使用该映射）。
+  /// 作废这条映射并重新解析一次——映射失效后 `lookup` 视为未知 → 重新 HEAD。
+  /// 每个 uid 只自愈一次，避免真正断网时无限重试。
+  void _onImageError() {
+    if (_reResolvedAfterError || !mounted) return;
+    _reResolvedAfterError = true;
+    AvatarRedirectStore.instance.invalidate(_originalUrl);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadTask?.cancel();
+      setState(() {
+        _ready = false;
+        _scheduledOnce = false;
+        _resolvedUrl = null;
+      });
+      _schedule();
     });
   }
 
@@ -329,7 +353,10 @@ class _UserAvatarState extends State<UserAvatar> {
                   ),
                 ),
               ),
-              errorWidget: (_, __, ___) => _fallback(cs),
+              errorWidget: (_, __, ___) {
+                _onImageError();
+                return _fallback(cs);
+              },
             ),
             if (widget.showBorder)
               Positioned.fill(

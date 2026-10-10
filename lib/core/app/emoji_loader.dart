@@ -35,6 +35,12 @@ class EmojiService {
   /// smilieId → insertText（如 "1240" → "[呵呵]"）
   Map<String, String> get smilieIdMap => _current.smilieIdMap;
 
+  /// 表情图片**路径**（`/static/image/smiley/…`）→ insertText。
+  ///
+  /// 部分页面（如私信）渲染的表情 `<img>` 不带 `smilieid`，只能按图片地址反查；
+  /// 用 path 而非完整 URL，避免原站 / CDN 域名差异导致匹配失败。
+  Map<String, String> get urlPathMap => _current.urlPathMap;
+
   /// 全部分组数据
   List<Map<String, dynamic>> get groups => _current.groups;
 
@@ -195,6 +201,26 @@ class _SiteEmojiData {
 
   /// smilieId → 使用次数
   Map<String, int> usageCount = {};
+
+  // urlPathMap 的懒构建缓存（源 map 被替换时靠 identical 判定失效）
+  Map<String, String>? _urlPathMap;
+  Map<String, String>? _urlPathMapSrc;
+
+  /// 表情图片路径（`/static/image/smiley/…`）→ insertText。
+  /// 从 [map]（insertText → imageUrl）反转而来，只取 path 部分。
+  Map<String, String> get urlPathMap {
+    if (identical(_urlPathMapSrc, map) && _urlPathMap != null) {
+      return _urlPathMap!;
+    }
+    final built = <String, String>{};
+    for (final e in map.entries) {
+      final path = Uri.tryParse(e.value)?.path;
+      if (path != null && path.isNotEmpty) built[path] = e.key;
+    }
+    _urlPathMapSrc = map;
+    _urlPathMap = built;
+    return built;
+  }
 
   void reset() {
     map = {};

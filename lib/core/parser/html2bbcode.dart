@@ -11,17 +11,28 @@ import 'package:mtbbs/core/utils/url_util.dart';
 /// 专注于 PC 模板的 Discuz 帖子内容解析。
 ///
 /// [smilieIdMap] 可选（测试/特殊场景注入），smilieId → insertText 映射。
+/// [smileyUrlMap] 可选（测试/特殊场景注入），表情图片路径 → insertText 映射，
+/// 用于 `<img>` 缺 `smilieid` 时的保底匹配（如私信页）。
 /// 未传入时从 [EmojiService] 直接读取当前站点的表情数据（按站点隔离，
 /// 不依赖加载时序）；站点数据为空时不还原表情，静默跳过。
 class Html2BBCode {
   static final _noRecurseTags = <String>{'code'};
   final List<String> tips = [];
   final Map<String, String>? _customMap;
+  final Map<String, String>? _customUrlMap;
 
-  Html2BBCode({Map<String, String>? smilieIdMap}) : _customMap = smilieIdMap;
+  Html2BBCode({
+    Map<String, String>? smilieIdMap,
+    Map<String, String>? smileyUrlMap,
+  }) : _customMap = smilieIdMap,
+       _customUrlMap = smileyUrlMap;
 
   Map<String, String> get _effectiveMap =>
       _customMap ?? EmojiService().smilieIdMap;
+
+  /// 表情图片路径 → insertText：smilieid 缺失时的保底匹配（见 [EmojiService.urlPathMap]）
+  Map<String, String> get _effectiveUrlMap =>
+      _customUrlMap ?? EmojiService().urlPathMap;
 
   void _reset() => tips.clear();
 
@@ -414,18 +425,22 @@ class Html2BBCode {
 
     // 图片
     if (tag == 'img') {
-      // 表情：通过 smilieid 匹配
+      // 表情：优先用 smilieid 精确匹配
       final smilieId = el.attributes['smilieid'];
       if (smilieId != null && smilieId.isNotEmpty) {
         final entry = _effectiveMap[smilieId];
         if (entry != null) return entry;
         return '';
       }
-      // 普通图片
       final imgSrc = _resolveImageSrc(el);
       if (imgSrc.isEmpty) return '';
       final src = normalizeUrl(imgSrc);
       if (src.isEmpty) return '';
+      // 表情保底：部分页面（如私信）不输出 smilieid，按图片路径反查。
+      // 用 path 而非完整 URL，避免原站 / CDN 域名差异导致匹配失败。
+      final smiley = _effectiveUrlMap[Uri.tryParse(src)?.path];
+      if (smiley != null) return smiley;
+      // 普通图片
       final w = el.attributes['width'];
       final h = el.attributes['height'];
       if (w != null && h != null) return '[img=$w,$h]$src[/img]';
