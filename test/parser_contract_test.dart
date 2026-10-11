@@ -171,4 +171,53 @@ void main() {
       expect(post.floorText, '#3');
     });
   });
+
+  // 主题印章（精华）与置顶回复：用内联 HTML，不依赖站点样本。
+  group('帖子详情：主题印章与置顶回复', () {
+    test('楼主帖 #threadstamp → mainPost.stamp', () {
+      const html =
+          '<html><body>'
+          '<a href="forum.php?mod=viewthread&tid=169000">x</a>'
+          '<div id="thread_subject">标题</div>'
+          '<div id="postlist">'
+          '<div id="threadstamp"><img src="static/image/stamp/001.gif" title="精华"></div>'
+          '<table id="pid1"><tr>'
+          '<td class="pls"><div class="pi"><div class="authi">'
+          '<a href="home.php?mod=space&uid=1">甲</a>'
+          '</div></div></td>'
+          '<td class="plc"><a id="postnum1"><em>楼主</em></a>'
+          '<div class="t_fsz"><table><tr>'
+          '<td class="t_f" id="postmessage_1">正文</td>'
+          '</tr></table></div></td>'
+          '</tr></table>'
+          '</div></body></html>';
+      final r = detail.parseResponse(html, 200, page: 1);
+      expect(r['mainPost']['stamp'], '精华');
+    });
+
+    test('评论带 settop 图标 → isStickReply', () {
+      const html =
+          '<html><body>'
+          '<a href="forum.php?mod=viewthread&tid=169000">x</a>'
+          '<div id="thread_subject">标题</div>'
+          '<div id="postlist">'
+          '<table id="pid1"><tr>'
+          '<td class="pls"><div class="pi"><div class="authi"><a href="home.php?mod=space&uid=1">甲</a></div></div></td>'
+          '<td class="plc"><a id="postnum1"><em>楼主</em></a>'
+          '<div class="t_fsz"><table><tr><td class="t_f" id="postmessage_1">正文</td></tr></table></div></td>'
+          '</tr></table>'
+          '<table id="pid2"><tr>'
+          '<td class="pls"><div class="pi"><div class="authi"><a href="home.php?mod=space&uid=2">乙</a></div></div></td>'
+          '<td class="plc">'
+          '<div class="pi"><strong><a id="postnum2"><img src="template/x/img/settop.png" title="置顶回复" class="vm"> 来自 5#</a></strong></div>'
+          '<div class="t_fsz"><table><tr><td class="t_f" id="postmessage_2">置顶内容</td></tr></table></div></td>'
+          '</tr></table>'
+          '</div></body></html>';
+      final r = detail.parseResponse(html, 200, page: 1);
+      expect(r['mainPost']['isStickReply'], false);
+      final posts = r['posts'] as List;
+      expect(posts, hasLength(1));
+      expect(posts.first['isStickReply'], true);
+    });
+  });
 }

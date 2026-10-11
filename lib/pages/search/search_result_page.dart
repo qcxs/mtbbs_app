@@ -19,7 +19,15 @@ class SearchResultPage extends StatefulWidget {
   /// 初始搜索关键词
   final String keyword;
 
-  const SearchResultPage({super.key, required this.keyword});
+  /// 搜索范围过滤（如 `digest` = 全站精华）。为空 = 全站搜索；
+  /// 非空且无关键词时列出该范围内的全部帖子（从「我的 → 精华帖」进入）。
+  final String searchFilter;
+
+  const SearchResultPage({
+    super.key,
+    required this.keyword,
+    this.searchFilter = '',
+  });
 
   @override
   State<SearchResultPage> createState() => _SearchResultPageState();
@@ -55,6 +63,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
           keyword: _keyword,
           page: page,
           searchId: _searchId,
+          srchFilter: widget.searchFilter,
         );
         // 首次搜索后缓存 searchid，供后续翻页使用
         _searchId ??= r['searchId'] as String?;
@@ -177,11 +186,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
           focusNode: _focusNode,
           textInputAction: TextInputAction.search,
           onSubmitted: _submit,
-          decoration: const InputDecoration(
-            hintText: '搜索帖子...',
+          decoration: InputDecoration(
+            hintText: widget.searchFilter == 'digest' ? '搜索精华帖...' : '搜索帖子...',
             border: InputBorder.none,
             isDense: true,
-            contentPadding: EdgeInsets.symmetric(vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
           ),
           style: const TextStyle(fontSize: 16),
         ),
@@ -197,6 +206,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
               keyword: _keyword,
               searchId: _searchId,
               page: _listCtrl.page,
+              srchFilter: widget.searchFilter,
             ),
             // 用 refresh 而非 loadInitial：保留 searchid，刷新复用同一次搜索会话，
             // 不会在服务端新建搜索（避免触发搜索频率限制）

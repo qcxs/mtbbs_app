@@ -128,6 +128,9 @@ class SpaceThreadParser implements ThreadListParser {
       }
     }
 
+    // 精华：标准 Discuz 表格标题列渲染 `span.tbox.tdigest`
+    final digest = parseDigestBadge(tr.querySelector('th'));
+
     return ThreadItem(
       uid: null,
       nickname: null,
@@ -140,6 +143,7 @@ class SpaceThreadParser implements ThreadListParser {
       boardId: boardId,
       comments: replies,
       views: views,
+      digest: digest,
     );
   }
 }

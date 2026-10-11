@@ -17,6 +17,9 @@ class ThreadItem {
   final int? views;
   final List<String>? images;
 
+  /// 精华等级（>0 = 精华帖；null/0 = 普通帖）。
+  final int? digest;
+
   const ThreadItem({
     this.uid,
     this.nickname,
@@ -34,6 +37,7 @@ class ThreadItem {
     this.comments,
     this.views,
     this.images,
+    this.digest,
   });
 
   factory ThreadItem.fromJson(Map<String, dynamic> json) => ThreadItem(
@@ -55,6 +59,7 @@ class ThreadItem {
     images: json['images'] != null
         ? (json['images'] as List).cast<String>()
         : null,
+    digest: json['digest'] as int?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -74,5 +79,6 @@ class ThreadItem {
     'comments': comments,
     'views': views,
     'images': images,
+    'digest': digest,
   };
 }

@@ -13,12 +13,14 @@ Future<Map<String, dynamic>> searchThreads(
   required String keyword,
   int page = 1,
   String? searchId,
+  String srchFilter = '',
 }) async {
   final resp = await http.searchThreads(
     dio,
     keyword: keyword,
     page: page,
     searchId: searchId,
+    srchFilter: srchFilter,
   );
   final data = parseWithLog(resp, parse.parseResponse);
   // searchid 只在重定向后的最终 URL 上（空结果页 body 里没有分页链接）
@@ -34,12 +36,13 @@ Future<Map<String, dynamic>> searchThreads(
 /// 搜索结果页完整 URL（供"在浏览器中打开"用）
 ///
 /// 传入 [searchId] 时直接打开该次搜索的结果页（可带 [page]），**不会**在服务端
-/// 新建搜索、也不触发搜索频率限制；为空时退化为"按关键词发起新搜索"的 URL。
+/// 新建搜索、也不触发搜索频率限制；为空时退化为"按关键词/过滤条件发起新搜索"的 URL。
 String searchPageUrl({
   required String keyword,
   String? searchId,
   int page = 1,
+  String srchFilter = '',
 }) {
   final base = SiteStore.instance.baseUrl;
-  return '$base${http.searchPath(keyword: keyword, page: page, searchId: searchId)}';
+  return '$base${http.searchPath(keyword: keyword, page: page, searchId: searchId, srchFilter: srchFilter)}';
 }

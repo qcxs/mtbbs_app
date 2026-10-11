@@ -82,6 +82,10 @@ class ComiisTableParser implements ThreadListParser {
     // 从 <p> 段落提取各字段
     final p = postlist.querySelector('p');
 
+    // 精华：克米表格模板的 `span.tbox.tdigest`（个别变体用标题内 `<span>精</span>`）。
+    // 注意：MT 的克米 PC 列表实测**不渲染**精华徽标，此处为兼容其它站点/变体。
+    final digest = parseDigestBadge(postlist) ?? (hasDigestBadge(titleSpan) ? 1 : null);
+
     // 统计
     int? replies, views;
     if (p != null) {
@@ -152,6 +156,7 @@ class ComiisTableParser implements ThreadListParser {
       boardId: boardId,
       comments: replies,
       views: views,
+      digest: digest,
     );
   }
 }

@@ -37,7 +37,14 @@ Future<Response<String>> getForumThreads(
 }) {
   final buf = StringBuffer('/forum.php?mod=forumdisplay&fid=$fid&page=$page');
   if (orderby.isNotEmpty) buf.write('&orderby=$orderby');
-  if (filter.isNotEmpty) buf.write('&filter=$filter');
+  if (filter.isNotEmpty) {
+    buf.write('&filter=$filter');
+    // Discuz 的精华/推荐筛选真正由**同名参数**触发（$filterarr['digest'] /
+    // $filterarr['recommends'] 只在存在名为 digest / recommend 的参数时设置），
+    // 只带 filter=xxx 不会真正过滤，必须补上同名参数。
+    if (filter == 'digest') buf.write('&digest=1');
+    if (filter == 'recommend') buf.write('&recommend=1');
+  }
 
   return dio.get<String>(
     buf.toString(),

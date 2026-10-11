@@ -421,6 +421,79 @@ void main() {
     });
   });
 
+  group('精华标记（digest）解析', () {
+    test('标准 Discuz 表格：span.tbox.tdigest → digest=1', () {
+      const html =
+          ''
+          '<div id="threadlist" class="tl bm bmw">'
+          '<table><tbody id="normalthread_1000"><tr>'
+          '<td class="icn"><a><img src="folder_common.gif"></a></td>'
+          '<th class="common">'
+          '<a class="xst" href="thread-1000-1-1.html">精华帖子</a>'
+          '<span class="tbox tdigest">精华 1</span>'
+          '</th>'
+          '<td class="by"><a href="forum-1-1.html">版块</a></td>'
+          '<td class="by"><cite><a>user</a></cite><em><span>time</span></em></td>'
+          '<td class="num"><a class="xi2">1</a><em>2</em></td>'
+          '<td class="by"><cite><a>u2</a></cite><em><a>t2</a></em></td>'
+          '</tr></tbody></table>'
+          '</div>';
+      final result = parseThreadList(html);
+      expect(result.length, 1);
+      expect(result[0].digest, 1);
+      expect(result[0].title, '精华帖子'); // 徽标不混入标题
+    });
+
+    test('标准 Discuz 表格：无 tdigest → digest 为 null', () {
+      const html =
+          ''
+          '<div id="threadlist" class="tl bm bmw">'
+          '<table><tbody id="normalthread_1001"><tr>'
+          '<th class="common"><a class="xst" href="thread-1001-1-1.html">普通帖子</a></th>'
+          '<td class="by"><cite><a>user</a></cite><em>time</em></td>'
+          '<td class="num"><a>0</a><em>0</em></td>'
+          '<td class="by"><cite></cite><em></em></td>'
+          '</tr></tbody></table>'
+          '</div>';
+      final result = parseThreadList(html);
+      expect(result[0].digest, isNull);
+    });
+
+    test('克米移动卡片：标题内 <span>精</span> → digest=1', () {
+      const html =
+          ''
+          '<ul><li class="forumlist_li comiis_znalist">'
+          '<div class="mmlist_li_box cl">'
+          '<h2><a href="thread-2000-1-1.html">'
+          '<span class="bg_c f_f">精</span>'
+          '<span class="bg_a f_f" title="热度: 116"><i class="comiis_font kmhotico"></i></span>'
+          '精华帖子标题</a></h2>'
+          '</div>'
+          '</li></ul>';
+      final result = parseThreadList(html);
+      expect(result.length, 1);
+      expect(result[0].digest, 1);
+      expect(result[0].title, '精华帖子标题'); // 徽标不混入标题
+    });
+
+    test('克米 PC 表格：span.tbox.tdigest → digest=2', () {
+      const html =
+          ''
+          '<table><tbody id="normalthread_3000"><tr><td>'
+          '<div class="comiis_postlist cl">'
+          '<h2 class="cl"><span class="comiis_common">'
+          '<a href="thread-3000-1-1.html">精华帖</a>'
+          '<span class="tbox tdigest">精华 2</span>'
+          '</span></h2>'
+          '<p><em class="km_user"><a>user</a></em></p>'
+          '</div>'
+          '</td></tr></tbody></table>';
+      final result = parseThreadList(html);
+      expect(result.length, 1);
+      expect(result[0].digest, 2);
+    });
+  });
+
   group('多模板混合 - 工厂自动选择', () {
     test('同一 HTML 包含三种特征时，ComiisCardParser 优先', () {
       // 同时包含 comiis_znalist、th.common、comiis_postlist

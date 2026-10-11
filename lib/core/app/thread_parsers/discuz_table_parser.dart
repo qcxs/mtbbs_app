@@ -129,6 +129,9 @@ class DiscuzTableParser implements ThreadListParser {
       }
     }
 
+    // 精华：标准 Discuz 在标题列渲染 `span.tbox.tdigest`（文本「精华 N」）
+    final digest = parseDigestBadge(titleCell);
+
     return ThreadItem(
       uid: uid,
       nickname: author,
@@ -141,6 +144,7 @@ class DiscuzTableParser implements ThreadListParser {
       boardId: boardId,
       comments: replies,
       views: views,
+      digest: digest,
     );
   }
 }

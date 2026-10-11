@@ -327,6 +327,10 @@ class _ShortcutTile extends StatelessWidget {
 class _ForumList extends StatelessWidget {
   const _ForumList();
 
+  /// 目标芯片宽度：据此反推列数，列宽再均分整行 → 右侧不留白
+  static const double _minTileWidth = 128;
+  static const double _spacing = 8;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -343,37 +347,87 @@ class _ForumList extends StatelessWidget {
         ),
       );
     }
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: forums.map((entry) {
-        return InkWell(
-          onTap: () => context.push('/forum?fid=${entry.key}'),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+    // 列数由容器宽度反推、列宽均分整行：内容宽度的 Wrap 会在窄屏右侧留出一大块空白
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = math.max(
+          2,
+          (constraints.maxWidth / (_minTileWidth + _spacing)).floor(),
+        );
+        final tileWidth =
+            (constraints.maxWidth - _spacing * (columns - 1)) / columns;
+        final rows = <Widget>[];
+        for (var i = 0; i < forums.length; i += columns) {
+          final chunk = forums.sublist(
+            i,
+            math.min(i + columns, forums.length),
+          );
+          rows.add(
+            Row(
               children: [
-                Icon(Icons.forum, size: 18, color: cs.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Text(
-                  entry.value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: cs.onSurfaceVariant,
+                for (var j = 0; j < chunk.length; j++) ...[
+                  if (j > 0) const SizedBox(width: _spacing),
+                  SizedBox(
+                    width: tileWidth,
+                    child: _ForumChip(entry: chunk[j]),
                   ),
-                ),
+                ],
               ],
             ),
-          ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const SizedBox(height: _spacing),
+              rows[i],
+            ],
+          ],
         );
-      }).toList(),
+      },
+    );
+  }
+}
+
+/// 单个版块芯片（等宽填充整行）
+class _ForumChip extends StatelessWidget {
+  const _ForumChip({required this.entry});
+
+  final MapEntry<String, String> entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => context.push('/forum?fid=${entry.key}'),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.forum, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                entry.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -94,10 +94,12 @@ class ComiisCardParser implements ThreadListParser {
     // 标题
     String? title, summary, threadUrl;
     int? threadId;
+    dom.Element? titleLinkEl;
     final titleEl = li.querySelector('.mmlist_li_box h2');
     if (titleEl != null) {
       final titleLink = titleEl.querySelector('a');
       if (titleLink != null) {
+        titleLinkEl = titleLink;
         title = sanitizeText(
           cleanElementText(titleLink, excludeTags: {'span', 'i'}),
         );
@@ -111,12 +113,16 @@ class ComiisCardParser implements ThreadListParser {
       // 回退：无 h2，摘要内直接是链接
       final bodyLink = li.querySelector('.mmlist_li_box .list_body a');
       if (bodyLink != null) {
+        titleLinkEl = bodyLink;
         title = sanitizeText(bodyLink.text);
         threadUrl = bodyLink.attributes['href'];
         threadId = extractThreadIdFromUrl(threadUrl ?? '');
         if (threadUrl != null) threadUrl = normalizeUrl(threadUrl);
       }
     }
+
+    // 精华：克米卡片把徽标渲染为标题链接内的前置 `<span>精</span>`
+    final digest = hasDigestBadge(titleLinkEl) ? 1 : null;
 
     // 版块
     final boardEl = li.querySelector(
@@ -182,6 +188,7 @@ class ComiisCardParser implements ThreadListParser {
       comments: comments,
       views: views,
       images: images,
+      digest: digest,
     );
   }
 

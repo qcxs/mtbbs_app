@@ -292,29 +292,47 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    widget.post.username,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                  // 昵称 + 标签：用 Wrap 允许换行，避免标签多（楼主/置顶回复…）时横向溢出
+                  Expanded(
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          widget.post.username,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (widget.post.usergroup.isNotEmpty)
+                          _badge(
+                            widget.post.usergroup,
+                            levelColor,
+                            levelColor.withValues(alpha: 0.12),
+                          ),
+                        // 楼主标志：主帖本身（isOp）或评论作者与楼主 uid 相同
+                        if (widget.post.isOp ||
+                            (widget.post.uid.isNotEmpty &&
+                                widget.post.uid == widget.opUid))
+                          _badge('楼主', cs.onPrimary, cs.primary),
+                        // 置顶回复（管理员置顶的评论）
+                        if (widget.post.isStickReply)
+                          _badge(
+                            '置顶回复',
+                            stickTopColor,
+                            stickTopColor.withValues(alpha: 0.12),
+                          ),
+                      ],
                     ),
                   ),
-                  if (widget.post.usergroup.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    _badge(
-                      widget.post.usergroup,
-                      levelColor,
-                      levelColor.withValues(alpha: 0.12),
-                    ),
-                  ],
-                  // 楼主标志（统一样式）：主帖本身（isOp）或评论作者与楼主 uid 相同。
-                  // primary 底 + onPrimary 文字，高对比（PiliPlus badge 范式）
-                  if (widget.post.isOp ||
-                      (widget.post.uid.isNotEmpty &&
-                          widget.post.uid == widget.opUid)) ...[
-                    const SizedBox(width: 4),
-                    _badge('楼主', cs.onPrimary, cs.primary),
+                  // 主题印章（如「精华」）：右侧盖章式渲染，比普通标签更突出
+                  if (widget.post.stamp.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    digestColor.toStamp(widget.post.stamp, fontSize: 13),
                   ],
                 ],
               ),
@@ -414,16 +432,13 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
   }
 
   Widget _badge(String text, Color textColor, Color bgColor) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(2),
-        ),
-        child: Text(text, style: TextStyle(fontSize: 10, color: textColor)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(2),
       ),
+      child: Text(text, style: TextStyle(fontSize: 10, color: textColor)),
     );
   }
 

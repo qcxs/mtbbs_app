@@ -191,9 +191,15 @@ String? siteUrlFor(String appPath) {
     case 'search':
       // 仅 /search/result 会落到这里（`/search` 入口页不受开关影响）
       final kw = q['kw'] ?? '';
-      if (kw.isEmpty) return '$base/search.php?mod=forum';
-      return '$base/search.php?mod=forum'
-          '&srchtxt=${Uri.encodeQueryComponent(kw)}&searchsubmit=yes';
+      final filter = q['filter'] ?? '';
+      if (kw.isEmpty && filter.isEmpty) return '$base/search.php?mod=forum';
+      final buf = StringBuffer('$base/search.php?mod=forum');
+      if (kw.isNotEmpty) {
+        buf.write('&srchtxt=${Uri.encodeQueryComponent(kw)}');
+      }
+      if (filter.isNotEmpty) buf.write('&srchfilter=$filter');
+      buf.write('&searchsubmit=yes');
+      return buf.toString();
 
     case 'myThread':
       final uid = q['uid'] ?? '';

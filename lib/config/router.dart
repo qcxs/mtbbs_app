@@ -265,6 +265,7 @@ GoRouter buildRouter({
             pageBuilder: (_, state) => NoTransitionPage(
               child: SearchResultPage(
                 keyword: state.uri.queryParameters['kw'] ?? '',
+                searchFilter: state.uri.queryParameters['filter'] ?? '',
               ),
             ),
           ),

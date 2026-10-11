@@ -46,3 +46,25 @@ String cleanElementText(dom.Element el, {Set<String> excludeTags = const {}}) {
   }
   return buf.toString().trim();
 }
+
+/// 精华等级（>0 = 精华帖）——标准 Discuz / 克米**表格**模板把精华渲染为
+/// `span.tbox.tdigest`（文本形如「精华 1」，其中数字为精华等级）。无标记返回 null。
+///
+/// 注意：`filter=digest` 的精华列表里服务端会**抑制**该徽标（`$filter != 'digest'`），
+/// 此时解析不到属正常。
+int? parseDigestBadge(dom.Element? scope) {
+  final el = scope?.querySelector('.tdigest');
+  if (el == null) return null;
+  final m = RegExp(r'(\d+)').firstMatch(el.text);
+  return (m != null ? int.tryParse(m.group(1)!) : null) ?? 1;
+}
+
+/// 精华标记（克米**移动卡片**模板）：标题链接内的前置徽标
+/// `<span class="bg_c f_f">精</span>`（文本恰为「精」）。命中返回 true。
+bool hasDigestBadge(dom.Element? titleLink) {
+  if (titleLink == null) return false;
+  for (final child in titleLink.children) {
+    if (child.localName == 'span' && child.text.trim() == '精') return true;
+  }
+  return false;
+}

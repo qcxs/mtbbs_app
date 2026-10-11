@@ -144,6 +144,13 @@ class ProfilePage extends StatelessWidget {
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(
+                  leading: const Icon(Icons.workspace_premium_outlined),
+                  title: const Text('精华帖'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/search/result?filter=digest'),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
                   leading: const Icon(Icons.groups_outlined),
                   title: const Text('圈子'),
                   trailing: const Icon(Icons.chevron_right),

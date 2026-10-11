@@ -58,6 +58,14 @@ Map<String, dynamic> parsePostFromTable(
       bbcode = '';
   Map<String, dynamic>? rating;
 
+  // 置顶回复：管理员将该楼层置顶时，楼层号前会渲染 settop 图标
+  // （克米 PC / 移动模板：`td.plc ... a[id^=postnum] img[src*=settop]`，title=置顶回复）
+  final isStickReply =
+      table.querySelector(
+        'img[src*="settop"], img[title*="置顶回复"], img[alt*="置顶回复"]',
+      ) !=
+      null;
+
   if (plc != null) {
     // 楼层标签
     final postnum = plc.querySelector('a[id^="postnum"]');
@@ -285,6 +293,7 @@ Map<String, dynamic> parsePostFromTable(
     'bbcode': bbcode,
     'followUrl': followUrl,
     'rating': rating,
+    'isStickReply': isStickReply,
   };
 }
 

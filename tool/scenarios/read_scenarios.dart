@@ -160,7 +160,8 @@ final Map<String, ApiScenario> readScenarios = {
   'search.list': ApiScenario(
     desc: '站内搜索帖子列表（search.php；UA 随「浏览模式」→ 移动克米 / 桌面 Discuz）',
     params: {
-      'kw': '*搜索关键词',
+      'kw': '搜索关键词（与 filter 至少留一个；空=不限定关键词）',
+      'filter': '搜索范围过滤：digest=全站精华 / top=置顶（可空）',
       'page': '页码（默认 1）',
       'searchid': '搜索结果会话 id（翻页用；空=发起新搜索）',
     },
@@ -170,6 +171,7 @@ final Map<String, ApiScenario> readScenarios = {
       keyword: a['kw'] ?? '',
       page: intArg(a, 'page', 1),
       searchId: (a['searchid'] ?? '').isEmpty ? null : a['searchid'],
+      srchFilter: a['filter'] ?? '',
     ),
   ),
   'thread.detail': ApiScenario(

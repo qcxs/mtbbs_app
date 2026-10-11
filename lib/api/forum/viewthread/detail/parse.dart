@@ -32,6 +32,9 @@ Map<String, dynamic> parseResponse(
   // formhash
   final formhash = _extractFormhash(doc);
 
+  // 主题印章（如「精华」）：楼主帖前置的 `#threadstamp`，只在第 1 页出现
+  final threadStamp = _extractThreadStamp(doc);
+
   // 全局操作 URL
   final recommendUrl = resolveUrl(_extractRecommendUrl(doc));
   final favoriteUrl = resolveUrl(_extractFavoriteUrl(doc));
@@ -116,6 +119,7 @@ Map<String, dynamic> parseResponse(
     mainPost['favoriteUrl'] = favoriteUrl;
     mainPost['kickUrl'] = kickUrl;
     mainPost['isLiked'] = isLiked;
+    mainPost['stamp'] = threadStamp;
 
     for (int i = 1; i < postTables.length; i++) {
       comments.add(_parsePostSafe(postTables[i], floor: i, isOp: false));
@@ -255,4 +259,18 @@ String _extractTitle(dom.Document doc) {
     return sanitizeText(subject.text);
   }
   return '';
+}
+
+/// 主题印章文本（如「精华」）——楼主帖的 `#threadstamp > img`（取 title/alt）。
+///
+/// 标准 Discuz 与克米模板都是 `<div id="threadstamp"><img ... title="印章文本"></div>`，
+/// 整页只出现一次（仅在楼主帖）。无印章返回空串。
+String _extractThreadStamp(dom.Document doc) {
+  final img = doc.querySelector('#threadstamp img');
+  if (img != null) {
+    final t = (img.attributes['title'] ?? img.attributes['alt'] ?? '').trim();
+    if (t.isNotEmpty) return t;
+  }
+  final box = doc.querySelector('#threadstamp');
+  return box == null ? '' : sanitizeText(box.text).trim();
 }

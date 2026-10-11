@@ -35,6 +35,12 @@ const levelColor = Color(0xFFFF9900);
 const forumColor = Color(0xFF53BCF5);
 const onlineColor = Color(0xFF4CAF50);
 
+// -- 精华徽标色（金色，与等级/版块色区分）--
+const digestColor = Color(0xFFE6A23C);
+
+// -- 置顶回复徽标色（红，呼应站内 settop 图标）--
+const stickTopColor = Color(0xFFE5484D);
+
 // -- 搜索结果关键词高亮（对应网页 <font color="#ff0000">；深色提高亮度保证可读）--
 const _searchHlPair = _ColorPair(Color(0xFFD32F2F), Color(0xFFFF8A80));
 
@@ -153,6 +159,31 @@ extension ColorBadge on Color {
       child: Text(
         text,
         style: TextStyle(fontSize: fontSize, color: this),
+      ),
+    );
+  }
+
+  /// 生成「盖章」样式标签：略微旋转 + 描边 + 淡底，模仿站内印章（精华/置顶等）
+  Widget toStamp(String text, {double fontSize = 13, double angle = -0.12}) {
+    return Transform.rotate(
+      angle: angle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: withValues(alpha: 0.08),
+          border: Border.all(color: this, width: 1.6),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: this,
+            fontSize: fontSize,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.5,
+            height: 1.1,
+          ),
+        ),
       ),
     );
   }

@@ -244,16 +244,26 @@ class ThreadCard extends StatelessWidget {
     final hasNick = item.nickname != null && item.nickname!.isNotEmpty;
     final hasTime = item.time != null && item.time!.isNotEmpty;
 
-    // 无发帖人信息时，仅在有时间时显示时间文本
+    // 精华帖：右上角盖「精」章（与网页的印章式一致），不再挤在标题前
+    final stamp = (item.digest ?? 0) > 0
+        ? Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: digestColor.toStamp('精', fontSize: 12),
+          )
+        : null;
+
+    // 无发帖人信息时，仅在有时间/印章时显示
     if (!hasUid && !hasNick) {
-      if (!hasTime) return const SizedBox.shrink();
+      if (!hasTime && stamp == null) return const SizedBox.shrink();
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text(
-            item.time!,
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-          ),
+          if (hasTime)
+            Text(
+              item.time!,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ?stamp,
         ],
       );
     }
@@ -314,6 +324,7 @@ class ThreadCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ],
+        ?stamp,
       ],
     );
   }

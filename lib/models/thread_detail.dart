@@ -86,6 +86,12 @@ class PostItem {
   /// 该楼层的解析是否失败（解析异常时降级为占位，避免拖垮整页）
   final bool degraded;
 
+  /// 主题印章文本（如「精华」）——来自楼主帖的 `#threadstamp`，普通楼层为空
+  final String stamp;
+
+  /// 是否为「置顶回复」（管理员置顶的评论；模板在楼层号前渲染 settop 图标）
+  final bool isStickReply;
+
   const PostItem({
     this.pid = '',
     this.floor = 0,
@@ -105,6 +111,8 @@ class PostItem {
     this.isLiked = false,
     this.rating,
     this.degraded = false,
+    this.stamp = '',
+    this.isStickReply = false,
   });
 
   bool get isMainPost => isOp;
@@ -140,6 +148,8 @@ class PostItem {
         ? Map<String, dynamic>.from(p['rating'] as Map)
         : null,
     degraded: p['degraded'] == true,
+    stamp: p['stamp']?.toString() ?? '',
+    isStickReply: p['isStickReply'] == true,
   );
 
   Map<String, dynamic> toMap() => {
@@ -161,6 +171,8 @@ class PostItem {
     'isLiked': isLiked,
     'rating': rating,
     'degraded': degraded,
+    'stamp': stamp,
+    'isStickReply': isStickReply,
   };
 }
 
