@@ -65,6 +65,7 @@ void main() {
       'tid': const String.fromEnvironment('tid'),
       'pid': const String.fromEnvironment('pid'),
       'favid': const String.fromEnvironment('favid'),
+      'cid': const String.fromEnvironment('cid'),
       'subject': const String.fromEnvironment('subject'),
       'authorid': const String.fromEnvironment('authorid'),
       'uid': const String.fromEnvironment('uid'),

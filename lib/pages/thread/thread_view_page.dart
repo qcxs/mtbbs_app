@@ -27,7 +27,8 @@ import 'package:mtbbs/models/editor_snapshot.dart';
 import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/pages/editor/editor_session.dart';
 import 'package:mtbbs/pages/editor/editor_draft_handoff.dart';
-import 'package:mtbbs/pages/editor/forum_image_upload.dart';
+import 'package:mtbbs/pages/editor/forum_image_drawer.dart';
+import 'package:mtbbs/pages/editor/forum_image_controller.dart';
 import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
@@ -112,6 +113,9 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   // ---- 迷你编辑器（评论 / 回复某评论，共享内核） ----
   late final EditorSession _editorSession;
   final MtImageHosting _mtImageHosting = MtImageHosting();
+
+  /// 迷你编辑器图片管理（与完整编辑器共用同一实现；页面内持久，供工具栏角标）
+  late final ForumImageController _images;
   bool _editorExpanded = false;
   bool _editorSubmitting = false;
 
@@ -127,15 +131,26 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       editorType: EditorType.comment,
       tid: widget.tid,
     );
+    _images = ForumImageController(
+      contentCtl: _editorSession.contentCtl,
+      pageData: () => _editorSession.pageData,
+      uid: () => context.read<AuthProvider>().uid,
+      fallbackTid: widget.tid,
+    )..addListener(_onImagesChanged);
     _loadInitial();
   }
 
   @override
   void dispose() {
+    _images.removeListener(_onImagesChanged);
+    _images.dispose();
     _editorSession.dispose();
     _scrollController.dispose();
     super.dispose();
   }
+
+  /// 图片管理数据变更 → 重建（迷你编辑器工具栏角标随之刷新）
+  void _onImagesChanged() => _setState(() {});
 
   /// 供 part 扩展使用（扩展无法直接访问受保护的 setState）
   void _setState(VoidCallback fn) {
@@ -337,13 +352,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     final page = Scaffold(
       appBar: AppBar(
         title: GestureDetector(
-          onTap: () {
-            _scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-          },
+          onTap: _scrollToTop,
           child: Text(
             _data?.title.isNotEmpty == true ? _data!.title : '帖子详情',
             style: const TextStyle(fontSize: 15),
@@ -457,25 +466,34 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   ///
   /// - Esc：页面级 [Shortcuts] 覆盖全局 `GoBackIntent`（最近者优先），收起即可
   /// - Android 返回：`PopScope(canPop: false)` 拦下本次 pop 并收起
-  /// 未展开时原样返回，交回全局 Esc / GoRouter 默认返回行为。
+  /// 收起时各层为空操作，交回全局 Esc / GoRouter 默认返回行为。
+  ///
+  /// **必须结构恒定**：不能"收起时直接 `return child`、展开时才包壳"——那样根 widget
+  /// 类型在收起 ↔ 展开间变化，Flutter 会整棵子树重建，`ScrollView` 的 `ScrollPosition`
+  /// 随之丢弃，帖子阅读进度归零（回到顶部）。这里改为始终返回同一套外壳，
+  /// 只让快捷键表 / 动作表 / `canPop` 随 `_editorExpanded` 变化。
   Widget _wrapBackToCollapse(Widget child) {
-    if (!_editorExpanded) return child;
     return Shortcuts(
-      shortcuts: {
-        SingleActivator(LogicalKeyboardKey.escape):
-            const _CollapseMiniEditorIntent(),
-      },
+      shortcuts: _editorExpanded
+          ? {
+              SingleActivator(LogicalKeyboardKey.escape):
+                  const _CollapseMiniEditorIntent(),
+            }
+          : const <ShortcutActivator, Intent>{},
       child: Actions(
-        actions: {
-          _CollapseMiniEditorIntent: CallbackAction<_CollapseMiniEditorIntent>(
-            onInvoke: (_) {
-              _collapseEditor();
-              return null;
-            },
-          ),
-        },
+        actions: _editorExpanded
+            ? {
+                _CollapseMiniEditorIntent:
+                    CallbackAction<_CollapseMiniEditorIntent>(
+                      onInvoke: (_) {
+                        _collapseEditor();
+                        return null;
+                      },
+                    ),
+              }
+            : const <Type, Action<Intent>>{},
         child: PopScope(
-          canPop: false,
+          canPop: !_editorExpanded,
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _collapseEditor();
           },

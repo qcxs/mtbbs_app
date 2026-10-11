@@ -88,6 +88,10 @@ class SettingsProvider extends ChangeNotifier {
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;
 
+  /// 站点正文字数上限（编辑器 / 留言板共用），Discuz 默认 65535。
+  /// 未配置时一律按 65535 计。
+  int _postMaxLength = kDefaultPostMaxLength;
+
   /// 头像缓存天数（-1 表示永不过期），默认取自 cache.json
   int _avatarCacheDays = DefaultConfig.instance.cacheExpireDays.avatar;
 

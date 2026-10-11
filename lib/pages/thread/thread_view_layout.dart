@@ -14,6 +14,9 @@ extension on _ThreadViewPageState {
         Expanded(
           flex: 3,
           child: ListView(
+            // 与窄屏共用同一 controller：点标题"回顶部"在两种布局下都生效；
+            // 两种布局互斥（只挂一个），不会同时 attach 同一 controller。
+            controller: _scrollController,
             padding: const EdgeInsets.all(8),
             children: [
               if (_data!.title.isNotEmpty) _buildTitleSection(),
@@ -180,6 +183,8 @@ extension on _ThreadViewPageState {
       onExpandToFull: _expandToFull,
       targetLabel: _replyTargetName != null ? '回复 ${_replyTargetName}' : null,
       onTapTarget: _replyTargetPid != null ? _showReplyTargetPreview : null,
+      // 图片角标：已上传的图片数（有角标时该项强制显示，与完整编辑器一致）
+      badges: {if (_images.list.isNotEmpty) 'image': _images.list.length},
     );
   }
 

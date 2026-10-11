@@ -7,8 +7,9 @@ import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 
 /// 图片管理面板 — 纯 UI 组件
 ///
-/// 图片数据由编辑器 [EditorPage] 持有，面板仅负责展示和交互回调。
-/// 上传/删除/忽略等操作通过回调修改编辑器数据，面板关闭重开不会丢失数据。
+/// 图片数据由调用方持有（完整编辑器 `EditorPage` / 迷你编辑器的图片抽屉
+/// `showForumImageDrawer`），面板仅负责展示和交互回调。上传/删除/忽略等
+/// 操作通过回调修改调用方数据，面板关闭重开不会丢失数据。
 class ImagePickerSheet extends StatefulWidget {
   final List<Map<String, dynamic>> images;
   final bool loading;

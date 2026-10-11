@@ -1,9 +1,10 @@
 part of 'editor_page.dart';
 
-/// 图片/附件管理 — 列表刷新、上传、删除、忽略、AID 同步与预览预处理。
+/// 图片/附件媒体 — 预览预处理（图片/附件）与附件管理（列表/上传/删除）。
 ///
-/// 通过 `part of` 与 editor_page.dart 共享库内私有成员；
-/// 扩展方式拆分，避免 mixin `on` 自引用造成接口循环。
+/// 图片管理的**状态与动作**已抽到 [ForumImageController]（完整版持久持有、
+/// 迷你版图片抽屉临时持有，两份共用一份实现，见 forum_image_controller.dart）；
+/// 这里只保留预览预处理与附件管理。
 extension on _EditorPageState {
   // ==================== BBCode 预处理（预览用） ====================
 
@@ -14,7 +15,7 @@ extension on _EditorPageState {
       RegExp(r'\[attachimg\](\d+)\[/attachimg\]'),
       (m) {
         final aid = m.group(1) ?? '';
-        final src = _aidToSrc[aid] ?? '';
+        final src = _images.aidToSrc[aid] ?? '';
         if (src.isNotEmpty) {
           final data = jsonEncode({
             'type': 'image_attach',
@@ -46,210 +47,6 @@ extension on _EditorPageState {
     return bbcode;
   }
 
-  // ==================== 图片管理 ====================
-
-  /// 同步图片数据到 notifier（让图片管理面板重建）
-  void _syncImagesNotifier() {
-    _imageSheetDataNotifier.value = _ImageSheetData(
-      _imageList.where((i) => !_ignoredAids.contains(i['aid'])).toList(),
-      _loadingImages,
-    );
-  }
-
-  /// 刷新图片列表（合并页面已有 + 已上传未绑定的图片）
-  Future<void> _refreshImageList() async {
-    try {
-      final fid = _session.pageData.fid.isNotEmpty ? _session.pageData.fid : widget.fid;
-      final tid = _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid;
-
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({'action': 'refreshImageList', 'fid': fid, 'tid': tid}),
-      );
-      _setState(() => _loadingImages = true);
-      _syncImagesNotifier();
-      final images = await upload_api.fetchUnusedImages(
-        ApiService().dio,
-        fid: fid,
-        tid: tid.isNotEmpty ? tid : null,
-      );
-      if (!mounted) return;
-      int newCount = 0;
-      _setState(() {
-        for (final img in images) {
-          final aid = img['aid']?.toString() ?? '';
-          final src = img['src']?.toString() ?? '';
-          if (aid.isEmpty || src.isEmpty) continue;
-          // 合并到 _imageList（去重）
-          if (!_imageList.any((i) => i['aid'] == aid)) {
-            _imageList.add({
-              'aid': aid,
-              'src': src,
-              'title': img['title']?.toString() ?? '',
-              'type': 'uploaded',
-            });
-            newCount++;
-          }
-          // 同时更新 _aidToSrc（供预览用）
-          if (!_aidToSrc.containsKey(aid)) {
-            _aidToSrc[aid] = src;
-          }
-        }
-        _loadingImages = false;
-      });
-      _syncImagesNotifier();
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({
-          'action': 'refreshImageList_done',
-          'total': _imageList.length,
-          'new': newCount,
-        }),
-      );
-    } catch (_) {
-      AppLogger.w('EDITOR', 'refreshImageList failed');
-      if (mounted) {
-        _setState(() => _loadingImages = false);
-        _syncImagesNotifier();
-      }
-    }
-  }
-
-  /// 处理图片上传（选择文件 → 上传 → 加入列表）
-  Future<void> _handleImageUpload() async {
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) return;
-    if (_session.pageData.uploadHash.isEmpty) return;
-
-    final imgExts = _session.pageData.imageExtensions;
-    final result = await FilePicker.platform.pickFiles(
-      type: imgExts.isNotEmpty ? FileType.custom : FileType.image,
-      allowedExtensions: imgExts.isNotEmpty ? imgExts : null,
-      allowMultiple: true,
-      withReadStream: true,
-      allowCompression: false,
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    int successCount = 0;
-    int failCount = 0;
-    for (final f in result.files) {
-      final filePath = f.path;
-      if (filePath == null) {
-        failCount++;
-        continue;
-      }
-
-      final file = File(filePath);
-      try {
-        final uploadResult = await upload_api.uploadImage(
-          ApiService().dio,
-          file: file,
-          uid: auth.uid,
-          uploadHash: _session.pageData.uploadHash,
-        );
-        if (!mounted) return;
-        if (uploadResult['success'] == true) {
-          final aid = uploadResult['aid']?.toString() ?? '';
-          final src = uploadResult['src']?.toString() ?? '';
-          final title = uploadResult['title']?.toString() ?? '';
-          if (aid.isNotEmpty && src.isNotEmpty) {
-            _setState(() {
-              _imageList.add({
-                'aid': aid,
-                'src': src,
-                'title': title,
-                'type': 'uploaded',
-              });
-              _aidToSrc[aid] = src;
-            });
-            successCount++;
-          }
-          // 上传成功后清理 file_picker 复制的临时缓存文件（Android）
-          await deleteFilePickerTempIfAny(filePath);
-        } else {
-          failCount++;
-        }
-      } finally {}
-    }
-    _syncImagesNotifier();
-
-    AppLogger.i(
-      'EDITOR',
-      jsonEncode({
-        'action': 'handleImageUpload',
-        'success': successCount,
-        'fail': failCount,
-        'totalFiles': result.files.length,
-        'imageListSize': _imageList.length,
-      }),
-    );
-
-    if (!mounted) return;
-    if (successCount > 0 && failCount == 0) {
-      showToast('上传成功 $successCount 张图片');
-    } else if (successCount > 0 && failCount > 0) {
-      showToast('上传完成：成功 $successCount 张，失败 $failCount 张');
-    } else {
-      showToast('上传失败');
-    }
-  }
-
-  /// 删除图片（调用 API 删除 + 从本地列表移除）
-  Future<void> _handleImageDelete(String aid) async {
-    final ok = await upload_api.deleteUnusedImage(
-      ApiService().dio,
-      formhash: _session.pageData.formhash,
-      tid: _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid,
-      pid: _session.pageData.pid.isNotEmpty ? _session.pageData.pid : widget.pid,
-      aid: aid,
-    );
-    if (!mounted) return;
-    if (ok) {
-      _setState(() {
-        _imageList.removeWhere((i) => i['aid'] == aid);
-        _aidToSrc.remove(aid);
-      });
-      _syncImagesNotifier();
-      AppLogger.i(
-        'EDITOR',
-        jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': true}),
-      );
-      showToast('已删除');
-    } else {
-      AppLogger.w(
-        'EDITOR',
-        jsonEncode({'action': 'deleteImage', 'aid': aid, 'success': false}),
-      );
-      showToast('删除失败');
-    }
-  }
-
-  /// 忽略图片（从显示列表中隐藏）
-  void _handleImageIgnore(String aid) {
-    _setState(() {
-      _ignoredAids.add(aid);
-      _imageList.removeWhere((i) => i['aid'] == aid);
-      _aidToSrc.remove(aid);
-    });
-    _syncImagesNotifier();
-  }
-
-  /// 获取当前活跃的 AID 集合（未忽略的图片）
-  Set<String> get _activeAids {
-    return _imageList
-        .map((i) => i['aid'] as String)
-        .where((aid) => !_ignoredAids.contains(aid))
-        .toSet();
-  }
-
-  /// 同步活跃 AID 到 BBCodeController
-  void _syncPendingAids() {
-    _session.contentCtl.pendingAids
-      ..clear()
-      ..addAll(_activeAids);
-  }
-
   // ==================== 附件管理 ====================
 
   /// 同步附件数据到 notifier
@@ -275,8 +72,12 @@ extension on _EditorPageState {
   /// 刷新附件列表
   Future<void> _refreshAttachmentList() async {
     try {
-      final fid = _session.pageData.fid.isNotEmpty ? _session.pageData.fid : widget.fid;
-      final tid = _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid;
+      final fid = _session.pageData.fid.isNotEmpty
+          ? _session.pageData.fid
+          : widget.fid;
+      final tid = _session.pageData.tid.isNotEmpty
+          ? _session.pageData.tid
+          : widget.tid;
 
       AppLogger.i(
         'EDITOR',
@@ -371,7 +172,9 @@ extension on _EditorPageState {
           file: file,
           uid: auth.uid,
           uploadHash: _session.pageData.uploadHash,
-          fid: _session.pageData.fid.isNotEmpty ? _session.pageData.fid : widget.fid,
+          fid: _session.pageData.fid.isNotEmpty
+              ? _session.pageData.fid
+              : widget.fid,
         );
         if (!mounted) return;
         if (uploadResult['success'] == true) {
@@ -420,8 +223,12 @@ extension on _EditorPageState {
     final ok = await upload_api.deleteUnusedImage(
       ApiService().dio,
       formhash: _session.pageData.formhash,
-      tid: _session.pageData.tid.isNotEmpty ? _session.pageData.tid : widget.tid,
-      pid: _session.pageData.pid.isNotEmpty ? _session.pageData.pid : widget.pid,
+      tid: _session.pageData.tid.isNotEmpty
+          ? _session.pageData.tid
+          : widget.tid,
+      pid: _session.pageData.pid.isNotEmpty
+          ? _session.pageData.pid
+          : widget.pid,
       aid: aid,
     );
     if (!mounted) return;
@@ -449,46 +256,25 @@ extension on _EditorPageState {
     }
   }
 
-  /// 上传图片到论坛（默认上传），成功后插入 [attachimg]
+  /// 剪贴板图片上传 → 插入 [attachimg]（默认上传）
   Future<void> _uploadDefaultImage(File file) async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn || _session.pageData.uploadHash.isEmpty) {
       if (mounted) showToast('未登录或无上传权限');
       return;
     }
-
-    try {
-      final uploadResult = await upload_api.uploadImage(
-        ApiService().dio,
-        file: file,
-        uid: auth.uid,
-        uploadHash: _session.pageData.uploadHash,
+    final up = await _images.uploadFile(file);
+    if (!mounted) return;
+    if (up != null) {
+      _session.contentCtl.wrapInline(
+        '',
+        '',
+        '[attachimg]${up['aid']}[/attachimg]',
       );
-      if (!mounted) return;
-      if (uploadResult['success'] == true) {
-        final aid = uploadResult['aid']?.toString() ?? '';
-        final src = uploadResult['src']?.toString() ?? '';
-        final title = uploadResult['title']?.toString() ?? '';
-        if (aid.isNotEmpty && src.isNotEmpty) {
-          _setState(() {
-            _imageList.add({
-              'aid': aid,
-              'src': src,
-              'title': title,
-              'type': 'uploaded',
-            });
-            _aidToSrc[aid] = src;
-          });
-          _syncImagesNotifier();
-          _session.contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
-          _focusContent();
-        }
-        if (mounted) showToast('剪贴板图片已上传');
-      } else {
-        if (mounted) showToast('上传失败: ${uploadResult['error'] ?? '未知错误'}');
-      }
-    } catch (e) {
-      if (mounted) showToast('上传失败: $e');
+      _focusContent();
+      showToast('剪贴板图片已上传');
+    } else {
+      showToast('上传失败');
     }
   }
 }

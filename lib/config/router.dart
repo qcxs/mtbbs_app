@@ -26,6 +26,7 @@ import 'package:mtbbs/pages/thread/thread_view_page.dart';
 import 'package:mtbbs/pages/editor/editor_page.dart';
 import 'package:mtbbs/pages/editor/editor_history_page.dart';
 import 'package:mtbbs/pages/user/user_profile_page.dart';
+import 'package:mtbbs/pages/user/wall_page.dart';
 import 'package:mtbbs/pages/user/my_thread_page.dart';
 import 'package:mtbbs/pages/user/credit_log_page.dart';
 import 'package:mtbbs/pages/browser/browser_page.dart';
@@ -224,6 +225,22 @@ GoRouter buildRouter({
               return NoTransitionPage(
                 key: ValueKey('user_page_$uid'),
                 child: UserProfilePage(uid: uid),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/user/:uid/wall',
+            pageBuilder: (_, state) {
+              final uid = state.pathParameters['uid'] ?? '';
+              return NoTransitionPage(
+                key: ValueKey('user_wall_$uid'),
+                child: WallPage(
+                  uid: uid,
+                  nickname: state.uri.queryParameters['nickname'] ?? '',
+                  initialPage:
+                      int.tryParse(state.uri.queryParameters['page'] ?? '') ??
+                      1,
+                ),
               );
             },
           ),

@@ -7,3 +7,4 @@ export 'post_preview.dart';
 export 'thread_detail.dart';
 export 'thread_item.dart';
 export 'user_profile.dart';
+export 'wall_comment.dart';

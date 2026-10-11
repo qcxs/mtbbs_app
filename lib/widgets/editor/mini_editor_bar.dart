@@ -36,6 +36,9 @@ class MiniEditorBar extends StatefulWidget {
     this.hintText = '说点什么…',
     this.submitting = false,
     this.autofocus = false,
+    this.maxLength,
+    this.submitLabel = '发送',
+    this.badges = const {},
   });
 
   /// 正文控制器（通常来自 `EditorSession.contentCtl`；私信页可独立创建）
@@ -71,6 +74,16 @@ class MiniEditorBar extends StatefulWidget {
   final String hintText;
   final bool submitting;
   final bool autofocus;
+
+  /// 正文字数上限（null = 不限制）；由调用方传入站点字数限制
+  final int? maxLength;
+
+  /// 主按钮文案（默认「发送」；留言板编辑态用「保存」）
+  final String submitLabel;
+
+  /// 工具栏角标：item id → 数量（如「图片」已上传的数量）。
+  /// 有角标的项无视隐藏设置强制显示（与完整编辑器一致）。
+  final Map<String, int> badges;
 
   @override
   State<MiniEditorBar> createState() => _MiniEditorBarState();
@@ -144,6 +157,7 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.targetLabel != null) _buildTargetRow(cs),
           _buildTopRow(cs, items, shortcuts),
           const SizedBox(height: 6),
           _buildBody(cs),
@@ -154,10 +168,38 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
     );
   }
 
-  /// 单行顶部：回复目标芯片 + 工具栏 + 右上角（预览 / 完整版 / 收起）。
+  /// 回复目标芯片（单独一行，置于最上方；无目标时不渲染）
+  Widget _buildTargetRow(ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      child: InkWell(
+        onTap: widget.onTapTarget,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.reply_rounded, size: 14, color: cs.primary),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  widget.targetLabel!,
+                  style: TextStyle(fontSize: 12, color: cs.primary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 顶部：工具栏 + 右侧固定「收起」。
   ///
-  /// 共用一行为的是不出现"只有几个按钮的空行"（私信页曾在预览按钮上浪费一整行），
-  /// 同时芯片与工具栏相邻、操作按钮固定在右侧。
+  /// 预览 / 展开已移到左下角（见 [_buildActionRow]），这一行留给工具栏，不再与右侧
+  /// 按钮抢空间；「收起」保持在原位（读帖主操作，位置不变）。
   Widget _buildTopRow(
     ColorScheme cs,
     List<ManagedItem> items,
@@ -165,31 +207,6 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
   ) {
     return Row(
       children: [
-        if (widget.targetLabel != null) ...[
-          InkWell(
-            onTap: widget.onTapTarget,
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.reply_rounded, size: 14, color: cs.primary),
-                  const SizedBox(width: 4),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 150),
-                    child: Text(
-                      widget.targetLabel!,
-                      style: TextStyle(fontSize: 12, color: cs.primary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-        ],
         Expanded(
           child: _previewing
               ? const SizedBox.shrink()
@@ -201,27 +218,12 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
                     canRedo: undoVal.canRedo,
                     items: items,
                     shortcuts: shortcuts,
+                    badges: widget.badges,
                     showSettingsButton: false,
                     showContainer: false,
                   ),
                 ),
         ),
-        IconButton(
-          icon: Icon(
-            _previewing ? Icons.edit_outlined : Icons.visibility_outlined,
-            size: 20,
-          ),
-          tooltip: _previewing ? '编辑' : '预览',
-          visualDensity: VisualDensity.compact,
-          onPressed: () => setState(() => _previewing = !_previewing),
-        ),
-        if (widget.onExpandToFull != null)
-          IconButton(
-            icon: const Icon(Icons.open_in_full, size: 20),
-            tooltip: '展开为完整版',
-            visualDensity: VisualDensity.compact,
-            onPressed: widget.submitting ? null : widget.onExpandToFull,
-          ),
         if (widget.onCollapse != null)
           IconButton(
             icon: const Icon(Icons.expand_more, size: 20),
@@ -268,6 +270,12 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
       undoController: _undoController,
       minLines: 2,
       maxLines: 6,
+      maxLength: widget.maxLength,
+      // 隐藏右下角 "0/65535" 计数器：上限仅作约束，不做展示
+      buildCounter: widget.maxLength == null
+          ? null
+          : (_, {required currentLength, required isFocused, maxLength}) =>
+                null,
       textInputAction: TextInputAction.newline,
       decoration: InputDecoration(
         hintText: widget.hintText,
@@ -284,9 +292,26 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
   Widget _buildActionRow(ColorScheme cs) {
     // 撤销/重做不再固定在此：它们是工具栏项（`undo`/`redo`），
     // 由工具栏渲染与派发（共用 `EditorActionHooks.undoController`）。
+    // 左下角固定「预览 / 展开」，右侧保留「发送」。
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        IconButton(
+          icon: Icon(
+            _previewing ? Icons.edit_outlined : Icons.visibility_outlined,
+            size: 20,
+          ),
+          tooltip: _previewing ? '编辑' : '预览',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => setState(() => _previewing = !_previewing),
+        ),
+        if (widget.onExpandToFull != null)
+          IconButton(
+            icon: const Icon(Icons.open_in_full, size: 20),
+            tooltip: '展开为完整版',
+            visualDensity: VisualDensity.compact,
+            onPressed: widget.submitting ? null : widget.onExpandToFull,
+          ),
+        const Spacer(),
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: widget.contentCtl,
           builder: (_, value, __) {
@@ -304,7 +329,7 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
             return FilledButton.icon(
               onPressed: hasText ? widget.onSubmit : null,
               icon: const Icon(Icons.send_rounded, size: 18),
-              label: const Text('发送'),
+              label: Text(widget.submitLabel),
             );
           },
         ),

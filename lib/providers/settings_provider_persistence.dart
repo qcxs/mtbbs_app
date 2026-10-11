@@ -54,6 +54,9 @@ extension SettingsPersistence on SettingsProvider {
     _spaceSource = (await _db.getSetting('spaceSource')) ?? '';
     space_api.applySpaceSourceOverride(_spaceSource);
     _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
+    // 站点正文字数上限（编辑器 / 留言板共用），无配置按 Discuz 默认 65535
+    _postMaxLength =
+        (await _db.getSettingInt('postMaxLength')) ?? kDefaultPostMaxLength;
     // 缓存过期天数（默认取自 cache.json，无配置或 JSON 错误时为 1 天）
     final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
     _avatarCacheDays =
@@ -394,6 +397,13 @@ extension SettingsPersistence on SettingsProvider {
   Future<void> setStaggerInterval(int ms) async {
     _staggerInterval = ms.clamp(20, 300);
     await _db.setSettingInt('staggerInterval', _staggerInterval);
+    _notify();
+  }
+
+  /// 站点正文字数上限（编辑器 / 留言板共用）
+  Future<void> setPostMaxLength(int value) async {
+    _postMaxLength = value.clamp(1, 1000000);
+    await _db.setSettingInt('postMaxLength', _postMaxLength);
     _notify();
   }
 

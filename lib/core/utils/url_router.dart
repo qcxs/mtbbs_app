@@ -36,6 +36,9 @@ class UrlRouteResult {
 /// - 帖子定位回复：  `forum.php?mod=redirect&goto=findpost&pid=X&ptid=Y`
 /// - 用户主页：      `home.php?mod=space&uid=456` / `space-uid-456.html`
 /// - 用户资料：      `home.php?mod=space&do=profile` / `home.php?mod=space&do=profile&uid=123`
+/// - 我的帖子/回复：  `home.php?mod=space[&uid=X]&do=thread[&type=reply]`
+/// - 我的收藏：      `home.php?mod=space&do=favorite[&view=me][&type=all|thread|forum]`
+/// - 好友 / 留言板：  `home.php?mod=space[&uid=X]&do=friend|wall[&page=N]`
 /// - 板块列表：      `forum.php?mod=forumdisplay&fid=42` / `forum-42-1.html` / `forum-42.html`
 /// - 发新帖：        `forum.php?mod=post&action=newthread&fid=41`
 /// - 回复帖子：      `forum.php?mod=post&action=reply&tid=123`（评论）
@@ -259,6 +262,47 @@ class UrlRouter {
           return UrlRouteResult(
             label: hasUid ? '好友列表' : '我的好友',
             appPath: '/friends$qs',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
+        // 留言板：home.php?mod=space[&uid=X]&do=wall[&page=N]
+        // 注意必须排在下面 `uid 非空 → 用户主页` 之前：do=wall 也带 uid
+        if (query['do'] == 'wall') {
+          final hasUid = uid != null && uid.isNotEmpty;
+          final page = _resolvePage(query['page']);
+          final qs = page > 1 ? '?page=$page' : '';
+          return UrlRouteResult(
+            label: hasUid ? '留言板' : '我的留言板',
+            appPath: '/user/${hasUid ? uid : 'self'}/wall$qs',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
+        // 我的帖子/回复：home.php?mod=space[&uid=X]&do=thread[&view=me][&type=reply]
+        // 注意排在下面 `uid 非空 → 用户主页` 之前：do=thread 也带 uid
+        if (query['do'] == 'thread') {
+          final hasUid = uid != null && uid.isNotEmpty;
+          final isReply = query['type'] == 'reply';
+          final params = <String, String>{
+            if (isReply) 'type': 'reply',
+            if (hasUid) 'uid': uid,
+          };
+          final qs = params.isEmpty
+              ? ''
+              : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+          return UrlRouteResult(
+            label: hasUid ? 'Ta的帖子' : (isReply ? '最近回复' : '我的帖子'),
+            appPath: '/my-threads$qs',
+            siteHost: otherSiteHost,
+            siteName: otherSiteName,
+          );
+        }
+        // 我的收藏：home.php?mod=space&do=favorite[&view=me][&type=all|thread|forum]
+        if (query['do'] == 'favorite') {
+          return UrlRouteResult(
+            label: '我的收藏',
+            appPath: '/favorite',
             siteHost: otherSiteHost,
             siteName: otherSiteName,
           );

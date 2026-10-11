@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/core/app/default_config.dart';
+import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/dialog/quick_reply_dialog.dart';
 
@@ -23,19 +24,36 @@ void main() {
     );
   });
 
-  test('常用语支持"显示 / 插入"分离', () async {
+  test('内置常用语不含 insert（美化 BBCode 由用户自行添加）', () async {
     await DefaultConfig.instance.load();
     final thanks = DefaultConfig.instance.quickReplies.firstWhere(
       (e) => e.id == 'qr_thanks',
     );
-    // 显示文本不变，插入内容是美化后的 BBCode
     expect(thanks.name, '感谢分享');
-    expect(quickReplyInsertOf(thanks), contains('[b]'));
-    // 未配置 insert 的条目，插入内容 == 显示文本
+    // 内置项不预设插入内容，插入内容 == 显示文本
+    expect(thanks.data?['insert'], isNull);
+    expect(quickReplyInsertOf(thanks), '感谢分享');
+
     final hidden = DefaultConfig.instance.quickReplies.firstWhere(
       (e) => e.id == 'qr_hidden',
     );
     expect(quickReplyInsertOf(hidden), hidden.name);
+  });
+
+  test('quickReplyInsertOf 优先取 data["insert"]（用户自定义美化内容）', () {
+    const withInsert = ManagedItem(
+      id: 'custom',
+      name: '感谢分享',
+      data: {'insert': '[b]感谢分享，辛苦了！[/b]'},
+    );
+    expect(quickReplyInsertOf(withInsert), '[b]感谢分享，辛苦了！[/b]');
+
+    const blankInsert = ManagedItem(
+      id: 'custom2',
+      name: '看看隐藏',
+      data: {'insert': '   '},
+    );
+    expect(quickReplyInsertOf(blankInsert), '看看隐藏');
   });
 
   test('常用语长度上限（显示 100 / 插入 500）', () {

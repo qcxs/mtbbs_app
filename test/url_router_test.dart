@@ -38,6 +38,69 @@ void main() {
       );
     });
 
+    test('留言板 home.php?mod=space&uid&do=wall → /user/{uid}/wall', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&uid=88062&do=wall&from=space',
+        ).appPath,
+        '/user/88062/wall',
+      );
+    });
+
+    test('留言板翻页 do=wall&page>1 → 携带 page', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&uid=88062&do=wall&page=2',
+        ).appPath,
+        '/user/88062/wall?page=2',
+      );
+    });
+
+    test('我的留言板 do=wall 无 uid → /user/self/wall', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&do=wall',
+        ).appPath,
+        '/user/self/wall',
+      );
+    });
+
+    test('我的收藏 do=favorite → /favorite', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&do=favorite&view=me&type=all',
+        ).appPath,
+        '/favorite',
+      );
+    });
+
+    test('我的帖子 do=thread&view=me → /my-threads', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&do=thread&view=me',
+        ).appPath,
+        '/my-threads',
+      );
+    });
+
+    test('我的回复 do=thread&type=reply → /my-threads?type=reply', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&do=thread&view=me&type=reply',
+        ).appPath,
+        '/my-threads?type=reply',
+      );
+    });
+
+    test('Ta的帖子 do=thread&uid → /my-threads?uid=', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/home.php?mod=space&uid=88062&do=thread',
+        ).appPath,
+        '/my-threads?uid=88062',
+      );
+    });
+
     test('定位回复 findpost(ptid+pid) → /thread/{tid}?pid=', () {
       expect(
         UrlRouter.parse(

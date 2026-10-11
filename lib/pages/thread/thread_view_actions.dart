@@ -241,6 +241,19 @@ extension on _ThreadViewPageState {
     );
   }
 
+  /// 点标题"回顶部"（宽/窄屏共用同一 `_scrollController`）。
+  ///
+  /// 必须判 `hasClients`：内容区可能尚未挂载（加载中 / 错误页 / 空态），
+  /// 此时 `animateTo` 会命中 `_positions.isNotEmpty` 断言（release 为静默无效）。
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   void _scrollToPid() {
     final pid = widget.pid;
     if (pid == null || pid.isEmpty) return;
@@ -395,7 +408,11 @@ extension on _ThreadViewPageState {
     _setState(() {});
     if (!result.success) {
       showToast(result.error ?? '页面数据加载失败');
+      return;
     }
+    // 同步图片列表与映射（供预览替换 [attachimg] 与工具栏角标）
+    _images.setFromPageImages(result.images);
+    _images.refresh();
   }
 
   /// 提交迷你编辑器内容（评论 / 回复某评论）
@@ -437,18 +454,14 @@ extension on _ThreadViewPageState {
     }
   }
 
-  /// 迷你编辑器图片：论坛图片上传（选图→上传→插入 `[attachimg]`）
-  Future<void> _showForumImageUpload() async {
+  /// 迷你编辑器图片：打开"图片管理"抽屉（与完整编辑器一致）
+  void _showForumImageUpload() {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       showToast('请先登录');
       return;
     }
-    await uploadForumImagesQuick(
-      contentCtl: _editorSession.contentCtl,
-      pageData: _editorSession.pageData,
-      uid: auth.uid,
-    );
+    showForumImageDrawer(context, controller: _images);
   }
 
   /// 迷你编辑器图片：插入 MT 图床外链（论坛附件上传走「完整版」）

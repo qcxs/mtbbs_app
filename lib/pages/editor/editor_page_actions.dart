@@ -71,7 +71,7 @@ extension on _EditorPageState {
     // 二、已上传但未插入正文的图片/附件会被追加到正文末尾：先告知用户，确认后才发布
     final pending = uninsertedMedia(
       content: content,
-      imageAids: _imageList.map((i) => i['aid']?.toString() ?? ''),
+      imageAids: _images.list.map((i) => i['aid']?.toString() ?? ''),
       attachmentAids: _attachmentList.map((i) => i['aid']?.toString() ?? ''),
     );
     final appendAids = {...pending.images, ...pending.attachments};
@@ -214,7 +214,7 @@ extension on _EditorPageState {
       final aid = img['aid'];
       final src = img['src'];
       if (aid != null && src != null && aid.isNotEmpty && src.isNotEmpty) {
-        _aidToSrc[aid] = src;
+        _images.addAidSrc(aid, src);
       }
     }
 

@@ -394,7 +394,8 @@ Map<String, String> defaultToolbarShortcuts() {
 /// 迷你编辑器工具栏的使用上下文
 enum MiniToolbarContext {
   thread('thread', '帖子页'),
-  pm('pm', '私信页');
+  pm('pm', '私信页'),
+  wall('wall', '留言板');
 
   const MiniToolbarContext(this.id, this.label);
 
@@ -412,6 +413,8 @@ enum MiniToolbarContext {
 const Map<MiniToolbarContext, Set<String>> kMiniToolbarUnsupported = {
   MiniToolbarContext.thread: {'attach'},
   MiniToolbarContext.pm: {'image', 'attach', 'quickReply'},
+  // 留言板无论坛图片/附件上传（图片走 MT 图床 mtImage），也无帖子常用语
+  MiniToolbarContext.wall: {'image', 'attach', 'quickReply'},
 };
 
 /// 某上下文是否支持该工具栏项

@@ -34,6 +34,7 @@ import 'package:mtbbs/widgets/thread/quoted_post_card.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/pages/editor/editor_precheck.dart';
 import 'package:mtbbs/pages/editor/editor_session.dart';
+import 'package:mtbbs/pages/editor/forum_image_controller.dart';
 import 'package:mtbbs/pages/editor/editor_dialogs.dart';
 import 'package:mtbbs/pages/editor/editor_draft_handoff.dart';
 import 'package:mtbbs/pages/editor/editor_interactions.dart';
@@ -82,13 +83,6 @@ class EditorPage extends StatefulWidget {
 
   @override
   State<EditorPage> createState() => _EditorPageState();
-}
-
-/// 图片管理面板的响应式数据
-class _ImageSheetData {
-  final List<Map<String, dynamic>> images;
-  final bool loading;
-  const _ImageSheetData(this.images, this.loading);
 }
 
 /// 附件管理面板的响应式数据
@@ -160,21 +154,12 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   bool _loadingQuoted = false;
   String? _quotedError;
 
-  /// AID → 图片URL 映射（用于预览时替换 [attachimg]）
-  Map<String, String> _aidToSrc = {};
-
   /// AID → 附件信息映射（用于预览时替换 [attach]）
   Map<String, Map<String, String>> _aidToAttachment = {};
 
-  /// 图片列表（编辑器生命周期内持久，供图片管理面板使用）
-  List<Map<String, dynamic>> _imageList = [];
-  final Set<String> _ignoredAids = <String>{};
-  bool _loadingImages = false;
-
-  /// 响应式数据（图片管理面板通过 ValueListenableBuilder 监听重建）
-  final ValueNotifier<_ImageSheetData> _imageSheetDataNotifier = ValueNotifier(
-    const _ImageSheetData([], false),
-  );
+  /// 图片管理（状态与动作的唯一实现，见 forum_image_controller.dart）。
+  /// 编辑器生命周期内持久：预览的 aidToSrc、工具栏角标、提交前预检、剪贴板上传都读它。
+  late final ForumImageController _images;
 
   /// 附件列表（编辑器生命周期内持久，供附件管理面板使用）
   List<Map<String, dynamic>> _attachmentList = [];
@@ -220,6 +205,16 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
       tid: widget.tid,
       pid: widget.pid,
     )..emojiMap = Map<String, String>.from(EmojiService().map);
+
+    // 图片管理（完整版持久持有；角标/预览/预检随其变更重建）
+    _images = ForumImageController(
+      contentCtl: _session.contentCtl,
+      pageData: () => _session.pageData,
+      uid: () => context.read<AuthProvider>().uid,
+      fallbackFid: widget.fid,
+      fallbackTid: widget.tid,
+      fallbackPid: widget.pid,
+    )..addListener(_onImagesChanged);
 
     // 迷你编辑器「展开为完整版」的内存草稿交接（调用方已先写快照保底）
     final draft = EditorDraftHandoff.take(
@@ -273,11 +268,16 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
     if (mounted) setState(fn);
   }
 
+  /// 图片管理数据变更 → 重建页面（角标/预览/信息面板随之刷新）
+  void _onImagesChanged() => _setState(() {});
+
   @override
   void dispose() {
     _session.titleCtl.removeListener(_onContentChanged);
     _session.contentCtl.removeListener(_onContentChanged);
     _session.contentCtl.removeListener(_onEditingChanged);
+    _images.removeListener(_onImagesChanged);
+    _images.dispose();
     _session.dispose();
     _contentFocusNode.dispose();
     _undoController.dispose();

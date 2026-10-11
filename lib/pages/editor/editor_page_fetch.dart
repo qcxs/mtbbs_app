@@ -52,31 +52,6 @@ extension on _EditorPageState {
       _session.pageData = result;
       _loadingPage = false;
       _pageError = null;
-      // 同步填充 AID→URL 映射和图片列表
-      if (preserveContent) {
-        // 保留模式：合并新数据，已有的快照数据不被覆盖
-        for (final img in result.images) {
-          final aid = img['aid'];
-          final src = img['src'];
-          if (aid != null && src != null && aid.isNotEmpty && src.isNotEmpty) {
-            _aidToSrc[aid] = src;
-          }
-        }
-      } else {
-        _aidToSrc = {
-          for (final img in result.images)
-            if (img['aid'] != null && img['src'] != null)
-              img['aid']!: img['src']!,
-        };
-      }
-      _imageList = result.images.map((img) {
-        return <String, dynamic>{
-          'aid': img['aid'] ?? '',
-          'src': img['src'] ?? '',
-          'title': img['title'] ?? '',
-          'type': 'existing',
-        };
-      }).toList();
       // 同步填充已绑定附件映射
       _aidToAttachment = {
         for (final att in result.boundAttachments)
@@ -88,13 +63,15 @@ extension on _EditorPageState {
       };
       if (_isEdit && !preserveContent) {
         if (result.title.isNotEmpty) _session.titleCtl.text = result.title;
-        if (result.content.isNotEmpty) _session.contentCtl.text = result.content;
+        if (result.content.isNotEmpty)
+          _session.contentCtl.text = result.content;
         if (result.title.isNotEmpty || result.content.isNotEmpty) {
           shouldSaveInitial = true;
         }
       }
     });
-    _syncImagesNotifier();
+    // 图片列表 + aid→src 映射（由 ForumImageController 通知页面重建）
+    _images.setFromPageImages(result.images, preserve: preserveContent);
 
     if (!preserveContent) {
       _initialTitle = _session.titleCtl.text;
@@ -112,7 +89,7 @@ extension on _EditorPageState {
     }
 
     // 异步加载已上传但未绑定的图片和附件
-    _refreshImageList();
+    _images.refresh();
     _refreshAttachmentList();
   }
 

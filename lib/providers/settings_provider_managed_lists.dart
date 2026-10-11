@@ -1,5 +1,59 @@
 part of 'settings_provider.dart';
 
+/// 把持久化的工具栏配置与当前内置默认值同步（供单测直接调用）。
+///
+/// 规则：
+/// - 内置项：`data` 以持久化为准，缺失字段用默认补齐（用户改过的模板/标签保留）；
+/// - **新引入的迷你上下文**（如新增的 `wall`）：老配置里"任何项都没出现过"的
+///   ctx 视为新增，补进对应内置项的 `mini`，否则老用户的该上下文工具栏会是空的；
+///   只补这类"从未出现过"的 ctx，不干扰用户已做的显隐选择；
+/// - 用户自定义模板项：原样保留；
+/// - 默认里有、持久化里没有的内置项：追加（新版本新增项自动补上）。
+List<ManagedItem> syncToolbarWithDefaults(
+  List<ManagedItem> loaded,
+  List<ManagedItem> canonical,
+) {
+  final canonicalIds = canonical.map((e) => e.id).toSet();
+  final loadedIds = loaded.map((e) => e.id).toSet();
+
+  final knownMiniCtx = <String>{
+    for (final e in loaded)
+      if (e.data?['mini'] is List)
+        ...(e.data!['mini'] as List).map((x) => x.toString()),
+  };
+
+  final synced = <ManagedItem>[];
+  for (final e in loaded) {
+    if (canonicalIds.contains(e.id)) {
+      final canonicalItem = canonical.firstWhere((c) => c.id == e.id);
+      final merged = <String, dynamic>{...?canonicalItem.data, ...?e.data};
+      final cMini = canonicalItem.data?['mini'];
+      if (cMini is List) {
+        final cur = merged['mini'] is List
+            ? (merged['mini'] as List).map((x) => x.toString()).toList()
+            : <String>[];
+        for (final ctx in cMini.map((x) => x.toString())) {
+          if (!knownMiniCtx.contains(ctx) && !cur.contains(ctx)) {
+            cur.add(ctx);
+          }
+        }
+        merged['mini'] = cur;
+      }
+      synced.add(e.copyWith(name: canonicalItem.name, data: merged));
+    } else if (isCustomToolbarItem(e)) {
+      // 用户自定义模板项：原样保留
+      synced.add(e);
+    }
+  }
+
+  for (final item in canonical) {
+    if (!loadedIds.contains(item.id)) {
+      synced.add(item);
+    }
+  }
+  return synced;
+}
+
 /// [SettingsProvider] 中可排序 / 可显隐配置项的写操作
 /// （编辑器工具栏、快捷链接、导读 Tab、首页区块）
 extension SettingsManagedLists on SettingsProvider {
@@ -7,35 +61,13 @@ extension SettingsManagedLists on SettingsProvider {
 
   Future<List<ManagedItem>> _loadSyncedToolbar() async {
     final canonical = defaultToolbarItems();
-    final canonicalIds = canonical.map((e) => e.id).toSet();
-
     final jsonStr = await _db.getToolbarItemsRaw();
     if (jsonStr == null || jsonStr.isEmpty) return canonical;
-
     try {
-      final loaded = ManagedItem.decodeList(jsonStr);
-      final loadedIds = loaded.map((e) => e.id).toSet();
-
-      final synced = <ManagedItem>[];
-      for (final e in loaded) {
-        if (canonicalIds.contains(e.id)) {
-          final canonicalItem = canonical.firstWhere((c) => c.id == e.id);
-          // 内置项：以 JSON 的模板/标签/分组为默认值（兼容旧版无 data 的持久化），
-          // 用持久化里的同名字段覆盖（用户改过的模板得以保留）
-          final merged = <String, dynamic>{...?canonicalItem.data, ...?e.data};
-          synced.add(e.copyWith(name: canonicalItem.name, data: merged));
-        } else if (isCustomToolbarItem(e)) {
-          // 用户自定义模板项：原样保留
-          synced.add(e);
-        }
-      }
-
-      for (final item in canonical) {
-        if (!loadedIds.contains(item.id)) {
-          synced.add(item);
-        }
-      }
-      return synced;
+      return syncToolbarWithDefaults(
+        ManagedItem.decodeList(jsonStr),
+        canonical,
+      );
     } catch (_) {
       return canonical;
     }

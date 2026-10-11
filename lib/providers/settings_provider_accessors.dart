@@ -72,6 +72,9 @@ extension SettingsAccessors on SettingsProvider {
   /// 是否处于"整体退化为内置浏览器"模式（逃生阀）
   bool get browserOnlyMode => _browserOnlyMode;
   int get staggerInterval => _staggerInterval;
+
+  /// 站点正文字数上限（编辑器 / 留言板共用），未配置时返回默认 65535
+  int get postMaxLength => _postMaxLength;
   int get avatarCacheDays => _avatarCacheDays;
   int get emojiCacheDays => _emojiCacheDays;
   int get imageCacheDays => _imageCacheDays;

@@ -18,6 +18,7 @@ import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
 import 'package:mtbbs/api/home/mythread/export.dart' as mythread_api;
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/api/home/wall/export.dart' as wall_api;
 import 'package:mtbbs/api/home/notice/export.dart' as notice_api;
 import 'package:mtbbs/api/home/notice_unread/export.dart' as unread_api;
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
@@ -179,6 +180,15 @@ final Map<String, ApiScenario> readScenarios = {
       ApiService().dio,
       uid: a['uid'] ?? '',
       username: a['username'] ?? '',
+    ),
+  ),
+  'wall.list': ApiScenario(
+    desc: '用户留言板（uid 空=自己；仅 PC 模板，含 formhash/canPost）',
+    params: {'uid': '用户 ID（可空=自己）', 'page': '页码（默认 1）'},
+    run: (a) => wall_api.getWall(
+      ApiService().dio,
+      uid: a['uid'] ?? '',
+      page: intArg(a, 'page', 1),
     ),
   ),
   'friend.list': ApiScenario(

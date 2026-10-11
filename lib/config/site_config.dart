@@ -1,5 +1,9 @@
 import 'package:mtbbs/core/app/default_config.dart';
 
+/// 站点正文字数上限的默认值（Discuz 默认 65535）。编辑器 / 留言板共用；
+/// 用户未在设置中配置时一律按此值计。
+const int kDefaultPostMaxLength = 65535;
+
 /// 站点配置 — 数据模型 + 默认值委托
 class SiteConfig {
   SiteConfig._();

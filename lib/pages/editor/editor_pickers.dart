@@ -79,7 +79,7 @@ extension on _EditorPageState {
     _focusContent();
   }
 
-  /// 图片管理底部面板
+  /// 图片管理底部面板（状态与动作见 [ForumImageController]；面板本身是纯 UI）
   void _showImagePickerSheet() {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
@@ -90,27 +90,31 @@ extension on _EditorPageState {
       showToast('页面数据未加载，无法上传');
       return;
     }
-    // 同步活跃 AID
-    _syncPendingAids();
+    // 同步活跃 AID（上传但未插入正文的图片，提交时经 attachnew 绑定）
+    _images.syncPendingAids();
 
     showModalBottomSheet(
       context: context,
       constraints: const BoxConstraints(maxWidth: 500, maxHeight: 450),
-      builder: (_) => ValueListenableBuilder<_ImageSheetData>(
-        valueListenable: _imageSheetDataNotifier,
-        builder: (_, data, __) => ImagePickerSheet(
-          images: data.images,
-          loading: data.loading,
-          ignoredAids: _ignoredAids,
+      builder: (_) => ListenableBuilder(
+        listenable: _images,
+        builder: (_, __) => ImagePickerSheet(
+          images: _images.list,
+          loading: _images.loading,
+          ignoredAids: _images.ignoredAids,
           contentText: _session.contentCtl.text,
           controller: _session.contentCtl,
-          onUpload: _handleImageUpload,
-          onDelete: _handleImageDelete,
-          onIgnore: _handleImageIgnore,
-          onRefresh: _refreshImageList,
+          onUpload: _images.upload,
+          onDelete: _images.delete,
+          onIgnore: _images.ignore,
+          onRefresh: _images.refresh,
           onInsert: (aid) {
-            _session.contentCtl.wrapInline('', '', '[attachimg]$aid[/attachimg]');
-            _syncPendingAids();
+            _session.contentCtl.wrapInline(
+              '',
+              '',
+              '[attachimg]$aid[/attachimg]',
+            );
+            _images.syncPendingAids();
           },
           allowedExtensions: _session.pageData.imageExtensions.isNotEmpty
               ? _session.pageData.imageExtensions

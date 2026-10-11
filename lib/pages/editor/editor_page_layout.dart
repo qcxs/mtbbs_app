@@ -5,7 +5,7 @@ extension on _EditorPageState {
   /// 「图片」「附件」角标＝当前已上传的数量；有角标时该项强制显示
   /// （即使被用户在工具栏设置里隐藏）。工具栏渲染与快捷键注册共用同一判定。
   Map<String, int> get _editorBadges => {
-    if (_imageList.isNotEmpty) 'image': _imageList.length,
+    if (_images.list.isNotEmpty) 'image': _images.list.length,
     if (_attachmentList.isNotEmpty) 'attach': _attachmentList.length,
   };
 
@@ -111,9 +111,12 @@ extension on _EditorPageState {
                           'URL': _session.pageData.fetchedUrl,
                           'formhash': _session.pageData.formhash,
                           'posttime': _session.pageData.posttime,
-                          if (_session.pageData.fid.isNotEmpty) 'fid': _session.pageData.fid,
-                          if (_session.pageData.tid.isNotEmpty) 'tid': _session.pageData.tid,
-                          if (_session.pageData.pid.isNotEmpty) 'pid': _session.pageData.pid,
+                          if (_session.pageData.fid.isNotEmpty)
+                            'fid': _session.pageData.fid,
+                          if (_session.pageData.tid.isNotEmpty)
+                            'tid': _session.pageData.tid,
+                          if (_session.pageData.pid.isNotEmpty)
+                            'pid': _session.pageData.pid,
                           if (curTitle.isNotEmpty)
                             '标题': curTitle.length > 50
                                 ? '${curTitle.substring(0, 50)}...'
@@ -124,8 +127,8 @@ extension on _EditorPageState {
                                 : curContent,
                           if (_session.pageData.uploadHash.isNotEmpty)
                             'uploadHash': _session.pageData.uploadHash,
-                          if (_imageList.isNotEmpty)
-                            '图片': '${_imageList.length} 张',
+                          if (_images.list.isNotEmpty)
+                            '图片': '${_images.list.length} 张',
                           if (_attachmentList.isNotEmpty)
                             '附件': '${_attachmentList.length} 个',
                         };
@@ -329,6 +332,17 @@ extension on _EditorPageState {
                         controller: _session.contentCtl,
                         focusNode: _contentFocusNode,
                         undoController: _undoController,
+                        maxLength: context
+                            .read<SettingsProvider>()
+                            .postMaxLength,
+                        // 隐藏 "0/65535" 计数器：上限仅作约束，不做展示
+                        buildCounter:
+                            (
+                              _, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
                         decoration: InputDecoration(
                           hintText: _isPost
                               ? '想和大家分享点什么...'

@@ -161,12 +161,23 @@ extension on _UserProfilePageState {
   ///
   /// 人气为移动独有（已并入瓦片）；私信仅他人视角（自己主页入口在「我的」页）。
   List<Widget> _headerActions() {
-    if (_uidNum == null) return const [];
+    if (widget.uid.isEmpty) return const [];
     final isSelf =
         context.select<AuthProvider, String>((a) => a.uid) == widget.uid;
 
     return [
-      if (!isSelf)
+      _actionItem(
+        icon: Icons.forum_outlined,
+        label: '留言板',
+        onTap: () {
+          final nickname = _profile!['nickname'] as String? ?? '';
+          context.push(
+            '/user/${widget.uid}/wall'
+            '${nickname.isEmpty ? '' : '?nickname=${Uri.encodeComponent(nickname)}'}',
+          );
+        },
+      ),
+      if (!isSelf && _uidNum != null)
         _actionItem(
           icon: Icons.mail_outline,
           label: '私信',

@@ -8,6 +8,7 @@ import 'package:mtbbs/api/forum/post/http.dart' as post_http;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as rate_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
+import 'package:mtbbs/api/home/wall/export.dart' as wall_api;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'scenario_types.dart';
@@ -341,6 +342,96 @@ final Map<String, ApiScenario> writeScenarios = {
         ApiService().dio,
         touid: touid,
         message: message,
+      );
+      return {'success': r.success, 'message': r.message};
+    },
+  ),
+  'wall.post': ApiScenario(
+    desc: '发布/回复留言板（写操作！需登录；uid=留言板主人；cid 空=发布，非空=回复该条）',
+    params: {
+      'uid': '*留言板主人 uid',
+      'message': '*内容',
+      'cid': '回复的留言 ID（可空=发布新留言）',
+    },
+    needsLogin: true,
+    run: (a) async {
+      final dio = ApiService().dio;
+      final uid = a['uid'] ?? '';
+      final message = a['message'] ?? '';
+      final cid = a['cid'] ?? '';
+      if (uid.isEmpty) throw Exception('缺少必填参数 uid');
+      if (message.isEmpty) throw Exception('缺少必填参数 message');
+
+      final page = await wall_api.getWall(dio, uid: uid);
+      final formhash = (page['formhash'] ?? '') as String;
+      if (formhash.isEmpty) {
+        return {'success': false, 'message': '留言板页未提取到 formhash（可能未登录）'};
+      }
+      final r = cid.isEmpty
+          ? await wall_api.postWallComment(
+              dio,
+              uid: uid,
+              formhash: formhash,
+              message: message,
+            )
+          : await wall_api.replyWallComment(
+              dio,
+              uid: uid,
+              cid: cid,
+              formhash: formhash,
+              message: message,
+            );
+      return {'success': r.success, 'message': r.message};
+    },
+  ),
+  'wall.edit': ApiScenario(
+    desc: '编辑自己的留言（写操作！需登录；自动拉取留言板页取 formhash 后提交）',
+    params: {'uid': '*留言板主人 uid', 'cid': '*留言 ID', 'message': '*新内容'},
+    needsLogin: true,
+    run: (a) async {
+      final dio = ApiService().dio;
+      final uid = a['uid'] ?? '';
+      final cid = a['cid'] ?? '';
+      final message = a['message'] ?? '';
+      if (uid.isEmpty) throw Exception('缺少必填参数 uid');
+      if (cid.isEmpty) throw Exception('缺少必填参数 cid');
+      if (message.isEmpty) throw Exception('缺少必填参数 message');
+
+      final page = await wall_api.getWall(dio, uid: uid);
+      final formhash = (page['formhash'] ?? '') as String;
+      if (formhash.isEmpty) {
+        return {'success': false, 'message': '留言板页未提取到 formhash（可能未登录）'};
+      }
+      final r = await wall_api.editWallComment(
+        dio,
+        uid: uid,
+        cid: cid,
+        formhash: formhash,
+        message: message,
+      );
+      return {'success': r.success, 'message': r.message};
+    },
+  ),
+  'wall.delete': ApiScenario(
+    desc: '删除留言（写操作！破坏性；需登录；uid=留言板主人，仅自己的留言或墙主可删）',
+    params: {'uid': '*留言板主人 uid', 'cid': '*留言 ID'},
+    needsLogin: true,
+    run: (a) async {
+      final dio = ApiService().dio;
+      final uid = a['uid'] ?? '';
+      final cid = a['cid'] ?? '';
+      if (uid.isEmpty) throw Exception('缺少必填参数 uid');
+      if (cid.isEmpty) throw Exception('缺少必填参数 cid');
+
+      final page = await wall_api.getWall(dio, uid: uid);
+      final formhash = (page['formhash'] ?? '') as String;
+      if (formhash.isEmpty) {
+        return {'success': false, 'message': '留言板页未提取到 formhash（可能未登录）'};
+      }
+      final r = await wall_api.deleteWallComment(
+        dio,
+        cid: cid,
+        formhash: formhash,
       );
       return {'success': r.success, 'message': r.message};
     },
