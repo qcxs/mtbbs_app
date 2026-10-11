@@ -7,6 +7,7 @@ import 'package:charset/charset.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/acw_solver.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
@@ -195,6 +196,21 @@ class ApiService {
             AppLogger.e('DIO', '$path 网络错误: ${error.message}');
           }
           handler.next(error);
+        },
+      ),
+    );
+
+    // 请求级「浏览模式」覆盖：仅在处于覆盖态（探针一次运行 / MCP 单次调用）时，
+    // 把**每个请求**的 UA 改写为覆盖值 —— 这样"不显式设站点 UA 的接口"
+    // （帖子详情/排行/在线/圈子/留言板…）也会一起换成指定模板，
+    // 从而让"换 UA 复测所有 API"成立。无覆盖时完全不干预（默认 PC UA 保持）。
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (browseModeOverrideActive()) {
+            options.headers['User-Agent'] = resolveRequestUserAgent();
+          }
+          handler.next(options);
         },
       ),
     );

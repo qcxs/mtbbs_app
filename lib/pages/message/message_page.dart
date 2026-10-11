@@ -28,7 +28,10 @@ class MessagePage extends StatefulWidget {
 }
 
 class _MessagePageState extends State<MessagePage>
-    with SingleTickerProviderStateMixin {
+    // 消息页会随"站点实际视图"增删**重建 TabController**（见 [_syncTabController]），
+    // 需要支持多个 ticker —— SingleTickerProviderStateMixin 只允许一个，
+    // 第二次创建会直接抛 "multiple tickers were created"。
+    with TickerProviderStateMixin {
   late TabController _tabCtl;
   final _nav = NoticeNavStore.instance;
 
@@ -150,27 +153,35 @@ class _MessagePageState extends State<MessagePage>
     unawaited(NoticeBadgeController.instance.check(force: true));
   }
 
-  /// 站点导航变化：
-  /// - 视图增删 → 重建 TabController（长度必须与 Tab 数一致）
-  /// - 子类型数据被判过期丢弃（探测发现新消息）→ 换 key **直接重构当前分组页**
+  /// 站点导航变化：视图增删 / 子类型计数变化都可能发生 → 触发一次重建。
+  ///
+  /// **不在通知回调里创建 TabController**：各分组页会把各自的页面导航同步进
+  /// [NoticeNavStore]，集合可能在不同页之间 5/6 交替；若在这里按"当前长度"
+  /// 建控制器，会与随后 build 实际用的 Tab 列表脱节。长度对齐统一交给
+  /// [build] 里的 [_syncTabController]。
   void _onNavChanged() {
     if (!mounted) return;
     if (_nav.dropRevision != _lastDropRev) {
       _lastDropRev = _nav.dropRevision;
       _reloadTick++;
     }
-    final len = _tabs.length;
-    if (len != _tabCtl.length) {
-      final old = _tabCtl;
-      final idx = old.index.clamp(0, len - 1);
-      setState(() {
-        _tabCtl = TabController(length: len, vsync: this, initialIndex: idx);
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
-      return;
-    }
-    // 视图数不变、但重建计数/子类型计数变了 → 让 Tab 徽标与页面跟着更新
     setState(() {});
+  }
+
+  /// 保证 TabController 的长度 == 当前 Tab 列表长度（在 [build] 里调用）。
+  ///
+  /// 视图增删（不同分组页同步来的导航集合可能 5/6 交替）时若不对齐长度，
+  /// TabBar / TabBarView 会直接抛 "Controller's length property (N) does not
+  /// match the number of tabs (M)"。旧控制器延迟到帧末再 dispose，避免仍被本帧使用。
+  TabController _syncTabController(int length) {
+    if (_tabCtl.length == length) return _tabCtl;
+    final old = _tabCtl;
+    final idx = old.index.clamp(0, length - 1);
+    old.removeListener(_onTabChanged);
+    _tabCtl = TabController(length: length, vsync: this, initialIndex: idx);
+    _tabCtl.addListener(_onTabChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+    return _tabCtl;
   }
 
   /// 视图 → 页面。我的帖子有「预览 / 回复」等额外能力，单独实现；
@@ -204,6 +215,8 @@ class _MessagePageState extends State<MessagePage>
     context.watch<NoticeNavStore>();
     final enabled = context.watch<SettingsProvider>().noticeCheckEnabled;
     final tabs = _tabs;
+    // 长度可能与上一帧不同（站点视图增删）→ 先对齐控制器再交给 TabBar/TabBarView
+    final tabCtl = _syncTabController(tabs.length);
     return Column(
       children: [
         Container(
@@ -212,7 +225,7 @@ class _MessagePageState extends State<MessagePage>
             children: [
               Expanded(
                 child: TabBar(
-                  controller: _tabCtl,
+                  controller: tabCtl,
                   // 顶栏有 5 个分组，窄屏放不下 → 横向可滚动
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
@@ -267,7 +280,10 @@ class _MessagePageState extends State<MessagePage>
         ),
         Expanded(
           child: TabBarView(
-            controller: _tabCtl,
+            controller: tabCtl,
+            // 一级 Tab（我的消息 / 我的帖子…）**只点击切换**，不响应左右滑动；
+            // 滑动留给分组内的二级子类型（帖子 / 评分 / 点评…，见 message_mypost_tab）。
+            physics: const NeverScrollableScrollPhysics(),
             children: [for (final t in tabs) _tabPage(t)],
           ),
         ),

@@ -2,11 +2,16 @@ package com.github.qcxs.discuz
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
 import android.content.res.Configuration
 import android.graphics.Point
 import android.graphics.Rect
+import android.graphics.drawable.Icon
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -29,6 +34,9 @@ class MainActivity : FlutterActivity() {
 
     /// MCP 状态通道（供原生在"用户点了常驻通知"时回调 Dart）
     private var mcpChannel: MethodChannel? = null
+
+    /// 桌面快捷方式注册通道（供 Dart 在启动时注册「缓存管理」等长按快捷方式）
+    private var shortcutsChannel: MethodChannel? = null
 
     /// Flutter 尚未就绪时暂存的"通知被点开"标记（冷启动场景）
     private var pendingMcpTap = false
@@ -132,6 +140,61 @@ class MainActivity : FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+
+        // 桌面长按快捷方式（动态注册，见 AppShortcuts.kt 注释）
+        shortcutsChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "mtbbs/shortcuts",
+        )
+        shortcutsChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "install" -> {
+                    val id = call.argument<String>("id")
+                    val shortLabel = call.argument<String>("shortLabel")
+                    val longLabel = call.argument<String>("longLabel")
+                    val uri = call.argument<String>("uri")
+                    if (id.isNullOrEmpty() || shortLabel.isNullOrEmpty() || uri.isNullOrEmpty()) {
+                        result.error("bad_args", "id/shortLabel/uri 不能为空", null)
+                    } else {
+                        result.success(installShortcut(id, shortLabel, longLabel, uri))
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    /// 注册（幂等）桌面长按快捷方式；点击后 Intent.data 走既有的 `mtbbs/intent` 通道。
+    ///
+    /// 用**动态**而非静态 `res/xml/shortcuts.xml`：静态 `<intent>` 必须写死
+    /// `targetPackage`，而本 App 有 `.debug` / `.beta` 等 applicationId 变体；
+    /// 这里用 `MainActivity::class.java` 构造组件，天然跟随当前变体的包名。
+    /// 仅 Android 7.1（API 25）及以上支持，更早或失败都返回 false（不抛给 Dart）。
+    private fun installShortcut(
+        id: String,
+        shortLabel: String,
+        longLabel: String?,
+        uri: String,
+    ): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return false
+        return try {
+            val manager = getSystemService(ShortcutManager::class.java) ?: return false
+            val intent = Intent(this, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse(uri)
+            }
+            val builder = ShortcutInfo.Builder(this, id)
+                .setShortLabel(shortLabel)
+                .setIcon(Icon.createWithResource(this, R.drawable.ic_shortcut_cache))
+                .setIntent(intent)
+            if (!longLabel.isNullOrEmpty()) builder.setLongLabel(longLabel)
+            // 只维护我们自己这一条：重复调用即覆盖同 id 项
+            manager.setDynamicShortcuts(listOf(builder.build()))
+            true
+        } catch (e: Exception) {
+            Log.w("MTBBS", "注册桌面快捷方式失败: $e")
+            false
         }
     }
 

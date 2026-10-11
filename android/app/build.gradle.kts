@@ -103,6 +103,8 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            // debug 版应用名带后缀，避免与正式版在桌面/最近任务里认不出
+            manifestPlaceholders.put("appName", "MT论坛 debug")
         }
         release {
             if (isBeta) {

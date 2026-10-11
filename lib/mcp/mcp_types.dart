@@ -13,7 +13,7 @@ enum McpToolGroup {
   publicData(
     id: 'public_data',
     label: '论坛公开数据',
-    description: '版块、帖子、用户公开资料、排行榜、在线会员、RSS',
+    description: '版块、帖子、用户公开资料、排行榜、在线会员、RSS、圈子、留言板',
     defaultEnabled: true,
   ),
   editorRead(
@@ -25,7 +25,7 @@ enum McpToolGroup {
   accountData(
     id: 'account_data',
     label: '账号相关数据',
-    description: '我的收藏（需登录；收藏不公开，仅自己可见）',
+    description: '我的收藏 / 积分记录 / 提醒（需登录；仅自己可见）',
     defaultEnabled: false,
   ),
   localData(

@@ -51,6 +51,9 @@ class UrlRouteResult {
 /// - 外部查询参数 `?page=N` 优先级高于路径中的 page
 /// - page > 1 时 appPath 包含 `?page=N`
 class UrlRouter {
+  /// App 自有深链 scheme（桌面长按快捷方式等），与论坛 http(s) 链接相区分
+  static const String appScheme = 'mtbbs';
+
   /// 解析 Discuz URL，返回 App 路由结果
   ///
   /// [url] 可以是完整 URL 或部分路径。
@@ -99,6 +102,26 @@ class UrlRouter {
 
     if (path.endsWith('/forum.php') || path.endsWith('forum.php')) {
       final mod = query['mod'];
+
+      // 在线用户（PC 专属页）：forum.php?showoldetails=yes
+      if (query['showoldetails'] != null) {
+        return UrlRouteResult(
+          label: '在线用户',
+          appPath: '/online',
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
+
+      // 小黑屋（PC 专属页）：forum.php?mod=misc&action=showdarkroom
+      if (mod == 'misc' && query['action'] == 'showdarkroom') {
+        return UrlRouteResult(
+          label: '小黑屋',
+          appPath: '/darkroom',
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
 
       // 导读：forum.php?mod=guide&view={newthread|hot|new|digest|sofa|my}[&index=N]
       // App 内对应「导读」页；具体 view 由页内 Tab 承载，路由层不带参数，
@@ -519,6 +542,13 @@ class UrlRouter {
   static String? resolveTarget(String url) {
     final text = url.trim();
     if (text.isEmpty) return null;
+    // App 自定义 scheme（桌面长按快捷方式等自有深链）：
+    // `mtbbs://settings/cache` → `/settings/cache`
+    if (text.startsWith('$appScheme://')) {
+      final uri = Uri.tryParse(text);
+      final rest = '${uri?.host ?? ''}${uri?.path ?? ''}';
+      return rest.isEmpty ? null : '/$rest';
+    }
     if (!text.startsWith('http://') && !text.startsWith('https://')) {
       // 已经是 App 内路径
       return text;

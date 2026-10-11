@@ -40,34 +40,35 @@ class FormulaDialog {
             constraints: const BoxConstraints(maxWidth: 400),
             content: SizedBox(
               width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '当前公式：',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(8),
+              // 积分公式来自服务端、长度不定且可换行：必须可滚动，避免长公式溢出
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '当前公式：',
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    child: Text(
-                      settings.creditFormula,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: cs.onSurfaceVariant,
-                        height: 1.5,
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        settings.creditFormula,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
+                          height: 1.5,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  const SizedBox.shrink(),
-                ],
+                  ],
+                ),
               ),
             ),
             actions: [

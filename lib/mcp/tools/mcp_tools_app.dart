@@ -98,6 +98,15 @@ Map<String, dynamic> _help() => {
           '翻页务必回传 search_id 以避免新建搜索；无结果返回 noMatch=true，'
           '需登录返回 loginRequired=true。',
     },
+    {
+      'task': '浏览圈子与留言板',
+      'steps': [
+        'list_groups 取推荐圈子、圈子分类与积分排行',
+        'list_group_forums(gid) 看某分类下的圈子列表',
+        'list_forum_threads(fid=gid) 读某个圈子的帖子（圈子讨论区就是 fid=gid 的版块）',
+        'list_wall_messages(uid) 看某用户留言板（省略 uid = 当前账号）',
+      ],
+    },
   ],
   'conventions': [
     'uid 省略 = 当前登录账号；显式传入 = 指定该用户。',

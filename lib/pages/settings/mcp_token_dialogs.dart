@@ -154,7 +154,8 @@ class _TokenDetailSheet extends StatelessWidget {
         final cs = Theme.of(context).colorScheme;
 
         return SafeArea(
-          child: Padding(
+          // 备注可能偏长、令牌串较长，叠加 4 个操作项：整体可滚动，避免面板溢出
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,

@@ -145,7 +145,10 @@ class _KickDialogContentState extends State<_KickDialogContent> {
     }
 
     if (_error != null) {
-      return Text('加载失败: $_error', style: TextStyle(color: cs.error));
+      // 异常串可能多行：可滚动，避免撑破弹窗
+      return SingleChildScrollView(
+        child: Text('加载失败: $_error', style: TextStyle(color: cs.error)),
+      );
     }
 
     if (_formData == null) {

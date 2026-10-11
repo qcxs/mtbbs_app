@@ -136,7 +136,14 @@ class _McpHelpSheet extends StatelessWidget {
                 const SizedBox(height: 8),
                 _section(cs, '重要说明'),
                 _bullet(cs, '只读服务：只能读取论坛内容与 App 信息，不能发帖、回复、点赞、收藏。'),
-                _bullet(cs, '仅本机：服务只监听 127.0.0.1，不暴露到局域网，AI 客户端需运行在同一台设备上。'),
+                _bullet(
+                  cs,
+                  controller.allowRemote
+                      ? '已开启局域网访问：服务监听所有网卡，同网段设备可用上面的 URL 连接'
+                            '（务必保留访问令牌；公共网络下请关闭此开关）。'
+                      : '仅本机：服务只监听 127.0.0.1，AI 客户端需运行在同一台设备上；'
+                            '如需同网段其它设备连接，在上一页开启「允许非本机连接」。',
+                ),
                 _bullet(cs, '能力开关：账号数据、本地记录默认关闭，需要时在上一页「能力开关」中开启。'),
 
                 const SizedBox(height: 8),

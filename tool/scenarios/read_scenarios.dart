@@ -3,9 +3,13 @@ library;
 
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:mtbbs/api/forum/darkroom/export.dart' as darkroom_api;
 import 'package:mtbbs/api/forum/forumdisplay/export.dart' as forum_api;
 import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
+import 'package:mtbbs/api/forum/misc/export.dart' as forum_nav_api;
+import 'package:mtbbs/api/forum/online/export.dart' as online_api;
 import 'package:mtbbs/api/forum/ranklist/export.dart' as ranklist_api;
+import 'package:mtbbs/api/forum/rss/export.dart' as rss_api;
 import 'package:mtbbs/api/forum/search/export.dart' as search_api;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as thread_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
@@ -64,6 +68,7 @@ final Map<String, ApiScenario> readScenarios = {
       'view': 'newthread/newreply/digest（默认 newthread）',
       'page': '页码（默认 1）',
     },
+    mobileSupported: true, // 导读：移动卡片 / PC 表格
     run: (a) => guide_api.getThreadList(
       ApiService().dio,
       view: a['view'] ?? 'newthread',
@@ -78,6 +83,7 @@ final Map<String, ApiScenario> readScenarios = {
       'filter': 'digest/recommend/...（默认空）',
       'page': '页码（默认 1）',
     },
+    mobileSupported: true, // 版块列表：移动克米 / PC 表格，解析器工厂两套通吃
     run: (a) => forum_api.getForumThreads(
       ApiService().dio,
       fid: a['fid'] ?? '',
@@ -117,6 +123,26 @@ final Map<String, ApiScenario> readScenarios = {
       view: a['view'] ?? 'threads',
     ),
   ),
+  'online.list': ApiScenario(
+    desc: '在线会员列表与统计（PC 专属页，移动模板通常无实现）',
+    params: {},
+    run: (a) => online_api.fetchOnlineUsers(ApiService().dio),
+  ),
+  'rss.list': ApiScenario(
+    desc: '站点 RSS 最新条目（标题 / 链接 / 发布时间）',
+    params: {},
+    run: (a) => rss_api.getRssFeed(ApiService().dio),
+  ),
+  'darkroom.list': ApiScenario(
+    desc: '小黑屋（违规用户与处理记录；PC 专属页），cid=分类（可空）',
+    params: {'cid': '分类 ID（可空）'},
+    run: (a) => darkroom_api.getList(ApiService().dio, cid: a['cid'] ?? ''),
+  ),
+  'forum.nav': ApiScenario(
+    desc: '论坛导航（版块/子版块列表；App 与 MCP list_forums 的站点缓存即来自它）',
+    params: {},
+    run: (a) => forum_nav_api.fetchForumNav(ApiService().dio),
+  ),
   'group.index': ApiScenario(
     desc: '圈子首页（推荐圈子 + 圈子分类 gid + 积分排行；桌面 UA，游客可访问）',
     params: {},
@@ -138,6 +164,7 @@ final Map<String, ApiScenario> readScenarios = {
       'page': '页码（默认 1）',
       'searchid': '搜索结果会话 id（翻页用；空=发起新搜索）',
     },
+    mobileSupported: true, // 搜索：移动克米 / 桌面 Discuz，两套解析器
     run: (a) => search_api.searchThreads(
       ApiService().dio,
       keyword: a['kw'] ?? '',
@@ -176,6 +203,7 @@ final Map<String, ApiScenario> readScenarios = {
   'user.info': ApiScenario(
     desc: '用户空间信息（uid/用户名 二选一，空则查自己）',
     params: {'uid': '用户 ID（可空）', 'username': '用户名（可空）'},
+    mobileSupported: true, // 用户空间：克米移动 ↔ 标准 PC，parse 按 DOM 分流
     run: (a) => space_api.getUserProfile(
       ApiService().dio,
       uid: a['uid'] ?? '',
@@ -320,6 +348,7 @@ final Map<String, ApiScenario> readScenarios = {
       'page': '页码（默认 1）',
     },
     needsLogin: true,
+    mobileSupported: true, // 我的主题/回复：移动 UA 走 SpaceThreadParser
     run: (a) => mythread_api.getMyThreads(
       ApiService().dio,
       page: intArg(a, 'page', 1),

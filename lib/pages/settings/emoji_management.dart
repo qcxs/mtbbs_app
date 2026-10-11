@@ -322,19 +322,22 @@ class _EmojiManagementSheetState extends State<_EmojiManagementSheet> {
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: StaggeredEmojiImage(imageUrl: imageUrl, size: 64),
-            ),
-            const SizedBox(height: 16),
-            _infoRow('insertText', insertText),
-            _infoRow('smilieId', smilieId),
-            _infoRow('分组', groupName),
-            _infoRow('图片 URL', imageUrl),
-          ],
+        // 图片 URL 可能很长并换行：content 必须可滚动，避免溢出
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: StaggeredEmojiImage(imageUrl: imageUrl, size: 64),
+              ),
+              const SizedBox(height: 16),
+              _infoRow('insertText', insertText),
+              _infoRow('smilieId', smilieId),
+              _infoRow('分组', groupName),
+              _infoRow('图片 URL', imageUrl),
+            ],
+          ),
         ),
         actions: [
           TextButton(

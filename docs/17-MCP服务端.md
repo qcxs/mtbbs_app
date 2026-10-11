@@ -10,9 +10,9 @@ App 内置一个**只读** MCP 服务端（本机 Streamable HTTP），让 Trae 
 
 | 方案 | 结论 |
 |------|------|
-| **Streamable HTTP（绑 127.0.0.1）** | ✅ 选定。Windows / Android 一致，AI 客户端直连本机 |
+| **Streamable HTTP（默认绑 127.0.0.1）** | ✅ 选定。Windows / Android 一致，AI 客户端直连本机 |
 | stdio 子进程 | ❌ 客户端在 PC、App 在手机，进程模型根本连不上 |
-| 绑 `0.0.0.0` 走局域网 | ❌ 令牌会暴露到局域网，等于把论坛账号开放给同网段 |
+| 绑 `0.0.0.0` 走局域网 | ⚠️ 默认**不**开；作为**可选**设置「允许非本机连接」（默认关、需二次确认）。开启后仍强制 Bearer 令牌 + Host 白名单，用于"App 与 AI 客户端不在同一台设备"的场景 |
 
 Discuz 没有官方 API，但项目已有 `lib/api/**`（HTML→JSON）与本地库，MCP 只是**换一个出口**把已有数据暴露给 AI，不新增解析逻辑。
 
@@ -47,7 +47,7 @@ lib/mcp/
 
 ## 安全模型（四层，缺一层都不够）
 
-1. **传输层** —— 只绑 `127.0.0.1`；开启 SDK 的 DNS rebinding 防护（`Host`/`Origin` 白名单）；`authenticator` 里再查一次**回环地址** + **Bearer 令牌**，令牌用常量时间比较；非回环来源、无令牌、错令牌一律 403。令牌可建多个（像 API Key），列表为空时**全部拒绝**（不存在"没令牌就放行"）。
+1. **传输层** —— 默认只绑 `127.0.0.1`，`authenticator` 只接受**回环**来源；设置「允许非本机连接」开启后才监听 `0.0.0.0`，并把 DNS-rebinding 的 `Host` 白名单扩为**本机各 IPv4 + 主机名**、`authenticator` 改收非回环来源（见 `McpServerController.allowRemote` / `McpAuthenticator.acceptsRemote`）。无论哪种模式都叠加 SDK 的 DNS rebinding 防护（`Host`/`Origin`）与 **Bearer 令牌**（常量时间比较）；无令牌、错令牌一律 403。令牌可建多个（像 API Key），列表为空时**全部拒绝**（不存在"没令牌就放行"）。开启局域网访问时设置页会二次确认、且无令牌时给出告警。
 2. **身份层** —— 工具复用 `ApiService().dio`，即**使用当前登录态**，所以需要登录的内容（我的收藏等）能读；但**不提供任何写操作**——没有发帖/回复/点赞/收藏工具。
 3. **数据层** —— `McpPayloads` 用**字段白名单**组装响应（不是把 parse 结果整体透传），`McpSanitizer` 再兜底剥离 `cookie`/`formhash`/`registerIp`/`qq`/`realName`/写操作 URL，并擦除文本里残留的 `formhash=` 参数。
 4. **审计层** —— 每次调用记一条（工具名 / 成败 / 耗时），设置页可看、可清空。
@@ -57,14 +57,18 @@ lib/mcp/
 | 分组 | 默认 | 工具 |
 |------|------|------|
 | App 信息 | 开 | `help`、`get_app_info`、`list_sites` |
-| 论坛公开数据 | 开 | `list_forums`、`list_forum_threads`、`list_guide_threads`、`search_forum_threads`、`get_thread_detail`、`get_user_profile`、`list_user_threads`、`list_user_friends`、`list_user_follows`、`get_ranklist`、`get_online_users`、`get_rss_feed` |
+| 论坛公开数据 | 开 | `list_forums`、`list_forum_threads`、`list_guide_threads`、`search_forum_threads`、`get_thread_detail`、`get_user_profile`、`list_user_threads`、`list_user_friends`、`list_user_follows`、`list_wall_messages`、`list_groups`、`list_group_forums`、`get_ranklist`、`get_online_users`、`get_rss_feed` |
 | 只读编辑器草稿 | 开 | `list_editor_sessions`、`get_editor_draft` |
-| 账号相关数据 | **关** | `list_my_favorites` |
+| 账号相关数据 | **关** | `list_my_favorites`、`list_credit_log`、`list_notifications` |
 | 本地浏览记录 | **关** | `get_browse_history` |
 
-> `help` 是所有工具里唯一"教 AI 怎么用"的入口：返回能力清单、四类典型任务（总结最近帖子 / 总结某个账号 / 读编辑器草稿）的工具组合、参数约定与注意事项。同时 `McpServerOptions.instructions` 在连接时就会提醒"第一次先调 help"。
+> `help` 是所有工具里唯一"教 AI 怎么用"的入口：返回能力清单、五类典型任务（总结最近帖子 / 总结某个账号 / 读编辑器草稿 / 搜索论坛内容 / 浏览圈子与留言板）的工具组合、参数约定与注意事项。同时 `McpServerOptions.instructions` 在连接时就会提醒"第一次先调 help"。
 >
 > 面向用户侧的完整工具清单就在「能力开关」里：点按任一分组行可展开，看到该组的每个工具名与描述——用于回答"这个开关到底管什么"以及"为什么我的调用被拒绝了"。
+>
+> 所有工具都额外支持一个**通用入参 `browse_mode`**（`mobile` / `desktop`）：本次调用临时换用「浏览模式」（UA 换模板），省略 = 跟随 App 当前站点设置。用途：某套模板解析异常时换 UA 复测。实现见 `core/app/browse_mode.dart`、docs/03；**仅本次调用有效**（Zone 级，并发调用不串味）。
+>
+> **`mobile` 是白名单**（只有少数接口支持移动端，且必定有 PC 保底）：仅 `list_forum_threads` / `list_guide_threads` / `search_forum_threads` / `list_user_threads` / `get_user_profile` 支持；其余工具为 PC-only，传 `mobile` 会返回明确错误（提示改用 `desktop` 或省略），避免"移动模板解析出错数据"被 AI 当成正常结果。白名单由各工具声明 `McpToolDefinition.mobileSupported`（默认 false）、`test/browse_mode_test.dart` 锁定。
 
 ### 与 API 探针（`tool/api_probe_test.dart`）的覆盖对照
 
@@ -72,6 +76,7 @@ lib/mcp/
 
 | 探针命令 | MCP 对应 | 备注 |
 |---|---|---|
+| `forum.nav` | `list_forums` | 已覆盖（版块表缓存的来源） |
 | `guide.list` | `list_guide_threads` | 已覆盖 |
 | `forum.list` | `list_forum_threads` | 已覆盖 |
 | `search.list` | `search_forum_threads` | 已覆盖；翻页需回传 `search_id`（见 docs/18） |
@@ -83,13 +88,21 @@ lib/mcp/
 | `favorite.list` | `list_my_favorites` | 已覆盖（收藏不公开，仅自己） |
 | `session.status` | `get_app_info` | 已覆盖（登录态/用户组） |
 | `ranklist.thread` / `ranklist.member` / `ranklist.forum` | `get_ranklist` | 已覆盖（`type=thread/member/forum`） |
+| `online.list` | `get_online_users` | 已覆盖 |
+| `rss.list` | `get_rss_feed` | 已覆盖 |
+| `group.index` / `group.category` | `list_groups` / `list_group_forums` | 已覆盖（圈内帖子用 `list_forum_threads`，fid 传 gid） |
+| `wall.list` | `list_wall_messages` | 已覆盖 |
+| `credit.log` | `list_credit_log` | 已覆盖（`accountData`，默认关） |
+| `message.system` / `message.manage` / `message.interactive` / `message.mypost` | `list_notifications` | 已覆盖（`accountData`，默认关） |
 | `session.list` | — | 有意不覆盖：列本机 Cookie 文件名，对 AI 无意义 |
-| `post.byPid` | — | 有意不覆盖：单楼层用 `get_thread_detail` 定位即可 |
-| `message.system` / `message.pm` / `message.mypost` | — | **待定**：提醒与私信，敏感度高，需单独评估后再决定 |
+| `post.byPid` / `post.findTid` | — | 有意不覆盖：单楼层用 `get_thread_detail` 定位即可 |
+| `notice.counts` | — | 有意不覆盖：未读计数属 App 内徽标逻辑，AI 读内容用 `list_notifications` |
+| `site.cdn` / `darkroom.list` | — | 有意不覆盖：CDN 探测是 App 内部逻辑；小黑屋面向管理，暂不暴露 |
+| `message.pm` / `message.pm.view` | — | **待定**：私信敏感度高，需单独评估后再决定 |
 | `debug.http` | — | **永不覆盖**：可带登录态取任意路径，等于绕过字段白名单与脱敏 |
-| 写操作（`post.*`、`favorite.add/delete`、`score.*`） | — | **永不覆盖**：MCP 是只读服务，见下方决策 7 |
+| 写操作（`post.*`、`favorite.add/delete`、`score.*`、`wall.post/edit/delete`、`message.pm.send`） | — | **永不覆盖**：MCP 是只读服务，见下方决策 7 |
 
-> MCP 另有探针没有的能力：`get_online_users`、`get_rss_feed`、编辑器草稿、本地浏览记录、`help`——说明两者本就各自演化，"逐条对齐"没有意义。
+> MCP 另有探针没有的"本地能力"：编辑器草稿、本地浏览记录、`help`——说明两者本就各自演化，"逐条对齐"没有意义。
 
 资源：`mtbbs://app/info`、`mtbbs://forums`。提示词：`summarize_thread`（总结帖子）。
 

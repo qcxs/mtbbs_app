@@ -42,7 +42,10 @@ class _FavoritePageState extends State<FavoritePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('取消收藏'),
-        content: Text('确定要取消收藏「$title」吗？'),
+        // 帖子标题可能很长：content 可滚动，避免多行标题撑破弹窗
+        content: SingleChildScrollView(
+          child: Text('确定要取消收藏「$title」吗？'),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),

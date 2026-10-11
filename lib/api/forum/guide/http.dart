@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 
 /// 导读 HTTP 请求 — 基于 Dio
 ///
@@ -12,9 +12,8 @@ Future<Response<String>> getThreadList(
   String view = 'newthread',
   int page = 1,
 }) {
-  final site = SiteStore.instance;
   return dio.get<String>(
     '/forum.php?mod=guide&index=1&view=$view&page=$page',
-    options: Options(headers: {'User-Agent': site.userAgent}),
+    options: Options(headers: {'User-Agent': resolveRequestUserAgent()}),
   );
 }

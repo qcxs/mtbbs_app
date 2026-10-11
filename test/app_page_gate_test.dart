@@ -27,6 +27,13 @@ void main() {
       expect(featureIdOf('/darkroom'), 'darkroom');
       expect(featureIdOf('/pm/chat?touid=1'), 'pm');
       expect(featureIdOf('/editor?type=post&fid=2'), 'editor');
+      // 留言板是 /user/{uid}/wall 子路径，必须与"用户主页"区分（曾误判为 user）
+      expect(featureIdOf('/user/1/wall'), 'wall');
+      expect(featureIdOf('/user/self/wall?page=2'), 'wall');
+      expect(featureIdOf('/groups'), 'groups');
+      expect(featureIdOf('/groups/category?gid=2'), 'groups');
+      expect(featureIdOf('/credit-log'), 'creditLog');
+      expect(featureIdOf('/ranklist?view=post'), 'ranklist');
     });
 
     test('非内容页返回 null（不受开关影响）', () {
@@ -115,6 +122,36 @@ void main() {
       );
       expect(siteUrlFor('/editor?type=comment'), isNull);
     });
+
+    test('留言板 / 圈子 / 积分记录 / 用户排行', () {
+      expect(
+        siteUrlFor('/user/9/wall'),
+        '$base/home.php?mod=space&uid=9&do=wall',
+      );
+      expect(
+        siteUrlFor('/user/self/wall?page=2'),
+        '$base/home.php?mod=space&do=wall&page=2',
+      );
+      expect(siteUrlFor('/groups'), '$base/group.php');
+      expect(siteUrlFor('/groups/category?gid=2'), '$base/group.php?gid=2');
+      expect(
+        siteUrlFor('/groups/content?gid=2'),
+        '$base/forum.php?mod=forumdisplay&fid=2',
+      );
+      expect(siteUrlFor('/groups/category'), isNull); // 缺 gid
+      expect(
+        siteUrlFor('/credit-log'),
+        '$base/home.php?mod=spacecp&ac=credit&op=log',
+      );
+      expect(
+        siteUrlFor('/credit-log?exttype=2&optype=RSC'),
+        '$base/home.php?mod=spacecp&ac=credit&op=log&exttype=2&optype=RSC',
+      );
+      expect(
+        siteUrlFor('/ranklist?view=post'),
+        '$base/misc.php?mod=ranklist&type=member&view=post',
+      );
+    });
   });
 
   group('appPageRedirect - 唯一决策点', () {
@@ -144,6 +181,19 @@ void main() {
     test('关闭但算不出站内地址 → 仍走 App（不硬凑地址）', () {
       applyDisabledAppPages({'editor'});
       expect(appPageRedirect('/editor?type=comment'), isNull);
+    });
+
+    test('关闭"用户主页"不误伤留言板（子路径已按 wall 识别）', () {
+      applyDisabledAppPages({'user'});
+      expect(appPageRedirect('/user/1'), isNotNull); // 主页按开关回退浏览器
+      // 留言板走自己的开关（默认开）→ 仍进 App，不会被错拼成主页 URL
+      expect(appPageRedirect('/user/1/wall'), isNull);
+      // 单独关闭留言板 → 回退到留言板 URL（而非主页 URL）
+      applyDisabledAppPages({'wall'});
+      expect(
+        appPageRedirect('/user/1/wall'),
+        contains(Uri.encodeComponent('do=wall')),
+      );
     });
 
     test('关闭"站内搜索结果"不影响搜索中心入口页', () {

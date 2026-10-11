@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -54,6 +55,11 @@ class WindowsCertOverride extends HttpOverrides {
 ///
 /// [cookie] / [header] 是**临时注入**的额外凭证与请求头，用于站点开启
 /// 人机验证 / 防盗链等防护时的自保（详见 docs/10 与下方 [_applyProbeExtras]）。
+///
+/// [ua] 可选：临时换用「浏览模式」——`mobile` / `m`（移动 UA）或
+/// `desktop` / `pc`（桌面 UA）。默认空 = 跟随站点「浏览模式」（探针加载的是默认
+/// 站点，通常即移动 UA）。覆盖为**进程级**：本次运行的所有请求都用该 UA
+/// （含本不显式设站点 UA 的接口），便于"某套模板解析出问题时换 UA 复测"。
 Future<void> bootstrap({
   String account = '',
   String site = '',
@@ -61,9 +67,12 @@ Future<void> bootstrap({
   String siteName = '',
   String cookie = '',
   String header = '',
+  String ua = '',
 }) async {
   probeInterstitialHit = false;
   probeAcwSolved = 0;
+  // 先落覆盖：后续所有请求（含登录态扫描）都按该浏览模式发
+  applyStickyBrowseMode(ua);
   TestWidgetsFlutterBinding.ensureInitialized();
   // flutter_test 会安装 _MockHttpOverrides（所有请求返回 400），
   // 必须用真实 HttpOverrides 覆盖才能发真实网络请求。

@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 
 /// 站内搜索 HTTP 请求（`search.php?mod=forum`）— 基于 Dio
 ///
@@ -43,9 +43,8 @@ Future<Response<String>> searchThreads(
   int page = 1,
   String? searchId,
 }) {
-  final site = SiteStore.instance;
   return dio.get<String>(
     searchPath(keyword: keyword, page: page, searchId: searchId),
-    options: Options(headers: {'User-Agent': site.userAgent}),
+    options: Options(headers: {'User-Agent': resolveRequestUserAgent()}),
   );
 }

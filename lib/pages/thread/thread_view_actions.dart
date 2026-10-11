@@ -135,9 +135,13 @@ extension on _ThreadViewPageState {
             ),
           ],
         ),
-        content: SelectableText(
-          post.bbcode,
-          style: TextStyle(fontSize: 12, color: cs.onSurface, height: 1.5),
+        // BBCode 可能很长（整楼原文 / 含代码块）：必须可滚动，
+        // 否则超出 AlertDialog 的 maxHeight 后被裁剪、无法查看
+        content: SingleChildScrollView(
+          child: SelectableText(
+            post.bbcode,
+            style: TextStyle(fontSize: 12, color: cs.onSurface, height: 1.5),
+          ),
         ),
         actions: [
           TextButton(

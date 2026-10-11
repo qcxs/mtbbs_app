@@ -43,6 +43,10 @@ const List<AppPage> appPages = [
   AppPage('darkroom', '小黑屋', Icons.gavel_outlined),
   AppPage('pm', '私信会话', Icons.chat_bubble_outline),
   AppPage('editor', '发帖/编辑器', Icons.edit_outlined),
+  AppPage('wall', '留言板', Icons.mode_comment_outlined),
+  AppPage('groups', '圈子', Icons.groups_outlined),
+  AppPage('creditLog', '积分记录', Icons.receipt_long_outlined),
+  AppPage('ranklist', '用户排行', Icons.leaderboard_outlined),
 ];
 
 final Set<String> _allPageIds = {for (final p in appPages) p.id};
@@ -128,6 +132,10 @@ String? appPageRedirect(String location) {
 String? featureIdOf(String location) {
   final path = location.split('?').first;
   if (path.startsWith('/thread/')) return 'thread';
+  // 留言板必须排在 `/user/` 之前：它是 `/user/{uid}/wall` 的子路径，
+  // 否则会被识别成"用户主页"——关掉用户主页接管时，留言板链接会被错误地
+  // 按 `/user/{uid}` 拼成个人主页 URL（真 bug，已修）。
+  if (path.startsWith('/user/') && path.endsWith('/wall')) return 'wall';
   if (path.startsWith('/user/')) return 'user';
   if (path.startsWith('/forum')) return 'forum';
   // 只拦「站内搜索结果」页；`/search` 是搜索中心（站内搜索/Bing/打开链接/找用户/历史
@@ -141,6 +149,9 @@ String? featureIdOf(String location) {
   if (path.startsWith('/darkroom')) return 'darkroom';
   if (path.startsWith('/pm/chat')) return 'pm';
   if (path.startsWith('/editor')) return 'editor';
+  if (path.startsWith('/groups')) return 'groups';
+  if (path.startsWith('/credit-log')) return 'creditLog';
+  if (path.startsWith('/ranklist')) return 'ranklist';
   return null;
 }
 
@@ -241,6 +252,39 @@ String? siteUrlFor(String appPath) {
           if (fid.isEmpty) return null;
           return '$base/forum.php?mod=post&action=newthread&fid=$fid';
       }
+
+    case 'wall':
+      final p = page > 1 ? '&page=$page' : '';
+      // /user/{uid}/wall；uid 为空或 self → 我的留言板（无 uid）
+      if (seg.isEmpty || seg == 'self') {
+        return '$base/home.php?mod=space&do=wall$p';
+      }
+      return '$base/home.php?mod=space&uid=$seg&do=wall$p';
+
+    case 'groups':
+      final gid = q['gid'] ?? '';
+      if (uri.path == '/groups/category' && gid.isNotEmpty) {
+        return '$base/group.php?gid=$gid';
+      }
+      // 圈子「讨论区」= forumdisplay&fid={gid}（与 UrlRouter 的 group-{gid}.html 一致）
+      if (uri.path == '/groups/content' && gid.isNotEmpty) {
+        return '$base/forum.php?mod=forumdisplay&fid=$gid';
+      }
+      if (uri.path == '/groups') return '$base/group.php';
+      return null;
+
+    case 'creditLog':
+      final exttype = q['exttype'] ?? '';
+      final optype = q['optype'] ?? '';
+      final buf = StringBuffer('$base/home.php?mod=spacecp&ac=credit&op=log');
+      if (exttype.isNotEmpty && exttype != '0') buf.write('&exttype=$exttype');
+      if (optype.isNotEmpty) buf.write('&optype=$optype');
+      return buf.toString();
+
+    case 'ranklist':
+      // App 的 /ranklist 只承载"用户排行"（type=member）
+      final view = q['view'] ?? 'beauty';
+      return '$base/misc.php?mod=ranklist&type=member&view=$view';
   }
   return null;
 }

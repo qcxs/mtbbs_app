@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 
 /// 版块帖子列表 HTTP 请求（forumdisplay）— 基于 Dio
 /// 只负责发请求，不做 print 或解析。
@@ -35,13 +35,12 @@ Future<Response<String>> getForumThreads(
   String filter = '',
   int page = 1,
 }) {
-  final site = SiteStore.instance;
   final buf = StringBuffer('/forum.php?mod=forumdisplay&fid=$fid&page=$page');
   if (orderby.isNotEmpty) buf.write('&orderby=$orderby');
   if (filter.isNotEmpty) buf.write('&filter=$filter');
 
   return dio.get<String>(
     buf.toString(),
-    options: Options(headers: {'User-Agent': site.userAgent}),
+    options: Options(headers: {'User-Agent': resolveRequestUserAgent()}),
   );
 }

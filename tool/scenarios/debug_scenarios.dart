@@ -18,6 +18,7 @@ final Map<String, ApiScenario> debugScenarios = {
       'n': '正文最多输出字符数（默认 1200）',
     },
     raw: true,
+    mobileSupported: true, // 调试：可显式指定 UA 抓任意页面对照 DOM
     run: (a) async {
       final dio = ApiService().dio;
       final n = int.tryParse(a['n'] ?? '') ?? 1200;

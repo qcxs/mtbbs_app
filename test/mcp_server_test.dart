@@ -106,6 +106,27 @@ void main() {
     });
   });
 
+  group('鉴权：允许非本机连接开关', () {
+    test('acceptsRemote：回环恒接受，非回环仅在开启后接受', () {
+      expect(
+        McpAuthenticator.acceptsRemote(isLoopback: true, allowRemote: false),
+        isTrue,
+      );
+      expect(
+        McpAuthenticator.acceptsRemote(isLoopback: true, allowRemote: true),
+        isTrue,
+      );
+      expect(
+        McpAuthenticator.acceptsRemote(isLoopback: false, allowRemote: false),
+        isFalse,
+      );
+      expect(
+        McpAuthenticator.acceptsRemote(isLoopback: false, allowRemote: true),
+        isTrue,
+      );
+    });
+  });
+
   group('工具表与只读约束', () {
     late StreamableMcpServer server;
     late int port;
@@ -137,6 +158,12 @@ void main() {
       expect(names, contains('list_user_threads'));
       expect(names, contains('list_user_friends'));
       expect(names, contains('list_user_follows'));
+      // 新增能力：圈子 / 留言板（公开只读）与积分 / 提醒（账号私有，默认关）
+      expect(names, contains('list_groups'));
+      expect(names, contains('list_group_forums'));
+      expect(names, contains('list_wall_messages'));
+      expect(names, contains('list_credit_log'));
+      expect(names, contains('list_notifications'));
 
       // 只读断言 ①：每个工具的注解都必须声明 readOnlyHint
       for (final tool in tools.tools) {
@@ -173,6 +200,36 @@ void main() {
       final text = (result.content.first as TextContent).text;
       expect(text, contains('测试版块'));
       expect(text, contains(SiteStore.instance.host));
+      await client.close();
+    });
+
+    test('通用 browse_mode 选项被接受（本地工具不受影响）', () async {
+      final client = buildClient();
+      await client.connect(transportFor(port, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'get_app_info',
+          arguments: const {'browse_mode': 'desktop'},
+        ),
+      );
+      expect(result.isError, isFalse);
+      await client.close();
+    });
+
+    test('PC-only 工具传 browse_mode=mobile 被明确拒绝', () async {
+      final client = buildClient();
+      await client.connect(transportFor(port, bearer: tokenA));
+      // get_ranklist 为 PC-only：拒绝发生在发请求之前，无需网络
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'get_ranklist',
+          arguments: const {'view': 'heats', 'browse_mode': 'mobile'},
+        ),
+      );
+      expect(result.isError, isTrue);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('仅支持桌面模板'));
+      expect(text, contains('browse_mode'));
       await client.close();
     });
 

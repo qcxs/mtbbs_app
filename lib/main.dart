@@ -14,6 +14,7 @@ import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
 import 'package:mtbbs/core/app/app_link.dart';
+import 'package:mtbbs/core/app/app_shortcuts.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/site_cdn.dart';
 import 'package:mtbbs/core/app/acw_solver.dart';
@@ -223,6 +224,9 @@ void main() async {
   // Android：接管系统「打开方式」传入的论坛链接
   // （UrlRouter.resolveTarget 决定落地页：App 内路由优先，兜底内置浏览器）
   unawaited(AppLink.init(onOpen: (target) => router.push(target)));
+
+  // Android：注册桌面长按快捷方式（「缓存管理」），失败静默
+  unawaited(AppShortcuts.install());
 
   // 设置守卫：UI 启动后后台加载，不阻塞首帧渲染
   _runSettingsGuard(settings);

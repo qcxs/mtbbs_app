@@ -76,33 +76,36 @@ class _McpQuickDialog extends StatelessWidget {
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _statusRow(cs, controller),
-              const SizedBox(height: 12),
-              Divider(height: 1, color: cs.outlineVariant),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '启用 MCP 服务',
-                      style: TextStyle(fontSize: 14, color: cs.onSurface),
+          // 状态行可能含多行错误串 / 端点地址：content 可滚动，避免溢出
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _statusRow(cs, controller),
+                const SizedBox(height: 12),
+                Divider(height: 1, color: cs.outlineVariant),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '启用 MCP 服务',
+                        style: TextStyle(fontSize: 14, color: cs.onSurface),
+                      ),
                     ),
-                  ),
-                  Switch(
-                    value: controller.enabled,
-                    onChanged: (v) => controller.setEnabled(v),
-                  ),
-                ],
-              ),
-              Text(
-                '仅监听本机 127.0.0.1，并要求访问令牌',
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-              ),
-            ],
+                    Switch(
+                      value: controller.enabled,
+                      onChanged: (v) => controller.setEnabled(v),
+                    ),
+                  ],
+                ),
+                Text(
+                  '默认仅监听本机 127.0.0.1；可在设置中允许非本机连接',
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
           // 只有「关闭窗口」：开/关由上面的开关承载，不再另设一个同一语义的
           // 主按钮（两处都能开关 = 用户看到两套入口）

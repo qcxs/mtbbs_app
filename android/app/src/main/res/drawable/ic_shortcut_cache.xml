@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  桌面长按快捷方式「缓存管理」的图标（见 MainActivity.installShortcut）。
+  深色圆底 + 白色“存储层”简图：不依赖桌面深浅色，任意背景都清晰可见。
+  只用了直线/三次贝塞尔，避免矢量路径解析出问题。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF212121"
+        android:pathData="M12,1C18.08,1 23,5.92 23,12C23,18.08 18.08,23 12,23C5.92,23 1,18.08 1,12C1,5.92 5.92,1 12,1Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,8h10v2h-10zM7,11h10v2h-10zM7,14h10v2h-10z" />
+</vector>

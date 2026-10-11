@@ -44,23 +44,26 @@ void showImageInfoDialog(
       final cs = Theme.of(ctx).colorScheme;
       return AlertDialog(
         title: const Text('图片信息'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (nameStr != null) _infoRow('文件名', nameStr, cs),
-            if (sizeStr != null) _infoRow('尺寸', sizeStr, cs),
-            if (downloadsStr != null) _infoRow('下载次数', downloadsStr, cs),
-            if (uploadTimeStr != null) _infoRow('上传时间', uploadTimeStr, cs),
-            if (sourceInfo != null) _infoRow('来源', sourceInfo, cs),
-            const SizedBox(height: 8),
-            Text(
-              'URL:',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: 4),
-            SelectableText(url, style: const TextStyle(fontSize: 12)),
-          ],
+        // 文件名 / URL 等可能很长并换行：content 必须可滚动，避免溢出
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (nameStr != null) _infoRow('文件名', nameStr, cs),
+              if (sizeStr != null) _infoRow('尺寸', sizeStr, cs),
+              if (downloadsStr != null) _infoRow('下载次数', downloadsStr, cs),
+              if (uploadTimeStr != null) _infoRow('上传时间', uploadTimeStr, cs),
+              if (sourceInfo != null) _infoRow('来源', sourceInfo, cs),
+              const SizedBox(height: 8),
+              Text(
+                'URL:',
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(url, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
         ),
         actions: [
           TextButton(

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart' show DioException;
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:mtbbs/config/build_config.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/mcp/mcp_audit.dart';
@@ -60,7 +61,20 @@ class McpToolRegistry {
         def.name,
         description: def.description,
         inputSchema: JsonSchema.object(
-          properties: def.properties,
+          properties: {
+            ...def.properties,
+            // 跨工具通用选项：本次调用临时换用「浏览模式」（UA 换模板）。
+            // 省略 = 跟随 App 当前站点设置；便于"某套模板解析出问题时换 UA 复测"。
+            'browse_mode': JsonSchema.string(
+              description:
+                  '可选：本次调用临时换用浏览模式（mobile 移动模板 / desktop 桌面模板）。'
+                  '省略 = 跟随 App 当前的站点「浏览模式」。'
+                  '注意：仅少数工具支持 mobile（list_forum_threads / list_guide_threads / '
+                  'search_forum_threads / list_user_threads / get_user_profile），'
+                  '其余为 PC-only，传 mobile 会被明确拒绝。',
+              enumValues: const ['mobile', 'desktop'],
+            ),
+          },
           required: def.requiredArgs,
         ),
         annotations: const ToolAnnotations(readOnlyHint: true),
@@ -107,6 +121,9 @@ class McpToolRegistry {
   }) async {
     final sw = Stopwatch()..start();
 
+    // 跨工具通用选项：本次调用临时换用浏览模式（Zone 级，仅本次有效；非法/缺省=不覆盖）
+    final browseMode = normalizeBrowseMode(args['browse_mode']?.toString());
+
     if (!enabled) {
       return _fail(
         def.name,
@@ -117,13 +134,32 @@ class McpToolRegistry {
       );
     }
 
+    // 浏览模式白名单：默认 PC-only 的接口不接受 mobile —— 明确拒绝，
+    // 而不是静默按移动 UA 请求、把移动模板解析出的错数据当正常结果返回
+    // （避免 AI 误以为该接口 PC / 移动两套等价）。
+    if (browseMode == 'mobile' && !def.mobileSupported) {
+      return _fail(
+        def.name,
+        sw,
+        '工具 ${def.name} 仅支持桌面模板（PC），不支持 browse_mode=mobile：'
+        '该接口的数据来自 Discuz PC 页面，移动模板下结构不同或不存在。'
+        '请省略 browse_mode（跟随 App「浏览模式」）或改传 browse_mode=desktop 后重试。'
+        '支持移动模板的工具仅：list_forum_threads、list_guide_threads、'
+        'search_forum_threads、list_user_threads、get_user_profile。',
+        auditError: '不支持 browse_mode=mobile',
+      );
+    }
+
     // 会真正发请求的工具先过全局错峰队列：AI 可能并发调用多个工具，
     // 这里逐个放行，避免短时间打出一串请求被站点风控。
     // 排队等待不计入下面的执行超时（本地工具不排队，立即执行）。
     if (def.network) await enqueueStagger().ready;
 
     try {
-      final raw = await def.run(args).timeout(callTimeout);
+      final raw = await runWithBrowseMode(
+        browseMode,
+        () => def.run(args).timeout(callTimeout),
+      );
       final safe = McpSanitizer.sanitize(raw);
       return _ok(def.name, safe, sw);
     } on TimeoutException {

@@ -2,6 +2,7 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'package:mtbbs/api/home/follow/export.dart' as follow;
 import 'package:mtbbs/api/home/friend/export.dart' as friend;
 import 'package:mtbbs/api/home/mythread/export.dart' as mythread;
+import 'package:mtbbs/api/home/wall/export.dart' as wall;
 import 'package:mtbbs/mcp/mcp_types.dart';
 import 'package:mtbbs/mcp/tools/mcp_payloads.dart';
 import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
@@ -38,6 +39,7 @@ List<McpToolDefinition> userTools() => [
         description: '页码，默认 1',
       ),
     },
+    mobileSupported: true, // 我的帖子/回复：移动 UA 走 SpaceThreadParser
     run: (args) async {
       final uid = McpArgs.str(args, 'uid');
       final type = McpArgs.str(args, 'type', fallback: 'thread');
@@ -112,6 +114,25 @@ List<McpToolDefinition> userTools() => [
         result,
         extra: {'uid': uid.isEmpty ? 'self' : uid, 'type': type},
       );
+    },
+  ),
+  McpToolDefinition(
+    name: 'list_wall_messages',
+    group: McpToolGroup.publicData,
+    description: '列出某用户留言板上的留言（uid 省略 = 当前登录账号）。',
+    properties: {
+      'uid': JsonSchema.string(description: '留言板主人 UID；省略则为当前登录账号'),
+      'page': JsonSchema.integer(
+        minimum: 1,
+        maximum: 200,
+        description: '页码，默认 1',
+      ),
+    },
+    run: (args) async {
+      final uid = McpArgs.str(args, 'uid');
+      final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
+      final result = await wall.getWall(ApiService().dio, uid: uid, page: page);
+      return McpPayloads.wallList(result, uid: uid);
     },
   ),
 ];

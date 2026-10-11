@@ -20,17 +20,37 @@ class McpAuthenticator {
     return base64Url.encode(bytes).replaceAll('=', '');
   }
 
-  /// 校验请求：来源必须是回环地址，且携带 `Authorization: Bearer <token>`，
-  /// 且该令牌属于用户已创建的令牌列表。
+  /// 是否接受该来源：**回环恒接受**；非回环仅在开启「允许非本机连接」时接受。
+  ///
+  /// 抽成纯函数便于单测（HttpRequest 不便构造）。
+  static bool acceptsRemote({
+    required bool isLoopback,
+    required bool allowRemote,
+  }) => isLoopback || allowRemote;
+
+  /// 校验请求：来源必须是回环地址（或在开启「允许非本机连接」时允许非回环），
+  /// 且携带 `Authorization: Bearer <token>`，且该令牌属于用户已创建的令牌列表。
   ///
   /// 令牌列表为空时一律拒绝（不允许"无令牌即放行"）。
-  static bool authorize(dynamic request, Iterable<String> expectedTokens) {
+  /// [allowRemote] 见 `McpServerController.allowRemote`（默认 false = 仅本机）。
+  static bool authorize(
+    dynamic request,
+    Iterable<String> expectedTokens, {
+    bool allowRemote = false,
+  }) {
     try {
       final req = request as HttpRequest;
       final remote = req.connectionInfo?.remoteAddress;
-      if (remote == null || !remote.isLoopback) {
-        AppLogger.w('MCP', '拒绝非本机连接: ${remote?.address}');
+      if (remote == null) return false;
+      if (!acceptsRemote(
+        isLoopback: remote.isLoopback,
+        allowRemote: allowRemote,
+      )) {
+        AppLogger.w('MCP', '拒绝非本机连接: ${remote.address}（未开启「允许非本机连接」）');
         return false;
+      }
+      if (!remote.isLoopback) {
+        AppLogger.i('MCP', '接受非本机连接: ${remote.address}');
       }
       final header = req.headers.value(HttpHeaders.authorizationHeader);
       if (header == null || !header.startsWith(bearerPrefix)) return false;

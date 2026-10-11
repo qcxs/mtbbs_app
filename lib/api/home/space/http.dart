@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 
 /// 用户空间主页 HTTP 请求 — 基于 Dio
@@ -23,8 +24,9 @@ void applySpaceSourceOverride(String value) => _sourceOverride = value;
 /// 当前覆盖设置（`''` 表示未覆盖，跟随「浏览模式」）
 String get spaceSourceOverride => _sourceOverride;
 
-/// 本页请求实际使用的 UA：有覆盖则强制，否则跟随站点「浏览模式」
+/// 本页请求实际使用的 UA：请求级覆盖（探针 / MCP）> 本页覆盖 > 站点「浏览模式」
 String _resolvedUserAgent() {
+  if (browseModeOverrideActive()) return resolveRequestUserAgent();
   switch (_sourceOverride) {
     case 'mobile':
       return Site.uaAndroid;

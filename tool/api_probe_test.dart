@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
@@ -19,6 +20,7 @@ import 'api_scenarios.dart';
 ///   cmd       场景命令（默认 session.list），见 [scenarios]
 ///   account   登录账号名（可空=游客），需先运行 App 登录生成 Cookie
 ///   site      站点（索引数字或站点名，空=默认第一个站点）
+///   ua        临时换用浏览模式：mobile / desktop(或 pc)；空=跟随站点设置
 ///   log       off/info/debug（默认 info，debug 输出 PARSE 明细）
 ///   其余键    透传给场景的 params
 ///
@@ -42,6 +44,7 @@ void main() {
     final siteName = const String.fromEnvironment('siteName', defaultValue: '');
     final cookie = const String.fromEnvironment('cookie', defaultValue: '');
     final header = const String.fromEnvironment('header', defaultValue: '');
+    final ua = const String.fromEnvironment('ua', defaultValue: '');
     final log = const String.fromEnvironment('log', defaultValue: 'info');
 
     // 日志级别控制
@@ -98,6 +101,7 @@ void main() {
       siteName: siteName,
       cookie: cookie,
       header: header,
+      ua: ua,
     );
 
     print('=== API_PROBE_BEGIN ===');
@@ -118,6 +122,7 @@ Future<Map<String, dynamic>> runProbe({
   String siteName = '',
   String cookie = '',
   String header = '',
+  String ua = '',
 }) async {
   // 自描述：无上下文的 AI 跑 help 即可掌握全部用法，无需读源码
   if (cmd == 'help' || cmd == '--help' || cmd == 'h') {
@@ -136,6 +141,25 @@ Future<Map<String, dynamic>> runProbe({
     };
   }
 
+  // 浏览模式白名单：显式 ua=mobile 时，PC-only 场景明确拒绝（避免误判两套等价）
+  if (normalizeBrowseMode(ua) == 'mobile' && !scenario.mobileSupported) {
+    return {
+      'ok': true,
+      'cmd': cmd,
+      'browseMode': 'mobile',
+      'result': {
+        'success': false,
+        'message':
+            '场景 $cmd 仅支持桌面模板（PC），不支持 ua=mobile：'
+            '该接口的数据来自 Discuz PC 页面，移动模板下结构不同或不存在。'
+            '请去掉 ua（跟随站点「浏览模式」）或改 ua=desktop 后重试。'
+            '支持 ua=mobile 的场景仅：guide.list、forum.list、search.list、'
+            'my.threads、user.info、debug.http。',
+      },
+      'usage': scenario.desc,
+    };
+  }
+
   try {
     await bootstrap(
       account: account,
@@ -144,6 +168,7 @@ Future<Map<String, dynamic>> runProbe({
       siteName: siteName,
       cookie: cookie,
       header: header,
+      ua: ua,
     );
   } catch (e) {
     return {'ok': false, 'cmd': cmd, 'error': '初始化失败: $e'};
@@ -210,6 +235,8 @@ Future<Map<String, dynamic>> runProbe({
       },
       'runtimeMs': sw.elapsedMilliseconds,
       'account': ApiService().activeAccount ?? '(游客)',
+      // 本次运行的浏览模式：site = 跟随站点设置；mobile/desktop = ua 覆盖生效
+      'browseMode': normalizeBrowseMode(ua) ?? 'site',
       'result': compactJson(result, maxStr: scenario.raw ? 100000 : 160),
       'usage': scenario.desc,
       if (probeAcwSolved > 0) 'acwSolved': probeAcwSolved,
@@ -275,6 +302,11 @@ Map<String, dynamic> _buildHelp() {
       'header':
           '临时注入的请求头，格式 Name:Value,Name2:Value2，加到 Dio 默认头，'
           '如 header=Referer:https://bbs.binmt.cc/',
+      'ua':
+          '临时换用「浏览模式」：mobile（移动模板）或 desktop/pc（桌面模板）。'
+          '默认空 = 跟随站点浏览模式。**对整个运行的所有请求生效**。'
+          '注意：仅少数场景支持 mobile（见各场景的 mobileSupported 标记），'
+          '其余为 PC-only，传 ua=mobile 会被拒绝。',
       'log': 'off/info/debug（默认 info，off 只输出协议 JSON）',
     },
     'scenarios': {
@@ -283,6 +315,8 @@ Map<String, dynamic> _buildHelp() {
           'desc': e.value.desc,
           'params': e.value.params,
           'needsLogin': e.value.needsLogin,
+          // 白名单：仅这些场景接受 ua=mobile；其余为 PC-only
+          if (e.value.mobileSupported) 'mobileSupported': true,
         },
     },
     'examples': [
@@ -293,6 +327,7 @@ Map<String, dynamic> _buildHelp() {
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=debug.http --dart-define=path=/forum.php --dart-define=q=mod=guide,index=1',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=session.status --dart-define=site=1 --dart-define=account=qcxs  # 跨站点账号',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=log=info   # 人机验证会自解，日志可见「已自算 acw_sc__v2」',
+      r'flutter test tool/api_probe_test.dart --dart-define=cmd=forum.list --dart-define=fid=2 --dart-define=ua=desktop  # 换桌面 UA 复测（默认跟随浏览模式）',
     ],
     'tips': [
       '首次使用：先运行一次 App（flutter run -d windows）并登录，生成 Cookie；'
@@ -304,6 +339,8 @@ Map<String, dynamic> _buildHelp() {
           '（URL 中的 & 会被 PowerShell→cmd 拆散，禁止直接传完整 URL）',
       '参数值不要包含 & | ; " 空格 等特殊字符',
       '大列表结果自动截断为前 3 项 + __more__，长字符串截断 160 字符',
+      '换 UA 复测：加 --dart-define=ua=desktop（或 mobile）临时换「浏览模式」，'
+          '本次运行所有请求都按该 UA 发；某套模板解析异常时用它对照',
     ],
   };
 }

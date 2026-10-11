@@ -8,6 +8,7 @@ import 'package:mtbbs/pages/settings/mcp_token_dialogs.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// MCP 服务组设置项（一级设置分组）
 ///
@@ -30,7 +31,7 @@ List<SettingsModel> mcpSettings() {
       subtitle: '三步接入 Trae / Claude / Cursor，含可复制的配置片段',
       onTap: (ctx, s) => showMcpHelpSheet(ctx, c),
     ),
-    HeaderSetting(title: '服务', subtitle: '只读；仅监听本机 127.0.0.1，并要求访问令牌'),
+    HeaderSetting(title: '服务', subtitle: '只读；默认仅监听本机 127.0.0.1（可开启局域网访问），并要求访问令牌'),
     SwitchSetting(
       title: '启用 MCP 服务',
       subtitle: '让 AI 客户端读取论坛内容与 App 信息',
@@ -95,6 +96,22 @@ List<SettingsModel> mcpSettings() {
       ),
       onTap: (ctx, s) => _copy(c.endpointUrl, '端点地址已复制'),
     ),
+    SwitchSetting(
+      title: '允许非本机连接',
+      subtitle: '默认关闭（仅本机可连）。开启后监听所有网卡，局域网内其它设备也可连接（仍必须带访问令牌）',
+      icon: Icons.lan_outlined,
+      value: (s) => c.allowRemote,
+      onChanged: (ctx, s, v) async {
+        if (v && !await _confirmAllowRemote(ctx)) return;
+        await c.setAllowRemote(v);
+      },
+    ),
+    if (c.allowRemote && !c.hasToken)
+      const InfoSetting(
+        title: '还没创建访问令牌',
+        subtitle: '已允许非本机连接，但没有令牌时所有连接都会被拒绝',
+        icon: Icons.warning_amber,
+      ),
 
     HeaderSetting(
       title: '访问令牌',
@@ -274,4 +291,21 @@ String _formatTime(DateTime t) =>
 Future<void> _copy(String text, String toast) async {
   await Clipboard.setData(ClipboardData(text: text));
   showToast(toast);
+}
+
+/// 开启「允许非本机连接」前的风险确认（返回 true = 继续开启）。
+///
+/// 这是唯一会扩大监听范围的操作，默认关闭；开启后仍强制要求访问令牌。
+Future<bool> _confirmAllowRemote(BuildContext context) async {
+  final ok = await showConfirmDialog(
+    context,
+    title: '允许局域网内其它设备连接？',
+    message:
+        '开启后 MCP 会监听所有网卡（0.0.0.0），同一局域网内的设备都可尝试连接。\n\n'
+        '• 没有访问令牌时，所有连接都会被拒绝；\n'
+        '• 请只在可信网络（如家庭 Wi-Fi）下开启，公共网络请保持关闭。',
+    confirmText: '仍要开启',
+    danger: true,
+  );
+  return ok == true;
 }

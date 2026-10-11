@@ -156,6 +156,162 @@ class McpPayloads {
     });
   }
 
+  // ==================== 圈子 / 留言板 / 积分 / 提醒 ====================
+
+  /// 圈子首页（推荐圈子 + 分类 + 积分排行）
+  static Map<String, dynamic> groupIndex(Map<String, dynamic> result) {
+    final categories = _listOf(result['categories'], _groupCategory);
+    return _dropNulls({
+      'success': result['success'] ?? false,
+      if (result['message'] != null) 'message': result['message'],
+      'featured': _listOf(result['featured'], _groupBrief),
+      'categories': categories,
+      'categoryCount': categories.length,
+      'rank': _listOf(result['rank'], _groupRank),
+    });
+  }
+
+  /// 圈子分类下的圈子列表（分页）
+  static Map<String, dynamic> groupCategory(Map<String, dynamic> result) {
+    final groups = _listOf(result['groups'], _groupDetail);
+    return _dropNulls({
+      'success': result['success'] ?? false,
+      if (result['message'] != null) 'message': result['message'],
+      'categoryName': result['categoryName'],
+      'count': groups.length,
+      'currentPage': result['currentPage'],
+      'totalPages': result['totalPages'],
+      if (result['hasMore'] != null) 'hasMore': result['hasMore'],
+      'groups': groups,
+    });
+  }
+
+  static Map<String, dynamic>? _groupBrief(dynamic raw) {
+    if (raw is! Map) return null;
+    return _dropNulls({
+      'gid': raw['gid']?.toString(),
+      'name': raw['name'],
+      'description': raw['description'],
+    });
+  }
+
+  static Map<String, dynamic>? _groupDetail(dynamic raw) {
+    if (raw is! Map) return null;
+    return _dropNulls({
+      'gid': raw['gid']?.toString(),
+      'name': raw['name'],
+      'description': raw['description'],
+      'members': raw['members'],
+      'threads': raw['threads'],
+    });
+  }
+
+  static Map<String, dynamic>? _groupCategory(dynamic raw) {
+    if (raw is! Map) return null;
+    return _dropNulls({
+      'gid': raw['gid']?.toString(),
+      'name': raw['name'],
+      'count': raw['count'],
+      'groups': _listOf(raw['groups'], _groupBrief),
+    });
+  }
+
+  static Map<String, dynamic>? _groupRank(dynamic raw) {
+    if (raw is! Map) return null;
+    return _dropNulls({
+      'gid': raw['gid']?.toString(),
+      'name': raw['name'],
+      'score': raw['score'],
+    });
+  }
+
+  /// 用户留言板（留言列表 + 分页）
+  static Map<String, dynamic> wallList(
+    Map<String, dynamic> result, {
+    required String uid,
+  }) {
+    final comments = _listOf(result['comments'], _wallComment);
+    return _dropNulls({
+      'uid': uid.isEmpty ? 'self' : uid,
+      'success': result['success'] ?? false,
+      if (result['message'] != null) 'message': result['message'],
+      'canPost': result['canPost'],
+      'count': comments.length,
+      'currentPage': result['currentPage'],
+      'totalPages': result['totalPages'],
+      if (result['hasMore'] != null) 'hasMore': result['hasMore'],
+      'comments': comments,
+    });
+  }
+
+  static Map<String, dynamic>? _wallComment(dynamic raw) {
+    if (raw is! Map) return null;
+    return _dropNulls({
+      'cid': raw['cid']?.toString(),
+      'author': raw['authorName'],
+      'authorUid': raw['authorUid']?.toString(),
+      'time': _oneLine(raw['time']),
+      'message': raw['message'],
+      'quotedUser': raw['quotedUser'],
+      'quotedText': raw['quotedText'],
+    });
+  }
+
+  /// 积分变更记录（分页；`detailUrl` 等冗余 URL 丢弃）
+  static Map<String, dynamic> creditLog(Map<String, dynamic> result) {
+    final records = _listOf(result['items'], _creditItem);
+    return _dropNulls({
+      'success': result['success'] ?? false,
+      if (result['message'] != null) 'message': result['message'],
+      'count': records.length,
+      'currentPage': result['currentPage'],
+      'totalPages': result['totalPages'],
+      if (result['hasMore'] != null) 'hasMore': result['hasMore'],
+      'records': records,
+    });
+  }
+
+  static Map<String, dynamic>? _creditItem(dynamic raw) {
+    if (raw is! Map) return null;
+    return _dropNulls({
+      'action': raw['action'],
+      'creditType': raw['creditType'],
+      'delta': raw['delta'],
+      'detail': raw['detail'],
+      'time': _oneLine(raw['time']),
+    });
+  }
+
+  /// 提醒列表（系统 / 管理 / 互动 / 帖子）；丢弃 `bodyHtml`/`segments` 等含 HTML 的字段
+  static Map<String, dynamic> notifications(
+    Map<String, dynamic> result, {
+    required String view,
+  }) {
+    final notices = _listOf(result['items'], _noticeItem);
+    return _dropNulls({
+      'view': view,
+      'success': result['success'] ?? false,
+      if (result['message'] != null) 'message': result['message'],
+      'count': notices.length,
+      'currentPage': result['currentPage'],
+      'totalPages': result['totalPages'],
+      'notices': notices,
+    });
+  }
+
+  static Map<String, dynamic>? _noticeItem(dynamic raw) {
+    if (raw is! Map) return null;
+    return _dropNulls({
+      'noticeId': raw['noticeId']?.toString(),
+      'time': _oneLine(raw['time']),
+      'message': raw['message'],
+      'threadTitle': raw['threadTitle'],
+      'from': raw['username'],
+      'fromUid': raw['userUid']?.toString(),
+      'fromNum': raw['fromNum'],
+    });
+  }
+
   /// 帖子详情：标题 + 楼层正文，按 [maxPosts] 截断
   ///
   /// [fullBbcode] 为 false（默认）时正文剔除纯样式标签，省 AI 上下文。
@@ -298,6 +454,14 @@ class McpPayloads {
   }
 
   // ==================== 内部工具 ====================
+
+  /// 把 parse 输出的动态列表按 [map] 映射为字段白名单列表（非列表 / 非法项一律丢弃）
+  static List<Map<String, dynamic>> _listOf(
+    dynamic raw,
+    Map<String, dynamic>? Function(dynamic) map,
+  ) => raw is List
+      ? raw.map(map).whereType<Map<String, dynamic>>().toList()
+      : <Map<String, dynamic>>[];
 
   /// 去掉值为 null 的键，减少 AI 上下文噪音（缺字段即代表无值）
   static Map<String, dynamic> _dropNulls(Map<String, dynamic> map) =>

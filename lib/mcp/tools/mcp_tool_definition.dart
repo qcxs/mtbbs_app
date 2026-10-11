@@ -14,6 +14,7 @@ class McpToolDefinition {
     required this.run,
     this.requiredArgs = const [],
     this.network = true,
+    this.mobileSupported = false,
   });
 
   final String name;
@@ -29,6 +30,17 @@ class McpToolDefinition {
   /// **默认 true**：新增工具时忘记声明的代价只是多等一个间隔，
   /// 反之（默认 false 却忘了标）会让请求不受限流，风险大得多。
   final bool network;
+
+  /// 是否支持**移动模板**（白名单，默认 false = 仅桌面模板 PC）。
+  ///
+  /// 设计前提：支持移动端的接口必定同时支持 PC（有 PC 保底），且这类接口是少数
+  /// （站点「浏览模式」生效的 5 个：版块 / 导读 / 搜索 / 我的帖子 / 用户空间）。
+  /// 因此用**白名单**表达：默认只支持 PC，新增工具时"忘记标"的代价只是
+  /// 少一个移动能力，而不会把移动模板解析出的错数据当正常结果返回。
+  ///
+  /// 为 false 时，显式传 `browse_mode=mobile` 会被**明确拒绝**并提示，
+  /// 避免 AI 误以为该接口 PC / 移动两套等价（`browse_mode=desktop` 始终允许）。
+  final bool mobileSupported;
 
   /// 返回业务数据（Map），出站前统一过 `McpSanitizer`
   final Future<Map<String, dynamic>> Function(Map<String, dynamic> args) run;

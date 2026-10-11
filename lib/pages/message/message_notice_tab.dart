@@ -41,6 +41,15 @@ class _NoticeTabState extends State<NoticeTab> {
   late final NoticeGroup? _group = noticeGroupOf(widget.view);
   final _nav = NoticeNavStore.instance;
 
+  /// 子类型页控制器：**二级**子类型之间用左右滑动切换（一级 Tab 只点击）。
+  ///
+  /// 首次拉到站点导航、确定默认子类型后才创建（`initialPage` 直接落在该子类型上，
+  /// 避免先显示第 0 页再跳）。无子类型的视图（系统提醒/管理工作/应用提醒）恒为 null。
+  PageController? _pc;
+
+  /// 上一次的子类型集合（检测站点增删 → 对齐页位置）
+  String _typesKey = '';
+
   /// 子类型：已同步过就用**站点返回的**（站点会按权限/配置增删），否则回退配置
   List<NoticeType> get _types =>
       _nav.subtypesOf(widget.view) ?? _group?.types ?? const [];
@@ -57,6 +66,12 @@ class _NoticeTabState extends State<NoticeTab> {
   void initState() {
     super.initState();
     _load(1);
+  }
+
+  @override
+  void dispose() {
+    _pc?.dispose();
+    super.dispose();
   }
 
   Future<void> _load(int page) async {
@@ -116,12 +131,19 @@ class _NoticeTabState extends State<NoticeTab> {
       requestedView: widget.view,
     );
     if (!_typePicked) {
-      final active = _nav.activeSubtype;
       final types = _types;
+      final active = _nav.activeSubtype;
       final next = active.isNotEmpty
           ? active
           : (types.isNotEmpty ? types.first.id : '');
-      if (next.isNotEmpty && next != _type) setState(() => _type = next);
+      if (next.isNotEmpty && next != _type) {
+        setState(() {
+          _type = next;
+          // 首次确定默认子类型 → 就地建页控制器（初始页 = 该子类型），
+          // 避免"先显示第 0 页再跳过去"
+          _pc ??= PageController(initialPage: _indexOfType(types, next));
+        });
+      }
     }
     NoticeBadgeController.instance.applyViewCounts(_nav.viewCounts);
     // 本次拉取已把该子类型的条目置为已读 → 立刻清零它的未读。
@@ -140,9 +162,45 @@ class _NoticeTabState extends State<NoticeTab> {
     if (type == _type) return;
     // 用户手动选过之后，不再被站点默认子类型覆盖
     _typePicked = true;
-    setState(() => _type = type);
+    setState(() {
+      _type = type;
+      // 兜底：首次加载尚未确定默认子类型时（_pc 还没建）用户就点了 chip →
+      // 这里补建，保证之后二级仍可左右滑动
+      if (_pc == null) {
+        final types = _types;
+        if (types.isNotEmpty) {
+          _pc = PageController(initialPage: _indexOfType(types, type));
+        }
+      }
+    });
     _load(1);
   }
+
+  /// 点 chip：优先用页控制器**滑动**过去（onPageChanged 里再真正切换+加载）；
+  /// 无控制器（尚未确定默认子类型）时退化为直接切换。
+  void _selectType(String type) {
+    if (type == _type) return;
+    _typePicked = true;
+    final pc = _pc;
+    final i = _indexOfType(_types, type);
+    if (pc != null && pc.hasClients && i >= 0) {
+      pc.animateToPage(
+        i,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    } else {
+      _switchType(type);
+    }
+  }
+
+  int _indexOfType(List<NoticeType> types, String id) {
+    final i = types.indexWhere((t) => t.id == id);
+    return i < 0 ? 0 : i;
+  }
+
+  /// 当前展示的子类型在 [types] 中的下标（`_type` 未定时取 0）
+  int _currentIndex(List<NoticeType> types) => _indexOfType(types, _type);
 
   @override
   Widget build(BuildContext context) {
@@ -150,45 +208,64 @@ class _NoticeTabState extends State<NoticeTab> {
     context.watch<NoticeNavStore>();
     final types = _types;
 
-    if (_loading) {
-      return Column(
-        children: [
-          if (types.isNotEmpty) _buildHeader(types),
-          const Expanded(child: LoadingView()),
-        ],
-      );
+    // 站点增删子类型 → 把页位置对齐到当前子类型
+    final key = types.map((t) => t.id).join(',');
+    if (key != _typesKey) {
+      _typesKey = key;
+      final pc0 = _pc;
+      if (pc0 != null && types.isNotEmpty) {
+        final target = _currentIndex(types);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && pc0.hasClients && pc0.page?.round() != target) {
+            pc0.jumpToPage(target);
+          }
+        });
+      }
     }
-    if (_error != null) {
+
+    final pc = _pc;
+    // 无子类型，或默认子类型尚未确定 → 单块内容（含加载 / 错误 / 空态）
+    if (types.isEmpty || pc == null) {
       return Column(
         children: [
           if (types.isNotEmpty) _buildHeader(types),
-          Expanded(
-            child: PageErrorWidget(
-              message: _error!,
-              onRetry: () => _load(1),
-              showBack: false,
-            ),
-          ),
-        ],
-      );
-    }
-    if (_items.isEmpty) {
-      return Column(
-        children: [
-          if (types.isNotEmpty) _buildHeader(types),
-          Expanded(
-            child: EmptyView(
-              icon: Icons.notifications_none,
-              text: widget.emptyText,
-            ),
-          ),
+          Expanded(child: _body()),
         ],
       );
     }
 
+    // 二级子类型之间可左右滑动；一级 Tab 只点击（见 message_page.dart）
     return Column(
       children: [
-        if (types.isNotEmpty) _buildHeader(types),
+        _buildHeader(types),
+        Expanded(
+          child: PageView.builder(
+            controller: pc,
+            itemCount: types.length,
+            onPageChanged: (i) => _switchType(types[i].id),
+            itemBuilder: (_, i) =>
+                i == _currentIndex(types) ? _body() : const LoadingView(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 当前子类型的内容块：加载 / 错误 / 空 / 列表 + 分页
+  Widget _body() {
+    if (_loading) return const LoadingView();
+    if (_error != null) {
+      return PageErrorWidget(
+        message: _error!,
+        onRetry: () => _load(1),
+        showBack: false,
+      );
+    }
+    if (_items.isEmpty) {
+      return EmptyView(icon: Icons.notifications_none, text: widget.emptyText);
+    }
+    return Column(
+      children: [
         Expanded(
           child: RefreshIndicator(
             onRefresh: () => _load(1),
@@ -239,7 +316,7 @@ class _NoticeTabState extends State<NoticeTab> {
     // 子类型未读：来自页面子栏的权威计数（服务端置已读之后的值）
     final count = _nav.subtypeCount(widget.view, type);
     return GestureDetector(
-      onTap: () => _switchType(type),
+      onTap: () => _selectType(type),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(

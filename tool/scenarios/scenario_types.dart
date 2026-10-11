@@ -16,6 +16,13 @@ class ApiScenario {
   /// （调试场景用于展示完整原始响应，由场景自己控制输出长度）
   final bool raw;
 
+  /// 是否支持**移动模板**（白名单，默认 false = 仅桌面模板 PC）。
+  ///
+  /// 前提与 MCP 的 `McpToolDefinition.mobileSupported` 一致：支持移动端的接口
+  /// 必定同时支持 PC（有 PC 保底），且这类接口是少数。显式传 `ua=mobile` 时，
+  /// 白名单外的场景会被拒绝并提示，避免把移动模板解析出的错数据当正常结果。
+  final bool mobileSupported;
+
   /// 执行函数：args 为参数值（字符串）
   final Future<Map<String, dynamic>> Function(Map<String, String> args) run;
 
@@ -24,6 +31,7 @@ class ApiScenario {
     required this.params,
     this.needsLogin = false,
     this.raw = false,
+    this.mobileSupported = false,
     required this.run,
   });
 }

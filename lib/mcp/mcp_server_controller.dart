@@ -24,7 +24,8 @@ enum McpServerStatus { stopped, starting, running, error }
 /// - 所有异常在工具边界被吞掉并转成 JSON-RPC error，不会向上冒泡到 UI。
 ///
 /// 安全设计：
-/// - 只绑 `127.0.0.1`，仅接受回环地址连接；
+/// - 默认只绑 `127.0.0.1`、仅接受回环连接；开启「允许非本机连接」后才监听所有网卡
+///   （此时仍需 Bearer 令牌，且 DNS-rebinding 的 Host 白名单扩为本机各 IPv4 / 主机名）；
 /// - 复用 SDK 的 DNS rebinding 防护（Host / Origin 白名单）；
 /// - 必须携带本机生成的 Bearer token；
 /// - 出站数据统一过 `McpSanitizer`；
@@ -38,23 +39,33 @@ class McpServerController extends ChangeNotifier {
   static const int maxPort = 65535;
   static const String endpointPath = '/mcp';
 
-  /// 只绑回环，绝不监听 0.0.0.0
-  static const String bindHost = '127.0.0.1';
+  /// 回环地址：`允许非本机连接` 关闭时**只**监听它（默认）
+  static const String loopbackHost = '127.0.0.1';
 
-  static const Set<String> _allowedHosts = {'127.0.0.1', 'localhost'};
+  /// 监听所有网卡：开启「允许非本机连接」时使用
+  static const String anyHost = '0.0.0.0';
+
+  /// DNS-rebinding 防护的 Host 白名单基础项（回环写法）；
+  /// 局域网访问开启时再补上本机各 IPv4 与主机名。
+  static const Set<String> _baseAllowedHosts = {'127.0.0.1', 'localhost'};
 
   static const String _kEnabled = 'mcpEnabled';
   static const String _kPort = 'mcpPort';
   static const String _kTokens = 'mcpTokens';
   static const String _kDisabledGroups = 'mcpDisabledGroups';
+  static const String _kAllowRemote = 'mcpAllowRemote';
 
   /// 旧版单令牌键（首次运行迁移为"默认令牌"，保住已配置的客户端）
   static const String _kLegacyToken = 'mcpToken';
 
   bool _loaded = false;
   bool _enabled = false;
+  bool _allowRemote = false;
   int _port = defaultPort;
   final List<McpToken> _tokens = [];
+
+  /// 对外展示/连接的地址（开启局域网访问后为本机局域网 IP；否则回环）
+  String _advertisedHost = loopbackHost;
 
   /// 分组 → 工具数（静态：工具清单不随运行时变化）
   static final Map<McpToolGroup, int> _toolCounts =
@@ -78,6 +89,9 @@ class McpServerController extends ChangeNotifier {
   bool get enabled => _enabled;
   int get port => _port;
 
+  /// 是否允许非本机（局域网）连接。默认 false = 只监听回环 127.0.0.1。
+  bool get allowRemote => _allowRemote;
+
   /// 用户创建的访问令牌（可多个，像 API Key 一样管理）
   List<McpToken> get tokens => List.unmodifiable(_tokens);
 
@@ -91,7 +105,14 @@ class McpServerController extends ChangeNotifier {
   /// 实际监听端口（未运行时为配置端口）
   int get activePort => _boundPort ?? _port;
 
-  String get endpointUrl => 'http://$bindHost:$activePort$endpointPath';
+  String get endpointUrl => 'http://$_advertisedHost:$activePort$endpointPath';
+
+  /// 本机自检恒用回环地址（不受局域网开关影响，避免防火墙 / 网卡干扰）
+  String get loopbackEndpointUrl =>
+      'http://$loopbackHost:$activePort$endpointPath';
+
+  /// 实际监听地址：默认仅回环；开启「允许非本机连接」后监听所有网卡
+  String get bindHost => _allowRemote ? anyHost : loopbackHost;
 
   bool isGroupEnabled(McpToolGroup group) => !_disabledGroups.contains(group);
 
@@ -130,6 +151,7 @@ class McpServerController extends ChangeNotifier {
       minPort,
       maxPort,
     );
+    _allowRemote = (await _db.getSettingBool(_kAllowRemote)) ?? false;
 
     await _loadTokens();
 
@@ -172,6 +194,17 @@ class McpServerController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // 局域网访问：解析本机 IPv4 作为对外地址，并补进 DNS-rebinding 的 Host 白名单
+      final lanIps = _allowRemote ? await _localIPv4s() : const <String>[];
+      _advertisedHost = _allowRemote && lanIps.isNotEmpty
+          ? lanIps.first
+          : loopbackHost;
+      final allowedHosts = {
+        ..._baseAllowedHosts,
+        if (_allowRemote) ...lanIps,
+        if (_allowRemote) ..._localHostnames(),
+      };
+
       final server = StreamableMcpServer(
         serverFactory: (sessionId) => McpToolRegistry.createServer(
           isGroupEnabled: isGroupEnabled,
@@ -181,7 +214,7 @@ class McpServerController extends ChangeNotifier {
         port: _port,
         path: endpointPath,
         enableDnsRebindingProtection: true,
-        allowedHosts: _allowedHosts,
+        allowedHosts: allowedHosts,
         // 刻意**不传** allowedOrigins：显式传集合时 SDK 要求 Origin 字符串
         // 精确相等（含端口），于是 Trae 这类 Chromium 系客户端发来的
         // `http://127.0.0.1:8765` 会被 DNS rebinding 防护判为非法并返回 403，
@@ -190,24 +223,59 @@ class McpServerController extends ChangeNotifier {
         // 即任意端口的回环 Origin 均放行，安全性等价：
         // 非回环 Origin 照样被拒，且 Host 校验与 Bearer 令牌两层防护仍在。
         enableJsonResponse: true,
-        authenticator: (request) =>
-            McpAuthenticator.authorize(request, _tokens.map((t) => t.value)),
+        authenticator: (request) => McpAuthenticator.authorize(
+          request,
+          _tokens.map((t) => t.value),
+          allowRemote: _allowRemote,
+        ),
       );
       await server.start();
       _server = server;
       _boundPort = server.boundPort;
       _status = McpServerStatus.running;
-      AppLogger.i('MCP', '服务已启动 $endpointUrl');
+      AppLogger.i(
+        'MCP',
+        '服务已启动 $endpointUrl${_allowRemote ? '（已允许非本机连接）' : ''}',
+      );
       // Android：通知栏常驻状态，让用户明确 MCP 正在运行
       unawaited(McpStatusNotice.show(endpointUrl));
     } catch (e) {
       _server = null;
       _boundPort = null;
+      _advertisedHost = loopbackHost;
       _status = McpServerStatus.error;
       _lastError = _describeStartError(e);
       AppLogger.e('MCP', '服务启动失败: $e');
     }
     notifyListeners();
+  }
+
+  /// 本机主机名（供 Host 白名单，允许客户端用 `http://<主机名>:port` 连接）；
+  /// 取不到时返回空列表，不影响启动。
+  List<String> _localHostnames() {
+    try {
+      final name = Platform.localHostname;
+      return name.isEmpty ? const [] : [name];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// 列出本机非回环 IPv4 地址（局域网访问时用于对外展示与 Host 白名单）
+  Future<List<String>> _localIPv4s() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLoopback: false,
+      );
+      return [
+        for (final i in interfaces)
+          for (final a in i.addresses) a.address,
+      ];
+    } catch (e) {
+      AppLogger.w('MCP', '枚举本机网卡失败: $e');
+      return const [];
+    }
   }
 
   /// 把启动失败翻译成可操作提示（最常见的是端口被占用）
@@ -224,6 +292,7 @@ class McpServerController extends ChangeNotifier {
     final server = _server;
     _server = null;
     _boundPort = null;
+    _advertisedHost = loopbackHost;
     _status = McpServerStatus.stopped;
     _lastError = null;
     notifyListeners();
@@ -245,6 +314,20 @@ class McpServerController extends ChangeNotifier {
     if (next == _port) return;
     _port = next;
     await _db.setSettingInt(_kPort, next);
+    notifyListeners();
+    if (_server != null) {
+      await stop();
+      await start();
+    }
+  }
+
+  /// 是否允许非本机（局域网）连接。
+  ///
+  /// 变更监听地址需重建 socket，故运行中会**重启服务**；令牌 / 能力开关不受影响。
+  Future<void> setAllowRemote(bool value) async {
+    if (_allowRemote == value) return;
+    _allowRemote = value;
+    await _db.setSettingBool(_kAllowRemote, value);
     notifyListeners();
     if (_server != null) {
       await stop();
@@ -392,7 +475,7 @@ class McpServerController extends ChangeNotifier {
     notifyListeners();
 
     final result = await McpSelfTest.run(
-      endpointUrl: endpointUrl,
+      endpointUrl: loopbackEndpointUrl,
       token: _tokens.first.value,
     );
     _testing = false;

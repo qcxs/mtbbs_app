@@ -80,45 +80,50 @@ extension _BrowserPageActions on _BrowserPageState {
     final result = await showModalBottomSheet<int>(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                '切换账号',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        // 账号数量不定：整体可滚动，避免账号一多就溢出（默认弹层高度上限为 9/16 屏高）
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  '切换账号',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            ...List.generate(accounts.length, (i) {
-              final a = accounts[i];
-              final isActive = i == activeIdx;
-              final isGuest = a.uid == '0';
-              return ListTile(
-                leading: CircleAvatar(
-                  radius: 16,
-                  child: Text(
-                    isGuest
-                        ? '?'
-                        : (a.username.isNotEmpty
-                              ? a.username[0].toUpperCase()
-                              : '?'),
-                    style: const TextStyle(fontSize: 14),
+              const Divider(height: 1),
+              ...List.generate(accounts.length, (i) {
+                final a = accounts[i];
+                final isActive = i == activeIdx;
+                final isGuest = a.uid == '0';
+                return ListTile(
+                  leading: CircleAvatar(
+                    radius: 16,
+                    child: Text(
+                      isGuest
+                          ? '?'
+                          : (a.username.isNotEmpty
+                                ? a.username[0].toUpperCase()
+                                : '?'),
+                      style: const TextStyle(fontSize: 14),
+                    ),
                   ),
-                ),
-                title: Text(
-                  isGuest ? '游客' : a.username,
-                  style: TextStyle(
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  title: Text(
+                    isGuest ? '游客' : a.username,
+                    style: TextStyle(
+                      fontWeight: isActive
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
                   ),
-                ),
-                subtitle: isGuest ? null : Text('UID: ${a.uid}'),
-                trailing: isActive ? const Icon(Icons.check, size: 18) : null,
-                onTap: () => Navigator.of(ctx).pop(i),
-              );
-            }),
-          ],
+                  subtitle: isGuest ? null : Text('UID: ${a.uid}'),
+                  trailing: isActive ? const Icon(Icons.check, size: 18) : null,
+                  onTap: () => Navigator.of(ctx).pop(i),
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );

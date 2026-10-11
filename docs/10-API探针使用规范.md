@@ -52,6 +52,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `siteName` | 与 `baseUrl` 配合的站点名（空则用域名） |
 | `cookie` | 临时注入 Cookie，格式 `k=v,k2=v2`（也兼容浏览器复制出来的 `k=v; k2=v2`）。写入**当前账号**的 CookieJar，用于防盗链 / 站点特定 Cookie；**人机验证不需要它**（探针会自动自解，见 5.1） |
 | `header` | 临时注入请求头，格式 `Name:Value,Name2:Value2`，加进 Dio 默认头，如 `header=Referer:https://bbs.binmt.cc/` |
+| `ua` | 临时换用「浏览模式」：`mobile`（移动模板）/ `desktop` 或 `pc`（桌面模板）。空 = 跟随站点设置。**对本次运行的所有请求生效**（含本不显式设站点 UA 的接口），用于"换 UA 复测解析" |
 | `log` | `off` / `info` / `debug`（默认 `info`；`off` 只输出协议 JSON，`debug` 输出 PARSE 明细） |
 | 其余键 | 透传给场景的 `params`（见 help 中每个场景的 `params` 字段） |
 
@@ -62,13 +63,23 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `session.list` | 查看本机 Cookie 目录（游客 + 各账号） | 否 |
 | `session.status` | 当前会话用户状态（uid/用户名/积分/用户组） | 否 |
 | `site.cdn` | 自动识别站点 CDN（读 PC 帮助页内联的 `STATICURL`，失败回退首页） | 否 |
-| `guide.list` | 导读列表（默认移动端 UA），`view=newthread/newreply/digest` | 否 |
+| `forum.nav` | 论坛导航（版块/子版块列表；App 与 MCP `list_forums` 的缓存来源） | 否 |
+| `guide.list` | 导读列表（默认移动端 UA），`view=newthread/hot/digest/...` | 否 |
 | `forum.list` | 版块帖子列表，`fid=*`（必填） | 否 |
+| `ranklist.thread` | 帖子排行（PC UA），`view`、`orderby` | 否 |
+| `ranklist.member` | 用户排行（PC UA），`view` | 否 |
+| `ranklist.forum` | 版块排行（PC UA），`view` | 否 |
+| `online.list` | 在线会员列表与统计（PC 专属页，移动模板通常无实现） | 否 |
+| `rss.list` | 站点 RSS 最新条目（标题/链接/发布时间） | 否 |
+| `darkroom.list` | 小黑屋（违规用户/处理记录，PC 专属页），`cid`（可空） | 否 |
+| `group.index` | 圈子首页（推荐圈子 + 分类 + 积分排行） | 否 |
+| `group.category` | 圈子分类下的圈子列表，`gid=*`、`page` | 否 |
 | `search.list` | 站内搜索帖子列表，`kw=*`、`page`、`searchid`（翻页） | 否 |
 | `thread.detail` | 帖子详情（楼主 + 楼层，自动截断），`tid=*` | 否 |
 | `post.byPid` | 按 pid 取单个楼层（viewpid 接口），`tid=*`/`pid=*` | 否 |
 | `post.findTid` | 按 pid 解析所在帖子 tid（findpost 301 跳转，供 App 内帖子页定位），`pid=*` | 否 |
 | `user.info` | 用户空间信息，`uid`/`username` 二选一，空则查自己 | 否 |
+| `wall.list` | 用户留言板，`uid`（空=自己）、`page` | 否 |
 | `friend.list` | 好友列表，`uid`（空=自己） | 否 |
 | `follow.list` | 关注/粉丝列表，`type=*`（following/follower），`uid`（空=自己） | 否 |
 | `favorite.list` | 收藏列表（含 favid，供删除用） | 是 |
@@ -80,8 +91,18 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `message.pm` | 私人消息列表 | 是 |
 | `message.pm.view` | 私信会话详情，`touid=*`；`page` 空=最新页，`1`=最旧页 | 是 |
 | `message.mypost` | 帖子提醒列表，`type=post/at` | 是 |
-| `my.threads` | 我的主题列表（默认移动端 UA） | 是 |
+| `my.threads` | 我的主题列表（默认移动端 UA），`type`、`uid` | 是 |
+| `post.new` | 发布新帖（写操作），`fid=*`、`subject=*`、`message=*` | 是 |
+| `post.reply` | 评论/回复帖子（写操作），`tid=*`、`message=*`、`reppid` | 是 |
+| `post.edit` | 修改帖子/评论（写操作），`tid=*`、`pid=*`、`message=*` | 是 |
+| `favorite.add` | 收藏帖子（写操作），`tid=*`、`note` | 是 |
+| `favorite.delete` | 删除收藏（写操作），`favid=*` | 是 |
+| `score.form` | 解析评分弹窗（写操作前奏），`tid=*`、`pid=*` | 是 |
+| `score.submit` | 提交评分（写操作），`tid=*`、`pid=*`、`scores` | 是 |
 | `message.pm.send` | 发送私信（写操作），`touid=*`、`message=*` | 是 |
+| `wall.post` | 发布/回复留言（写操作），`uid=*`、`message=*`、`cid`（回复某条） | 是 |
+| `wall.edit` | 编辑自己的留言（写操作），`uid=*`、`cid=*`、`message=*` | 是 |
+| `wall.delete` | 删除留言（写操作，破坏性），`uid=*`、`cid=*` | 是 |
 | `debug.http` | 调试：GET 指定路径，输出状态码/响应头/原始正文（携带当前会话 Cookie） | 否 |
 
 > 完整参数与说明以 `cmd=help` 实时输出为准（本表可能滞后）。
@@ -91,6 +112,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 - **输出协议**：`=== API_PROBE_BEGIN ===` + JSON + `=== API_PROBE_END ===`。`ok=true` = 管线无异常；`result.success` = 业务层结果。缺登录态时 `blocked=true` + `reminder` 提示先运行 App 登录。
 - **大结果压缩**：列表保留前 3 项 + `__more__`，长字符串截断 160 字符（`debug.http` 等 `raw` 场景除外，由场景自己控制长度）。
 - **参数值禁止包含** `& | ; " 空格` 等特殊字符：`&` 在 PowerShell→cmd 传递时会被拆成命令分隔符；`"` 会被 shell 剥离（JSON 方案不可行）。
+- **浏览模式（UA）**：默认跟随站点「浏览模式」（探针加载的是默认站点，通常即移动 UA）；加 `--dart-define=ua=desktop`（或 `mobile`）可临时换 UA 复测，**整次运行生效**、覆盖所有接口。**白名单**：仅 `guide.list` / `forum.list` / `search.list` / `my.threads` / `user.info` / `debug.http` 支持 `ua=mobile`；其余场景为 PC-only，传 `mobile` 会被明确拒绝（见各场景 `mobileSupported` 标记、docs/03）。
 - **`debug.http` 的 query 参数**：用 `q=k1=v1,k2=v2` 逗号分隔（逗号在各类 shell 中均安全），禁止直接传含 `&` 的完整 URL：
   ```
   --dart-define=cmd=debug.http --dart-define=path=/forum.php --dart-define=q=mod=guide,index=1,view=newthread

@@ -6,6 +6,7 @@ import 'package:mtbbs/api/forum/ranklist/export.dart' as ranklist;
 import 'package:mtbbs/api/forum/rss/export.dart' as rss;
 import 'package:mtbbs/api/forum/search/export.dart' as search;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as viewthread;
+import 'package:mtbbs/api/group/groupindex/export.dart' as groups;
 import 'package:mtbbs/api/home/space/export.dart' as space;
 import 'package:mtbbs/mcp/mcp_types.dart';
 import 'package:mtbbs/mcp/tools/mcp_payloads.dart';
@@ -38,6 +39,7 @@ List<McpToolDefinition> forumTools() => [
       ),
     },
     requiredArgs: const ['fid'],
+    mobileSupported: true, // 版块列表：克米移动卡片 / 标准 PC 表格，解析器工厂两套通吃
     run: (args) async {
       final fid = McpArgs.requireStr(args, 'fid');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
@@ -65,6 +67,7 @@ List<McpToolDefinition> forumTools() => [
         description: '页码，默认 1',
       ),
     },
+    mobileSupported: true, // 导读：移动卡片 / PC 表格
     run: (args) async {
       final view = McpArgs.str(args, 'view', fallback: 'newthread');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
@@ -95,6 +98,7 @@ List<McpToolDefinition> forumTools() => [
         description: '页码，默认 1',
       ),
     },
+    mobileSupported: true, // 搜索：移动克米 / 桌面 Discuz，两套解析器
     run: (args) async {
       final keyword = McpArgs.str(args, 'keyword');
       final searchId = McpArgs.str(args, 'search_id');
@@ -213,6 +217,7 @@ List<McpToolDefinition> forumTools() => [
       'uid': JsonSchema.string(description: '用户 UID'),
       'username': JsonSchema.string(description: '用户名'),
     },
+    mobileSupported: true, // 用户空间：克米移动 ↔ 标准 PC，parse 按 DOM 分流
     run: (args) async {
       final uid = McpArgs.str(args, 'uid');
       final username = McpArgs.str(args, 'username');
@@ -275,5 +280,38 @@ List<McpToolDefinition> forumTools() => [
     description: '获取站点 RSS 最新条目（标题、链接、发布时间）。',
     properties: const {},
     run: (args) async => rss.getRssFeed(ApiService().dio),
+  ),
+  McpToolDefinition(
+    name: 'list_groups',
+    group: McpToolGroup.publicData,
+    description:
+        '列出站点的圈子（Discuz 群组）首页：推荐圈子、圈子分类（含各分类下的圈子预览）与积分排行。'
+        '读某个圈子的帖子用 list_forum_threads（fid 传圈子的 gid）。',
+    properties: const {},
+    run: (args) async => McpPayloads.groupIndex(await groups.fetchGroupIndex(ApiService().dio)),
+  ),
+  McpToolDefinition(
+    name: 'list_group_forums',
+    group: McpToolGroup.publicData,
+    description: '列出某个圈子分类（gid）下的圈子列表（分页）。gid 来自 list_groups 的 categories。',
+    properties: {
+      'gid': JsonSchema.string(description: '圈子分类 ID，来自 list_groups'),
+      'page': JsonSchema.integer(
+        minimum: 1,
+        maximum: 200,
+        description: '页码，默认 1',
+      ),
+    },
+    requiredArgs: const ['gid'],
+    run: (args) async {
+      final gid = McpArgs.requireStr(args, 'gid');
+      final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
+      final result = await groups.fetchCategoryGroups(
+        ApiService().dio,
+        gid: gid,
+        page: page,
+      );
+      return McpPayloads.groupCategory(result);
+    },
   ),
 ];

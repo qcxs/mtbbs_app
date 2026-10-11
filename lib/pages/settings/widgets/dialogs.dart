@@ -74,28 +74,31 @@ class _NumberInputDialogState extends State<_NumberInputDialog> {
     return AlertDialog(
       constraints: const BoxConstraints(maxWidth: settingsDialogMaxWidth),
       title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.description != null) ...[
-            Text(widget.description!),
-            const SizedBox(height: 12),
-          ],
-          TextField(
-            controller: _ctl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: '数值',
-              border: const OutlineInputBorder(),
-              isDense: true,
-              helperText:
-                  widget.helperText ??
-                  (widget.min > 0 || widget.max < 100000
-                      ? '${widget.min} - ${widget.max}'
-                      : null),
+      // 说明文字由调用方传入、可能较长：content 必须可滚动
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.description != null) ...[
+              Text(widget.description!),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _ctl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: '数值',
+                border: const OutlineInputBorder(),
+                isDense: true,
+                helperText:
+                    widget.helperText ??
+                    (widget.min > 0 || widget.max < 100000
+                        ? '${widget.min} - ${widget.max}'
+                        : null),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -146,23 +149,28 @@ Future<T?> showSelectDialog<T>({
     builder: (ctx) => AlertDialog(
       constraints: const BoxConstraints(maxWidth: settingsDialogMaxWidth),
       title: Text(title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final opt in options)
-            ListTile(
-              leading: opt.icon == null
-                  ? null
-                  : Icon(opt.icon, color: cs.primary),
-              title: Text(opt.label),
-              subtitle: opt.description == null ? null : Text(opt.description!),
-              trailing: opt.value == selected
-                  ? Icon(Icons.check, color: cs.primary)
-                  : null,
-              onTap: () => Navigator.of(ctx).pop(opt.value),
-            ),
-        ],
+      // 选项数量由调用方决定（通用组件）：可滚动，避免后续传入长列表时溢出
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final opt in options)
+              ListTile(
+                leading: opt.icon == null
+                    ? null
+                    : Icon(opt.icon, color: cs.primary),
+                title: Text(opt.label),
+                subtitle: opt.description == null
+                    ? null
+                    : Text(opt.description!),
+                trailing: opt.value == selected
+                    ? Icon(Icons.check, color: cs.primary)
+                    : null,
+                onTap: () => Navigator.of(ctx).pop(opt.value),
+              ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -196,25 +204,28 @@ Future<Set<T>?> showMultiSelectDialog<T>({
         builder: (ctx, setLocal) => AlertDialog(
           constraints: const BoxConstraints(maxWidth: settingsDialogMaxWidth),
           title: Text(title),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final opt in options)
-                CheckboxListTile(
-                  value: cur.contains(opt.value),
-                  title: Text(opt.label),
-                  subtitle: opt.description == null
-                      ? null
-                      : Text(opt.description!),
-                  onChanged: (v) => setLocal(() {
-                    if (v == true) {
-                      cur.add(opt.value);
-                    } else {
-                      cur.remove(opt.value);
-                    }
-                  }),
-                ),
-            ],
+          // 选项数量由调用方决定（通用组件）：可滚动，避免后续传入长列表时溢出
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final opt in options)
+                  CheckboxListTile(
+                    value: cur.contains(opt.value),
+                    title: Text(opt.label),
+                    subtitle: opt.description == null
+                        ? null
+                        : Text(opt.description!),
+                    onChanged: (v) => setLocal(() {
+                      if (v == true) {
+                        cur.add(opt.value);
+                      } else {
+                        cur.remove(opt.value);
+                      }
+                    }),
+                  ),
+              ],
+            ),
           ),
           actions: [
             TextButton(

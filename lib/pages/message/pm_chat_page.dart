@@ -356,28 +356,33 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
       showDragHandle: true,
       constraints: const BoxConstraints(maxWidth: 560),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                error,
-                style: TextStyle(fontSize: 13, color: cs.error),
+        // 错误文案可能很长（服务端返回的消息 / 含换行），整块可滚动：
+        // 内容短时贴合，超出底部面板高度时纵向滚动，避免 RenderFlex 溢出
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  error,
+                  style: TextStyle(fontSize: 13, color: cs.error),
+                ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.refresh),
-              title: const Text('重新发送'),
-              onTap: () => Navigator.of(ctx).pop('retry'),
-            ),
-            ListTile(
-              leading: Icon(Icons.delete_outline, color: cs.error),
-              title: Text('删除', style: TextStyle(color: cs.error)),
-              onTap: () => Navigator.of(ctx).pop('delete'),
-            ),
-          ],
+              ListTile(
+                leading: const Icon(Icons.refresh),
+                title: const Text('重新发送'),
+                onTap: () => Navigator.of(ctx).pop('retry'),
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline, color: cs.error),
+                title: Text('删除', style: TextStyle(color: cs.error)),
+                onTap: () => Navigator.of(ctx).pop('delete'),
+              ),
+            ],
+          ),
         ),
       ),
     );

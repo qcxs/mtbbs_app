@@ -220,6 +220,24 @@ void main() {
         isNull,
       );
     });
+
+    test('在线用户 forum.php?showoldetails=yes → /online', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/forum.php?showoldetails=yes',
+        ).appPath,
+        '/online',
+      );
+    });
+
+    test('小黑屋 forum.php?mod=misc&action=showdarkroom → /darkroom', () {
+      expect(
+        UrlRouter.parse(
+          'https://bbs.binmt.cc/forum.php?mod=misc&action=showdarkroom',
+        ).appPath,
+        '/darkroom',
+      );
+    });
   });
 
   group('resolveTarget - 唯一决策点', () {
@@ -249,6 +267,20 @@ void main() {
 
     test('App 内路径原样返回', () {
       expect(UrlRouter.resolveTarget('/home'), '/home');
+    });
+
+    test('App 自定义 scheme（桌面快捷方式）→ App 内路径', () {
+      expect(
+        UrlRouter.resolveTarget('mtbbs://settings/cache'),
+        '/settings/cache',
+      );
+      // 前后空白要容忍（原生侧 intent 可能带）
+      expect(
+        UrlRouter.resolveTarget('  mtbbs://settings/cache  '),
+        '/settings/cache',
+      );
+      // 只有 scheme 没有路径 → null（调用方不跳转）
+      expect(UrlRouter.resolveTarget('mtbbs://'), isNull);
     });
 
     test('空串 → null（调用方不跳转）', () {

@@ -42,27 +42,30 @@ class BbcodeDialog {
             ],
           ),
           constraints: const BoxConstraints(maxWidth: 400),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: tags.map((tag) {
-              final label = _tagLabels[tag] ?? tag;
-              final enabled = !localDisabled.contains(tag);
-              return CheckboxListTile(
-                value: enabled,
-                title: Text(label, style: const TextStyle(fontSize: 14)),
-                dense: true,
-                controlAffinity: ListTileControlAffinity.trailing,
-                onChanged: (v) {
-                  setD(() {
-                    if (v == true) {
-                      localDisabled.remove(tag);
-                    } else {
-                      localDisabled.add(tag);
-                    }
-                  });
-                },
-              );
-            }).toList(),
+          // 选项为样式标签全集（9 项），小屏 / 大字体下可能超出弹窗高度：可滚动
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: tags.map((tag) {
+                final label = _tagLabels[tag] ?? tag;
+                final enabled = !localDisabled.contains(tag);
+                return CheckboxListTile(
+                  value: enabled,
+                  title: Text(label, style: const TextStyle(fontSize: 14)),
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  onChanged: (v) {
+                    setD(() {
+                      if (v == true) {
+                        localDisabled.remove(tag);
+                      } else {
+                        localDisabled.add(tag);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
           ),
           actions: [
             TextButton(
