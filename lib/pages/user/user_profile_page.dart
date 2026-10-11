@@ -21,6 +21,7 @@ import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/pages/user/user_uid_picker_dialog.dart';
+import 'package:mtbbs/pages/user/user_share_page.dart';
 
 part 'user_profile_sections.dart';
 part 'user_profile_sections_extra.dart';
@@ -43,6 +44,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   bool _loading = true;
   String? _error;
   bool _showRawSignature = false;
+
+  /// 「生成图片」预览模式：正文区切换为预览（复用本页区块，见 _contentSections）
+  bool _sharing = false;
 
   @override
   void initState() {
@@ -117,6 +121,34 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
+  /// 生成个人主页分享图（见 pages/user/user_share_page.dart）
+  ///
+  /// 直接复用本页正文区块（`_contentSections`）→ 图片与页面完全一致，无需任何配置。
+  void _shareImage() {
+    if (_profile == null) return;
+    setState(() => _sharing = true);
+  }
+
+  /// 正文区块（正文列表与「生成图片」共用，保证图片与页面完全一致）
+  List<Widget> _contentSections() => [
+    _buildHeader(),
+    const SizedBox(height: 8),
+    _buildPointsSection(),
+    const SizedBox(height: 8),
+    if (_profile!['signature'] != null) _buildSignature(),
+    if (_profile!['customTitle'] != null) ...[
+      const SizedBox(height: 8),
+      _buildCustomTitle(),
+    ],
+    const SizedBox(height: 8),
+    _buildActivityInfo(),
+    if (_profile!['medals'] != null) ...[
+      const SizedBox(height: 8),
+      _buildMedals(),
+    ],
+    const SizedBox(height: 24),
+  ];
+
   /// 数据源菜单行：图标 + 文案 + 勾选
   Widget _sourceMenuRow({
     required IconData icon,
@@ -165,6 +197,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
             loading: _loading,
             copyLabel: '复制个人主页链接',
             extraItems: [
+              // 生成分享图（与帖子/评论同一套：预览 → 截图保存）
+              PopupMenuItem<String>(
+                value: 'save_image',
+                child: Row(
+                  children: [
+                    const Icon(Icons.save_alt, size: 18),
+                    const SizedBox(width: 8),
+                    const Text('生成图片'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
               // 本页数据源（仅个人空间生效）：移动版社交数据全，桌面版资料更全
               PopupMenuItem<String>(
                 value: 'src_follow',
@@ -223,6 +267,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ],
             onExtraSelected: (action) {
               switch (action) {
+                case 'save_image':
+                  _shareImage();
                 case 'src_follow':
                   _setSpaceSource('');
                 case 'src_mobile':
@@ -244,7 +290,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: _sharing ? _buildSharePreview() : _buildBody(),
     );
   }
 
@@ -259,26 +305,25 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 8),
-          _buildPointsSection(),
-          const SizedBox(height: 8),
-          if (_profile!['signature'] != null) _buildSignature(),
-          if (_profile!['customTitle'] != null) ...[
-            const SizedBox(height: 8),
-            _buildCustomTitle(),
-          ],
-          const SizedBox(height: 8),
-          _buildActivityInfo(),
-          if (_profile!['medals'] != null) ...[
-            const SizedBox(height: 8),
-            _buildMedals(),
-          ],
-          const SizedBox(height: 24),
-        ],
-      ),
+      child: ListView(children: _contentSections()),
+    );
+  }
+
+  /// 生成图片预览：复用本页正文区块（与页面完全一致）+ 底部「站点 / 用户 / 二维码」水印
+  Widget _buildSharePreview() {
+    final p = _profile!;
+    final nickname = p['nickname'] as String? ?? '';
+    final spaceUrl = p['spaceUrl'] as String? ?? '';
+    return UserSharePreview(
+      sections: _contentSections(),
+      userLabel: nickname.isEmpty
+          ? 'uid=${widget.uid}'
+          : '$nickname · uid=${widget.uid}',
+      qrUrl: spaceUrl.isNotEmpty
+          ? spaceUrl
+          : '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
+      filePrefix: 'MTBBS_user_${widget.uid}',
+      onClose: () => setState(() => _sharing = false),
     );
   }
 

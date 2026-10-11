@@ -43,6 +43,15 @@ final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 抬高"已解码图片"的内存缓存预算（Flutter 默认 100MB）。
+  //
+  // 生成分享图时，同一批帖子图片会在分享卡里按**不同的解码宽度**再解码一份
+  // （分享卡更窄）。宽屏下帖子图按「图片最大宽度 600」解码、单张更大，两份叠加
+  // 容易超过 100MB → LRU 会把**帖子页自己的**（更早访问）图片淘汰掉，返回帖子页时
+  // 重新解码（表现为"帖子页被重载 / 图片重新加载"）。窄屏帖子图小，两份也装得下，
+  // 所以只有宽屏复现。调大预算消除这种误淘汰（见 docs/07 #91）。
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 200 << 20;
+
   // Windows 上 Dart BoringSSL 可能无法正确读取系统根证书，
   // 导致 CERTIFICATE_VERIFY_FAILED 错误。
   // 使用系统默认的证书校验方式运行。

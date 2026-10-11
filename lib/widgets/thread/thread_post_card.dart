@@ -10,7 +10,7 @@ import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 帖子卡片操作类型（PopupMenu）
-enum PostCardAction { showBbcode, editPost, viewTime, rate }
+enum PostCardAction { showBbcode, editPost, viewTime, rate, saveImage }
 
 /// 帖子/评论卡片组件
 ///
@@ -391,14 +391,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
           icon: Icon(Icons.more_horiz, size: 16, color: cs.onSurfaceVariant),
-          onSelected: (action) {
-            if (action == PostCardAction.showBbcode ||
-                action == PostCardAction.editPost ||
-                action == PostCardAction.viewTime ||
-                action == PostCardAction.rate) {
-              widget.onPopupAction?.call(action);
-            }
-          },
+          onSelected: (action) => widget.onPopupAction?.call(action),
           itemBuilder: (_) => [
             const PopupMenuItem(
               value: PostCardAction.showBbcode,
@@ -410,6 +403,10 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                 enabled: widget.post.pid.isNotEmpty,
                 child: const Text('查看时间', style: TextStyle(fontSize: 13)),
               ),
+            const PopupMenuItem(
+              value: PostCardAction.saveImage,
+              child: Text('生成图片', style: TextStyle(fontSize: 13)),
+            ),
           ],
         ),
       ],

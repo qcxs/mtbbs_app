@@ -89,4 +89,28 @@ List<SettingsModel> contentSettings() => [
     value: (s) => s.noticeCheckEnabled,
     onChanged: (ctx, s, v) => s.setNoticeCheckEnabled(v),
   ),
+  NormalSetting(
+    title: '分享图最大正文高度',
+    icon: Icons.height,
+    subtitleBuilder: (s) => '${s.shareImageMaxHeight}px（生成页勾选「截断」时生效）',
+    onTap: (ctx, s) => showNumberDialog(
+      context: ctx,
+      title: '分享图最大正文高度',
+      description:
+          '生成分享图时，正文高度超过该值（逻辑像素）即截断，底部渐隐 + 提示查看原帖 / 该楼层。'
+          '数值越大图越长，默认 8000px（≈ 10 个手机屏）。是否截断在「生成图片」页临时勾选。',
+      initValue: s.shareImageMaxHeight,
+      min: 1000,
+      max: 100000,
+      helperText: '默认 8000px',
+      onSave: (v) => s.setShareImageMaxHeight(v),
+    ),
+  ),
+  SwitchSetting(
+    title: '只生成内容图',
+    subtitle: '仅输出帖子正文，不含作者信息、评分/打赏用户、页脚与定位信息（默认关闭 = 完整卡片）',
+    icon: Icons.article_outlined,
+    value: (s) => s.shareImageContentOnly,
+    onChanged: (ctx, s, v) => s.setShareImageContentOnly(v),
+  ),
 ];

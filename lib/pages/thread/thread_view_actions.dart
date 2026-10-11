@@ -157,6 +157,17 @@ extension on _ThreadViewPageState {
     );
   }
 
+  /// 生成当前楼层的分享图片（预览 → 截图保存，见 pages/thread/thread_share_page.dart）
+  void _showShareImage(PostItem post) {
+    ThreadSharePage.open(
+      context,
+      post: post,
+      tid: widget.tid,
+      threadTitle: _data?.title ?? '',
+      opUid: _data?.mainPost?.uid ?? '',
+    );
+  }
+
   void _editPost(PostItem post) {
     final isOp = post.pid == _data?.mainPost?.pid;
     _openEditor(

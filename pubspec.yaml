@@ -82,6 +82,19 @@ dependencies:
   url_launcher: ^6.3.2
   photo_view: ^0.15.0
 
+  # 保存「生成图片」分享卡到相册（Android/iOS 相册，Windows 图片库）。
+  # 自带权限处理（Gal.hasAccess/requestAccess），无需 permission_handler/device_info_plus，
+  # 使用见 lib/services/image_export.dart。
+  gal: ^2.3.3
+
+  # 长图分享：超长楼层按块截图后在 CPU 侧拼接并编码 PNG（纯 Dart，
+  # 绕开单张 GPU 纹理上限），见 lib/services/image_export.dart。
+  image: ^4.5.4
+
+  # 分享图右下角二维码：用 qr 编码 + 自绘模块。
+  # 不用 pretty_qr_code —— 它断言「单模块 ≥ 2px」，64px 的二维码会直接崩（见 docs/07 #91）。
+  qr: ^3.0.2
+
   # 内嵌 JS 引擎（QuickJS / JavaScriptCore）：在本地执行站点的人机验证挑战脚本，
   # 免去弹 WebView 打断用户（见 lib/core/app/acw_solver.dart）。
   # 注意 Windows/Linux/Android 用的是 2021 版 QuickJS，且必须显式调小栈上限。

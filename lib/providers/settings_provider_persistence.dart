@@ -268,6 +268,14 @@ extension SettingsPersistence on SettingsProvider {
     // 宽屏时帖子图片最大宽度（默认 600）
     _maxImageWidth = (await _db.getSettingInt('maxImageWidth')) ?? 600;
 
+    // 分享图正文最大高度（生成页勾选「截断」时生效）
+    _shareImageMaxHeight =
+        (await _db.getSettingInt('shareImageMaxHeight')) ?? 8000;
+
+    // 「生成图片」只输出正文（默认关）
+    _shareImageContentOnly =
+        (await _db.getSettingBool('shareImageContentOnly')) ?? false;
+
     // 编辑器启动自检
     _editorStartupCheck =
         (await _db.getSettingBool('editorStartupCheck')) ?? true;

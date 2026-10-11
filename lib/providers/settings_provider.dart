@@ -222,6 +222,12 @@ class SettingsProvider extends ChangeNotifier {
   /// 宽屏时帖子图片最大宽度（px），窄屏占满不受此限制；默认 600
   int _maxImageWidth = 600;
 
+  /// 分享图正文最大高度（逻辑像素）：生成页勾选「截断」时生效
+  int _shareImageMaxHeight = 8000;
+
+  /// 「生成图片」只输出正文（不含作者信息 / 评分、页脚与定位信息），默认关
+  bool _shareImageContentOnly = false;
+
   /// 编辑器启动自检（默认开启，关闭后跳过启动报错，无条件进入编辑器）
   bool _editorStartupCheck = true;
 

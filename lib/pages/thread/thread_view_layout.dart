@@ -111,6 +111,8 @@ extension on _ThreadViewPageState {
             _fetchPostDetailInfo(post);
           case PostCardAction.rate:
             _handleRate(post);
+          case PostCardAction.saveImage:
+            _showShareImage(post);
         }
       },
     );
@@ -159,6 +161,8 @@ extension on _ThreadViewPageState {
             _fetchPostDetailInfo(post);
           case PostCardAction.rate:
             _handleRate(post);
+          case PostCardAction.saveImage:
+            _showShareImage(post);
         }
       },
     );

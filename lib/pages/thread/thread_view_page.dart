@@ -40,6 +40,7 @@ import 'package:mtbbs/core/utils/screen_size_ext.dart';
 import 'package:mtbbs/pages/thread/thread_view_comment_section.dart';
 import 'package:mtbbs/pages/thread/thread_view_main_post.dart';
 import 'package:mtbbs/pages/thread/thread_favorite_note_dialog.dart';
+import 'package:mtbbs/pages/thread/thread_share_page.dart';
 
 part 'thread_view_actions.dart';
 part 'thread_view_layout.dart';

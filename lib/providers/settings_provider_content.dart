@@ -44,4 +44,18 @@ extension SettingsContent on SettingsProvider {
     await _db.setSettingInt('maxImageWidth', _maxImageWidth);
     _notify();
   }
+
+  /// 分享图正文最大高度（逻辑像素）
+  Future<void> setShareImageMaxHeight(int px) async {
+    _shareImageMaxHeight = px.clamp(1000, 100000);
+    await _db.setSettingInt('shareImageMaxHeight', _shareImageMaxHeight);
+    _notify();
+  }
+
+  /// 开关「只生成内容图」（仅正文，不含作者信息 / 评分、页脚与定位信息）
+  Future<void> setShareImageContentOnly(bool value) async {
+    _shareImageContentOnly = value;
+    await _db.setSettingBool('shareImageContentOnly', value);
+    _notify();
+  }
 }

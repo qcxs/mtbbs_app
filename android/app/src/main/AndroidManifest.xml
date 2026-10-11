@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 保存「生成图片」分享卡到相册：Android 10（API 29）及以下写外部存储需要；
+         10+ 走 MediaStore 无需权限（见 lib/services/image_export.dart） -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"/>
     <!-- MCP 服务运行时的常驻状态通知（Android 13+ 需要，运行时申请） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- MCP 运行状态前台服务（Android 14+ 需要声明服务类型对应的权限） -->

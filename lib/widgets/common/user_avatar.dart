@@ -338,6 +338,9 @@ class _UserAvatarState extends State<UserAvatar> {
               height: widget.radius * 2,
               memCacheWidth: (widget.radius * 2 * 2).toInt(),
               memCacheHeight: (widget.radius * 2 * 2).toInt(),
+              // 命中缓存时不再淡入，避免"返回页面头像重新加载"的观感
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
               fit: BoxFit.cover,
               placeholder: (_, __) => SizedBox(
                 width: widget.radius * 2,

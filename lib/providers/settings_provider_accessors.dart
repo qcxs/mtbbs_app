@@ -86,6 +86,12 @@ extension SettingsAccessors on SettingsProvider {
   AvatarSizeMode get avatarSizeMode => _avatarSizeMode;
   int get maxImageWidth => _maxImageWidth;
 
+  /// 分享图正文最大高度（逻辑像素）：生成页勾选「截断」时生效
+  int get shareImageMaxHeight => _shareImageMaxHeight;
+
+  /// 分享图是否只输出正文（不含作者信息 / 评分、页脚与定位信息）
+  bool get shareImageContentOnly => _shareImageContentOnly;
+
   /// 某上下文的迷你编辑器工具栏项。
   ///
   /// 与完整版**共用同一套工具栏**（同一份 `_toolbarItems`，顺序统一），

@@ -157,12 +157,23 @@ class BbcodeImage extends StatelessWidget {
         // ResizeImage）与缓存层的磁盘缩放都是 allowUpscaling=false，解码结果
         // 不会超过原图，因此"只设上限"即等价于 min(上限, 原始像素宽)。
         final hasExplicitWidth = explicitWidth != null && explicitWidth! > 0;
+        // 解码宽度与"布局宽度"解耦：取 min(屏幕宽, max(图片最大宽度, 显式宽))。
+        // 布局宽一图一变（宽/窄布局、分享卡、编辑器预览各不同），若拿它当解码宽，
+        // 同一张图会按不同尺寸各解一份、互相挤占 imageCache（返回时重解码，见 docs/07 #91）。
+        // 用"屏幕宽 + 图片最大宽度"这个与布局无关的量，全场景命中同一条目。
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final intended =
+            (explicitWidth ?? 0) > maxImageWidth ? explicitWidth! : maxImageWidth;
+        final decodeWidth = intended < screenWidth ? intended : screenWidth;
         final image = CachedNetworkImage(
           imageUrl: url,
           cacheManager: imageCacheManager,
           // 显式尺寸才给 width：给了就会把低分辨率小图拉伸放大（变糊）
           width: hasExplicitWidth ? width : null,
-          memCacheWidth: (width * 2).toInt(),
+          memCacheWidth: (decodeWidth * 2).round(),
+          // 命中缓存（内存/磁盘）时不再淡入，避免"返回页面图片重新加载"的观感
+          fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
           fit: BoxFit.contain,
           placeholder: (_, __) => const SizedBox(
             height: 100,
