@@ -116,6 +116,10 @@ jobs:
             mv "$file" "MTBBS_android_${{ env.MTBBS_VERSION }}_${abi}.apk"
           done
 
+      - name: 输出产物摘要与 Hash（溯源）
+        shell: pwsh
+        run: scripts/artifact_summary.ps1 -Title 'Android APK' -Patterns 'MTBBS_android_*.apk'
+
       - name: 发布到 GitHub Release
         if: ${{ github.event.inputs.tag != '' }}
         uses: softprops/action-gh-release@v2
@@ -202,6 +206,10 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "MTBBS_windows_${env:MTBBS_VERSION}_x64_portable.zip"
+
+      - name: 输出产物摘要与 Hash（溯源）
+        shell: pwsh
+        run: scripts/artifact_summary.ps1 -Title 'Windows 安装包' -Patterns 'MTBBS_windows_*.exe','MTBBS_windows_*.zip'
 
       - name: 发布到 GitHub Release
         if: ${{ github.event.inputs.tag != '' }}
