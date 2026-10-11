@@ -32,12 +32,22 @@
 
 成功响应：`非常感谢，您的主题已发布…`，返回新 `tid`。
 
+**tid/pid 提取（`parseSubmitResponse`）**：按"可靠性递减"链式取值，两字段各自独立，不要只认 `tid=`：
+
+| 来源（优先级从高到低） | tid | pid |
+|---|---|---|
+| `succeedhandle_` 第 3 参 JS 对象 | `'tid':'…'` | `'pid':'…'` |
+| redirect 查询串 | `tid=` / `ptid=` | `pid=` / `#pid` |
+| 伪静态路径 | `thread-{tid}-…html` | — |
+
+兼容两种站点风格：查询串式（`forum.php?mod=viewthread&tid=…`）与伪静态式（`thread-{tid}-1-1.html`，如 MT 论坛）。见 docs/07 #95。
+
 **客户端落点（发帖后自动跳转，见 `editor_page_actions.dart`）**：
 
 | 结果 | 跳转 |
 |---|---|
-| 解析到 `tid`（redirect 里带 `tid=`） | 直接打开新帖 `/thread/{tid}` |
-| 未解析到 `tid`（如 MT 论坛的响应不含 tid） | 打开 `/my-threads`（刚发布的必是第一条） |
+| 解析到 `tid` | 直接打开新帖 `/thread/{tid}` |
+| 未解析到 `tid`（响应里无任何 tid 线索，极少数） | 打开 `/my-threads`（刚发布的必是第一条） |
 | 需审核（`needsApproval`，或提示文案含「审核」） | 什么都不做，仅退出编辑器 |
 
 ## 2. 评论 — tid

@@ -129,8 +129,8 @@ extension on _EditorPageState {
         );
 
         // 发帖成功后的落点（覆盖编辑器路由，返回时回到来源页）：
-        // - 拿到 tid（站点在 redirect 里回了 tid）→ 直接打开新帖
-        // - 拿不到 tid（如 MT 论坛）→ 打开「我的帖子」：刚发布的必是第一条
+        // - 拿到 tid（响应含 tid，含伪静态 redirect / succeedhandle 第 3 参对象）→ 直接打开新帖
+        // - 拿不到 tid（响应里无任何 tid 线索）→ 打开「我的帖子」：刚发布的必是第一条
         // - 需审核 → 什么都不做（帖子尚未上架，跳过去也看不到）
         if (widget.type == EditorType.post && !needsApproval) {
           if (result.tid.isNotEmpty) {

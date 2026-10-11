@@ -88,15 +88,28 @@ SubmitResult parseSubmitResponse(String body) {
 
   // 2. succeedhandle_ — Discuz 标准成功
   //    格式1: succeedhandle_('redirect', 'message')
-  //    格式2: succeedhandle_rate('redirect', 'message', {})（带函数后缀）
+  //    格式2: succeedhandle_('redirect', 'message', {params})（第 3 参为结构化字段）
+  //    格式3: succeedhandle_rate('redirect', 'message', {})（带函数后缀）
   final successMatch = RegExp(
-    r"succeedhandle_(?:\w+)?\('([^']+)',\s*'([^']*)'",
+    r"succeedhandle_(?:\w+)?\('([^']+)',\s*'([^']*)'(?:,\s*(\{[^}]*\}))?",
   ).firstMatch(cdata);
   if (successMatch != null) {
     final redirect = successMatch.group(1) ?? '';
     final message = successMatch.group(2) ?? '';
-    final tid = RegExp(r'tid=(\d+)').firstMatch(redirect)?.group(1) ?? '';
-    final pid = RegExp(r'pid=(\d+)').firstMatch(redirect)?.group(1) ?? '';
+    final params = successMatch.group(3) ?? '';
+    // tid/pid 可能只在伪静态 redirect（thread-{tid}-…html，无 `tid=`）或第 3 参对象里。
+    // 结构化对象最可靠（与站点 URL 风格无关），优先；再退到查询串与伪静态路径。
+    final tid = _extractSubmitField(params, redirect, const [
+      r"""['"]?tid['"]?\s*:\s*['"]?(\d+)""",
+      r'[?&]tid=(\d+)',
+      r'[?&]ptid=(\d+)', // mod=redirect&goto=findpost 回复场景
+      r'thread-(\d+)', // 伪静态路径 thread-{tid}-{page}-…
+    ]);
+    final pid = _extractSubmitField(params, redirect, const [
+      r"""['"]?pid['"]?\s*:\s*['"]?(\d+)""",
+      r'[?&]pid=(\d+)',
+      r'#pid(\d+)',
+    ]);
     final needsApproval = message.contains('审核');
     return SubmitResult(
       success: true,
@@ -181,4 +194,20 @@ SubmitResult parseSubmitResponse(String body) {
   }
 
   return const SubmitResult(success: false, message: '未知响应');
+}
+
+/// 从提交响应的结构化字段 [structured]（`succeedhandle_` 第 3 参 JS 对象）
+/// 与 [url]（redirect 地址）中按优先级提取数字字段。
+///
+/// 先整体扫 [structured]，再整体扫 [url]；每个来源内按 [patterns] 顺序取首个命中。
+/// 均未命中返回空串。
+String _extractSubmitField(String structured, String url, List<String> patterns) {
+  for (final source in [structured, url]) {
+    if (source.isEmpty) continue;
+    for (final p in patterns) {
+      final g = RegExp(p).firstMatch(source)?.group(1);
+      if (g != null && g.isNotEmpty) return g;
+    }
+  }
+  return '';
 }
