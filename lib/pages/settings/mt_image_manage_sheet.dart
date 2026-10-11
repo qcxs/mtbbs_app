@@ -1,11 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
+import 'package:mtbbs/widgets/image_preview/image_preview.dart';
 
-/// MT 图床管理面板 — 查看/隐藏/删除历史上传。
+/// MT 图床管理面板 — 查看/删除历史上传。
 ///
 /// 只有列表操作、没有设置表单，因此以底部面板承载，不再占用独立路由。
 Future<void> showMtImageManageSheet(BuildContext context) {
@@ -40,7 +43,7 @@ class _MtImageManageSheetState extends State<_MtImageManageSheet> {
   }
 
   Future<void> _load() async {
-    final list = await _hosting.getHistory(limit: 200, includeHidden: true);
+    final list = await _hosting.getHistory(limit: 200);
     if (!mounted) return;
     setState(() {
       _items = list;
@@ -60,9 +63,21 @@ class _MtImageManageSheetState extends State<_MtImageManageSheet> {
     _load();
   }
 
-  Future<void> _toggleHidden(MtUploadResult item) async {
-    await _hosting.toggleHistoryHidden(item.url);
-    _load();
+  /// 点击眼镜图标：用通用大图查看器查看（可左右滑动切换）
+  void _openGallery(int index) {
+    showImageViewer(
+      context,
+      imageUrls: _items.map((e) => e.url).toList(),
+      initialIndex: index,
+    );
+  }
+
+  /// 查看信息：文件名 / 大小 / 时间 / 链接（可复制）
+  void _showInfo(MtUploadResult item) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => _MtImageInfoDialog(item: item),
+    );
   }
 
   @override
@@ -125,6 +140,7 @@ class _MtImageManageSheetState extends State<_MtImageManageSheet> {
       itemBuilder: (_, i) {
         final item = _items[i];
         return ListTile(
+          onTap: () => _showInfo(item),
           leading: ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: CachedNetworkImage(
@@ -139,11 +155,7 @@ class _MtImageManageSheetState extends State<_MtImageManageSheet> {
                 width: 48,
                 height: 48,
                 color: cs.surfaceContainerHigh,
-                child: Icon(
-                  Icons.image,
-                  size: 24,
-                  color: cs.onSurfaceVariant,
-                ),
+                child: Icon(Icons.image, size: 24, color: cs.onSurfaceVariant),
               ),
             ),
           ),
@@ -151,39 +163,177 @@ class _MtImageManageSheetState extends State<_MtImageManageSheet> {
             item.originName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14,
-              color: item.hidden ? cs.onSurfaceVariant : null,
-            ),
+            style: const TextStyle(fontSize: 14),
           ),
           subtitle: Text(
-            '${item.sizeText}  ·  ${formatRelativeTimeShort(item.uploadedAt)}'
-            '${item.hidden ? '  ·  已隐藏' : ''}',
+            '${item.sizeText}  ·  ${formatRelativeTimeShort(item.uploadedAt)}',
             style: const TextStyle(fontSize: 12),
           ),
-          trailing: PopupMenuButton<String>(
-            onSelected: (v) {
-              switch (v) {
-                case 'hide':
-                  _toggleHidden(item);
-                case 'delete':
-                  _delete(item);
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'hide',
-                child: Text(item.hidden ? '取消隐藏' : '隐藏'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.visibility_outlined, size: 20),
+                tooltip: '查看大图',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _openGallery(i),
               ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'delete',
-                child: Text('删除', style: TextStyle(color: cs.error)),
+              PopupMenuButton<String>(
+                onSelected: (v) {
+                  switch (v) {
+                    case 'info':
+                      _showInfo(item);
+                    case 'delete':
+                      _delete(item);
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'info', child: Text('查看信息')),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text('删除', style: TextStyle(color: cs.error)),
+                  ),
+                ],
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// 单条上传记录的信息弹窗 — 预览 + 可复制的链接
+class _MtImageInfoDialog extends StatelessWidget {
+  const _MtImageInfoDialog({required this.item});
+
+  final MtUploadResult item;
+
+  Future<void> _copy(String text) async {
+    await ClipboardHelper.write(text);
+    showToast('已复制');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: const Text('图片信息', style: TextStyle(fontSize: 16)),
+      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      content: SizedBox(
+        width: 320,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 预览图
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: CachedNetworkImage(
+                  imageUrl: item.url,
+                  cacheManager: imageCacheManager,
+                  width: double.infinity,
+                  height: 160,
+                  fit: BoxFit.contain,
+                  errorWidget: (_, __, ___) => Container(
+                    height: 160,
+                    alignment: Alignment.center,
+                    color: cs.surfaceContainerHigh,
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _metaRow(cs, '文件名', item.originName),
+              _metaRow(cs, '大小', item.sizeText),
+              _metaRow(cs, '上传时间', formatDateTimeFull(item.uploadedAt)),
+              const SizedBox(height: 8),
+              _CopyField(label: '原图链接', value: item.url, onCopy: _copy),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+      ],
+    );
+  }
+
+  Widget _metaRow(ColorScheme cs, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 60,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+            ),
+          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+}
+
+/// 可复制字段：标签 + 只读值 + 复制按钮
+class _CopyField extends StatelessWidget {
+  const _CopyField({
+    required this.label,
+    required this.value,
+    required this.onCopy,
+  });
+
+  final String label;
+  final String value;
+  final Future<void> Function(String text) onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: SelectableText(
+                  value,
+                  maxLines: 4,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, size: 18),
+                tooltip: '复制',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => onCopy(value),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

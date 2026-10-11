@@ -14,6 +14,29 @@ extension SettingsAccessors on SettingsProvider {
   /// 完整首页区块列表（含隐藏项，供设置面板使用）
   List<ManagedItem> get homeSections => List.unmodifiable(_homeSections);
 
+  /// 完整消息页 Tab 列表（含隐藏项，供排序弹窗使用）
+  List<ManagedItem> get noticeTabs => List.unmodifiable(_noticeTabs);
+
+  /// 可见消息页 Tab id（按用户排序）
+  List<String> get noticeTabOrder => [
+    for (final t in _noticeTabs)
+      if (t.visible) t.id,
+  ];
+
+  /// 「常用项自动前排」开关
+  bool get autoFrequentTabs => _autoFrequentTabs;
+
+  /// 某作用域的 Tab 使用次数
+  Map<String, int> tabUsage(String scope) =>
+      Map.unmodifiable(_tabUsage[scope] ?? const {});
+
+  /// 按设置给出最终顺序：开启「常用项自动前排」时把**第 1 项之后的**项按使用次数重排
+  /// （第 1 项固定 = 默认进入项，只由手动排序决定；次数相同保持 [base] 顺序）
+  List<String> orderedTabIds(String scope, List<String> base) =>
+      _autoFrequentTabs
+      ? orderByFrequency(base, _tabUsage[scope] ?? const {})
+      : base;
+
   /// 首页当前显示的区块（按用户排序）
   List<ManagedItem> get visibleHomeSections => [
     for (final s in _homeSections)
@@ -27,6 +50,15 @@ extension SettingsAccessors on SettingsProvider {
 
   bool get simulateBrowserHeaders => _simulateBrowserHeaders;
   bool get interstitialAutoVerify => _interstitialAutoVerify;
+
+  /// 消息未读标记样式（隐藏 / 红点 / 数字）
+  NoticeBadgeMode get noticeBadgeMode => _noticeBadgeMode;
+
+  /// 是否检查新提醒
+  bool get noticeCheckEnabled => _noticeCheckEnabled;
+
+  /// 计入底栏未读的分组 id
+  Set<String> get noticeBadgeGroups => Set.unmodifiable(_noticeBadgeGroups);
 
   /// 跳过本地自解，强制走内置浏览器完成人机验证
   bool get acwForceWebview => _acwForceWebview;

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/config/notice_config.dart';
 import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
@@ -14,6 +15,7 @@ import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
+import 'package:mtbbs/core/utils/frequent_order.dart';
 
 part 'settings_provider_defaults.dart';
 part 'settings_provider_accessors.dart';
@@ -43,6 +45,24 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 自动识别并链接 URL
   bool _autoDetectUrls = true;
+
+  /// 消息未读标记样式（隐藏 / 红点 / 数字）
+  NoticeBadgeMode _noticeBadgeMode = NoticeBadgeMode.number;
+
+  /// 是否检查新提醒（关掉后完全不请求，见 NoticeBadgeController）
+  bool _noticeCheckEnabled = true;
+
+  /// 计入底栏未读的分组 id（默认全部，见 notice_config 的 noticeGroups）
+  Set<String> _noticeBadgeGroups = noticeGroupIds;
+
+  /// 消息页 Tab（顺序 + 显隐），见 [defaultNoticeTabs]
+  List<ManagedItem> _noticeTabs = defaultNoticeTabs();
+
+  /// 「常用项自动前排」：按使用次数把常用的 Tab 排到前面（默认开）
+  bool _autoFrequentTabs = true;
+
+  /// Tab 使用次数：scope → id → 次数（scope 见 [kTabUsageGuide] / [kTabUsageNotice]）
+  Map<String, Map<String, int>> _tabUsage = {};
 
   /// 请求携带 Referer / Accept 等浏览器仿真头（模拟浏览器访问）
   bool _simulateBrowserHeaders = true;

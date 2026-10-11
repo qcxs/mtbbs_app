@@ -425,22 +425,30 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (_loading) return const LoadingView();
-          if (_error != null)
-            return PageErrorWidget(
-              message: _error!,
-              onRetry: () => _loadInitial(),
-            );
-          if (_data == null) return const EmptyView(text: '暂无数据');
-          if (isWide) return _buildWideLayout();
-          return _buildNarrowLayout();
-        },
+      // 迷你编辑器 / 回复栏放在 body 的 Column 内（而非 bottomNavigationBar）：
+      // Scaffold 的 bottomNavigationBar 不随键盘 viewInsets 上移，会被虚拟键盘遮挡；
+      // 放进 body 后随 body 一起收缩，编辑器始终停在键盘上方。
+      // 与私信页（pm_chat_page）保持同一范式。
+      body: Column(
+        children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (_loading) return const LoadingView();
+                if (_error != null)
+                  return PageErrorWidget(
+                    message: _error!,
+                    onRetry: () => _loadInitial(),
+                  );
+                if (_data == null) return const EmptyView(text: '暂无数据');
+                if (isWide) return _buildWideLayout();
+                return _buildNarrowLayout();
+              },
+            ),
+          ),
+          _editorExpanded ? _buildMiniEditor() : _buildReplyBar(),
+        ],
       ),
-      bottomNavigationBar: _editorExpanded
-          ? _buildMiniEditor()
-          : _buildReplyBar(),
     );
     return _wrapBackToCollapse(page);
   }

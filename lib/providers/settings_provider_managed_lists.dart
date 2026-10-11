@@ -207,6 +207,8 @@ extension SettingsManagedLists on SettingsProvider {
 
   Future<void> moveTab(int from, int to) async {
     reorderManagedItems(_guideTabs, from, to);
+    // 用户手排 = 以这份顺序为准 → 清空常用记录，之后重新累计
+    _clearTabUsage(kTabUsageGuide);
     await _persistGuideTabs();
   }
 
@@ -217,7 +219,51 @@ extension SettingsManagedLists on SettingsProvider {
 
   Future<void> _persistGuideTabs() async {
     await _db.setSetting('guideTabs', ManagedItem.encodeList(_guideTabs));
+    await _persistTabUsage();
     _notify();
+  }
+
+  // ==================== 消息页 Tab ====================
+
+  Future<void> moveNoticeTab(int from, int to) async {
+    reorderManagedItems(_noticeTabs, from, to);
+    // 同上：手排后清空常用记录
+    _clearTabUsage(kTabUsageNotice);
+    await _persistNoticeTabs();
+  }
+
+  Future<void> toggleNoticeTab(String id) async {
+    toggleManagedItem(_noticeTabs, id);
+    await _persistNoticeTabs();
+  }
+
+  Future<void> _persistNoticeTabs() async {
+    await _db.setSetting('noticeTabs', ManagedItem.encodeList(_noticeTabs));
+    await _persistTabUsage();
+    _notify();
+  }
+
+  // ==================== Tab 使用次数（常用项自动前排） ====================
+
+  /// 记录一次 Tab 使用（关掉「常用项自动前排」时不记，省一次写盘）
+  Future<void> recordTabUsage(String scope, String id) async {
+    if (!_autoFrequentTabs) return;
+    final m = _tabUsage.putIfAbsent(scope, () => {});
+    m[id] = (m[id] ?? 0) + 1;
+    await _persistTabUsage();
+  }
+
+  void _clearTabUsage(String scope) => _tabUsage[scope] = {};
+
+  Future<void> setAutoFrequentTabs(bool value) async {
+    if (_autoFrequentTabs == value) return;
+    _autoFrequentTabs = value;
+    await _db.setSetting('autoFrequentTabs', value ? '1' : '0');
+    _notify();
+  }
+
+  Future<void> _persistTabUsage() async {
+    await _db.setSetting('tabUsage', jsonEncode(_tabUsage));
   }
 
   // ==================== 首页区块 ====================

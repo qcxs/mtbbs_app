@@ -222,23 +222,15 @@ class MtImageHosting {
 
   // ==================== 历史记录 ====================
 
-  /// 获取历史记录
+  /// 获取历史记录（按上传时间倒序）
   ///
-  /// [includeHidden] 为 false 时只返回未隐藏的记录（编辑器用），
-  /// 默认最多返回 20 条，管理页面可传 [limit] 获取全部。
-  Future<List<MtUploadResult>> getHistory({
-    int limit = 20,
-    bool includeHidden = false,
-  }) async {
+  /// 默认最多返回 20 条（编辑器插图用），管理面板可传 [limit] 取更多。
+  Future<List<MtUploadResult>> getHistory({int limit = 20}) async {
     final list = await _readHistory();
     if (list.isEmpty) return [];
     final results = list.map((e) => MtUploadResult.fromJson(e)).toList()
       ..sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
-
-    final visible = includeHidden
-        ? results
-        : results.where((r) => !r.hidden).toList();
-    return visible.length > limit ? visible.sublist(0, limit) : visible;
+    return results.length > limit ? results.sublist(0, limit) : results;
   }
 
   /// 读历史原始列表（从未写过、或数据损坏时返回空列表）
@@ -274,18 +266,6 @@ class MtImageHosting {
     list.removeWhere((e) => e['url'] == url);
     await DatabaseHelper.instance.setImageHistoryRaw(jsonEncode(list));
   }
-
-  /// 切换隐藏/显示
-  Future<void> toggleHistoryHidden(String url) async {
-    final list = await _readHistory();
-    for (final e in list) {
-      if (e['url'] == url) {
-        e['hidden'] = !(e['hidden'] == true);
-        break;
-      }
-    }
-    await DatabaseHelper.instance.setImageHistoryRaw(jsonEncode(list));
-  }
 }
 
 /// MT 图床上传结果
@@ -296,7 +276,6 @@ class MtUploadResult {
   final double size;
   final String thumbnailUrl;
   final DateTime uploadedAt;
-  final bool hidden;
 
   const MtUploadResult({
     required this.url,
@@ -305,7 +284,6 @@ class MtUploadResult {
     required this.size,
     required this.thumbnailUrl,
     required this.uploadedAt,
-    this.hidden = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -315,7 +293,6 @@ class MtUploadResult {
     'size': size,
     'thumbnailUrl': thumbnailUrl,
     'uploadedAt': uploadedAt.toIso8601String(),
-    'hidden': hidden,
   };
 
   factory MtUploadResult.fromJson(Map<String, dynamic> json) => MtUploadResult(
@@ -327,17 +304,6 @@ class MtUploadResult {
     uploadedAt:
         DateTime.tryParse(json['uploadedAt'] as String? ?? '') ??
         DateTime.now(),
-    hidden: json['hidden'] == true,
-  );
-
-  MtUploadResult copyWith({bool? hidden}) => MtUploadResult(
-    url: url,
-    bbcode: bbcode,
-    originName: originName,
-    size: size,
-    thumbnailUrl: thumbnailUrl,
-    uploadedAt: uploadedAt,
-    hidden: hidden ?? this.hidden,
   );
 
   String get sizeText => formatBytes(size.toInt());

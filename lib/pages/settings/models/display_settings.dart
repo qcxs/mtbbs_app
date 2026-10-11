@@ -6,6 +6,7 @@ import 'package:mtbbs/pages/settings/home_sections_sheet.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/dialog/managed_list_dialog.dart';
 
 /// 外观组设置项
 List<SettingsModel> displaySettings() => [
@@ -41,6 +42,25 @@ List<SettingsModel> displaySettings() => [
     onTap: (ctx, s) => showHomeSectionsSheet(ctx),
   ),
   NormalSetting(
+    title: '导读 Tab',
+    icon: Icons.view_agenda_outlined,
+    subtitleBuilder: (s) => '${s.tabOrder.length} 个 Tab，可调顺序与显隐',
+    onTap: (ctx, s) => _showGuideTabOrderDialog(ctx, s),
+  ),
+  NormalSetting(
+    title: '消息页 Tab',
+    icon: Icons.tab_unselected_outlined,
+    subtitleBuilder: (s) => '${s.noticeTabOrder.length} 个 Tab，可调顺序与显隐',
+    onTap: (ctx, s) => _showNoticeTabOrderDialog(ctx, s),
+  ),
+  SwitchSetting(
+    title: '常用项自动前排',
+    subtitle: '第 1 个固定（默认进入项），其余的按使用次数靠前；手工排序后重新统计',
+    icon: Icons.auto_awesome_motion,
+    value: (s) => s.autoFrequentTabs,
+    onChanged: (ctx, s, v) => s.setAutoFrequentTabs(v),
+  ),
+  NormalSetting(
     title: '图片最大宽度',
     icon: Icons.photo_size_select_large,
     subtitleBuilder: (s) => '${s.maxImageWidth}px，窄屏自动占满',
@@ -69,6 +89,43 @@ List<SettingsModel> displaySettings() => [
     onTap: (ctx, s) => _showAvatarSizeDialog(ctx, s),
   ),
 ];
+
+/// 导读 Tab 的排序 / 显隐（与导读页里"Tab 排序"入口共用同一份设置）。
+/// 手动排序会清空常用记录，之后按使用习惯重新累计。
+Future<void> _showGuideTabOrderDialog(
+  BuildContext context,
+  SettingsProvider settings,
+) => showManagedListDialog(
+  context: context,
+  title: '导读 Tab',
+  items: settings.guideTabs,
+  allowAdd: false,
+  allowDelete: false,
+  allowEdit: false,
+  allowReorder: true,
+  allowToggleVisibility: true,
+  onReorder: (from, to) => settings.moveTab(from, to),
+  onToggleVisibility: (id) => settings.toggleTab(id),
+  emptyHint: '暂无 Tab',
+);
+
+/// 消息页 Tab 的排序 / 显隐
+Future<void> _showNoticeTabOrderDialog(
+  BuildContext context,
+  SettingsProvider settings,
+) => showManagedListDialog(
+  context: context,
+  title: '消息页 Tab',
+  items: settings.noticeTabs,
+  allowAdd: false,
+  allowDelete: false,
+  allowEdit: false,
+  allowReorder: true,
+  allowToggleVisibility: true,
+  onReorder: (from, to) => settings.moveNoticeTab(from, to),
+  onToggleVisibility: (id) => settings.toggleNoticeTab(id),
+  emptyHint: '暂无 Tab',
+);
 
 Future<void> _showAvatarSizeDialog(
   BuildContext context,

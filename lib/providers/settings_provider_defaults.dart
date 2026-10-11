@@ -25,6 +25,23 @@ const int kQuickReplyMaxLength = 100;
 /// 帖子迷你编辑器「常用语」插入内容长度上限（可含 BBCode，故更宽松）
 const int kQuickReplyInsertMaxLength = 500;
 
+/// 「常用项自动前排」的两个作用域（作 [SettingsProvider.tabUsage] 的 key）
+const String kTabUsageGuide = 'guide';
+const String kTabUsageNotice = 'notice';
+
+/// 消息页 Tab 默认定义（顺序即默认顺序）。
+/// 「我的消息」= 私信；其余 id 与 `notice_config` 的 [noticeGroups] 一致。
+List<ManagedItem> defaultNoticeTabs() => [
+  const ManagedItem(id: 'pm', name: '我的消息'),
+  for (final g in noticeGroups) ManagedItem(id: g.id, name: g.label),
+];
+
+/// 合法消息页 Tab id（用于过滤损坏的持久化数据）
+final Set<String> _noticeTabIds = {
+  'pm',
+  for (final g in noticeGroups) g.id,
+};
+
 /// 帖子迷你编辑器「常用语」默认项
 /// 优先从 [DefaultConfig]（`assets/config/quick_replies.json`）加载，失败用内嵌兜底。
 List<ManagedItem> defaultQuickReplies() {

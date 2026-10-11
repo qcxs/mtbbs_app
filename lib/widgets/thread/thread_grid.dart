@@ -34,6 +34,11 @@ class ThreadGrid extends StatefulWidget {
   /// 关键词高亮：非空时透传给 [ThreadCard]（搜索场景使用）
   final String highlight;
 
+  /// 供"重复点击 Tab 回到顶部"取用：列表控制器 → 该列表的滚动控制器
+  /// （滚动控制器在 State 里是私有的，外面够不着，只能这样暴露）
+  static final Map<ThreadListController, ScrollController> scrollControllers =
+      {};
+
   const ThreadGrid({
     super.key,
     required this.controller,
@@ -65,6 +70,7 @@ class _ThreadGridState extends State<ThreadGrid>
   @override
   void initState() {
     super.initState();
+    ThreadGrid.scrollControllers[widget.controller] = _scrollController;
     widget.controller.addListener(_onStateChanged);
   }
 
@@ -90,6 +96,7 @@ class _ThreadGridState extends State<ThreadGrid>
 
   @override
   void dispose() {
+    ThreadGrid.scrollControllers.remove(widget.controller);
     widget.controller.removeListener(_onStateChanged);
     _scrollController.dispose();
     super.dispose();

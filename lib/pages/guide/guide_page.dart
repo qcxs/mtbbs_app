@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:mtbbs/core/app/tab_retap.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:provider/provider.dart';
@@ -30,16 +33,45 @@ class _GuidePageState extends State<GuidePage> {
   String _focusView = '';
   static final Map<String, ThreadListController> _ctrlMap = {};
 
+  /// 重复点击「导读」Tab：对**当前子 Tab 的列表**回顶 / 刷新（规则见 TabReTap）
+  late final Future<void> Function() _reTap = () async {
+    final c = _ctrlMap[_focusView];
+    if (c == null) return;
+    await ThreadGrid.scrollControllers[c].toTopOrRefresh(c.refresh);
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    TabReTap.instance.register('/guide', _reTap);
+  }
+
   @override
   void dispose() {
+    TabReTap.instance.unregister('/guide', _reTap);
     _pageController.dispose();
     super.dispose();
   }
 
+  /// Tab 顺序的"冻结键"（用户设置变化时才重排）
+  String _orderKey = '';
+  List<String> _orderedViews = const [];
+
+  /// 可见 Tab（按用户顺序）；开启「常用项自动前排」时把**第 1 项之后的**按使用次数重排
+  /// （第 1 项 = 默认进入项，固定）。
+  ///
+  /// 重排只在挂载/设置变化时发生 —— 否则点一下 Tab 就把自己顶上来，
+  /// Tab 栏会在手指底下跳；累计的使用次数在下次进入时生效。
   List<String> _views(bool loggedIn) {
-    final order = List<String>.from(context.read<SettingsProvider>().tabOrder);
-    if (loggedIn && !order.contains('my')) order.add('my');
-    return order;
+    final s = context.read<SettingsProvider>();
+    final base = List<String>.from(s.tabOrder);
+    if (loggedIn && !base.contains('my')) base.add('my');
+    final key = '${base.join(',')}|${s.autoFrequentTabs}';
+    if (key != _orderKey) {
+      _orderKey = key;
+      _orderedViews = s.orderedTabIds(kTabUsageGuide, base);
+    }
+    return _orderedViews;
   }
 
   void _ensureCtrls(Iterable<String> views) {
@@ -92,6 +124,10 @@ class _GuidePageState extends State<GuidePage> {
     if (i < 0 || view == _focusView) return;
     setState(() => _focusView = view);
     _pageController.jumpToPage(i);
+    // 记录使用（「常用项自动前排」用）
+    unawaited(
+      context.read<SettingsProvider>().recordTabUsage(kTabUsageGuide, view),
+    );
   }
 
   @override
@@ -200,8 +236,16 @@ class _GuidePageState extends State<GuidePage> {
                         key: ValueKey(views.join(',')),
                         controller: _pageController,
                         onPageChanged: (i) {
-                          if (i >= 0 && i < views.length)
+                          if (i >= 0 && i < views.length) {
                             setState(() => _focusView = views[i]);
+                            // 记录使用（「常用项自动前排」用）
+                            unawaited(
+                              context.read<SettingsProvider>().recordTabUsage(
+                                kTabUsageGuide,
+                                views[i],
+                              ),
+                            );
+                          }
                         },
                         children: views.map((v) {
                           final ctrl = _ctrlMap[v];

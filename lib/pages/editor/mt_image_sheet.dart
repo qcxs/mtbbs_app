@@ -209,7 +209,7 @@ class _MtImageSheetState extends State<MtImageSheet> {
   // ==================== 历史 ====================
 
   Future<void> _loadHistory() async {
-    final list = await widget.hosting.getHistory(includeHidden: false);
+    final list = await widget.hosting.getHistory();
     if (!mounted) return;
     setState(() {
       _history = list;

@@ -18,7 +18,8 @@ import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
 import 'package:mtbbs/api/home/mythread/export.dart' as mythread_api;
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
-import 'package:mtbbs/api/home/system/export.dart' as system_api;
+import 'package:mtbbs/api/home/notice/export.dart' as notice_api;
+import 'package:mtbbs/api/home/notice_unread/export.dart' as unread_api;
 import 'package:mtbbs/api/misc/userstatus/export.dart' as userstatus_api;
 import 'package:mtbbs/api/site/cdn/export.dart' as cdn_api;
 import 'package:mtbbs/core/app/app_paths.dart';
@@ -238,7 +239,35 @@ final Map<String, ApiScenario> readScenarios = {
     params: {'page': '页码（默认 1）'},
     needsLogin: true,
     run: (a) =>
-        system_api.getSystemList(ApiService().dio, page: intArg(a, 'page', 1)),
+        notice_api.getNoticeList(ApiService().dio, page: intArg(a, 'page', 1)),
+  ),
+  'message.manage': ApiScenario(
+    desc: '管理工作提醒列表（需登录；管理员/版主为待办，普通用户仅举报处理反馈）',
+    params: {'page': '页码（默认 1）'},
+    needsLogin: true,
+    run: (a) => notice_api.getNoticeList(
+      ApiService().dio,
+      page: intArg(a, 'page', 1),
+      view: 'manage',
+    ),
+  ),
+  'message.interactive': ApiScenario(
+    desc:
+        '坛友互动提醒列表（需登录；type 见 noticeConfig：poke/friend/wall/comment/click/sharenotice）',
+    params: {'type': '子类型（默认 wall=留言）', 'page': '页码（默认 1）'},
+    needsLogin: true,
+    run: (a) => notice_api.getNoticeList(
+      ApiService().dio,
+      page: intArg(a, 'page', 1),
+      view: 'interactive',
+      type: (a['type'] ?? '').isEmpty ? 'wall' : a['type']!,
+    ),
+  ),
+  'notice.counts': ApiScenario(
+    desc: '未读提醒计数（非破坏性：只读页面 header，不打开通知页、不改变已读状态）',
+    params: {},
+    needsLogin: true,
+    run: (a) => unread_api.getNoticeUnread(ApiService().dio),
   ),
   'message.pm': ApiScenario(
     desc: '私人消息列表（需登录）',

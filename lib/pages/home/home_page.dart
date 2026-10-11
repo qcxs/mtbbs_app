@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:mtbbs/core/app/tab_retap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -38,9 +39,27 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _refreshCounter = 0;
+  final _scrollCtl = ScrollController();
+
+  /// 重复点击「首页」Tab：不在顶部回顶，已在顶部刷新（规则见 TabReTap）
+  late final Future<void> Function() _reTap = () =>
+      _scrollCtl.toTopOrRefresh(_refreshAll);
 
   Future<void> _refreshAll() async {
     setState(() => _refreshCounter++);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    TabReTap.instance.register('/', _reTap);
+  }
+
+  @override
+  void dispose() {
+    TabReTap.instance.unregister('/', _reTap);
+    _scrollCtl.dispose();
+    super.dispose();
   }
 
   @override
@@ -58,6 +77,7 @@ class _HomePageState extends State<HomePage> {
       key: ValueKey('home_$baseUrl'),
       onRefresh: _refreshAll,
       child: ListView(
+        controller: _scrollCtl,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 24),
         children: [

@@ -21,6 +21,8 @@ import 'package:mtbbs/core/app/verification_gate.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/app/event_bus.dart';
+import 'package:mtbbs/core/app/notice_badge.dart';
+import 'package:mtbbs/core/app/notice_nav_store.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/api/forum/misc/export.dart' as forum_misc;
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
@@ -313,6 +315,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: SiteCdnStore.instance),
         // MCP 服务状态（设置分组页订阅它刷新）
         ChangeNotifierProvider.value(value: McpServerController.instance),
+        // 未读提醒徽标（底栏「消息」与消息页分组 Tab 订阅它）
+        ChangeNotifierProvider.value(value: NoticeBadgeController.instance),
+        // 站点实际有哪些提醒视图/子类型（消息页 Tab 与页内 chip 订阅它）
+        ChangeNotifierProvider.value(value: NoticeNavStore.instance),
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: history),
@@ -380,8 +386,12 @@ class MyApp extends StatelessWidget {
             // 语义树恒为空 → 没有节点更新 → 不再刷屏。
             // 副作用：读屏软件读不到任何东西；将来若要恢复无障碍，删掉这一层即可。
             builder: (context, child) => ExcludeSemantics(
-              child: _WindowBackgroundSync(
-                child: child ?? const SizedBox.shrink(),
+              child: _NoticeLifecycleWatcher(
+                settings: settings,
+                auth: auth,
+                child: _WindowBackgroundSync(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
             routerConfig: router,
@@ -415,6 +425,86 @@ class _WindowBackgroundSyncState extends State<_WindowBackgroundSync> {
     if (brightness == _applied) return;
     _applied = brightness;
     unawaited(syncWindowBackground(brightness));
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// 不可见组件：把「App 冷启动 / 回前台」转成一次未读检查。
+///
+/// 探测时机照 PiliPlus 的实战做法——**不用定时器**，只在事件点触发，
+/// 由 [NoticeBadgeController] 内部按 5 分钟节流；切到消息 Tab 的那次触发在
+/// AppShell 里（见 app_shell.dart）。
+class _NoticeLifecycleWatcher extends StatefulWidget {
+  const _NoticeLifecycleWatcher({
+    required this.settings,
+    required this.auth,
+    required this.child,
+  });
+
+  final SettingsProvider settings;
+  final AuthProvider auth;
+  final Widget child;
+
+  @override
+  State<_NoticeLifecycleWatcher> createState() =>
+      _NoticeLifecycleWatcherState();
+}
+
+class _NoticeLifecycleWatcherState extends State<_NoticeLifecycleWatcher>
+    with WidgetsBindingObserver {
+  /// 上次触发时的「站点 + 账号」；变化即视为切换
+  String _identity = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _identity = _currentIdentity;
+    // 切换站点 / 账号时旧计数立刻作废（见 _onIdentityChanged）
+    widget.auth.addListener(_onIdentityChanged);
+    SiteStore.instance.addListener(_onIdentityChanged);
+    // 冷启动：首帧后检查一次
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUnread());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.auth.removeListener(_onIdentityChanged);
+    SiteStore.instance.removeListener(_onIdentityChanged);
+    super.dispose();
+  }
+
+  String get _currentIdentity =>
+      '${SiteStore.instance.host}|${widget.auth.uid}|${widget.auth.username}';
+
+  /// 切换站点 / 账号 —— 这是**另一套数据**，旧徽标必须立刻作废并强制重探一次。
+  ///
+  /// 此时节流没有意义（反而会让新账号沿用上一个账号的未读）；站点视图集合也可能
+  /// 不同（例：管理员有「管理工作」），所以连导航一起清空，回到配置兜底。
+  void _onIdentityChanged() {
+    final id = _currentIdentity;
+    if (id == _identity) return;
+    _identity = id;
+    NoticeBadgeController.instance.clear();
+    NoticeNavStore.instance.clear();
+    _checkUnread(force: true);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkUnread();
+  }
+
+  void _checkUnread({bool force = false}) {
+    if (!widget.settings.noticeCheckEnabled || !widget.auth.isLoggedIn) {
+      NoticeBadgeController.instance.clear();
+      NoticeNavStore.instance.clear();
+      return;
+    }
+    NoticeBadgeController.instance.check(force: force);
   }
 
   @override

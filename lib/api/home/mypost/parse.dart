@@ -1,12 +1,16 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/parser/notice_segments.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
 /// 我的帖子 HTML 解析
 ///
 /// 解析 home.php?mod=space&do=notice&view=mypost&type=post 页面，
 /// 提取帖子提醒列表和分页信息。
+///
+/// 正文的结构化段落由 [extractNoticeSegments] 统一产出（与系统提醒/管理工作
+/// 同一份实现），本文件只额外提取「预览 / 回复」需要的 tid/pid 相关字段。
 ///
 /// 每条提醒的 DOM 结构：
 /// ```html
@@ -50,16 +54,15 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     'count': items.length,
     'currentPage': currentPage,
     'totalPages': totalPages,
+    // 页面自带导航：站点实际有哪些视图 / 子类型（用于裁剪 Tab，与 notice/parse 同源）
+    'nav': parseNoticeNav(doc),
   };
 }
 
 Map<String, dynamic>? _parseItem(dom.Element dl) {
   try {
     // 头像链接 → uid
-    final avatarLink = dl.querySelector('dd.avt a');
-    final avatarHref = avatarLink?.attributes['href'] ?? '';
-    final uidMatch = RegExp(r'uid[=-](\d+)').firstMatch(avatarHref);
-    final uid = uidMatch?.group(1) ?? '';
+    final uid = noticeAvatarUid(dl);
 
     // ntc_body 中的解析
     final bodyEl = dl.querySelector('dd.ntc_body');
@@ -72,9 +75,10 @@ Map<String, dynamic>? _parseItem(dom.Element dl) {
       return n.toString();
     }).join();
 
-    // 用户名：ntc_body 中的第一个 a 标签
-    final firstLink = bodyEl.querySelector('a');
-    final username = sanitizeText(firstLink?.text ?? '');
+    final segments = extractNoticeSegments(bodyEl);
+
+    // 用户名：ntc_body 中的第一个链接
+    final username = sanitizeText(bodyEl.querySelector('a')?.text ?? '');
 
     // 帖子标题 + 查看链接
     String threadTitle = '';
@@ -98,17 +102,7 @@ Map<String, dynamic>? _parseItem(dom.Element dl) {
       }
     }
 
-    // 时间：<dt><span class="xg1 xw0"><span title="2026-7-20 02:46">14 小时前</span></span></dt>
-    String time = '';
-    String timeTitle = '';
-    final dtEl = dl.querySelector('dt');
-    if (dtEl != null) {
-      final timeInner = dtEl.querySelector('span.xg1.xw0 span');
-      if (timeInner != null) {
-        time = timeInner.text.trim().replaceAll('\u00A0', ' ');
-        timeTitle = timeInner.attributes['title'] ?? '';
-      }
-    }
+    final time = noticeTime(dl);
 
     return {
       'uid': uid,
@@ -116,43 +110,14 @@ Map<String, dynamic>? _parseItem(dom.Element dl) {
       'threadTitle': threadTitle,
       'viewUrl': viewUrl,
       'bodyHtml': bodyHtml,
-      'time': time,
-      'timeTitle': timeTitle,
+      'time': time.text,
+      'timeTitle': time.title,
+      'fromNum': noticeHasFromNum(dl),
       // segments：结构化段落供 UI 直接渲染，无需 HTML 解析
-      'segments': _extractSegments(bodyEl),
+      'segments': segments,
     };
   } catch (e) {
     AppLogger.w('PARSE', 'mypost item parse error: $e');
     return null;
   }
-}
-
-/// 从 ntc_body 中提取结构化段落
-List<Map<String, dynamic>> _extractSegments(dom.Element bodyEl) {
-  final segments = <Map<String, dynamic>>[];
-  for (final node in bodyEl.nodes) {
-    if (node is dom.Text) {
-      final text = node.text
-          .replaceAll('\u00A0', ' ')
-          .replaceAll(RegExp(r'\s+'), ' ');
-      if (text.trim().isNotEmpty) {
-        segments.add({'type': 'text', 'text': text.trim()});
-      }
-    } else if (node is dom.Element && node.localName == 'a') {
-      final href = node.attributes['href'] ?? '';
-      final text = sanitizeText(node.text);
-      if (text.isEmpty) continue;
-      if (href.contains('space-uid-') || href.contains('space.php?uid=')) {
-        final uidMatch = RegExp(r'uid[=-](\d+)').firstMatch(href);
-        segments.add({
-          'type': 'user',
-          'text': text,
-          'uid': uidMatch?.group(1) ?? '',
-        });
-      } else {
-        segments.add({'type': 'thread', 'text': text, 'url': href});
-      }
-    }
-  }
-  return segments;
 }

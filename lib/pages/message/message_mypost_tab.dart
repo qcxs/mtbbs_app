@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
+import 'package:mtbbs/config/notice_config.dart';
+import 'package:mtbbs/core/app/notice_badge.dart';
+import 'package:mtbbs/core/app/notice_nav_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
@@ -12,6 +15,9 @@ import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/pagination_bar.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
+
+/// 「我的帖子」分组配置（唯一数据源：lib/config/notice_config.dart）
+final NoticeGroup _mypostGroup = noticeGroupOf('mypost')!;
 
 /// 我的帖子 Tab
 class MypostTab extends StatefulWidget {
@@ -27,7 +33,19 @@ class _MypostTabState extends State<MypostTab> {
   String? _error;
   int _page = 1;
   int _totalPages = 1;
-  String _type = 'post'; // post / at
+
+  /// 当前请求的子类型；空串 = 尚未确定 → **不传 type**，交给站点挑
+  /// 「第一个有未读的子类型」（Discuz 的 `$deftype`）。这样打开「我的帖子」
+  /// 时看到的就是真正有新消息的那个子类型（可能是「点评」而不是「帖子」）。
+  String _type = '';
+
+  /// 用户是否手动点过子类型（点过就不再被站点默认值覆盖）
+  bool _typePicked = false;
+
+  final _nav = NoticeNavStore.instance;
+
+  List<NoticeType> get _types =>
+      _nav.subtypesOf('mypost') ?? _mypostGroup.types;
 
   final Map<int, PostPreviewData?> _previews = {};
   final Set<int> _previewLoading = {};
@@ -57,6 +75,8 @@ class _MypostTabState extends State<MypostTab> {
         });
         return;
       }
+      _applyNav(result['nav']);
+      if (!mounted) return;
       setState(() {
         _items = (result['items'] as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
@@ -85,8 +105,37 @@ class _MypostTabState extends State<MypostTab> {
     _load(p);
   }
 
+  /// 用页面自带的导航与计数校正 UI（站点会按权限/配置增删，见 NoticeNavStore）：
+  /// - 尚未手动选过子类型 → 采用站点本次实际打开的那个（= 有未读的那个）
+  /// - 分组徽标用页面的**权威计数**覆盖（不能"整组清零"猜：打开「帖子」时
+  ///   未读可能全在「点评」上，服务端什么都没置已读）
+  void _applyNav(Object? nav) {
+    if (nav is! Map) return;
+    _nav.syncFromPage(Map<String, dynamic>.from(nav), requestedView: 'mypost');
+    if (!_typePicked) {
+      final active = _nav.activeSubtype;
+      final types = _types;
+      final next = active.isNotEmpty
+          ? active
+          : (types.isNotEmpty ? types.first.id : '');
+      if (next.isNotEmpty && next != _type) setState(() => _type = next);
+    }
+    NoticeBadgeController.instance.applyViewCounts(_nav.viewCounts);
+    // 本次拉取已把该子类型的条目置为已读 → 立刻清零它的未读。
+    // （子类型计数只可能来自"打开过的提醒页"，header 探测给不到，不清就永远是旧值）
+    final activeType = _type.isNotEmpty ? _type : _nav.activeSubtype;
+    if (activeType.isNotEmpty) {
+      _nav.markSubtypeRead('mypost', activeType);
+    } else if (_types.isEmpty) {
+      // 无子类型的视图：没有可求和的子类型，直接乐观清零本视图计数
+      NoticeBadgeController.instance.markViewRead('mypost');
+    }
+  }
+
   void _switchType(String type) {
     if (type == _type) return;
+    // 用户手动选过之后，不再被站点默认子类型覆盖
+    _typePicked = true;
     setState(() {
       _type = type;
       _previews.clear();
@@ -126,16 +175,40 @@ class _MypostTabState extends State<MypostTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const LoadingView();
+    // 订阅站点导航：子类型未读数变化（读完清零）时刷新 chip
+    context.watch<NoticeNavStore>();
+    // 子类型 chip 常驻：某个子类型为空时也要能切到别的类型（7 个子类型尤其需要）
+    if (_loading) {
+      return Column(
+        children: [
+          _buildHeader(),
+          const Expanded(child: LoadingView()),
+        ],
+      );
+    }
     if (_error != null) {
-      return PageErrorWidget(
-        message: _error!,
-        onRetry: () => _load(1),
-        showBack: false,
+      return Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: PageErrorWidget(
+              message: _error!,
+              onRetry: () => _load(1),
+              showBack: false,
+            ),
+          ),
+        ],
       );
     }
     if (_items.isEmpty) {
-      return const EmptyView(icon: Icons.forum_outlined, text: '暂无提醒');
+      return Column(
+        children: [
+          _buildHeader(),
+          const Expanded(
+            child: EmptyView(icon: Icons.forum_outlined, text: '暂无提醒'),
+          ),
+        ],
+      );
     }
 
     return Column(
@@ -151,6 +224,15 @@ class _MypostTabState extends State<MypostTab> {
             ),
           ),
         ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          color: Theme.of(context).colorScheme.surface,
+          child: PaginationBar(
+            page: _page,
+            totalPages: _totalPages,
+            onGoToPage: _goToPage,
+          ),
+        ),
       ],
     );
   }
@@ -158,25 +240,20 @@ class _MypostTabState extends State<MypostTab> {
   Widget _buildHeader() {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       color: cs.surface,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              _subTab('帖子', 'post'),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      // 7 个子类型窄屏放不下 → 横向可滚动
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            for (final t in _types) ...[
+              _subTab(t.label, t.id),
               const SizedBox(width: 4),
-              _subTab('提到我的', 'at'),
-              const Spacer(),
-              PaginationBar(
-                page: _page,
-                totalPages: _totalPages,
-                onGoToPage: _goToPage,
-              ),
             ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -184,6 +261,8 @@ class _MypostTabState extends State<MypostTab> {
   Widget _subTab(String label, String type) {
     final cs = Theme.of(context).colorScheme;
     final active = _type == type;
+    // 子类型未读：来自页面子栏的权威计数（服务端置已读之后的值）
+    final count = _nav.subtypeCount('mypost', type);
     return GestureDetector(
       onTap: () => _switchType(type),
       child: Container(
@@ -192,12 +271,16 @@ class _MypostTabState extends State<MypostTab> {
           color: active ? cs.surfaceContainerLow : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-            color: active ? cs.onSurfaceVariant : cs.onSurfaceVariant,
+        child: Badge(
+          isLabelVisible: count > 0,
+          label: Text(count > 99 ? '99+' : '$count'),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+              color: cs.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -393,14 +476,36 @@ class _MypostTabState extends State<MypostTab> {
     final cs = Theme.of(context).colorScheme;
     final spans = <InlineSpan>[];
     final style = TextStyle(fontSize: 13, color: cs.onSurface, height: 1.4);
+    final linkStyle = TextStyle(
+      fontSize: 13,
+      color: cs.onSurfaceVariant,
+      decoration: TextDecoration.underline,
+      height: 1.4,
+    );
 
     for (final seg in segments) {
       final map = seg as Map<String, dynamic>;
       final type = map['type'] as String;
+      // 换行段没有文本，须在下面的 text.isEmpty 跳过之前处理
+      if (type == 'br') {
+        spans.add(const TextSpan(text: '\n'));
+        continue;
+      }
       final text = map['text'] as String? ?? '';
       if (text.isEmpty) continue;
 
       switch (type) {
+        case 'user':
+          final uid = map['uid'] as String? ?? '';
+          spans.add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: GestureDetector(
+                onTap: uid.isNotEmpty ? () => context.push('/user/$uid') : null,
+                child: Text(text, style: linkStyle),
+              ),
+            ),
+          );
         case 'thread':
           final url = map['url'] as String? ?? '';
           spans.add(
@@ -409,26 +514,14 @@ class _MypostTabState extends State<MypostTab> {
               child: GestureDetector(
                 onTap: url.isNotEmpty
                     ? () {
-                        final fullUrl = normalizeUrl(url);
-                        final result = UrlRouter.parse(fullUrl);
-                        if (result.appPath != null && !result.isOtherSite) {
-                          context.push(result.appPath!);
-                        } else {
-                          context.push(
-                            '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
-                          );
-                        }
+                        // 链接落地的唯一决策点（App 内优先，兜底内置浏览器）
+                        final target = UrlRouter.resolveTarget(
+                          normalizeUrl(url),
+                        );
+                        if (target != null) context.push(target);
                       }
                     : null,
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cs.onSurfaceVariant,
-                    decoration: TextDecoration.underline,
-                    height: 1.4,
-                  ),
-                ),
+                child: Text(text, style: linkStyle),
               ),
             ),
           );

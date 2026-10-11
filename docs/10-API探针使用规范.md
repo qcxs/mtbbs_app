@@ -74,6 +74,9 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `favorite.list` | 收藏列表（含 favid，供删除用） | 是 |
 | `credit.log` | 积分记录（当前登录用户的积分变更记录，`page` 分页，可按 `exttype`/`income`/`optype`/`starttime`/`endtime` 筛选） | 是 |
 | `message.system` | 系统提醒列表 | 是 |
+| `message.manage` | 管理工作提醒列表（管理员/版主为待办；普通用户仅举报处理反馈） | 是 |
+| `message.interactive` | 坛友互动提醒列表，`type`（poke/friend/wall/comment/click/sharenotice，默认 wall） | 是 |
+| `notice.counts` | 未读提醒计数（非破坏性：读页面 header，不打开通知页） | 是 |
 | `message.pm` | 私人消息列表 | 是 |
 | `message.pm.view` | 私信会话详情，`touid=*`；`page` 空=最新页，`1`=最旧页 | 是 |
 | `message.mypost` | 帖子提醒列表，`type=post/at` | 是 |

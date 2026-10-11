@@ -8,7 +8,8 @@ extension on _EditorPageState {
     if (!_hasUnsavedChanges) return true;
     final minWords = context.read<EditorHistoryProvider>().minSnapshotWordCount;
     final totalWords =
-        _session.titleCtl.text.trim().length + _session.contentCtl.text.trim().length;
+        _session.titleCtl.text.trim().length +
+        _session.contentCtl.text.trim().length;
     if (totalWords < minWords) return true;
     final shouldPop = await showExitConfirmDialog(context);
     if (shouldPop == 'save') {
@@ -39,7 +40,8 @@ extension on _EditorPageState {
       return;
     }
     if (_isEdit &&
-        (!_session.pageData.formhash.isNotEmpty || !_session.pageData.posttime.isNotEmpty)) {
+        (!_session.pageData.formhash.isNotEmpty ||
+            !_session.pageData.posttime.isNotEmpty)) {
       if (mounted) {
         showToast('页面数据未加载，请稍后');
       }
@@ -105,30 +107,42 @@ extension on _EditorPageState {
       );
       if (!mounted) return;
       if (result.success) {
-        final msg = result.needsApproval ? '需要审核' : '操作成功';
+        // 需审核：解析层只在部分响应分支标记；提示文案提到「审核」一律按需审核处理，
+        // 避免审核中的帖子被当作已发布而跳转（跳过去也看不到）。
+        final needsApproval =
+            result.needsApproval || result.message.contains('审核');
+        final msg = needsApproval ? '需要审核' : '操作成功';
         AppLogger.i(
           'EDITOR',
           jsonEncode({
             'action': 'submit_done',
             'success': true,
-            'needsApproval': result.needsApproval,
+            'needsApproval': needsApproval,
             'type': widget.type.name,
           }),
         );
         showToast(msg);
         _isLeavingNormally = true;
         _autoSaveTimer?.cancel();
-        context.read<EditorHistoryProvider>().markSubmitted(_session.sessionKey);
+        context.read<EditorHistoryProvider>().markSubmitted(
+          _session.sessionKey,
+        );
 
-        // 发帖成功：直接打开新帖，覆盖编辑器路由（返回时回到来源页，编辑器不留在栈里）
-        if (widget.type == EditorType.post &&
-            !result.needsApproval &&
-            result.tid.isNotEmpty) {
-          AppLogger.i(
-            'EDITOR',
-            jsonEncode({'action': 'open_new_thread', 'tid': result.tid}),
-          );
-          context.replace('/thread/${result.tid}');
+        // 发帖成功后的落点（覆盖编辑器路由，返回时回到来源页）：
+        // - 拿到 tid（站点在 redirect 里回了 tid）→ 直接打开新帖
+        // - 拿不到 tid（如 MT 论坛）→ 打开「我的帖子」：刚发布的必是第一条
+        // - 需审核 → 什么都不做（帖子尚未上架，跳过去也看不到）
+        if (widget.type == EditorType.post && !needsApproval) {
+          if (result.tid.isNotEmpty) {
+            AppLogger.i(
+              'EDITOR',
+              jsonEncode({'action': 'open_new_thread', 'tid': result.tid}),
+            );
+            context.replace('/thread/${result.tid}');
+          } else {
+            AppLogger.i('EDITOR', jsonEncode({'action': 'open_my_threads'}));
+            context.replace('/my-threads');
+          }
           return;
         }
         Navigator.of(context).pop({'success': true, 'result': result});

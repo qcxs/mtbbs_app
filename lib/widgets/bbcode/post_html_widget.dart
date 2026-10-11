@@ -53,6 +53,14 @@ double resolvePostImageWidth({
   return availableWidth.clamp(1, maxImageWidth).toDouble();
 }
 
+/// 段落间距 = 正文字号 × 该倍数。
+///
+/// 硬换行 `<br>` 在 flutter_widget_from_html 里只是文本里的 `'\n'`（不是盒子），
+/// CSS 无法给“换行”本身加高。这里在 [customWidgetBuilder] 把 `<br>` 换成**块级
+/// 间隔**（= 换行 + 段间距）。段内自动折行不含 `<br>`，因此仍只是 line-height，
+/// 于是“段距 > 行距”，读起来不再串行。调整段间距只需改这个倍数。
+const double _kParagraphGapRatio = 0.5;
+
 /// 基于 flutter_widget_from_html 的 BBCode 渲染组件
 ///
 /// 链路：`BBCode → BBCode2Html → HTML → HtmlWidget`
@@ -128,9 +136,22 @@ class PostHtmlWidget extends StatelessWidget {
       html,
       // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
       buildAsync: false,
-      textStyle: TextStyle(fontSize: textSize, color: cs.onSurface),
+      // height 即 CSS line-height（渲染器按 line-height 语义处理）。
+      // 解析层会清掉空行使 BBCode 紧凑，段与段之间只剩单个 \n → 单个 <br>，
+      // 段落间距因此等于行间距；而 <br> 是文本里的换行符、非盒子，CSS 无法单独
+      // 撑开它。故统一放宽行高来缓解"串行"。中文正文 1.6 较舒适。
+      textStyle: TextStyle(
+        fontSize: textSize,
+        color: cs.onSurface,
+        height: 1.6,
+      ),
       customStylesBuilder: (element) => _stylesFor(element, cs),
       customWidgetBuilder: (element) {
+        // 硬换行 → 块级间隔：既完成换行，又提供段间距（见 _kParagraphGapRatio）。
+        // 段内自动折行不经过这里，故只有“段落”被撑开。
+        if (element.localName == 'br') {
+          return SizedBox(height: textSize * _kParagraphGapRatio);
+        }
         // [code] 占位 div → 代码高亮组件（块级）
         final codeIndex = element.attributes['data-code-index'];
         if (codeIndex != null) {

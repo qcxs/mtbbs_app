@@ -12,6 +12,24 @@ extension SettingsPersistence on SettingsProvider {
         .clamp(0, 3);
 
     _autoDetectUrls = (await _db.getSettingBool('autoDetectUrls')) ?? true;
+    // 消息未读徽标：样式 / 是否检查 / 计入的分组（见 NoticeBadgeController）
+    final badgeIdx =
+        (await _db.getSettingInt('noticeBadgeMode')) ??
+        NoticeBadgeMode.number.index;
+    _noticeBadgeMode = NoticeBadgeMode
+        .values[badgeIdx.clamp(0, NoticeBadgeMode.values.length - 1)];
+    _noticeCheckEnabled =
+        (await _db.getSettingBool('noticeCheckEnabled')) ?? true;
+    final groupsJson = await _db.getSetting('noticeBadgeGroups');
+    if (groupsJson != null && groupsJson.isNotEmpty) {
+      try {
+        final parsed = (jsonDecode(groupsJson) as List<dynamic>)
+            .map((e) => e.toString())
+            .where(noticeGroupIds.contains)
+            .toSet();
+        _noticeBadgeGroups = parsed;
+      } catch (_) {}
+    }
     // 浏览器仿真头：此处在 ApiService.init 之前，只登记开关值，init 会读它
     _simulateBrowserHeaders =
         (await _db.getSettingBool('simulateBrowserHeaders')) ?? true;
@@ -120,6 +138,31 @@ extension SettingsPersistence on SettingsProvider {
           homeJson,
         ).where((e) => _homeSectionIds.contains(e.id)).toList();
         if (loaded.isNotEmpty) _homeSections = loaded;
+      } catch (_) {}
+    }
+
+    // 消息页 Tab（顺序/显隐）与「常用项自动前排」+ 使用次数
+    final noticeTabsJson = await _db.getSetting('noticeTabs');
+    if (noticeTabsJson != null && noticeTabsJson.isNotEmpty) {
+      try {
+        final loaded = ManagedItem.decodeList(
+          noticeTabsJson,
+        ).where((e) => _noticeTabIds.contains(e.id)).toList();
+        if (loaded.isNotEmpty) _noticeTabs = loaded;
+      } catch (_) {}
+    }
+    _autoFrequentTabs = (await _db.getSetting('autoFrequentTabs')) != '0';
+    final usageJson = await _db.getSetting('tabUsage');
+    if (usageJson != null && usageJson.isNotEmpty) {
+      try {
+        final parsed = jsonDecode(usageJson) as Map<String, dynamic>;
+        _tabUsage = {
+          for (final e in parsed.entries)
+            e.key: {
+              for (final kv in (e.value as Map).entries)
+                kv.key: (kv.value as num).toInt(),
+            },
+        };
       } catch (_) {}
     }
 
@@ -266,6 +309,30 @@ extension SettingsPersistence on SettingsProvider {
   Future<void> setAcwForceWebview(bool enabled) async {
     _acwForceWebview = enabled;
     await _db.setSettingBool('acwForceWebview', enabled);
+    _notify();
+  }
+
+  /// 消息未读标记样式（隐藏 / 红点 / 数字）
+  Future<void> setNoticeBadgeMode(NoticeBadgeMode mode) async {
+    _noticeBadgeMode = mode;
+    await _db.setSettingInt('noticeBadgeMode', mode.index);
+    _notify();
+  }
+
+  /// 是否检查新提醒（关掉后完全不请求）
+  Future<void> setNoticeCheckEnabled(bool enabled) async {
+    _noticeCheckEnabled = enabled;
+    await _db.setSettingBool('noticeCheckEnabled', enabled);
+    _notify();
+  }
+
+  /// 计入底栏未读的分组
+  Future<void> setNoticeBadgeGroups(Set<String> groups) async {
+    _noticeBadgeGroups = Set.from(groups);
+    await _db.setSetting(
+      'noticeBadgeGroups',
+      jsonEncode(_noticeBadgeGroups.toList()),
+    );
     _notify();
   }
 

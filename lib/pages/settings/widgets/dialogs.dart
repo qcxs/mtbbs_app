@@ -181,6 +181,57 @@ String themeModeLabel(ThemeMode mode) => switch (mode) {
   ThemeMode.system => '跟随系统',
 };
 
+/// 通用多选弹窗（返回新集合；关闭返回 null）
+Future<Set<T>?> showMultiSelectDialog<T>({
+  required BuildContext context,
+  required String title,
+  required List<SelectOption<T>> options,
+  required Set<T> selected,
+}) {
+  return showDialog<Set<T>>(
+    context: context,
+    builder: (ctx) {
+      final cur = Set<T>.from(selected);
+      return StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          constraints: const BoxConstraints(maxWidth: settingsDialogMaxWidth),
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final opt in options)
+                CheckboxListTile(
+                  value: cur.contains(opt.value),
+                  title: Text(opt.label),
+                  subtitle: opt.description == null
+                      ? null
+                      : Text(opt.description!),
+                  onChanged: (v) => setLocal(() {
+                    if (v == true) {
+                      cur.add(opt.value);
+                    } else {
+                      cur.remove(opt.value);
+                    }
+                  }),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(cur),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 /// 主题模式选择弹窗（设置页「外观」组与「我的」页共用同一实现）
 Future<void> showThemeModeDialog(
   BuildContext context,
