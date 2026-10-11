@@ -87,17 +87,13 @@ class ComiisTableParser implements ThreadListParser {
     final digest = parseDigestBadge(postlist) ?? (hasDigestBadge(titleSpan) ? 1 : null);
 
     // 统计
-    int? replies, views;
-    if (p != null) {
-      final replyEl = p.querySelector('.km_reply a');
-      if (replyEl != null) {
-        replies = int.tryParse(replyEl.text.trim());
-      }
-      final viewEl = p.querySelector('.km_view');
-      if (viewEl != null) {
-        views = int.tryParse(viewEl.text.trim());
-      }
-    }
+    final num = parseNumCell(
+      p,
+      replySelector: '.km_reply a',
+      viewSelector: '.km_view',
+    );
+    final replies = num.replies;
+    final views = num.views;
 
     // 作者
     String? author;
@@ -130,19 +126,13 @@ class ComiisTableParser implements ThreadListParser {
     }
 
     // 版块
-    String? boardName;
-    String? boardUrl;
-    int? boardId;
-    if (p != null) {
-      final forumLink = p.querySelector(
-        'em a[href*="forum-"], em a[href*="forumdisplay"]',
-      );
-      if (forumLink != null) {
-        boardName = sanitizeText(forumLink.text);
-        boardUrl = forumLink.attributes['href'] ?? '';
-        if (boardUrl.isNotEmpty) boardId = extractBoardIdFromUrl(boardUrl);
-      }
-    }
+    final board = parseBoardFields(
+      p,
+      selector: 'em a[href*="forum-"], em a[href*="forumdisplay"]',
+    );
+    final boardName = board.name;
+    final boardUrl = board.url;
+    final boardId = board.id;
 
     return ThreadItem(
       uid: uid,

@@ -44,38 +44,6 @@ class RateFormData {
   });
 }
 
-class KickFormData {
-  final String formhash;
-  final String tid;
-  final int currentKicks;
-  final int maxKicks;
-  final String action;
-
-  const KickFormData({
-    required this.formhash,
-    required this.tid,
-    required this.action,
-    this.currentKicks = 0,
-    this.maxKicks = 0,
-  });
-}
-
-class FavoriteFormData {
-  final String formhash;
-  final String tid;
-  final String action;
-
-  /// 表单元素的 id，用于提交时构造 handlekey（如 favoriteform_3）
-  final String formId;
-
-  const FavoriteFormData({
-    required this.formhash,
-    required this.tid,
-    required this.action,
-    this.formId = '',
-  });
-}
-
 // ============================================================
 // Helpers
 // ============================================================
@@ -228,53 +196,5 @@ RateFormData parseRateDialog(String body) {
     items: items,
     reasonOptions: reasonOptions,
     hasNotifyAuthor: hasNotifyAuthor,
-  );
-}
-
-/// 解析踢帖弹窗表单
-KickFormData parseKickDialog(String body) {
-  final html = parseInajaxXml(body)?.cdataHtml ?? body;
-  final doc = htmlParser.parse(html);
-
-  final formhash = _extractInputValue(doc, 'formhash');
-  final tid = _extractInputValue(doc, 'tid');
-  final action = _extractFormAction(doc);
-
-  // 当前踢数和最大踢数
-  int currentKicks = 0, maxKicks = 0;
-  final text = doc.text;
-  final kickMatch = RegExp(r'(\d+)\s*/\s*(\d+)').firstMatch(text ?? '');
-  if (kickMatch != null) {
-    currentKicks = int.tryParse(kickMatch.group(1)!) ?? 0;
-    maxKicks = int.tryParse(kickMatch.group(2)!) ?? 0;
-  }
-
-  return KickFormData(
-    formhash: formhash,
-    tid: tid,
-    action: action,
-    currentKicks: currentKicks,
-    maxKicks: maxKicks,
-  );
-}
-
-/// 解析收藏弹窗表单
-FavoriteFormData parseFavoriteDialog(String body) {
-  final html = parseInajaxXml(body)?.cdataHtml ?? body;
-  final doc = htmlParser.parse(html);
-
-  final formhash = _extractInputValue(doc, 'formhash');
-  final action = _extractFormAction(doc);
-  // 收藏表单没有 <input name="tid">，tid 在 action URL 中
-  final tid = RegExp(r'tid=(\d+)').firstMatch(action)?.group(1) ?? '';
-  // 表单 ID（如 favoriteform_3），用于提交 URL 的 handlekey
-  final form = doc.querySelector('form');
-  final formId = form?.attributes['id'] ?? '';
-
-  return FavoriteFormData(
-    formhash: formhash,
-    tid: tid,
-    action: action,
-    formId: formId,
   );
 }

@@ -4,10 +4,66 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:mtbbs/core/app/event_bus.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/parser/thread_parser.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
 /// 从 Dio Response 中安全解码响应体
 String safeDecode(Response<String> resp) => resp.data ?? '';
+
+/// 帖子列表页解析（版块列表 / 导读共用）。
+///
+/// 从完整 HTML 页面中提取帖子列表与分页，复用 thread_parser 解析帖子列表。
+/// 容器不存在时返回空列表（`_health.parser = 'skipped'`）；
+/// 容器存在却解析不出帖子时给出健康告警（结构可能变了，不报错——见下）。
+Map<String, dynamic> parseThreadListPage(String body, int statusCode) {
+  final pre = prepareDoc(body, statusCode);
+  if (pre.error != null) return pre.error!;
+  final doc = pre.doc!;
+
+  final pagination = extractPagination(doc);
+
+  // 检测是否包含帖子列表（兼容三种模板）
+  final hasThreadList =
+      doc.querySelector(
+        '[class*="forumlist_li"], #threadlist, [class*="comiis_postlist"]',
+      ) !=
+      null;
+
+  if (!hasThreadList) {
+    return {
+      'success': true,
+      'threads': <Map<String, dynamic>>[],
+      'count': 0,
+      'currentPage': pagination['currentPage'] ?? 1,
+      'totalPages': pagination['totalPages'] ?? 1,
+      'hasMore': false,
+      '_health': const {'parser': 'skipped', 'missing': <String>[]},
+    };
+  }
+
+  final info = parseThreadListInfo(body);
+  final threads = info.items;
+
+  final cp = pagination['currentPage'] ?? 1;
+  final tp = pagination['totalPages'] ?? 1;
+
+  return {
+    'success': true,
+    'threads': threads.map((t) => t.toJson()).toList(),
+    'count': threads.length,
+    'currentPage': cp,
+    'totalPages': tp,
+    'hasMore': cp < tp,
+    '_health': {
+      'parser': info.parser,
+      // 容器存在却解析不出帖子 = 结构可能变了（区别于"版块确实没帖子"）。
+      // 这里只告警不报错：空列表无法与"真的没帖子"区分，误报一个错误页更糟。
+      'missing': (threads.isEmpty && hasThreadList)
+          ? const ['列表容器存在但未解析出帖子']
+          : const <String>[],
+    },
+  };
+}
 
 /// parse.dart 统一前置：HTTP 状态码校验 + 解析 DOM + Discuz 错误页/登录页检测。
 ///

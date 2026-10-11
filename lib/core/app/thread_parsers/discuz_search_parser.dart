@@ -104,17 +104,10 @@ class DiscuzSearchParser implements ThreadListParser {
         uid = extractUidFromUrl(authorLink.attributes['href'] ?? '');
       }
 
-      final boardLink = metaP.querySelector(
-        'a[href*="forum-"], a[href*="forumdisplay"]',
-      );
-      if (boardLink != null) {
-        boardName = sanitizeText(boardLink.text);
-        final href = boardLink.attributes['href'] ?? '';
-        if (href.isNotEmpty) {
-          boardUrl = normalizeUrl(href);
-          boardId = extractBoardIdFromUrl(boardUrl);
-        }
-      }
+      final board = parseBoardFields(metaP, normalize: true);
+      boardName = board.name;
+      boardUrl = board.url;
+      boardId = board.id;
     }
 
     return ThreadItem(

@@ -142,7 +142,7 @@ lib/mcp/
 ## 验证方式
 
 ```bash
-flutter test test/mcp_server_test.dart        # 15 例：鉴权/只读不变量/能力开关/脱敏
+flutter test test/mcp_server_test.dart        # 24 例：鉴权/只读不变量/能力开关/脱敏/正文分片
 flutter analyze lib test
 curl -i -X POST http://127.0.0.1:8765/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'   # 无令牌应 403

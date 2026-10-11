@@ -169,15 +169,6 @@ class Html2BBCode {
 
   // ==================== 复杂匹配 ====================
 
-  /// 占位图列表
-  static const _placeholders = [
-    'none.png',
-    'nophoto.gif',
-    'nophoto.png',
-    'loading.gif',
-    'loading.png',
-  ];
-
   /// 解析图片真实 URL
   ///
   /// 优先级：PC 模板 `file`/`zoomfile` → `src`（跳过占位图）
@@ -195,10 +186,7 @@ class Html2BBCode {
     return '';
   }
 
-  bool _isPlaceholder(String url) {
-    final lower = url.toLowerCase();
-    return _placeholders.any((p) => lower.contains(p));
-  }
+  bool _isPlaceholder(String url) => isPlaceholderImageUrl(url);
 
   /// 处理 ignore_js_op 包装器内的各类内容
   String? _handleIgnoreJsOp(dom.Element el) {

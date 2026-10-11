@@ -4,7 +4,7 @@
 /// ```dart
 /// final cs = Theme.of(context).colorScheme;
 /// cs.linkColor    // 自适应亮暗的链接色
-/// cs.levelColor   // 用户等级标签色（固定 #FF9900）
+/// levelColor      // 用户等级标签色（固定 #FF9900）
 /// ```
 ///
 /// 设计原则：
@@ -45,7 +45,6 @@ const stickTopColor = Color(0xFFE5484D);
 const _searchHlPair = _ColorPair(Color(0xFFD32F2F), Color(0xFFFF8A80));
 
 // -- 编码块 --
-const codeBg = Color(0xFF1E1E1E);
 const codeText = Color(0xFF98C379);
 
 // -- BBCode 容器色（浅色保留特征，深色用 M3 语义色替代）--
@@ -57,26 +56,7 @@ const quoteBgDark = Color(0xFF333333);
 // -- BBCode 其他容器色 --
 const attachBg = Color(0xFFE3F2FD);
 const lockedBg = Color(0xFFFFF3E0);
-const pstatusBg = Color(0xFFF5F5F5);
 const pstatusText = Color(0xFF999999);
-
-// -- 设置页图标色板 --
-const iconSite = Color(0xFF2196F3);
-const iconUser = Color(0xFF4CAF50);
-const iconForum = Color(0xFFFF9800);
-const iconEmoji = Color(0xFFFFC107);
-const iconStorage = Color(0xFF607D8B);
-const iconLink = Color(0xFF9C27B0);
-const iconTab = Color(0xFF3F51B5);
-const iconPalette = Color(0xFFFF9800);
-const iconSettings = Color(0xFF607D8B);
-const iconKeyboard = Color(0xFF00BCD4);
-const iconStagger = Color(0xFF009688);
-const iconSearch = Color(0xFF00BCD4);
-const iconUa = Color(0xFFFF5722);
-const iconHistory = Color(0xFF607D8B);
-const iconCalculate = Color(0xFFE91E63);
-const iconDecoration = Color(0xFFFF5722);
 
 // ==================== ColorScheme Extension ====================
 
@@ -91,9 +71,6 @@ extension BrandColors on ColorScheme {
   /// 容器引用/免费/隐藏背景色（浅色暖黄，深色使用 tertiaryContainer）
   Color get quoteBg =>
       brightness == Brightness.dark ? quoteBgDark : quoteBgLight;
-
-  /// 编码块背景
-  Color get codeBgColor => codeBg;
 
   /// 编码块文本色
   Color get codeTextColor => codeText;
@@ -129,40 +106,12 @@ extension BrandColors on ColorScheme {
   /// 锁定内容背景
   Color get lockedBgColor => lockedBg;
 
-  /// 帖子状态背景
-  Color get pstatusBgColor => pstatusBg;
-
   /// 帖子状态文本色
   Color get pstatusTextColor => pstatusText;
-
-  /// 「隐藏内容」标签色
-  Color get hideLabelColor => error;
-
-  /// 设置页图标色 — 通过 [iconBoxColor] 获取，不直接暴露
 }
 
-/// 工具：固定色 + 12% 透明度背景
-///
-/// 用于标签/badge 渲染，只需传前景色即可获得适配的容器色。
+/// 工具：颜色扩展
 extension ColorBadge on Color {
-  /// 生成带 12% 透明度的背景色
-  Color get withBg => withValues(alpha: 0.12);
-
-  /// 生成标签 widget
-  Widget toBadge(String text, {double fontSize = 11}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: withBg,
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: fontSize, color: this),
-      ),
-    );
-  }
-
   /// 生成「盖章」样式标签：略微旋转 + 描边 + 淡底，模仿站内印章（精华/置顶等）
   Widget toStamp(String text, {double fontSize = 13, double angle = -0.12}) {
     return Transform.rotate(

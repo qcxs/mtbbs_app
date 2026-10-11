@@ -90,14 +90,10 @@ class DiscuzTableParser implements ThreadListParser {
         authorTd ??= by;
       }
     }
-    if (forumTd != null) {
-      final link = forumTd.querySelector('a');
-      if (link != null) {
-        boardName = sanitizeText(link.text);
-        boardUrl = link.attributes['href'] ?? '';
-        if (boardUrl.isNotEmpty) boardId = extractBoardIdFromUrl(boardUrl);
-      }
-    }
+    final board = parseBoardFields(forumTd, selector: 'a');
+    boardName = board.name;
+    boardUrl = board.url;
+    boardId = board.id;
 
     // 作者 + 时间：已在上一步分离出来的 authorTd
     String? author;
@@ -116,18 +112,9 @@ class DiscuzTableParser implements ThreadListParser {
     }
 
     // 统计：td.num
-    int? replies, views;
-    final numTd = tr.querySelector('td.num');
-    if (numTd != null) {
-      final replyLink = numTd.querySelector('a');
-      if (replyLink != null) {
-        replies = int.tryParse(replyLink.text.trim());
-      }
-      final viewEm = numTd.querySelector('em');
-      if (viewEm != null) {
-        views = int.tryParse(viewEm.text.trim());
-      }
-    }
+    final num = parseNumCell(tr.querySelector('td.num'));
+    final replies = num.replies;
+    final views = num.views;
 
     // 精华：标准 Discuz 在标题列渲染 `span.tbox.tdigest`（文本「精华 N」）
     final digest = parseDigestBadge(titleCell);

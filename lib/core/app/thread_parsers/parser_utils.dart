@@ -1,5 +1,6 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 帖子列表解析器共享工具
 ///
@@ -45,6 +46,44 @@ String cleanElementText(dom.Element el, {Set<String> excludeTags = const {}}) {
     buf.write(node.text);
   }
   return buf.toString().trim();
+}
+
+/// 版块字段（名称 / URL / fid）——在 [scope] 内查找版块链接。
+///
+/// [selector] 默认匹配 `a[href*=forum-]` / `a[href*=forumdisplay]`；
+/// 个别模板版块链接是 `td`/`em` 下的首个 `a`，或作用域已收窄，可传更具体的选择器。
+/// [normalize] 为 true 时对 URL 走 [normalizeUrl]（标准搜索模板的 href 是相对地址）。
+({String? name, String? url, int? id}) parseBoardFields(
+  dom.Element? scope, {
+  String selector = 'a[href*="forum-"], a[href*="forumdisplay"]',
+  bool normalize = false,
+}) {
+  final link = scope?.querySelector(selector);
+  if (link == null) return (name: null, url: null, id: null);
+  var url = link.attributes['href'] ?? '';
+  if (normalize && url.isNotEmpty) url = normalizeUrl(url);
+  return (
+    name: sanitizeText(link.text),
+    url: url.isEmpty ? null : url,
+    id: url.isEmpty ? null : extractBoardIdFromUrl(url),
+  );
+}
+
+/// 回复 / 查看数：单元格内 `a` → replies、`em` → views。
+///
+/// 标准 Discuz 用 `td.num`；克米表格用 `.km_reply a` / `.km_view`，传自定义选择器。
+({int? replies, int? views}) parseNumCell(
+  dom.Element? cell, {
+  String replySelector = 'a',
+  String viewSelector = 'em',
+}) {
+  if (cell == null) return (replies: null, views: null);
+  final replyEl = cell.querySelector(replySelector);
+  final viewEl = cell.querySelector(viewSelector);
+  return (
+    replies: replyEl == null ? null : int.tryParse(replyEl.text.trim()),
+    views: viewEl == null ? null : int.tryParse(viewEl.text.trim()),
+  );
 }
 
 /// 精华等级（>0 = 精华帖）——标准 Discuz / 克米**表格**模板把精华渲染为

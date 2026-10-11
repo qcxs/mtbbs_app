@@ -92,31 +92,18 @@ class SpaceThreadParser implements ThreadListParser {
     }
 
     // 版块：查找含 forum 链接的 <td>
-    String? boardName;
-    String? boardUrl;
-    int? boardId;
-    final forumLink = tr.querySelector(
-      'td a[href*="forum-"], td a[href*="forumdisplay"]',
+    final board = parseBoardFields(
+      tr,
+      selector: 'td a[href*="forum-"], td a[href*="forumdisplay"]',
     );
-    if (forumLink != null) {
-      boardName = sanitizeText(forumLink.text);
-      boardUrl = forumLink.attributes['href'] ?? '';
-      if (boardUrl.isNotEmpty) boardId = extractBoardIdFromUrl(boardUrl);
-    }
+    final boardName = board.name;
+    final boardUrl = board.url;
+    final boardId = board.id;
 
     // 统计：<td class="num">
-    int? replies, views;
-    final numTd = tr.querySelector('td.num');
-    if (numTd != null) {
-      final replyLink = numTd.querySelector('a');
-      if (replyLink != null) {
-        replies = int.tryParse(replyLink.text.trim());
-      }
-      final viewEm = numTd.querySelector('em');
-      if (viewEm != null) {
-        views = int.tryParse(viewEm.text.trim());
-      }
-    }
+    final num = parseNumCell(tr.querySelector('td.num'));
+    final replies = num.replies;
+    final views = num.views;
 
     // 最后发表：<td class="by">（仅提取最后回复时间，不提取作者——这不是发帖人）
     String? time;

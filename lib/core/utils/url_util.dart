@@ -31,6 +31,24 @@ String normalizeUrl(String url, {String? base}) {
   return Uri.parse(baseUrl).resolve(url).toString();
 }
 
+/// 图片"占位图"特征（文件名片段）：URL 含其中任一即视为没有真实图片。
+///
+/// 用于过滤懒加载占位图（克米 `comiis_loadimages`、`none.png` 等）——
+/// 克米列表解析与 HTML→BBCode 共用这一份，避免两处清单漂移（docs/07 #79）。
+const imagePlaceholderMarkers = [
+  'none.png',
+  'nophoto.gif',
+  'nophoto.png',
+  'loading.gif',
+  'loading.png',
+];
+
+/// [url] 是否为占位图（按小写文件名片段匹配）。
+bool isPlaceholderImageUrl(String url) {
+  final lower = url.toLowerCase();
+  return imagePlaceholderMarkers.any(lower.contains);
+}
+
 /// 把 CDN 地址还原成**等价的原站地址**；不是该 CDN 下的地址时返回 null。
 ///
 /// CDN 与原站共用同一套路径（表情 `/static/image/smiley/…`、头像模板里的

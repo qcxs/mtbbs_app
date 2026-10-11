@@ -1,0 +1,38 @@
+# 经验教训 · 状态与 UI 架构
+
+> 适用：改状态管理/导航/站点切换、设置页与首页的信息架构前读。
+> 本册是 `docs/07-经验教训.md` 的分册之一；**条目编号是稳定 ID**（跨文档与测试注释按
+> `docs/07 #NN` 引用），册内编号沿用历史序号、不连续，检索请认编号。
+
+## 状态与导航
+
+4. **`Navigator.maybePop` vs `canPop + pop`** — `canPop` 检查 `Navigator`，非 GoRouter。在 GoRouter shell 环境下，`Navigator.canPop` 可能返回 false 但 `GoRouter.canPop()` true。
+5. **`showModalBottomSheet` 数据同步** — 面板关闭重开会重建 State，内部 State 会丢。数据源用 Provider（面板内 `context.watch` 实时读）或 `ValueNotifier` / 回调，不要在面板里自持一份副本。
+6. **双击退出** — 只在 Android 返回键触发，Esc 不做。
+7. **站点切换顺序** — `saveCurrentSiteState()` → `SiteConfig.switchTo()` → Provider reload，不可颠倒。
+
+85. **乐观发送的「发送中/发送成功」过渡不能改变气泡的尺寸——状态指示器与时间行都要"恒定占位"** — 症状：私信里点发送后，气泡从"转圈"变"已发送"的瞬间，列表会**抖一下**（反复微调都治不好）。**两个独立成因**（都只在自己发的消息这一侧）：① **横向**——状态指示器原来只在 `sending/failed` 时才渲染，`Row(mainAxisAlignment: end)` 里它一消失，`Flexible` 分给气泡的可用宽就从 `W-26` 变回 `W`，而气泡宽度是 `LayoutBuilder` 里按**可用宽** `*0.78` 算的 → 接近满宽的气泡左右边缘位移（短气泡看不出，容易误判成"只有长消息才抖"）；② **纵向**——本地乐观气泡没有时间行（`time` 为空时 `if` 跳过），而服务端气泡一定有；`reverse` 列表以底部为锚点，被替换的恰是最底部那条，它一长高 ~14px，可视区整体上移。**修法**：状态槽改为**恒定尺寸占位**（`sending`→转圈、`failed`→叹号、其余→空，外层固定 `20×20` + 固定左间距），时间行**始终渲染**（`time` 为空时是一个占位空 `Text`，撑出与有值行相同的高度）。**通用规则**：在"本地占位 → 服务端真身"的替换场景里，两个 widget 的**可用宽与总高必须逐帧一致**，任何"按状态增删子节点"的写法都会引起抖动；宁可留一个不可见的固定槽，也不要用条件渲染去换那点空间。
+
+86. **私信乐观发送的"收敛"要同时满足三条：轮询复查、原子交接、不信任重拉旧页** — 症状都表现为"消息消失 / 重复"，但**根因是三个不同的竞态**，缺一条都会复发（`pages/message/pm_chat_page.dart`）：① **轮询竞态**——`_poll` 原来只在**进入时**检查 `_sending`，请求发出后不再复查；于是"轮询先发出 → 用户点发送 → 轮询结果才回来"会把服务端那条重复灌进列表（表现为突然多一条）。修法：请求返回后**再查一次** `if (_sending || _loading) return;`，过期结果直接丢。② **交接必须原子**——"用服务端真身替换本地占位"若拆成两个 setState（先重拉替换 `_items`、再单独删 `_pending`），中间那帧要么重复要么空档；必须把两者放进**同一个 setState**。③ **不信任重拉的旧页**——发送成功后立刻重拉，实测 Discuz 有**读后写延迟**：`totalCount` 已 +1，但返回的条目还是发送前那一页（`pmid` 全同），**不含刚发的消息**。若此时"因为重拉成功就交出占位"，消息就消失到下次轮询。修法：重拉后算出**新出现的 pmid**（`appeared`），**只有非空才**交出占位；否则保留占位继续显示"已发送"，由轮询拿到真身后再收敛。收敛函数 `_dropCoveredSentPending` 按 FIFO 把"新出现的、自己发的"消息与本地 `sent` 占位一一抵消（本地占位永远比服务端"新"），**只动 `sent`，不动 `sending`/`failed`**。**失败消息的生命周期**：`failed` 占位只存在内存 `_pending` 里，轮询/重拉**不会**丢它（上面已核实），但**退出页面即丢**——因此返回时用 `PopScope(canPop: !_hasFailedMessage)` 拦一次并确认；点叹号弹「重新发送 / 删除」操作面板（删除即从本地移除，服务端本就没有它）。**已知边角**：若发送实际到达了服务端、但客户端因超时判失败，轮询会补上服务端那条而失败占位仍在 → 出现重复；不自动删除（宁可见重复也不误删用户内容），交给用户用「删除」处理。
+
+88. **切换状态时不能改变 `build` 返回的根 widget 类型，否则整棵子树重建、滚动位置归零** — 症状：帖子页点「评论」弹出迷你编辑器，帖子阅读进度丢失（跳回顶部）；Android 返回收起编辑器后布局又"复位"。**根因**：`_wrapBackToCollapse`（`pages/thread/thread_view_page.dart`）在收起时 `return child`（根 widget = `Scaffold`）、展开时返回 `Shortcuts(child: Actions(child: PopScope(child: child)))` —— 两次 build 的**根 widget 类型不同**，Flutter 无法原地更新 Element，只能销毁旧子树并 inflate 一棵全新子树；`CustomScrollView` 的 `Scrollable` 随之重建，新的 `ScrollPosition` 从偏移 0 开始 → 回到顶部。**修法**：让外壳**结构恒定**，只让行为随状态变化——始终返回同一套 `Shortcuts > Actions > PopScope > child`，收起时把快捷键表 / 动作表置空、`canPop: true`（各层皆空操作），展开时才填入 Esc 覆盖与 `canPop: false`。**排查提醒**：凡"某个布尔状态切换本该只重绘局部，结果整页闪一下 / 滚动丢失 / 输入框失焦 / 动画重启"，先看 `build` 的**根 widget 类型是否随该状态变化**（或是否有 `if (x) return A; return B;` 这类换根的写法）；正确范式见 `pm_chat_page` / `editor_page_layout`（根外壳恒定，只变 `canPop` 等参数）。
+
+89. **同一页面的宽/窄两套布局若共用 `ScrollController`，两套都必须挂它；只挂一套时基于该 controller 的操作在另一套下静默失效（debug 断言）** — 症状：帖子页**宽屏**点标题"回顶部"没反应（窄屏正常），debug 下还报 `ScrollController not attached to any scroll views`。**根因**：内容区按宽度二选一——窄屏 `CustomScrollView(controller: _scrollController)`，宽屏 `ListView`（漏挂 controller）；`_scrollController.animateTo(0)` 在宽屏下无 client → debug 命中 `_positions.isNotEmpty` 断言，release 里是空循环、静默无效。**修法**：给宽屏 `ListView` 也挂同一个 `_scrollController`（两种布局互斥、只挂一个，不会同时 attach），并把"回顶部"收敛为带 `if (!controller.hasClients) return;` 保护的 `_scrollToTop()`——内容区尚未挂载（加载中/错误页/空态）时也不炸。**通用规则**：任何"基于 controller 的滚动/回顶/定位"都要先判 `hasClients`，且当页面有多个互斥布局分支时，**每个分支都要挂上那个 controller**（漏一个 = 该布局下功能消失）。
+
+90. **"未识别到"也是一种探测结果：负结果必须记时间戳，否则每次启动都重探** — 症状：无独立 CDN 的站点（未配 `staticurl`）**每次启动**都跑一次 CDN 探测（日志 `[CDN] xxx 探测未识别到 CDN`），有 CDN 的站点则不会。**根因**：`SiteCdnStore.needsDetect` 把"未识别到"当成"需要探测"（`_cdn[host] == null → true`），而负结果既不写时间戳（`detectSiteCdn` 只在识别成功时 `setCdn`），`_load` 又跳过空值持久化——该 host 于是永远"需要探测"。**修法**：判据改为"**上次探测时间**"——`needsDetect` 只看 `_at[host]`；新增 `markChecked(host)` 在"探测完成但无 CDN"时记时间戳；`_load`/`_persist` 以 `_cdn ∪ _at` 为准（`cdn` 允许空串 = 负结果）；判定逻辑抽成纯函数 `cdnNeedsDetect` 便于单测（`test/site_cdn_parse_test.dart`）。**通用规则**：凡"缓存一次探测结果、之后据此跳过工作"的优化，要缓存的是"**上次尝试**"而不是"上次成功"——否则"合法的空结果"永远不命中，退化成每次都做（与 docs/07 #87「缓存解析结果必须给失败留自愈通道」是同一枚硬币的两面）。
+
+## 设置页信息架构
+
+51. **设置项「存在」不等于「找得到」：同一个能力的入口分散 = 用户眼里的两套设置** — 重构前的实际状态：`themeMode`（浅色/深色/跟随系统）只在「我的」页顶部的按钮里，设置页「界面」组只有主题色和纯黑主题；`docs/08` 当时写着"设置 → 夜间模式"，用户按文档进设置页找不到；设置搜索也搜不到（搜索只索引设置页自己的分组模型）。**规则**：凡是"设置项"，就必须能用一句话从设置页走到；页内快捷入口（如「我的」页的模式按钮）只能**调用同一个弹窗函数**（`showThemeModeDialog`），不能另写一份 `AlertDialog`。**补充**：**不渲染在设置列表里、但住在某个页面内的项**（如关于页的「检查更新」「自动检查更新」）同样要进搜索索引，否则"存在但找不到"的病照旧。**但别在搜索页另写一份清单**——"两套清单"正是遗漏的根源（加了一项忘了登记、或改了文案两边不一致）。做法：把页内项写成声明式模型 `models/about_settings.dart` 的 `aboutPageSettings()`，**页面渲染与搜索索引都从它取**（同一份、只有一列），页面那边 `for (final item in aboutPageSettings()) item.build(...)`，新增/改文案只动一处，两边自动同步。
+52. **分组按"用户关心什么"划分，不按"代码归属"划分** — 「通用错峰间隔」原本放在「关于」组（因为它在 `stagger_queue.dart` 里），对用户毫无线索；「插入格式」是编辑器引用格式却放在「内容渲染」。现为 7 组：站点与网络 / 外观 / 阅读与渲染 / 编辑与快捷键 / 存储与工具 / 页面接管 / MCP 服务（**唯一清单**在 `lib/pages/settings/models/settings_groups.dart`，设置主页与搜索页共用），「关于」降为列表底部单独一行、不占分组位。**宽屏一致性**：竖屏下「关于」是列表底部一行（点击进独立页），宽屏左栏则要跟其他分组一样**选中后右栏展示**（`AboutPage(showAppBar: false)`），否则会出现"其他都右侧、只有它跳新页"的割裂。**例外**：默认值就是对的、改错会导致"用不了"或难以自查的排障 / 诊断类开关（如「人机验证改用网页完成」）不进这些分组，统一收进**开发者选项**页（入口＝关于页图标连点 7 次、解锁后单击图标进入，见 `docs/20`）。
+53. **"只有查看 + 一个操作"的页面应该降级为底部面板** — 表情管理（唯一动作"重新获取"）、MT 图床管理（只有隐藏/删除）原先各占一个路由和 Scaffold，属于"点进去再点进去"。降级方式：把页面拆成 `showXxxSheet(context)` + 无 Scaffold 的内容 widget，路由删除，`showModalBottomSheet(isScrollControlled: true, constraints: BoxConstraints(maxWidth: 560, maxHeight: 600))`。内容 widget 用 `Column(children: [拖拽手柄, 标题行, Divider, Expanded(列表)])` —— **`Expanded` 依赖 `constraints` 给的上界，所以 `constraints` 必须给 `maxHeight`，否则 unbounded 直接崩**。反之，表单重、需要实时预览的页（缓存管理、编辑器设置、插入格式）保持独立页。
+54. **同一个功能有两份渲染实现时，删掉的是"实现"而不是"入口"** — `shortcut_settings_page.dart`（170 行）与 `models/shortcut_settings.dart`（98 行的声明式模型）渲染同一份数据，改一处漏一处。现在只保留模型 + 一个 `showShortcutSheet()`，设置页和编辑器设置页都调它（两个入口、一份实现）。
+
+## 首页信息架构
+
+55. **折叠状态不能用显示标题当 key** — 原实现 `_expandedSections = {'排行', 'RSS'}` 拿中文标题做标识：改文案即静默失效、重启 App 全部复位、用户也无法配置。现改为稳定 id（`shortcuts` / `forums` / `rank` / `rss`），持久化为 `ManagedItem` 列表、展开状态放 `data['expanded']`。首页里当场折叠与设置面板里改默认值走**同一个** `setHomeSectionExpanded()` —— 所以"记住我的操作"和"可改默认"原本是同一条状态，不需要两套。
+56. **`AnimatedCrossFade` 的折叠是假的：两个 child 都常驻 widget tree** — 折叠状态下 `RanklistSection.initState` 照跑 `_fetch()`，`RssSection` 同理："折叠"只省了屏幕空间，网络请求和内存一份没省，用户折叠掉不看的区块，每次进首页照样请求。要真正做到"折叠就不请求"，必须让子树**有条件地不构建**：`AnimatedSize(child: expanded ? 内容 : SizedBox(width: double.infinity))` —— 高度过渡保留，折叠时子树直接消失。
+57. **区块标题只渲染一层** — `_CollapsibleSection(title: 'RSS 订阅')` 外层已有标题，`RssSection` 内部又画了一个同名标题栏，展开后页面上同时出现两个"RSS 订阅"。**规则**：内容组件不自带标题，标题一律由容器提供；否则换容器（卡片 / 弹窗 / 独立页）时必然重复。
+58. **首页区块的顺序 + 显隐 + 默认展开共用一个 `ManagedItem` 列表** — `data` 是业务自定义字段的收纳位（这里放 `expanded`），顺序即列表顺序，持久化一个 key（`homeSections`）。设置面板用 `ReorderableListView` + 拖拽手柄 / 默认展开 Switch / 可见性按钮三个控件复用同一份数据。新增区块只需往 `_homeSectionDefaults` 加一行，加载时按 id 白名单过滤损坏数据。
+59. **区块列表不要按"列"分，宽度交给区块内部消化** — 首页曾在宽屏下把区块交替分到左右两列，结果左右高度必然不等（快捷链接 2 行、排行 10 条，差得远），比单列更乱。根因是**区块高度由内容决定，布局阶段无法拉平**；瀑布流能对齐列高但会打乱顺序。现在的做法：单列纵向 + 区块内部自适应宽度（快捷链接按容器宽度加列，版块 `Wrap` 铺开，排行自己按 `maxWidth > 600` 双列）。宽屏只额外增加页面左右边距。
+60. **网格的"列数"要由容器宽度反推，不能写死** — `crossAxisCount: 4` 写死时格子宽度 = 容器宽 / 4，于是宽屏下格子被撑到 100+ px 却"一行还是 4 个"，窄屏又显得挤。改成目标格子宽度驱动：`columns = max(3, ceil(containerWidth / (targetTileWidth + spacing)))`，超宽屏会一直加列而格子尺寸恒定（这里稳定在 53~56px）。首屏"两行"的数量也要跟着算：`initialCount = columns * 2`。

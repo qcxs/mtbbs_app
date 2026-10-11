@@ -1,7 +1,7 @@
 import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
-import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 积分公式响应解析 — PC 版 DOM
 ///
@@ -170,12 +170,10 @@ Map<String, dynamic> parseLogResponse(String body, int statusCode) {
 }
 
 /// 归一为绝对 URL（数据层负责补全域名，见 docs/02「数据层 ↔ 渲染层职责边界」）。
-/// 已绝对 / 协议相对原样或补协议；站内相对路径补 `baseUrl`。
+///
+/// 空串原样返回，其余交给 [normalizeUrl]（已绝对 / 协议相对 / 相对路径统一处理）。
 String _absUrl(String? href) {
   final h = href?.trim() ?? '';
   if (h.isEmpty) return '';
-  if (h.startsWith('http://') || h.startsWith('https://')) return h;
-  if (h.startsWith('//')) return 'https:$h';
-  final base = SiteStore.instance.baseUrl;
-  return h.startsWith('/') ? '$base$h' : '$base/$h';
+  return normalizeUrl(h);
 }

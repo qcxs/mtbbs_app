@@ -7,16 +7,6 @@ Future<Response<String>> getRateDialog(Dio dio, String rateUrl) {
   return dio.get<String>('${normalizeUrl(rateUrl)}${separator}inajax=1');
 }
 
-/// 获取踢帖弹窗 HTML
-Future<Response<String>> getKickDialog(Dio dio, String kickUrl) {
-  return dio.get<String>(kickUrl);
-}
-
-/// 获取收藏弹窗 HTML
-Future<Response<String>> getFavoriteDialog(Dio dio, String favUrl) {
-  return dio.get<String>(favUrl);
-}
-
 /// 提交评分
 Future<Response<String>> submitRate(
   Dio dio,
@@ -27,40 +17,6 @@ Future<Response<String>> submitRate(
   // Discuz 表单校验依赖 $_POST，必须显式声明 form-urlencoded（Dio 不会自动补 Content-Type）
   return dio.post<String>(
     '${normalizeUrl(action)}${separator}inajax=1',
-    options: Options(
-      headers: {'Content-Type': Headers.formUrlEncodedContentType},
-    ),
-    data: data,
-  );
-}
-
-/// 踢帖提交
-Future<Response<String>> submitKick(
-  Dio dio,
-  String action,
-  Map<String, dynamic> data,
-) {
-  final separator = action.contains('?') ? '&' : '?';
-  // Discuz 表单校验依赖 $_POST，必须显式声明 form-urlencoded（Dio 不会自动补 Content-Type）
-  return dio.post<String>(
-    '$action${separator}inajax=1',
-    options: Options(
-      headers: {'Content-Type': Headers.formUrlEncodedContentType},
-    ),
-    data: data,
-  );
-}
-
-/// 收藏提交
-Future<Response<String>> submitFavorite(
-  Dio dio,
-  String action,
-  Map<String, dynamic> data,
-) {
-  final separator = action.contains('?') ? '&' : '?';
-  // Discuz 表单校验依赖 $_POST，必须显式声明 form-urlencoded（Dio 不会自动补 Content-Type）
-  return dio.post<String>(
-    '$action${separator}inajax=1',
     options: Options(
       headers: {'Content-Type': Headers.formUrlEncodedContentType},
     ),

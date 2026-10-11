@@ -4,39 +4,17 @@ import 'package:mtbbs/config/build_config.dart';
 import 'package:mtbbs/core/utils/screen_size_ext.dart';
 import 'package:mtbbs/pages/settings/about_page.dart';
 import 'package:mtbbs/pages/settings/models/about_settings.dart';
-import 'package:mtbbs/pages/settings/models/content_settings.dart';
-import 'package:mtbbs/pages/settings/models/data_settings.dart';
-import 'package:mtbbs/pages/settings/models/display_settings.dart';
-import 'package:mtbbs/pages/settings/models/editor_settings.dart';
-import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
-import 'package:mtbbs/pages/settings/models/page_gate_settings.dart';
+import 'package:mtbbs/pages/settings/models/settings_groups.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
-import 'package:mtbbs/pages/settings/models/site_settings.dart';
 import 'package:mtbbs/pages/settings/settings_group_page.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
 
-/// 设置分组描述
-class _SettingsGroup {
-  const _SettingsGroup({
-    required this.title,
-    required this.icon,
-    required this.models,
-  });
-
-  final String title;
-  final IconData icon;
-
-  /// 每次构建时重新生成设置项：MCP 令牌列表、调用记录等是随运行时
-  /// 变化的动态内容，不能只在启动时求值一次
-  final List<SettingsModel> Function() models;
-}
-
 /// 设置页面 — 分组入口列表（竖屏）/ 分组内容（宽屏双栏）
 ///
-/// 分组按「用户关心什么」划分：站点与网络 / 外观 / 阅读与渲染 /
-/// 编辑与快捷键 / 存储与工具 / MCP 服务；「关于」作为列表底部单独一行，
-/// 不占分组位。
+/// 分组按「用户关心什么」划分，清单见 `models/settings_groups.dart`
+/// （与设置搜索页共用同一份，避免"两套清单"，见 docs/07 #51）；「关于」作为
+/// 列表底部单独一行（宽屏则作为右栏内容），不占分组位。
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -47,20 +25,6 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   /// 宽屏双栏下当前选中的分组索引（竖屏不使用）
   int _currentIndex = 0;
-
-  static const List<_SettingsGroup> _groups = [
-    _SettingsGroup(title: '站点与网络', icon: Icons.dns, models: siteSettings),
-    _SettingsGroup(title: '外观', icon: Icons.palette, models: displaySettings),
-    _SettingsGroup(
-      title: '阅读与渲染',
-      icon: Icons.article,
-      models: contentSettings,
-    ),
-    _SettingsGroup(title: '编辑与快捷键', icon: Icons.edit, models: editorSettings),
-    _SettingsGroup(title: '存储与工具', icon: Icons.storage, models: dataSettings),
-    _SettingsGroup(title: '页面接管', icon: Icons.pages, models: pageGateSettings),
-    _SettingsGroup(title: 'MCP 服务', icon: Icons.hub, models: mcpSettings),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +44,8 @@ class _SettingsPageState extends State<SettingsPage> {
         Expanded(
           child: ListView(
             children: [
-              for (final g in _groups) _groupTile(context, g, selected: false),
+              for (final g in settingsGroups)
+                _groupTile(context, g, settings: settings, selected: false),
               const Divider(height: 8),
               for (final m in aboutSettings()) m.build(context, settings),
             ],
@@ -91,10 +56,11 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildLandscape(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
-    // _groups.length 这一档代表「关于」：它不是分组（竖屏是列表底部单独一行），
+    // settingsGroups.length 这一档代表「关于」：它不是分组（竖屏是列表底部单独一行），
     // 但宽屏下同样作为右栏内容展示，避免"其他都右侧、只有它跳新页"的不一致
-    final isAbout = _currentIndex >= _groups.length;
+    final isAbout = _currentIndex >= settingsGroups.length;
     return Row(
       children: [
         // 左栏固定宽度，避免占太多空间
@@ -106,10 +72,11 @@ class _SettingsPageState extends State<SettingsPage> {
               Expanded(
                 child: ListView(
                   children: [
-                    for (var i = 0; i < _groups.length; i++)
+                    for (var i = 0; i < settingsGroups.length; i++)
                       _groupTile(
                         context,
-                        _groups[i],
+                        settingsGroups[i],
+                        settings: settings,
                         selected: i == _currentIndex,
                         index: i,
                       ),
@@ -127,8 +94,9 @@ class _SettingsPageState extends State<SettingsPage> {
           child: isAbout
               ? const AboutPage(showAppBar: false)
               : SettingsGroupPage(
-                  title: _groups[_currentIndex].title,
-                  modelsBuilder: _groups[_currentIndex].models,
+                  title: settingsGroups[_currentIndex].title,
+                  modelsBuilder: () =>
+                      settingsGroups[_currentIndex].models(settings),
                   showAppBar: false,
                 ),
         ),
@@ -179,13 +147,14 @@ class _SettingsPageState extends State<SettingsPage> {
       trailing: Icon(Icons.chevron_right, color: cs.outline),
       selected: selected,
       selectedTileColor: cs.secondaryContainer,
-      onTap: () => setState(() => _currentIndex = _groups.length),
+      onTap: () => setState(() => _currentIndex = settingsGroups.length),
     );
   }
 
   Widget _groupTile(
     BuildContext context,
-    _SettingsGroup g, {
+    SettingsGroupDef g, {
+    required SettingsProvider settings,
     required bool selected,
     int? index,
   }) {
@@ -194,7 +163,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return ListTile(
       leading: settingIcon(context, g.icon),
       title: Text(g.title),
-      subtitle: Text('${g.models().length} 项'),
+      subtitle: Text('${g.models(settings).length} 项'),
       trailing: Icon(Icons.chevron_right, color: cs.outline),
       selected: selected,
       selectedTileColor: cs.secondaryContainer,
@@ -202,8 +171,10 @@ class _SettingsPageState extends State<SettingsPage> {
         if (isPortrait) {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) =>
-                  SettingsGroupPage(title: g.title, modelsBuilder: g.models),
+              builder: (_) => SettingsGroupPage(
+                title: g.title,
+                modelsBuilder: () => g.models(settings),
+              ),
             ),
           );
         } else if (index != null) {

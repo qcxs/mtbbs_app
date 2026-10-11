@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/pages/settings/models/about_settings.dart';
-import 'package:mtbbs/pages/settings/models/content_settings.dart';
-import 'package:mtbbs/pages/settings/models/data_settings.dart';
 import 'package:mtbbs/pages/settings/models/developer_settings.dart';
-import 'package:mtbbs/pages/settings/models/display_settings.dart';
-import 'package:mtbbs/pages/settings/models/editor_settings.dart';
-import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
-import 'package:mtbbs/pages/settings/models/page_gate_settings.dart';
+import 'package:mtbbs/pages/settings/models/settings_groups.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/models/shortcut_settings.dart';
-import 'package:mtbbs/pages/settings/models/site_settings.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
 
 /// 设置搜索页 — 跨全部分组检索设置项（标题/副标题），结果可直接操作。
+///
+/// 分组清单来自 `models/settings_groups.dart`（与设置主页共用同一份），
+/// 仅在此之上并入检索专属的补充项，避免"两套清单"（见 docs/07 #51）。
 class SettingsSearchPage extends StatefulWidget {
   const SettingsSearchPage({super.key});
 
@@ -31,26 +28,26 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
     super.dispose();
   }
 
-  /// 全部分组（与设置主页共享同一份模型函数，每次检索时重新生成）
+  /// 全部分组（分组清单与设置主页共用；每次检索时重新生成设置项）
   ///
-  /// `models` 接收 provider：个别分组（编辑与快捷键）要展开运行时数据
-  /// （快捷键明细、工具栏项），无法在无参闭包里求值。
+  /// `models` 接收 provider：个别分组要展开运行时数据，无法在无参闭包里求值。
   static final List<
     ({String group, List<SettingsModel> Function(SettingsProvider) models})
   >
   _all = [
-    (group: '站点与网络', models: (_) => siteSettings()),
-    (group: '外观', models: (_) => displaySettings()),
-    (group: '阅读与渲染', models: (_) => contentSettings()),
-    // 并入快捷键明细（全局快捷键 + 工具栏项），否则面板里的每个快捷键项搜不到
-    (group: '编辑与快捷键', models: (s) => [...editorSettings(), ...shortcutSettings(s)]),
-    (group: '存储与工具', models: (_) => dataSettings()),
-    (group: '页面接管', models: (_) => pageGateSettings()),
-    (group: 'MCP 服务', models: (_) => mcpSettings()),
+    for (final g in settingsGroups)
+      (group: g.title, models: (s) => _expand(g, s)),
     // 「关于」组额外索引关于页内的项（如「检查更新」）—— 与关于页渲染同一份
-    // aboutPageSettings()，改一处两边都跟着变，不存在两套清单（见 docs/07 #51）
+    // aboutPageSettings()，改一处两边都跟着变，不存在两套清单
     (group: '关于', models: (_) => [...aboutSettings(), ...aboutPageSettings()]),
   ];
+
+  /// 「编辑与快捷键」分组额外并入快捷键明细（全局快捷键 + 工具栏项），
+  /// 否则面板里的每个快捷键项搜不到；其余分组原样返回。
+  static List<SettingsModel> _expand(SettingsGroupDef g, SettingsProvider s) =>
+      g.title == '编辑与快捷键'
+      ? [...g.models(s), ...shortcutSettings(s)]
+      : g.models(s);
 
   List<({String group, List<SettingsModel> items})> _results(
     SettingsProvider settings,
@@ -96,7 +93,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
           controller: _ctl,
           autofocus: true,
           textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: '搜索设置项',
             border: InputBorder.none,
             isDense: true,

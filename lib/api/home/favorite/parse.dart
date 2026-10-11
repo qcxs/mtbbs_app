@@ -105,13 +105,8 @@ Map<String, dynamic> parseAddResult(String body, int statusCode) {
   if (body.contains('已收藏')) {
     return {'success': true, 'message': '已收藏过该帖子'};
   }
-  final errorMatch = RegExp(r'(抱歉|错误|失败|无权|权限|非法)').firstMatch(body);
-  if (errorMatch != null) {
-    final start = body.indexOf(errorMatch.group(0)!);
-    final snippet = body.substring(start, start + 60);
-    final cleanMsg = snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-    return {'success': false, 'message': cleanMsg};
-  }
+  final err = _extractError(body);
+  if (err != null) return {'success': false, 'message': err};
   final ok = body.contains('收藏成功') || body.contains('已收藏');
   return {'success': ok, 'message': ok ? '收藏成功' : '未知响应'};
 }
@@ -127,13 +122,20 @@ Map<String, dynamic> parseDeleteResult(String body, int statusCode) {
   if (statusCode != 200) {
     return {'success': false, 'message': 'HTTP $statusCode'};
   }
-  final errorMatch = RegExp(r'(抱歉|错误|失败|无权|权限|非法)').firstMatch(body);
-  if (errorMatch != null) {
-    final start = body.indexOf(errorMatch.group(0)!);
-    final snippet = body.substring(start, start + 60);
-    final cleanMsg = snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-    return {'success': false, 'message': cleanMsg};
-  }
+  final err = _extractError(body);
+  if (err != null) return {'success': false, 'message': err};
   final ok = body.contains('取消收藏成功') || body.contains('收藏已取消');
   return {'success': ok, 'message': ok ? '取消收藏成功' : '未知响应'};
+}
+
+/// 从正文提取 Discuz 错误文案：自首个错误关键词起截 60 字符并去 HTML 标签。
+///
+/// 越界时按正文长度收尾（避免原实现 `substring` 的 RangeError）。
+String? _extractError(String body) {
+  final m = RegExp(r'(抱歉|错误|失败|无权|权限|非法)').firstMatch(body);
+  if (m == null) return null;
+  final start = body.indexOf(m.group(0)!);
+  final end = (start + 60) > body.length ? body.length : (start + 60);
+  final snippet = body.substring(start, end);
+  return snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim();
 }

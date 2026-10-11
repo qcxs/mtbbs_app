@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/api/forum/darkroom/export.dart' as darkroom_api;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/widgets/common/filter_search_field.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/load_more_footer.dart';
@@ -44,15 +45,8 @@ class _DarkroomPageState extends State<DarkroomPage> {
     super.dispose();
   }
 
-  List<Map<String, dynamic>> get _filteredItems {
-    if (_searchQuery.isEmpty) return _items;
-    final q = _searchQuery.toLowerCase();
-    return _items.where((item) {
-      final username = (item['username'] as String? ?? '').toLowerCase();
-      final uid = item['uid'] as String? ?? '';
-      return username.contains(q) || uid.contains(q);
-    }).toList();
-  }
+  List<Map<String, dynamic>> get _filteredItems =>
+      filterUserItems(_items, _searchQuery);
 
   Future<void> _fetch() async {
     setState(() {
@@ -177,31 +171,13 @@ class _DarkroomPageState extends State<DarkroomPage> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: '搜索 UID 或昵称…',
-          prefixIcon: const Icon(Icons.search, size: 20),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                )
-              : null,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        onChanged: (v) => setState(() => _searchQuery = v.trim()),
-      ),
-    );
-  }
+  Widget _buildSearchBar() => FilterSearchField(
+    controller: _searchController,
+    query: _searchQuery,
+    onChanged: (v) => setState(() => _searchQuery = v),
+    hint: '搜索 UID 或昵称…',
+    padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+  );
 
   Widget _buildBody() {
     if (_isLoading) return const LoadingView();

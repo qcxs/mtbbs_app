@@ -44,15 +44,6 @@ class ComiisCardParser implements ThreadListParser {
     'file',
   ];
 
-  /// 占位图特征（文件名片段），命中即视为"没有真实图片"。
-  static const _placeholderMarkers = [
-    'none.png',
-    'nophoto.gif',
-    'nophoto.png',
-    'loading.gif',
-    'loading.png',
-  ];
-
   @override
   bool canParse(dom.Document doc) {
     return doc.querySelector('li.forumlist_li.comiis_znalist') != null;
@@ -203,8 +194,5 @@ class ComiisCardParser implements ThreadListParser {
     return '';
   }
 
-  bool _isPlaceholder(String url) {
-    final lower = url.toLowerCase();
-    return _placeholderMarkers.any(lower.contains);
-  }
+  bool _isPlaceholder(String url) => isPlaceholderImageUrl(url);
 }

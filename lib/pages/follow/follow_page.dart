@@ -6,6 +6,8 @@ import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/widgets/common/account_header.dart';
+import 'package:mtbbs/widgets/common/filter_search_field.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
@@ -66,15 +68,8 @@ class _FollowPageState extends State<FollowPage> {
   }
 
   /// 本地搜索过滤（用户名 / UID）
-  List<Map<String, dynamic>> get _filteredItems {
-    if (_searchQuery.isEmpty) return _items;
-    final q = _searchQuery.toLowerCase();
-    return _items.where((item) {
-      final username = (item['username'] as String? ?? '').toLowerCase();
-      final uid = item['uid'] as String? ?? '';
-      return username.contains(q) || uid.contains(q);
-    }).toList();
-  }
+  List<Map<String, dynamic>> get _filteredItems =>
+      filterUserItems(_items, _searchQuery);
 
   Future<void> _load() async {
     setState(() {
@@ -203,115 +198,15 @@ class _FollowPageState extends State<FollowPage> {
   }
 
   /// 搜索框：本地过滤用户名 / UID
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: '搜索用户名或 UID…',
-          prefixIcon: const Icon(Icons.search, size: 20),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                )
-              : null,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        onChanged: (v) => setState(() => _searchQuery = v.trim()),
-      ),
-    );
-  }
+  Widget _buildSearchBar() => FilterSearchField(
+    controller: _searchController,
+    query: _searchQuery,
+    onChanged: (v) => setState(() => _searchQuery = v),
+  );
 
   /// 顶部账号卡片
-  Widget _buildAccountHeader() {
-    final cs = Theme.of(context).colorScheme;
-    final profile = _account;
-    final nickname = profile?['nickname'] as String? ?? '';
-    final uid = profile?['uid'] as String? ?? _uid;
-    final activity = profile?['activity'];
-    final userGroup = activity is Map
-        ? (activity['userGroup'] as String? ?? '')
-        : '';
-    final online = profile?['online'] == true;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      color: cs.surfaceContainerLow,
-      child: Row(
-        children: [
-          UserAvatar(
-            uid: uid,
-            nickname: nickname,
-            radius: 26,
-            tapAction: AvatarTapAction.none,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  nickname.isNotEmpty
-                      ? nickname
-                      : (uid.isNotEmpty ? '用户 $uid' : _title),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    if (uid.isNotEmpty)
-                      Text(
-                        'UID: $uid',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    if (uid.isNotEmpty && userGroup.isNotEmpty) ...[
-                      Text(
-                        ' · ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        userGroup,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    if (online) ...[
-                      const SizedBox(width: 8),
-                      Icon(Icons.circle, size: 8, color: cs.primary),
-                      const SizedBox(width: 2),
-                      Text(
-                        '在线',
-                        style: TextStyle(fontSize: 12, color: cs.primary),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildAccountHeader() =>
+      AccountHeader(profile: _account, uid: _uid, fallbackLabel: _title);
 
   /// 关注/粉丝列表（Wrap 自适应：窄屏单列整行卡片，宽屏多列）
   Widget _buildBody() {
