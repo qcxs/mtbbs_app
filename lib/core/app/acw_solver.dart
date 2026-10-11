@@ -1,6 +1,4 @@
-import 'dart:io';
-
-import 'package:flutter_js/flutter_js.dart';
+import 'package:flutter_qjs_next/flutter_qjs.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
 /// 阿里云 ESA「acw_sc__v2」挑战的**本地自解**（内嵌 JS 引擎执行挑战页脚本）。
@@ -38,6 +36,13 @@ class AcwSolver {
   /// 原生线程栈会先炸，整个进程以 `0xC00000FD`（STATUS_STACK_OVERFLOW）崩溃。
   /// 调到 256 KiB 后引擎会先抛可捕获错误，脚本正常跑完。
   static const int _stackSize = 256 * 1024;
+
+  /// 单次自解的最长墙上时间（毫秒）。挑战脚本是瞬时计算，5 秒足够；超时即中断
+  /// （返回可捕获的 `InternalError: interrupted`），防止脚本变更后死循环卡死。
+  static const int _timeout = 5000;
+
+  /// 单次运行时的堆上限（字节）。挑战脚本极小，32 MiB 足够，兼作 OOM 护栏。
+  static const int _memoryLimit = 32 * 1024 * 1024;
 
   /// 最小 DOM 桩：脚本只用到 `document.cookie`（可写）与
   /// `document.location.reload()`，其余是反调试分支可能碰到的空实现。
@@ -94,13 +99,14 @@ var self = this; var window = this;
     }
   }
 
-  /// Windows / Linux / Android 走 QuickJS —— **必须自建**才能传入 [_stackSize]，
-  /// 官方工厂 `getJavascriptRuntime` 只给 Android 透传该参数，Windows/Linux 会拿到
-  /// 默认的 1 MiB 从而崩溃（见 [_stackSize]）。Apple 侧交给工厂（即系统 JSC）。
+  /// 全平台统一走 QuickJS：`flutter_qjs_next` 在所有平台都内置同一 QuickJS 引擎
+  /// （不再有 Apple JSC 分叉），因此 [_stackSize] 对各平台一致生效，无需按平台分支。
+  /// 同时给不可信脚本加 wall-clock 超时与内存上限作护栏。
   JavascriptRuntime _createRuntime() {
-    if (Platform.isAndroid || Platform.isWindows || Platform.isLinux) {
-      return QuickJsRuntime2(stackSize: _stackSize);
-    }
-    return getJavascriptRuntime(xhr: false);
+    return getJavascriptRuntime(
+      stackSize: _stackSize,
+      timeout: _timeout,
+      memoryLimit: _memoryLimit,
+    );
   }
 }

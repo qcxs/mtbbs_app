@@ -2,7 +2,7 @@ part of 'home_page.dart';
 
 // ==================== 站点条 ====================
 
-/// 顶部站点标识 — 让首页有明确的"我在哪个论坛"，并承载签到入口。
+/// 顶部站点标识 — 让首页有明确的"我在哪个论坛"，并承载签到、精华帖入口。
 class _SiteHeader extends StatelessWidget {
   const _SiteHeader();
 
@@ -61,11 +61,22 @@ class _SiteHeader extends StatelessWidget {
               ),
             ),
             if (signUrl.isNotEmpty)
-              FilledButton.tonalIcon(
+              TextButton.icon(
                 onPressed: () => _openUrl(context, signUrl),
-                icon: const Icon(Icons.check_circle_outline, size: 16),
+                icon: const Icon(Icons.check_circle_outline, size: 18),
                 label: const Text('签到'),
               ),
+            // 精华帖：全站精华（走站内搜索的 srchfilter=digest，不受导读聚合时间窗限制）；
+            // 与签到一致，仅登录后显示
+            if (auth.isLoggedIn) ...[
+              if (signUrl.isNotEmpty) const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.workspace_premium_outlined, size: 20),
+                tooltip: '精华帖',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => context.push('/search/result?filter=digest'),
+              ),
+            ],
             IconButton(
               icon: const Icon(Icons.swap_horiz, size: 20),
               tooltip: '切换站点',

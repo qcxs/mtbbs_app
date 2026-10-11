@@ -95,10 +95,10 @@ dependencies:
   # 不用 pretty_qr_code —— 它断言「单模块 ≥ 2px」，64px 的二维码会直接崩（见 docs/07 #91）。
   qr: ^3.0.2
 
-  # 内嵌 JS 引擎（QuickJS / JavaScriptCore）：在本地执行站点的人机验证挑战脚本，
+  # 内嵌 JS 引擎（QuickJS）：在本地执行站点的人机验证挑战脚本，
   # 免去弹 WebView 打断用户（见 lib/core/app/acw_solver.dart）。
-  # 注意 Windows/Linux/Android 用的是 2021 版 QuickJS，且必须显式调小栈上限。
-  flutter_js: ^0.8.7
+  # 全平台同一 QuickJS（无 Apple JSC 分叉），须显式调小栈上限，并给不可信脚本设超时/内存上限。
+  flutter_qjs_next: ^1.5.2
 
   # HTML 渲染（BBCode → HTML → Widget）
   # 代码语法高亮
