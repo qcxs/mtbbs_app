@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:mtbbs/platform/optional/file_pick.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -103,7 +103,7 @@ class _MdImportSheetState extends State<_MdImportSheet> {
   Future<void> _pickFile() async {
     FilePickerResult? result;
     try {
-      result = await FilePicker.platform.pickFiles(
+      result = await FilePick.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['md', 'markdown', 'txt'],
         withData: true,

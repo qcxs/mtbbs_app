@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:mtbbs/platform/optional/file_pick.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:mtbbs/api/forum/post/upload.dart' as upload_api;
@@ -174,7 +174,7 @@ class ForumImageController extends ChangeNotifier {
     if (data.uploadHash.isEmpty) return;
 
     final exts = data.imageExtensions;
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePick.pickFiles(
       type: exts.isNotEmpty ? FileType.custom : FileType.image,
       allowedExtensions: exts.isNotEmpty ? exts : null,
       allowMultiple: true,

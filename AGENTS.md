@@ -8,6 +8,12 @@
 
 Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：`lib/api/` 按三文件规范（http/parse/export）抓取并解析 HTML/XML 为结构化 JSON；帖子正文走 `BBCode → BBCode2Html → flutter_widget_from_html` 渲染，`[code]`/图片用**占位元素**注入组件。分层与管线见 `docs/01-概述与架构.md`。
 
+## 相关项目
+
+- **鸿蒙独立版**：[qcxs/mtbbs_app_ohos](https://github.com/qcxs/mtbbs_app_ohos)
+  - 只面向 Flutter-OH；`lib/` 与主线保持一致
+  - 跨平台能力开关与降级见 `docs/23-可选能力与平台降级.md`
+
 ## 了解项目
 
 用户说"了解项目"、或你首次接触本仓库时，按这三步读；**07 不能跳过**：
@@ -45,6 +51,7 @@ Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：
 | 架构 / 分层 / 渲染管线 / 图片缓存 / Referer | 01 |
 | 开发规范（API 流程 / 文件 / UI 约定 / 数据↔渲染边界） | 02 |
 | 状态管理 / 站点切换 / 持久化 | 04 |
+| 可选能力 / 平台降级（鸿蒙等） | 23 + 02 |
 | 主题 / 夜间模式 / 配色 | 08 |
 | 依赖行为确认 / 升级 | 09 |
 

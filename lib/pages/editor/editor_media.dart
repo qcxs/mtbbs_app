@@ -147,7 +147,7 @@ extension on _EditorPageState {
     if (_session.pageData.uploadHash.isEmpty) return;
 
     final attExts = _session.pageData.attachmentExtensions;
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePick.pickFiles(
       type: attExts.isNotEmpty ? FileType.custom : FileType.any,
       allowedExtensions: attExts.isNotEmpty ? attExts : null,
       allowMultiple: true,

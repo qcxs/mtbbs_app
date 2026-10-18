@@ -107,6 +107,8 @@ class _ShareImagePageState extends State<ShareImagePage> {
           showToast('保存失败');
         case SaveImageOutcome.canceled:
           break;
+        case SaveImageOutcome.unavailable:
+          showToast('当前平台不支持保存图片');
       }
     } finally {
       if (mounted) setState(() => _saving = false);

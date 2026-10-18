@@ -14,6 +14,7 @@ import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
 import 'package:mtbbs/core/app/app_link.dart';
+import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/app_shortcuts.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/site_cdn.dart';
@@ -63,6 +64,9 @@ void main() async {
 
   // Android 折叠屏/自由窗口/分屏尺寸检测（原生侧缓存物理最大屏）
   await MaxScreenSize.init();
+
+  // 可选能力注册表：先按平台给出默认值，运行时插件缺失时由适配器再关闭。
+  AppCapabilities.init();
 
   // 加载默认配置（从 assets/config/ 下按域拆分的 JSON）
   await DefaultConfig.instance.load();
@@ -141,7 +145,11 @@ void main() async {
           )
         : const McpAccountInfo.guest(),
   );
-  unawaited(McpServerController.instance.bootstrap());
+  unawaited(
+    AppCapabilities.isAvailable(AppCapability.mcpServer)
+        ? McpServerController.instance.bootstrap()
+        : Future<void>.value(),
+  );
 
   // Windows 窗口标题标注 MCP 状态（服务在跑时一眼可见）
   void syncMcpTitle() => unawaited(

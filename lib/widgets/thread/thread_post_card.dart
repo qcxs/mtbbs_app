@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mtbbs/config/brand_colors.dart';
+import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -421,10 +422,11 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                 enabled: widget.post.pid.isNotEmpty,
                 child: const Text('查看时间', style: TextStyle(fontSize: 13)),
               ),
-            const PopupMenuItem(
-              value: PostCardAction.saveImage,
-              child: Text('生成图片', style: TextStyle(fontSize: 13)),
-            ),
+            if (AppCapabilities.isAvailable(AppCapability.saveImage))
+              const PopupMenuItem(
+                value: PostCardAction.saveImage,
+                child: Text('生成图片', style: TextStyle(fontSize: 13)),
+              ),
           ],
         ),
       ],

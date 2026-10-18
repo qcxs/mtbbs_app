@@ -1,17 +1,15 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:gal/gal.dart';
 import 'package:image/image.dart' as img;
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/platform/optional/image_save.dart';
 
-/// 保存结果（供调用方给用户不同反馈）
-enum SaveImageOutcome { saved, canceled, permissionDenied, failed }
+export 'package:mtbbs/platform/optional/image_save.dart'
+    show SaveImageOutcome;
 
 /// 可截图的边界：与 `RepaintBoundary` 等价，额外对外暴露底层 [OffsetLayer]。
 ///
@@ -118,56 +116,11 @@ abstract final class ImageExport {
     }
   }
 
-  /// 保存 PNG 字节：移动端存相册（gal，自带权限处理），桌面端走"另存为"对话框。
+  /// 保存 PNG 字节：优先相册，失败回退“另存为”（平台差异由适配器处理）。
   static Future<SaveImageOutcome> save(
     Uint8List bytes, {
     required String fileName,
-  }) async {
-    if (Platform.isAndroid || Platform.isIOS) {
-      return _saveToGallery(bytes, fileName);
-    }
-    return _saveAsFile(bytes, fileName);
-  }
-
-  static Future<SaveImageOutcome> _saveToGallery(
-    Uint8List bytes,
-    String fileName,
-  ) async {
-    try {
-      if (!await Gal.hasAccess()) {
-        if (!await Gal.requestAccess()) {
-          return SaveImageOutcome.permissionDenied;
-        }
-      }
-      await Gal.putImageBytes(bytes, name: fileName);
-      return SaveImageOutcome.saved;
-    } on GalException catch (e) {
-      AppLogger.w('PAGE', '保存到相册失败：${e.type}');
-      return e.type == GalExceptionType.accessDenied
-          ? SaveImageOutcome.permissionDenied
-          : SaveImageOutcome.failed;
-    } catch (e) {
-      AppLogger.w('PAGE', '保存到相册异常：$e');
-      return SaveImageOutcome.failed;
-    }
-  }
-
-  static Future<SaveImageOutcome> _saveAsFile(
-    Uint8List bytes,
-    String fileName,
-  ) async {
-    try {
-      final path = await FilePicker.platform.saveFile(
-        dialogTitle: '保存图片',
-        fileName: '$fileName.png',
-        type: FileType.image,
-      );
-      if (path == null) return SaveImageOutcome.canceled;
-      await File(path).writeAsBytes(bytes);
-      return SaveImageOutcome.saved;
-    } catch (e) {
-      AppLogger.w('PAGE', '另存为失败：$e');
-      return SaveImageOutcome.failed;
-    }
+  }) {
+    return ImageSave.save(bytes, fileName: fileName);
   }
 }

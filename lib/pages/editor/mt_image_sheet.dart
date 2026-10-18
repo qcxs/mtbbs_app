@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:mtbbs/platform/optional/file_pick.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
@@ -127,7 +127,7 @@ class _MtImageSheetState extends State<MtImageSheet> {
       await clipImg.delete();
     }
 
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePick.pickFiles(
       type: FileType.image,
       allowMultiple: true,
       withReadStream: true,

@@ -3,7 +3,6 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path/path.dart' as p;
 import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
@@ -11,6 +10,9 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
+
+export 'package:mtbbs/platform/optional/webview_support.dart'
+    show clearWebViewCache;
 
 // ==================== 文件服务（忽略服务器 Cache-Control） ====================
 
@@ -478,24 +480,5 @@ Future<void> deleteFilePickerTempIfAny(String path) async {
 }
 
 // ==================== WebView 浏览器缓存 ====================
-
-/// 清除内置浏览器的所有缓存数据（资源缓存、Web 存储、Cookie）
-///
-/// 使用 [flutter_inappwebview] 的静态 API，无需活动 WebView 实例。
-Future<void> clearWebViewCache() async {
-  try {
-    await InAppWebViewController.clearAllCache(includeDiskFiles: true);
-  } catch (e) {
-    AppLogger.w('CACHE', 'clearAllCache error: $e');
-  }
-  try {
-    await WebStorageManager.instance().deleteAllData();
-  } catch (e) {
-    AppLogger.w('CACHE', 'deleteAllData error: $e');
-  }
-  try {
-    await CookieManager.instance().deleteAllCookies();
-  } catch (e) {
-    AppLogger.w('CACHE', 'deleteAllCookies error: $e');
-  }
-}
+// `clearWebViewCache` 已下沉到 `lib/platform/optional/webview_support.dart`，
+// 本文件通过上方 export 保持旧 import 方式可用。

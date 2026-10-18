@@ -1,5 +1,6 @@
-import 'package:flutter_qjs_next/flutter_qjs.dart';
+import 'package:mtbbs/core/app/acw_pure_dart.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/platform/optional/js_engine.dart';
 
 /// 阿里云 ESA「acw_sc__v2」挑战的**本地自解**（内嵌 JS 引擎执行挑战页脚本）。
 ///
@@ -31,19 +32,6 @@ class AcwSolver {
   static final RegExp _scriptRe = RegExp(r'<script[^>]*>([\s\S]*?)</script>');
   static final RegExp _cookieRe = RegExp(r'acw_sc__v2=([0-9a-fA-F]+)');
 
-  /// JS 栈上限。**必须显式调小**：挑战脚本里的反调试分支会故意无限递归直到栈
-  /// 溢出，靠 `catch` 吞掉该错误来区分"原生/解释执行"。若用引擎默认的 1 MiB，
-  /// 原生线程栈会先炸，整个进程以 `0xC00000FD`（STATUS_STACK_OVERFLOW）崩溃。
-  /// 调到 256 KiB 后引擎会先抛可捕获错误，脚本正常跑完。
-  static const int _stackSize = 256 * 1024;
-
-  /// 单次自解的最长墙上时间（毫秒）。挑战脚本是瞬时计算，5 秒足够；超时即中断
-  /// （返回可捕获的 `InternalError: interrupted`），防止脚本变更后死循环卡死。
-  static const int _timeout = 5000;
-
-  /// 单次运行时的堆上限（字节）。挑战脚本极小，32 MiB 足够，兼作 OOM 护栏。
-  static const int _memoryLimit = 32 * 1024 * 1024;
-
   /// 最小 DOM 桩：脚本只用到 `document.cookie`（可写）与
   /// `document.location.reload()`，其余是反调试分支可能碰到的空实现。
   static const String _shim = r'''
@@ -71,42 +59,37 @@ var self = this; var window = this;
 
   /// 从挑战页正文解出 `acw_sc__v2`；非挑战页 / 解不出返回 null。
   ///
-  /// 每次都用**全新的运行时**：解算是低频事件（约每小时一次），换来的是不复用
-  /// 上一次的全局状态、也不长期占用原生内存。
+  /// 两段式：
+  /// 1. **本地 JS 引擎**（QuickJS）——执行页面真实脚本，能自动跟随站点改算法；
+  /// 2. **纯 Dart 算法兜底**——没有 JS 引擎实现（如鸿蒙）或脚本执行失败时使用。
+  ///    算法与探针共用 `acw_pure_dart.dart`，两套实现对同一 `arg1` 等价。
   String? solve(String html) {
     if (skipLocalSolve()) {
       AppLogger.i('DIO', '已按设置跳过本地自解，改由 WebView 处理');
       return null;
     }
-    final m = _scriptRe.firstMatch(html);
-    if (m == null) return null;
-    JavascriptRuntime? js;
-    try {
-      js = _createRuntime();
-      final r = js.evaluate(
-        '$_shim\n(function(){\n${m.group(1)!}\n})();\ndocument.cookie',
-      );
-      if (r.isError) {
-        AppLogger.w('DIO', 'acw 自解：脚本执行报错 ${r.stringResult}');
-        return null;
-      }
-      return _cookieRe.firstMatch(r.stringResult)?.group(1);
-    } catch (e) {
-      AppLogger.w('DIO', 'acw 自解失败: $e');
-      return null;
-    } finally {
-      js?.dispose();
-    }
+    return _solveWithJs(html) ?? _solveWithPureDart(html);
   }
 
-  /// 全平台统一走 QuickJS：`flutter_qjs_next` 在所有平台都内置同一 QuickJS 引擎
-  /// （不再有 Apple JSC 分叉），因此 [_stackSize] 对各平台一致生效，无需按平台分支。
-  /// 同时给不可信脚本加 wall-clock 超时与内存上限作护栏。
-  JavascriptRuntime _createRuntime() {
-    return getJavascriptRuntime(
-      stackSize: _stackSize,
-      timeout: _timeout,
-      memoryLimit: _memoryLimit,
+  String? _solveWithJs(String html) {
+    final m = _scriptRe.firstMatch(html);
+    if (m == null) return null;
+    final result = JsEngine.run(
+      '$_shim\n(function(){\n${m.group(1)!}\n})();\ndocument.cookie',
     );
+    if (result == null) return null;
+    if (result.isError) {
+      AppLogger.w('DIO', 'acw 自解：脚本执行报错 ${result.stringResult}');
+      return null;
+    }
+    return _cookieRe.firstMatch(result.stringResult)?.group(1);
+  }
+
+  String? _solveWithPureDart(String html) {
+    final arg1 = extractAcwArg1(html);
+    if (arg1 == null) return null;
+    final value = acwScV2(arg1);
+    AppLogger.i('DIO', 'acw 自解：使用纯 Dart 算法');
+    return value;
   }
 }

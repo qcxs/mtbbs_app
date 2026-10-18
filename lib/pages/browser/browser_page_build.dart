@@ -10,6 +10,15 @@ extension _BrowserPageBuild on _BrowserPageState {
   Widget _buildPage(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    if (!AppCapabilities.isAvailable(AppCapability.webView)) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('内置浏览器')),
+        body: const PageErrorWidget(
+          message: '当前平台不支持内置浏览器。\n请在系统浏览器中打开该链接。',
+        ),
+      );
+    }
+
     return PopScope(
       canPop: !_canGoBack,
       onPopInvokedWithResult: (didPop, _) {

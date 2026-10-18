@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/config/brand_colors.dart';
+import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
@@ -198,17 +199,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
             copyLabel: '复制个人主页链接',
             extraItems: [
               // 生成分享图（与帖子/评论同一套：预览 → 截图保存）
-              PopupMenuItem<String>(
-                value: 'save_image',
-                child: Row(
-                  children: [
-                    const Icon(Icons.save_alt, size: 18),
-                    const SizedBox(width: 8),
-                    const Text('生成图片'),
-                  ],
+              if (AppCapabilities.isAvailable(AppCapability.saveImage)) ...[
+                PopupMenuItem<String>(
+                  value: 'save_image',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.save_alt, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('生成图片'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuDivider(),
+                const PopupMenuDivider(),
+              ],
               // 本页数据源（仅个人空间生效）：移动版社交数据全，桌面版资料更全
               PopupMenuItem<String>(
                 value: 'src_follow',

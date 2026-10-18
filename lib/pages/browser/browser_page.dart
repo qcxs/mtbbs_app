@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
@@ -16,6 +17,7 @@ import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 part 'browser_page_actions.dart';

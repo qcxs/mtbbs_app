@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/mcp/mcp_authenticator.dart';
@@ -245,6 +246,10 @@ class McpServerController extends ChangeNotifier {
       _advertisedHost = loopbackHost;
       _status = McpServerStatus.error;
       _lastError = _describeStartError(e);
+      // 平台根本没有 dart:io 网络能力时，后续重试也不会成功；直接关闭入口。
+      if (e is UnsupportedError || e is UnimplementedError) {
+        AppCapabilities.disable(AppCapability.mcpServer);
+      }
       AppLogger.e('MCP', '服务启动失败: $e');
     }
     notifyListeners();
