@@ -25,8 +25,13 @@ class NoticeNavStore extends ChangeNotifier {
   /// 子类型未读（页面子栏的 `(N)`），键为 `view/type`
   Map<String, int> _subtypeCounts = const {};
 
-  /// 站点最近一次实际打开的子类型（不传 type 时即"第一个有未读的"）
-  String _activeSubtype = '';
+  /// 各视图最近一次实际打开的子类型（不传 type 时即"第一个有未读的"）。
+  ///
+  /// **必须按 view 隔离**：`system` / `manage` / `app` 没有子类型栏，
+  /// 若共用一个字段，它们会继承上一个有子类型视图（如 `mypost/post`）的值，
+  /// 导致 `NoticeTab._applyNav` 误判"系统提醒有子类型 wall/post"，
+  /// 从而只调 `markSubtypeRead` 而不清零组级徽标（见 docs/07 #97）。
+  Map<String, String> _activeSubtypeByView = const {};
 
   /// 站点返回的视图（空 = 尚未同步 → 调用方回退到配置）
   List<NoticeType> get views => _views;
@@ -37,8 +42,8 @@ class NoticeNavStore extends ChangeNotifier {
   /// 组级未读（来自页面侧栏，权威）
   Map<String, int> get viewCounts => _viewCounts;
 
-  /// 站点最近一次打开的子类型
-  String get activeSubtype => _activeSubtype;
+  /// 指定视图最近一次打开的子类型（无子类型的视图恒为空串）
+  String activeSubtypeFor(String view) => _activeSubtypeByView[view] ?? '';
 
   /// 指定子类型的未读（来自页面子栏）
   int subtypeCount(String view, String type) =>
@@ -144,7 +149,7 @@ class NoticeNavStore extends ChangeNotifier {
     // 子类型：只有站点真的渲染了子类型栏、且该视图存在时才覆盖
     final nextSubtypes = Map<String, List<NoticeType>>.from(_subtypes);
     final nextSubCounts = Map<String, int>.from(_subtypeCounts);
-    var activeSubtype = _activeSubtype;
+    final nextActive = Map<String, String>.from(_activeSubtypeByView);
     if (exists && nav['hasSubBar'] == true) {
       final subs = <NoticeType>[];
       for (final s in (nav['subtypes'] as List?) ?? const []) {
@@ -156,15 +161,16 @@ class NoticeNavStore extends ChangeNotifier {
             (s['count'] as num?)?.toInt() ?? 0;
       }
       nextSubtypes[requestedView] = subs;
-      final active = nav['activeSubtype']?.toString() ?? '';
-      if (active.isNotEmpty) activeSubtype = active;
+      // 无子类型的视图（system/manage/app）也要写入空串：按 view 覆盖，
+      // 不能因为"本次为空"就保留该视图上一次的值。
+      nextActive[requestedView] = nav['activeSubtype']?.toString() ?? '';
     }
 
     _views = views;
     _subtypes = nextSubtypes;
     _viewCounts = viewCounts;
     _subtypeCounts = nextSubCounts;
-    _activeSubtype = activeSubtype;
+    _activeSubtypeByView = nextActive;
     notifyListeners();
   }
 
@@ -175,7 +181,7 @@ class NoticeNavStore extends ChangeNotifier {
     _subtypes = const {};
     _viewCounts = const {};
     _subtypeCounts = const {};
-    _activeSubtype = '';
+    _activeSubtypeByView = const {};
     notifyListeners();
   }
 }

@@ -126,9 +126,9 @@ class _MypostTabState extends State<MypostTab> {
   void _applyNav(Object? nav) {
     if (nav is! Map) return;
     _nav.syncFromPage(Map<String, dynamic>.from(nav), requestedView: 'mypost');
+    final types = _types;
     if (!_typePicked) {
-      final types = _types;
-      final active = _nav.activeSubtype;
+      final active = types.isEmpty ? '' : _nav.activeSubtypeFor('mypost');
       final next = active.isNotEmpty
           ? active
           : (types.isNotEmpty ? types.first.id : '');
@@ -138,15 +138,19 @@ class _MypostTabState extends State<MypostTab> {
           // 首次确定默认子类型 → 就地建页控制器（初始页 = 该子类型）
           _pc ??= PageController(initialPage: _indexOfType(types, next));
         });
+      } else if (types.isEmpty && _type.isNotEmpty) {
+        setState(() => _type = '');
       }
     }
     NoticeBadgeController.instance.applyViewCounts(_nav.viewCounts);
     // 本次拉取已把该子类型的条目置为已读 → 立刻清零它的未读。
     // （子类型计数只可能来自"打开过的提醒页"，header 探测给不到，不清就永远是旧值）
-    final activeType = _type.isNotEmpty ? _type : _nav.activeSubtype;
+    final activeType = types.isEmpty
+        ? ''
+        : (_type.isNotEmpty ? _type : _nav.activeSubtypeFor('mypost'));
     if (activeType.isNotEmpty) {
       _nav.markSubtypeRead('mypost', activeType);
-    } else if (_types.isEmpty) {
+    } else if (types.isEmpty) {
       // 无子类型的视图：没有可求和的子类型，直接乐观清零本视图计数
       NoticeBadgeController.instance.markViewRead('mypost');
     }

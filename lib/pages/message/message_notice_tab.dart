@@ -130,9 +130,13 @@ class _NoticeTabState extends State<NoticeTab> {
       Map<String, dynamic>.from(nav),
       requestedView: widget.view,
     );
+    final types = _types;
     if (!_typePicked) {
-      final types = _types;
-      final active = _nav.activeSubtype;
+      // 只有真的有子类型时才采用站点的 activeSubtype；无子类型视图
+      // （system/manage/app）必须忽略它（按 view 取，见 NoticeNavStore）。
+      final active = types.isEmpty
+          ? ''
+          : _nav.activeSubtypeFor(widget.view);
       final next = active.isNotEmpty
           ? active
           : (types.isNotEmpty ? types.first.id : '');
@@ -143,15 +147,20 @@ class _NoticeTabState extends State<NoticeTab> {
           // 避免"先显示第 0 页再跳过去"
           _pc ??= PageController(initialPage: _indexOfType(types, next));
         });
+      } else if (types.isEmpty && _type.isNotEmpty) {
+        // 站点导航表明本视图没有子类型 → 清掉可能继承来的值
+        setState(() => _type = '');
       }
     }
     NoticeBadgeController.instance.applyViewCounts(_nav.viewCounts);
     // 本次拉取已把该子类型的条目置为已读 → 立刻清零它的未读。
     // （子类型计数只可能来自"打开过的提醒页"，header 探测给不到，不清就永远是旧值）
-    final activeType = _type.isNotEmpty ? _type : _nav.activeSubtype;
+    final activeType = types.isEmpty
+        ? ''
+        : (_type.isNotEmpty ? _type : _nav.activeSubtypeFor(widget.view));
     if (activeType.isNotEmpty) {
       _nav.markSubtypeRead(widget.view, activeType);
-    } else if (_types.isEmpty) {
+    } else if (types.isEmpty) {
       // 无子类型的视图（系统提醒/管理工作/应用提醒）：没有可求和的子类型，
       // 直接乐观清零本视图计数（页面渲染的是读前的值）
       NoticeBadgeController.instance.markViewRead(widget.view);
