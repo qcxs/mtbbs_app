@@ -9,6 +9,7 @@ import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/dialog/quick_reply_dialog.dart';
+import 'package:mtbbs/widgets/editor/editor_selection_toolbar.dart';
 
 /// 迷你编辑器 — 帖子页 / 私信页内嵌使用的紧凑编辑表面。
 ///
@@ -93,6 +94,9 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
   late final BBCodeToolbarController _toolbarCtl;
   final FocusNode _focusNode = FocusNode();
   final UndoHistoryController _undoController = UndoHistoryController();
+
+  /// BBCode 工具栏（选择菜单避让时用来测量它的底边）
+  final _toolbarKey = GlobalKey();
   bool _previewing = false;
 
   @override
@@ -212,15 +216,18 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
               ? const SizedBox.shrink()
               : ValueListenableBuilder<UndoHistoryValue>(
                   valueListenable: _undoController,
-                  builder: (_, undoVal, __) => BBCodeToolbar(
-                    controller: _toolbarCtl,
-                    canUndo: undoVal.canUndo,
-                    canRedo: undoVal.canRedo,
-                    items: items,
-                    shortcuts: shortcuts,
-                    badges: widget.badges,
-                    showSettingsButton: false,
-                    showContainer: false,
+                  builder: (_, undoVal, __) => KeyedSubtree(
+                    key: _toolbarKey,
+                    child: BBCodeToolbar(
+                      controller: _toolbarCtl,
+                      canUndo: undoVal.canUndo,
+                      canRedo: undoVal.canRedo,
+                      items: items,
+                      shortcuts: shortcuts,
+                      badges: widget.badges,
+                      showSettingsButton: false,
+                      showContainer: false,
+                    ),
                   ),
                 ),
         ),
@@ -268,6 +275,12 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
       controller: widget.contentCtl,
       focusNode: _focusNode,
       undoController: _undoController,
+      // 选中第一行时选择菜单会压住上方工具栏 → 自动翻到选区下方
+      contextMenuBuilder: (context, editableTextState) =>
+          buildEditorSelectionToolbar(
+            editableTextState: editableTextState,
+            toolbarKey: _toolbarKey,
+          ),
       minLines: 2,
       maxLines: 6,
       maxLength: widget.maxLength,

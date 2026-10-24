@@ -57,6 +57,20 @@ void main() {
     });
   });
 
+  group('BBCode2Html - 背景色标签', () {
+    test('[backcolor] 转成 background-color 样式', () {
+      final html = BBCode2Html().convert('[backcolor=red]背景[/backcolor]');
+      expect(html, contains('background-color:red'));
+    });
+
+    test('[background] 不是合法标签，按纯文本原样保留', () {
+      const bbcode = '[background=red]文字[/background]';
+      final html = BBCode2Html().convert(bbcode);
+      expect(html, contains(bbcode));
+      expect(html, isNot(contains('background-color')));
+    });
+  });
+
   group('stripDisabledBbcodeTags（渲染层与 MCP 精简输出共用）', () {
     test('删除样式标签标记但保留内容', () {
       const bbcode = '[b]加粗[/b][color=red]红字[/color][size=5]大字[/size]';
@@ -82,10 +96,13 @@ void main() {
       );
     });
 
-    test('禁用 backcolor 时连带删除同义的 background', () {
+    test('禁用 backcolor 只删除 backcolor 标记，background 纯文本不受影响', () {
       const bbcode =
           '[backcolor=yellow]黄底[/backcolor][background=pink]粉底[/background]';
-      expect(stripDisabledBbcodeTags(bbcode, {'backcolor'}), '黄底粉底');
+      expect(
+        stripDisabledBbcodeTags(bbcode, {'backcolor'}),
+        '黄底[background=pink]粉底[/background]',
+      );
     });
 
     test('非样式标签（quote/code/url/img）不受影响', () {

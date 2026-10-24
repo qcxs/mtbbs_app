@@ -256,6 +256,105 @@ extension on _EditorPageState {
     }
   }
 
+  /// 粘贴的剪贴板文件 → 图片插入 `[attachimg]`，其余文件上传为附件并插入 `[attach]`
+  Future<void> _uploadPastedFiles(List<File> files) async {
+    final auth = context.read<AuthProvider>();
+    final data = _session.pageData;
+    if (!auth.isLoggedIn || data.uploadHash.isEmpty) {
+      showToast(!auth.isLoggedIn ? '请先登录' : '页面数据未加载，无法上传');
+      return;
+    }
+
+    final imageExts = data.imageExtensions;
+    // 单张：上传后直接插入；多张：只进管理列表（队列），由用户自行决定插入位置
+    final autoInsert = files.length == 1;
+    final snippets = <String>[];
+    var imageCount = 0;
+    var attachCount = 0;
+    var failCount = 0;
+    String? firstError;
+
+    for (final file in files) {
+      // 站点声明了图片扩展名就以站点为准（页面给的是不带点的 "jpg,png"）；
+      // 拿不到时按常见图片后缀判断
+      final ext = ClipboardPasteService.extensionOf(file.path);
+      final isImage = imageExts.isNotEmpty
+          ? imageExts.contains(ext.replaceFirst('.', ''))
+          : ClipboardPasteService.isImagePath(file.path);
+      try {
+        if (isImage) {
+          final up = await _images.uploadFile(file);
+          if (up == null) {
+            failCount++;
+            continue;
+          }
+          if (autoInsert) {
+            snippets.add('[attachimg]${up['aid']}[/attachimg]');
+          }
+          imageCount++;
+        } else {
+          final up = await upload_api.uploadAttachment(
+            ApiService().dio,
+            file: file,
+            uid: auth.uid,
+            uploadHash: data.uploadHash,
+            fid: data.fid.isNotEmpty ? data.fid : widget.fid,
+          );
+          final aid = up['aid']?.toString() ?? '';
+          if (up['success'] != true || aid.isEmpty) {
+            failCount++;
+            firstError ??= up['error']?.toString();
+            continue;
+          }
+          final name =
+              up['filename']?.toString() ??
+              file.path.split(RegExp(r'[/\\]')).last;
+          _aidToAttachment[aid] = {
+            'name': name,
+            'size': '',
+            'url': 'forum.php?mod=attachment&aid=$aid',
+          };
+          _attachmentList.add({
+            'aid': aid,
+            'filename': name,
+            'title': '',
+            'isimage': '0',
+            'icon': '',
+            'bound': true,
+          });
+          if (autoInsert) snippets.add('[attach]$aid[/attach]');
+          attachCount++;
+        }
+      } catch (e) {
+        failCount++;
+        AppLogger.w('EDITOR', 'paste file upload failed: $e');
+      }
+    }
+
+    if (snippets.isNotEmpty) {
+      _session.contentCtl.wrapInline('', '', snippets.join('\n'));
+      _focusContent();
+    }
+    if (attachCount > 0) _syncAttachmentsNotifier();
+    if (!mounted) return;
+
+    final parts = <String>[
+      if (imageCount > 0) '$imageCount 张图片',
+      if (attachCount > 0) '$attachCount 个附件',
+    ];
+    if (parts.isEmpty) {
+      showToast(firstError ?? '上传失败');
+      return;
+    }
+    final ok = '已上传${parts.join('、')}';
+    final failed = failCount > 0 ? '，$failCount 个失败' : '';
+    if (autoInsert) {
+      showToast('$ok$failed');
+    } else {
+      showToast('$ok$failed，未插入正文（可在图片/附件管理中插入）');
+    }
+  }
+
   /// 剪贴板图片上传 → 插入 [attachimg]（默认上传）
   Future<void> _uploadDefaultImage(File file) async {
     final auth = context.read<AuthProvider>();

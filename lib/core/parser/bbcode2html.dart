@@ -41,16 +41,9 @@ String stripDisabledBbcodeTags(String text, Set<String> tagIds) {
     'underline': 'u',
     'strikethrough': 's',
   };
-  // 次标签：禁用主标签时连带删除的同义标签
-  const secondaryMapping = {
-    'backcolor': ['background'],
-  };
   var result = text;
   for (final tag in tagIds) {
     result = _stripTagMarkers(result, tagMapping[tag] ?? tag);
-    for (final sec in secondaryMapping[tag] ?? const <String>[]) {
-      result = _stripTagMarkers(result, sec);
-    }
   }
   return result;
 }

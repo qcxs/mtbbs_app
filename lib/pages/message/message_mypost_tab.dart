@@ -5,14 +5,15 @@ import 'package:mtbbs/api/home/mypost/export.dart' as mypost_api;
 import 'package:mtbbs/config/notice_config.dart';
 import 'package:mtbbs/core/app/notice_badge.dart';
 import 'package:mtbbs/core/app/notice_nav_store.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/layout/load_more_footer.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
-import 'package:mtbbs/widgets/layout/pagination_bar.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 
@@ -28,8 +29,11 @@ class MypostTab extends StatefulWidget {
 }
 
 class _MypostTabState extends State<MypostTab> {
+  final _scrollController = ScrollController();
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   String? _error;
   int _page = 1;
   int _totalPages = 1;
@@ -61,18 +65,33 @@ class _MypostTabState extends State<MypostTab> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _load(1);
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _pc?.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_loading &&
+        !_loadingMore &&
+        _hasMore) {
+      _loadMore();
+    }
   }
 
   Future<void> _load(int page) async {
     setState(() {
       _loading = true;
+      _loadingMore = false;
       _error = null;
     });
     try {
@@ -97,6 +116,7 @@ class _MypostTabState extends State<MypostTab> {
             .toList();
         _page = result['currentPage'] as int? ?? page;
         _totalPages = result['totalPages'] as int? ?? 1;
+        _hasMore = _page < _totalPages;
         _loading = false;
         _previews.clear();
         _previewLoading.clear();
@@ -114,9 +134,42 @@ class _MypostTabState extends State<MypostTab> {
     }
   }
 
-  void _goToPage(int p) {
-    if (p < 1 || p > _totalPages || p == _page) return;
-    _load(p);
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    final next = _page + 1;
+    try {
+      final result = await mypost_api.getMypostList(
+        ApiService().dio,
+        page: next,
+        type: _type,
+      );
+      if (!mounted) return;
+      if (result['success'] != true) {
+        setState(() => _loadingMore = false);
+        return;
+      }
+      final start = _items.length;
+      setState(() {
+        _items.addAll(
+          (result['items'] as List<dynamic>).map(
+            (e) => Map<String, dynamic>.from(e as Map),
+          ),
+        );
+        _page = result['currentPage'] as int? ?? next;
+        _totalPages = result['totalPages'] as int? ?? _totalPages;
+        _hasMore = _page < _totalPages;
+        _loadingMore = false;
+      });
+      // 只给新追加的条目拉预览
+      for (int i = start; i < _items.length; i++) {
+        _tryFetchPreview(i);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppLogger.w('PAGE', 'MypostTab loadMore error: $e');
+      setState(() => _loadingMore = false);
+    }
   }
 
   /// 用页面自带的导航与计数校正 UI（站点会按权限/配置增删，见 NoticeNavStore）：
@@ -294,28 +347,26 @@ class _MypostTabState extends State<MypostTab> {
     if (_items.isEmpty) {
       return const EmptyView(icon: Icons.forum_outlined, text: '暂无提醒');
     }
-    return Column(
-      children: [
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => _load(1),
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              itemCount: _items.length,
-              itemBuilder: (_, i) => _buildItem(_items[i], i),
-            ),
-          ),
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollEndNotification) _onScroll();
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh: () => _load(1),
+        child: ListView.builder(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          itemCount: _items.length + (_loadingMore || !_hasMore ? 1 : 0),
+          itemBuilder: (_, i) {
+            if (i >= _items.length) {
+              return LoadMoreFooter(loading: _loadingMore, hasMore: _hasMore);
+            }
+            return _buildItem(_items[i], i);
+          },
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          color: Theme.of(context).colorScheme.surface,
-          child: PaginationBar(
-            page: _page,
-            totalPages: _totalPages,
-            onGoToPage: _goToPage,
-          ),
-        ),
-      ],
+      ),
     );
   }
 

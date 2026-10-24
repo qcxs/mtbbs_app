@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mtbbs/core/app/tab_retap.dart';
 import 'package:provider/provider.dart';
@@ -27,11 +28,30 @@ class MessagePage extends StatefulWidget {
   State<MessagePage> createState() => _MessagePageState();
 }
 
+/// 未读分组前移：**第 1 项固定**，其余「有未读」稳定前置（保持原相对顺序）。
+///
+/// 第 1 项是默认进入项，位置一变用户感知最强；新消息只需要保证不被藏在
+/// 横向滚动区外，因此只重排第 1 项之后的 Tab。
+@visibleForTesting
+List<NoticeType> prioritizeUnreadTabs(
+  List<NoticeType> tabs,
+  bool Function(NoticeType tab) isUnread,
+) {
+  if (tabs.length < 2) return tabs;
+  final unread = <NoticeType>[];
+  final read = <NoticeType>[];
+  for (final tab in tabs.skip(1)) {
+    (isUnread(tab) ? unread : read).add(tab);
+  }
+  return [tabs.first, ...unread, ...read];
+}
+
 class _MessagePageState extends State<MessagePage>
-    // 消息页会随"站点实际视图"增删**重建 TabController**（见 [_syncTabController]），
-    // 需要支持多个 ticker —— SingleTickerProviderStateMixin 只允许一个，
-    // 第二次创建会直接抛 "multiple tickers were created"。
-    with TickerProviderStateMixin {
+        // 消息页会随"站点实际视图"增删**重建 TabController**（见 [_syncTabController]），
+        // 需要支持多个 ticker —— SingleTickerProviderStateMixin 只允许一个，
+        // 第二次创建会直接抛 "multiple tickers were created"。
+        with
+        TickerProviderStateMixin {
   late TabController _tabCtl;
   final _nav = NoticeNavStore.instance;
 
@@ -69,7 +89,8 @@ class _MessagePageState extends State<MessagePage>
   /// 记录一次 Tab 使用（「常用项自动前排」用）。跳跃过程中不记，稳定后记一次。
   void _onTabChanged() {
     if (_tabCtl.indexIsChanging) return;
-    final tabs = _tabs;
+    // 使用最近一次 build 实际渲染的顺序（未读前移后与 _tabs 可能不同）
+    final tabs = _displayTabs;
     final i = _tabCtl.index;
     if (i < 0 || i >= tabs.length) return;
     unawaited(
@@ -112,6 +133,10 @@ class _MessagePageState extends State<MessagePage>
   /// Tab 顺序的"冻结键"（用户设置 / 站点视图变化时才重排）
   String _tabOrderKey = '';
   List<NoticeType> _orderedTabs = const [];
+
+  /// 最近一次 build 实际使用的顺序（= TabController 下标对应的列表）。
+  /// 未读前移会改变它，因此不能再用 [_tabs] 直接换算下标。
+  List<NoticeType> _displayTabs = const [];
 
   /// 消息页 Tab 列表：用户设置（顺序/显隐）+ 站点实际有的视图 + 常用项自动前排。
   ///
@@ -168,17 +193,35 @@ class _MessagePageState extends State<MessagePage>
     setState(() {});
   }
 
-  /// 保证 TabController 的长度 == 当前 Tab 列表长度（在 [build] 里调用）。
+  /// 保证 TabController 的长度与顺序 == 当前 Tab 列表（在 [build] 里调用）。
   ///
-  /// 视图增删（不同分组页同步来的导航集合可能 5/6 交替）时若不对齐长度，
-  /// TabBar / TabBarView 会直接抛 "Controller's length property (N) does not
-  /// match the number of tabs (M)"。旧控制器延迟到帧末再 dispose，避免仍被本帧使用。
-  TabController _syncTabController(int length) {
-    if (_tabCtl.length == length) return _tabCtl;
+  /// 视图增删（不同分组页同步来的导航集合可能 5/6 交替）会改长度；未读前移会改
+  /// 顺序。两者都必须**按 id 找回当前选中的 Tab**，否则 TabBar/TabBarView 会
+  /// 长度不匹配，或内容跟着下标漂到别的分组。旧控制器延迟到帧末再 dispose，
+  /// 避免仍被本帧使用。
+  TabController _syncTabController(List<NoticeType> tabs) {
+    final length = tabs.length;
+    if (length == 0) {
+      _displayTabs = tabs;
+      return _tabCtl;
+    }
+
     final old = _tabCtl;
-    final idx = old.index.clamp(0, length - 1);
+    // 上一帧的顺序（首次 build 时 _displayTabs 还是空，按新列表处理）
+    final previous = _displayTabs.isEmpty ? tabs : _displayTabs;
+    final selectedId = old.index >= 0 && old.index < previous.length
+        ? previous[old.index].id
+        : '';
+    final found = selectedId.isEmpty
+        ? -1
+        : tabs.indexWhere((t) => t.id == selectedId);
+    final target = found >= 0 ? found : old.index.clamp(0, length - 1);
+
+    _displayTabs = tabs;
+    if (old.length == length && old.index == target) return old;
+
     old.removeListener(_onTabChanged);
-    _tabCtl = TabController(length: length, vsync: this, initialIndex: idx);
+    _tabCtl = TabController(length: length, vsync: this, initialIndex: target);
     _tabCtl.addListener(_onTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
     return _tabCtl;
@@ -214,9 +257,16 @@ class _MessagePageState extends State<MessagePage>
     // 分组徽标由子类型求和推导（数据驱动）→ 子类型计数变化也要重建
     context.watch<NoticeNavStore>();
     final enabled = context.watch<SettingsProvider>().noticeCheckEnabled;
-    final tabs = _tabs;
-    // 长度可能与上一帧不同（站点视图增删）→ 先对齐控制器再交给 TabBar/TabBarView
-    final tabCtl = _syncTabController(tabs.length);
+    // 一级 Tab：第 1 项固定；其余「有未读」的稳定前移，避免藏在横向滚动区外
+    final baseTabs = _tabs;
+    final tabs = enabled
+        ? prioritizeUnreadTabs(
+            baseTabs,
+            (t) => t.id == 'pm' ? badge.hasNewPm : badge.countOf(t.id) > 0,
+          )
+        : baseTabs;
+    // 数量或顺序都可能变化 → 先对齐控制器（保留当前选中 Tab）再交给 TabBarView
+    final tabCtl = _syncTabController(tabs);
     return Column(
       children: [
         Container(

@@ -45,7 +45,6 @@ extension on BBCodeParser {
               'u': 'underline',
               's': 'strikethrough',
               'url': 'link',
-              'background': 'backcolor',
               'hr': 'thematicBreak',
             };
             final type = nameMap[token.tag!] ?? token.tag!;
@@ -59,7 +58,6 @@ extension on BBCodeParser {
               'u': 'underline',
               's': 'strikethrough',
               'url': 'link',
-              'background': 'backcolor',
               'hr': 'thematicBreak',
             };
             popTo(nameMap[token.tag!] ?? token.tag!);

@@ -36,8 +36,8 @@ extension on _EditorPageState {
       if (activator == null) continue;
       editorShortcuts[activator] = EditorToolbarIntent(item.id);
     }
-    // 有未保存内容时拦截 Esc，先确认再退出
-    if (_hasUnsavedChanges) {
+    // 有未保存内容时拦截 Esc，先确认再退出；图片侧栏打开时 Esc 优先关侧栏
+    if (_hasUnsavedChanges || _showImagePanel) {
       final esc = ShortcutHelper.parse('Escape');
       if (esc != null) editorShortcuts[esc] = EditorEscapeIntent();
     }
@@ -57,6 +57,11 @@ extension on _EditorPageState {
           ),
           EditorEscapeIntent: CallbackAction<EditorEscapeIntent>(
             onInvoke: (_) async {
+              // Esc 先关图片侧栏（仅宽屏时存在），再走退出确认
+              if (_showImagePanel && MediaQuery.sizeOf(context).isWide) {
+                _setState(() => _showImagePanel = false);
+                return null;
+              }
               final ok = await _requestExit();
               if (ok && mounted) Navigator.of(context).pop();
               return null;
@@ -240,8 +245,75 @@ extension on _EditorPageState {
       children: [
         Expanded(child: _buildEditor()),
         Container(width: 1, color: cs.outlineVariant),
-        Expanded(child: _buildPreview()),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 侧栏占预览区右侧约一半，限制在 240~320，
+              // 保证左侧预览仍可见、可滚动
+              final panelWidth = (constraints.maxWidth * 0.55)
+                  .clamp(240.0, 320.0)
+                  .toDouble();
+              return Stack(
+                children: [
+                  Positioned.fill(child: _buildPreview()),
+                  if (_showImagePanel)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      bottom: 0,
+                      width: panelWidth,
+                      child: _buildWideImagePanel(),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
       ],
+    );
+  }
+
+  /// 宽屏图片侧栏：覆盖在预览区右侧，无遮罩，可连续插入
+  Widget _buildWideImagePanel() {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surface,
+      elevation: 8,
+      borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(left: BorderSide(color: cs.outlineVariant)),
+        ),
+        child: ListenableBuilder(
+          listenable: _images,
+          builder: (_, __) => ImagePickerSheet(
+            embedded: true,
+            images: _images.list,
+            loading: _images.loading,
+            ignoredAids: _images.ignoredAids,
+            contentText: _session.contentCtl.text,
+            controller: _session.contentCtl,
+            onUpload: _images.upload,
+            onDelete: _images.delete,
+            onIgnore: _images.ignore,
+            onRefresh: _images.refresh,
+            onInsert: (aid) {
+              _session.contentCtl.wrapInline(
+                '',
+                '',
+                '[attachimg]$aid[/attachimg]',
+              );
+              _images.syncPendingAids();
+              _focusContent();
+            },
+            onClose: () => _setState(() => _showImagePanel = false),
+            allowedExtensions: _session.pageData.imageExtensions.isNotEmpty
+                ? _session.pageData.imageExtensions
+                : null,
+          ),
+        ),
+      ),
     );
   }
 
@@ -294,13 +366,16 @@ extension on _EditorPageState {
             final shortcutsMap = {
               for (final item in items) item.id: s.toolbarShortcut(item.id),
             };
-            return BBCodeToolbar(
-              controller: _toolbarCtl,
-              canUndo: undoVal.canUndo,
-              canRedo: undoVal.canRedo,
-              items: items,
-              shortcuts: shortcutsMap,
-              badges: _editorBadges,
+            return KeyedSubtree(
+              key: _toolbarKey,
+              child: BBCodeToolbar(
+                controller: _toolbarCtl,
+                canUndo: undoVal.canUndo,
+                canRedo: undoVal.canRedo,
+                items: items,
+                shortcuts: shortcutsMap,
+                badges: _editorBadges,
+              ),
             );
           },
         ),
@@ -332,6 +407,12 @@ extension on _EditorPageState {
                         controller: _session.contentCtl,
                         focusNode: _contentFocusNode,
                         undoController: _undoController,
+                        // 选中第一行时选择菜单会压住上方工具栏 → 自动翻到选区下方
+                        contextMenuBuilder: (context, editableTextState) =>
+                            buildEditorSelectionToolbar(
+                              editableTextState: editableTextState,
+                              toolbarKey: _toolbarKey,
+                            ),
                         maxLength: context
                             .read<SettingsProvider>()
                             .postMaxLength,

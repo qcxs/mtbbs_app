@@ -29,14 +29,41 @@ extension on _EditorPageState {
     );
   }
 
-  /// 处理 Ctrl+V 粘贴：剪贴板图片 → 默认上传，文本 → 插入编辑器
+  /// 处理 Ctrl+V 粘贴：
+  /// - 资源管理器复制的文件（可多选）→ 图片走图片上传，其余走附件上传
+  /// - 截图 / 浏览器复制图片 → 默认上传
+  /// - 纯文本 → 插入编辑器
   Future<void> _handlePaste() async {
-    // 尝试剪贴板图片
-    final imgFile = await ClipboardPasteService.pasteImage();
+    // 一次 PowerShell 调用同时检测文件列表与图片
+    final clip = await ClipboardPasteService.pasteClipboard();
+
+    // 1. 资源管理器复制的文件（CF_HDROP，可多选）
+    if (clip.files.isNotEmpty) {
+      if (mounted) {
+        showToast('正在上传剪贴板文件…');
+        await _uploadPastedFiles(clip.files);
+      }
+      // 缓存副本用完即删（不会碰用户原文件）
+      for (final f in clip.files) {
+        try {
+          await f.delete();
+        } catch (_) {}
+      }
+      return;
+    }
+
+    // 2. 剪贴板图片（截图 / 浏览器复制）
+    final imgFile = clip.image;
     if (imgFile != null && mounted) {
       showToast('正在上传剪贴板图片…');
       await _uploadDefaultImage(imgFile);
       await imgFile.delete();
+      return;
+    }
+
+    // 只复制了文件夹等无法直接上传的内容 → 明确提示（否则看起来像"粘贴没反应"）
+    if (clip.ignored > 0) {
+      if (mounted) showToast('暂不支持粘贴文件夹');
       return;
     }
 

@@ -23,6 +23,14 @@ class ImagePickerSheet extends StatefulWidget {
   final void Function(String aid) onInsert;
   final List<String>? allowedExtensions;
 
+  /// 宽屏侧栏模式：隐藏拖拽手柄、插入后不关闭、关闭按钮走 [onClose]。
+  ///
+  /// 默认 `false` 保持底部抽屉（窄屏 / 迷你编辑器）原有行为。
+  final bool embedded;
+
+  /// 侧栏模式的关闭回调（[embedded] 为 true 时必传）
+  final VoidCallback? onClose;
+
   const ImagePickerSheet({
     super.key,
     required this.images,
@@ -36,6 +44,8 @@ class ImagePickerSheet extends StatefulWidget {
     required this.onRefresh,
     required this.onInsert,
     this.allowedExtensions,
+    this.embedded = false,
+    this.onClose,
   });
 
   @override
@@ -96,22 +106,24 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
     final cs = Theme.of(context).colorScheme;
     final effectiveDisabled = _uploading;
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      // 侧栏是全高抽屉；底部抽屉仍按内容收缩
+      mainAxisSize: widget.embedded ? MainAxisSize.max : MainAxisSize.min,
       children: [
-        // 拖拽手柄
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
+        // 拖拽手柄（仅底部抽屉）
+        if (!widget.embedded)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
           ),
-        ),
         // 标题栏 + 恢复 + 关闭
         Padding(
           padding: const EdgeInsets.only(right: 4),
@@ -139,6 +151,14 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
                           color: cs.onSurfaceVariant,
                         ),
                       ),
+                    if (widget.embedded)
+                      Text(
+                        '插入后不关闭，可连续插入',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -151,9 +171,12 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
               ),
               IconButton(
                 icon: const Icon(Icons.close, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: widget.embedded
+                    ? widget.onClose
+                    : () => Navigator.of(context).pop(),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
+                tooltip: '关闭',
               ),
             ],
           ),
@@ -177,8 +200,14 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
                 !_hasSelection || effectiveDisabled,
                 () {
                   if (_selectedAid == null) return;
-                  widget.onInsert(_selectedAid!);
-                  Navigator.of(context).pop();
+                  final aid = _selectedAid!;
+                  widget.onInsert(aid);
+                  if (widget.embedded) {
+                    // 侧栏不收起；清空选中，避免误重复插入同一张
+                    setState(() => _selectedAid = null);
+                  } else {
+                    Navigator.of(context).pop();
+                  }
                 },
               ),
               _toolBtn(Icons.delete_outline, '删除', !_hasSelection, () {
@@ -208,15 +237,17 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
   ) {
     final cs = Theme.of(context).colorScheme;
     final effectiveDisabled = disabled || _uploading;
+    // 侧栏最窄 240px，5 个按钮必须收紧，否则 Row 会溢出
+    final compact = widget.embedded;
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: EdgeInsets.only(left: compact ? 2 : 4),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
         onTap: effectiveDisabled ? null : onTap,
         child: Opacity(
           opacity: effectiveDisabled ? 0.35 : 1.0,
           child: Container(
-            constraints: const BoxConstraints(minWidth: 48),
+            constraints: BoxConstraints(minWidth: compact ? 36 : 48),
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(
               mainAxisSize: MainAxisSize.min,

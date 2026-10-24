@@ -9,15 +9,21 @@
     <!-- MCP 运行状态前台服务（Android 14+ 需要声明服务类型对应的权限） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <!-- 注意：不要给下面的 <application> 开启 android:enableOnBackInvokedCallback。
-         开启后（Android 13+）系统会用预测性返回接管返回键：根 Tab 页无栈可退、
-         且没有 PopScope(canPop:false) 时，框架会 setFrameworkHandlesBack(false)
-         把返回交给系统直接 finish，Dart 侧的 didPopRoute 不再被调用
-         —— 双击退出（global_shortcuts.dart）会被整个跳过，表现为"按一次返回就退出"。 -->
+    <!-- 必须显式关闭预测性返回（android:enableOnBackInvokedCallback="false"）。
+         原因：本 App targetSdk = 36（Flutter 3.44 默认值），而 Android 16+ 对
+         targetSdk >= 36 的应用**默认开启**预测性返回，并停止调用 onBackPressed /
+         派发 KEYCODE_BACK —— "不声明"不再等于"关闭"。
+         开启预测性返回时，根 Tab 页无栈可退、且没有 PopScope(canPop:false)，
+         框架会 setFrameworkHandlesBack(false) 把返回交给系统直接 finish，
+         Dart 侧的 didPopRoute 不再被调用 —— 双击退出（global_shortcuts.dart）
+         会被整个跳过，表现为"按一次返回就退出"。
+         Android 13/14/15 上显式 false 与原先"不声明"行为一致，仅 Android 16+
+         恢复旧版返回派发，因此这行不能删。 -->
     <application
         android:label="${appName}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="false"
         android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"

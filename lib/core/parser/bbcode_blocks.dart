@@ -101,7 +101,6 @@ const _inlineTags = <String>{
   'size',
   'font',
   'backcolor',
-  'background',
   'url',
   'email',
   'qq',

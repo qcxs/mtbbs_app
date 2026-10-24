@@ -6,7 +6,7 @@
 ///   块级容器: doc, quote, free, hide, align, list, listItem
 ///   块级原子: code, img, audio, media, attach, hr, table, tr, td
 ///   内联容器: bold, italic, underline, strikethrough,
-///             color, size, font, backcolor, background, link, url, email, qq
+///             color, size, font, backcolor, link, url, email, qq
 ///   内联原子: text, lineBreak
 ///
 /// quote / free / hide 三者语义不同但 CSS 相同（黄底容器）：
@@ -75,7 +75,6 @@ class BBCodeParser {
     'size',
     'font',
     'backcolor',
-    'background',
     'url',
     'email',
     'qq',
@@ -117,7 +116,6 @@ class BBCodeParser {
     'size',
     'font',
     'backcolor',
-    'background',
     'emoji',
     'img',
     'attachimg',
@@ -133,7 +131,6 @@ class BBCodeParser {
     'size',
     'font',
     'backcolor',
-    'background',
     'link',
     'url',
     'email',

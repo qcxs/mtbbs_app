@@ -93,6 +93,12 @@ extension on _EditorPageState {
     // 同步活跃 AID（上传但未插入正文的图片，提交时经 attachnew 绑定）
     _images.syncPendingAids();
 
+    // 宽屏：固定右侧栏（无遮罩，可连续插入）；窄屏保持底部抽屉
+    if (MediaQuery.sizeOf(context).isWide) {
+      _setState(() => _showImagePanel = !_showImagePanel);
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       constraints: const BoxConstraints(maxWidth: 500, maxHeight: 450),

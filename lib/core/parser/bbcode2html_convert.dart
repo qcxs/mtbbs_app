@@ -250,11 +250,8 @@ extension BBCode2HtmlConvert on BBCode2Html {
       },
     );
 
-    // 背景色 background
-    html = _replaceTag(html, 'background', (_, v) {
-      final c = BBCode2Html._normalizeColor(v);
-      return c.isEmpty ? '<span>' : '<span style="background-color:$c">';
-    }, '</span>');
+    // 注意：Discuz 的背景色标签是 [backcolor]，`[background=…]` 不是合法标签，
+    // 按纯文本原样显示，不在此转换。
 
     // ========== 4. 表情替换 ==========
     html = _replaceEmoji(html);

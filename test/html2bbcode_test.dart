@@ -180,21 +180,21 @@ void main() {
       final result = Html2BBCode().convert(
         '<font style="background-color:green">背景绿</font>',
       );
-      expect(result, '[background=green]背景绿[/background]');
+      expect(result, '[backcolor=green]背景绿[/backcolor]');
     });
 
     test('color 与 background-color 并存（color 在前）', () {
       final result = Html2BBCode().convert(
         '<font style="color:red;background-color:green">文字</font>',
       );
-      expect(result, '[background=green][color=red]文字[/color][/background]');
+      expect(result, '[backcolor=green][color=red]文字[/color][/backcolor]');
     });
 
     test('color 与 background-color 并存（background-color 在前）', () {
       final result = Html2BBCode().convert(
         '<font style="background-color:green;color:red">文字</font>',
       );
-      expect(result, '[background=green][color=red]文字[/color][/background]');
+      expect(result, '[backcolor=green][color=red]文字[/color][/backcolor]');
     });
 
     test('font-size 与 color 并存', () {
@@ -208,7 +208,7 @@ void main() {
       final result = Html2BBCode().convert(
         '<font style="background-color:rgb(0,128,0)">文字</font>',
       );
-      expect(result, '[background=rgb(0,128,0)]文字[/background]');
+      expect(result, '[backcolor=rgb(0,128,0)]文字[/backcolor]');
     });
   });
 

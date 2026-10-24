@@ -377,7 +377,7 @@ class Html2BBCode {
       if (styleSize != null) res = '[size=$styleSize]$res[/size]';
       if (styleFace != null) res = '[font=$styleFace]$res[/font]';
       if (bg != null && bg.isNotEmpty)
-        res = '[background=$bg]$res[/background]';
+        res = '[backcolor=$bg]$res[/backcolor]';
       return res;
     }
 

@@ -46,6 +46,7 @@ import 'package:mtbbs/services/clipboard_paste.dart';
 import 'package:mtbbs/widgets/editor/editor_hint_bar.dart';
 import 'package:mtbbs/widgets/editor/editor_preview.dart';
 import 'package:mtbbs/widgets/editor/editor_line_metrics.dart';
+import 'package:mtbbs/widgets/editor/editor_selection_toolbar.dart';
 import 'package:mtbbs/widgets/editor/block_marker_gutter.dart';
 import 'package:mtbbs/core/parser/bbcode_anchors.dart';
 import 'package:mtbbs/core/parser/bbcode_source_lines.dart';
@@ -125,6 +126,9 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   /// 编辑区正文容器（标记槽与它共用一个 Stack 坐标系）
   final _editorContentKey = GlobalKey();
 
+  /// BBCode 工具栏（选择菜单避让时用来测量它的底边）
+  final _toolbarKey = GlobalKey();
+
   /// 预览面板句柄（用于"点编辑区标记 → 预览定位"）
   final _previewKey = GlobalKey<EditorPreviewState>();
   final _editorScrollCtl = ScrollController();
@@ -143,6 +147,9 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   /// 最近一次测量时的窗口宽度（用于宽度变化后重算标记位置）
   double? _lastGutterWidth;
   bool _showPreview = false;
+
+  /// 宽屏图片侧栏是否展开（仅完整版编辑器；窄屏仍用底部抽屉）
+  bool _showImagePanel = false;
   Timer? _previewDebounce;
   final ValueNotifier<EditorPreviewData> _previewData = ValueNotifier(
     const EditorPreviewData.empty(),
