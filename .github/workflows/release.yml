@@ -65,7 +65,7 @@ jobs:
             scripts/version.ps1 android -VersionName $env:INPUT_TAG
           }
 
-      - name: 写入签名（可选，配置无效自动跳过 → debug 签名）
+      - name: 写入签名（可选，配置无效自动跳过 → MT 内置签名）
         shell: pwsh
         env:
           SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
@@ -94,7 +94,7 @@ jobs:
           } catch {
             Remove-Item android/app/key.jks -ErrorAction SilentlyContinue
             Remove-Item android/key.properties -ErrorAction SilentlyContinue
-            Write-Host "签名配置无效，跳过并回退 debug 签名: $($_.Exception.Message)"
+            Write-Host "签名配置无效，跳过并回退 MT 内置签名: $($_.Exception.Message)"
           }
 
       - name: 构建 APK
