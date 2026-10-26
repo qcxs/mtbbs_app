@@ -15,3 +15,6 @@ build/
 key.properties
 **/*.keystore
 **/*.jks
+
+# 例外：MT 内置签名所用的 AOSP 公开 testkey，零机密性、故意入库（见 docs/15）
+!app/testkey.keystore

@@ -109,7 +109,7 @@ flutter build apk --release `
 
 输出在 `build\app\outputs\flutter-apk\app-release.apk`。
 
-> 因 App 未上架商店，APK 需手动安装。多 ABI 全量打包去掉 `--target-platform` 参数即可。本地无 `android/key.properties` 时用 debug 签名（自测用），正式分发请配置签名（见 `docs/15-版本发布.md`）。
+> 因 App 未上架商店，APK 需手动安装。多 ABI 全量打包去掉 `--target-platform` 参数即可。本地无 `android/key.properties` 时用 **MT 内置签名**（仓库内置的 AOSP 公开 testkey，自测用，与 MT 管理器补签同证），正式分发请配置签名（见 `docs/15-版本发布.md`）。
 
 ---
 
@@ -169,7 +169,7 @@ Fork 后 Actions 默认可用，`release.yml` 为**手动触发**（`workflow_di
    - **填 `v1.0.0`**：构建后自动创建/更新 GitHub Release 并上传产物（应用版本名 = `1.0.0` + 9 位提交 hash）；若 tag 不存在则由发布动作自动创建（指向当前迁出的提交）
 3. 版本号规则与完整发布流程见 `docs/15-版本发布.md`
 
-**Android 签名（可选但正式分发必配）**：CI 默认降级为 debug 签名（仅自测可装）。正式发布需在仓库 **Settings → Secrets and variables → Actions** 配置以下 4 个变量，`release.yml` 会自动检测并正式签名；缺任一变量会静默降级，**不会报错**：
+**Android 签名（可选但正式分发必配）**：CI 在未配置签名时使用 **MT 内置签名**（仓库内置 `android/app/testkey.keystore`，AOSP 公开 platform testkey，所有使用者同一张证书，跨次构建可覆盖安装）。正式发布需在仓库 **Settings → Secrets and variables → Actions** 配置以下 4 个变量，`release.yml` 会自动检测并正式签名；缺任一变量会静默降级为 MT 内置签名，**不会报错**：
 
 | Secret 名 | 说明 |
 |-----------|------|

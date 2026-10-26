@@ -31,7 +31,8 @@ val dartDefines: Map<String, String> = run {
 val isBeta = dartDefines["BETA"] == "true"
 
 // 签名配置：key.properties 四项齐全且 key.jks 能成功加载才启用正式签名，
-// 否则（无 key.properties / 文件缺失 / 密码错误）回退 debug 签名，构建不报错。
+// 否则（无 key.properties / 文件缺失 / 密码错误）回退 **MT 内置签名**（见 mtTestkey），
+// 构建不报错。
 val keyProperties = Properties().apply {
     val f = rootProject.file("key.properties")
     if (f.exists()) {
@@ -75,6 +76,17 @@ android {
     }
 
     signingConfigs {
+        // MT 内置签名：AOSP 公开的 platform testkey（证书 SHA-256 以 a40da80a 开头，
+        // 与 MT 管理器给未签名 APK 补签所用证书相同）。密钥口令就是公开的 android，
+        // **零机密性、故意入库**，与 Flutter/Android 的 debug keystore 不同点在于
+        // 它是所有使用者共享的同一张固定证书，因此本地与 CI、不同次构建的包可互相
+        // 覆盖安装。仅用于"用户未指定签名"的兜底，正式分发仍应配置 key.properties。
+        create("mtTestkey") {
+            storeFile = file("testkey.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (keystoreOk) {
             create("release") {
                 storeFile = file(keyProperties.getProperty("storeFile"))
@@ -114,9 +126,10 @@ android {
                 manifestPlaceholders.put("appName", "MT论坛 beta")
                 signingConfig = signingConfigs.getByName("debug")
             } else {
-                // 有正式签名用正式签名；否则用 debug 签名（本地自测/CI 未配 Secrets 均不报错）
+                // 有正式签名用正式签名；否则用 MT 内置签名（AOSP 公开 testkey），
+                // 保证不同来源的包签名一致、可覆盖安装（本地自测/CI 未配 Secrets 均不报错）
                 signingConfig = if (keystoreOk) signingConfigs.getByName("release")
-                else signingConfigs.getByName("debug")
+                else signingConfigs.getByName("mtTestkey")
             }
         }
     }
