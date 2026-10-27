@@ -8,6 +8,7 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/services/thread_cache_service.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
@@ -103,6 +104,9 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 勋章图片缓存天数（-1 表示永不过期）
   int _medalCacheDays = DefaultConfig.instance.cacheExpireDays.medal;
+
+  /// 帖子自动缓存过期天数（下限 1，不提供「永不过期」）
+  int _threadCacheDays = DefaultConfig.instance.threadCacheConfig.expireDays;
 
   /// 用户自定义站点列表（持久化）
   List<Site> _sites = [];

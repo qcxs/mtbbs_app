@@ -10,7 +10,7 @@ import 'package:mtbbs/models/managed_item.dart';
 /// | `sites.json` | 站点与快捷链接（关键） | `sites` / `shortcutLinks` |
 /// | `toolbar.json` | 编辑器工具栏项（含默认快捷键/模板） | `items` |
 /// | `shortcuts.json` | 全局快捷键 | `global` |
-/// | `cache.json` | 图片缓存过期天数 | `expireDays` |
+/// | `cache.json` | 图片缓存过期天数 / 帖子缓存配置 | `expireDays` / `thread` |
 /// | `quick_replies.json` | 帖子迷你编辑器常用语 | `items` |
 ///
 /// 各文件**独立容错**：加载失败或 JSON 错误只让对应域返回空/默认，不影响其它域。
@@ -171,6 +171,26 @@ class DefaultConfig {
       avatar: dayOf(map['avatar']),
       image: dayOf(map['image']),
       medal: dayOf(map['medal']),
+    );
+  }
+
+  // ==================== 帖子缓存（非关键，缺省 1 天 / 4 MiB） ====================
+
+  /// 帖子自动缓存配置：过期天数（**下限 1**，没有「永不过期」）与单帖上限。
+  ({int expireDays, int maxBytesPerThread}) get threadCacheConfig {
+    const fallbackBytes = 4 * 1024 * 1024;
+    final map = _cache?['thread'] as Map<String, dynamic>?;
+    final days =
+        (map?['expireDays'] as num?)?.toInt() ??
+        int.tryParse(map?['expireDays']?.toString() ?? '') ??
+        1;
+    final bytes =
+        (map?['maxBytesPerThread'] as num?)?.toInt() ??
+        int.tryParse(map?['maxBytesPerThread']?.toString() ?? '') ??
+        fallbackBytes;
+    return (
+      expireDays: days < 1 ? 1 : days,
+      maxBytesPerThread: bytes > 0 ? bytes : fallbackBytes,
     );
   }
 

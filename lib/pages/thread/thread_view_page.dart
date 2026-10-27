@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +15,7 @@ import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/dialog/page_jump_dialog.dart';
 import 'package:mtbbs/widgets/dialog/rate_dialog.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
@@ -41,9 +44,16 @@ import 'package:mtbbs/pages/thread/thread_view_comment_section.dart';
 import 'package:mtbbs/pages/thread/thread_view_main_post.dart';
 import 'package:mtbbs/pages/thread/thread_favorite_note_dialog.dart';
 import 'package:mtbbs/pages/thread/thread_share_page.dart';
+import 'package:mtbbs/services/thread_cache_service.dart';
+import 'package:mtbbs/models/thread_snapshot.dart';
+import 'package:mtbbs/core/utils/formatters.dart';
 
 part 'thread_view_actions.dart';
+part 'thread_view_cache.dart';
+part 'thread_view_editor.dart';
 part 'thread_view_layout.dart';
+part 'thread_view_load.dart';
+part 'thread_view_offline.dart';
 
 /// Esc 在迷你编辑器展开时：先收起编辑器（不退出页面）
 class _CollapseMiniEditorIntent extends Intent {
@@ -59,11 +69,16 @@ class _CollapseMiniEditorIntent extends Intent {
 /// - [tid] + [initialPage]：加载指定页评论。
 /// - [tid] + [pid]：通过 redirect 解析实际 page，自动跳到对应页。
 /// - [authorid]：过滤只显示指定用户的评论。
+/// - [cacheKey]：只读缓存模式（从 `threads.sembast` 读快照），
+///   不发网络请求、不写缓存、不显示回复栏；布局与正常帖子页完全一致。
 class ThreadViewPage extends StatefulWidget {
   final String tid;
   final int initialPage;
   final String? pid;
   final String? authorid;
+
+  /// 快照存储键（`auto|...` / `offline|...`）；非空即只读缓存模式
+  final String? cacheKey;
 
   const ThreadViewPage({
     super.key,
@@ -71,7 +86,27 @@ class ThreadViewPage extends StatefulWidget {
     this.initialPage = 1,
     this.pid,
     this.authorid,
+    this.cacheKey,
   });
+
+  /// 从缓存键构造只读页（键内含 tid，避免路由再传一份）
+  factory ThreadViewPage.cached({Key? key, required String cacheKey}) {
+    final parts = cacheKey.split('|');
+    final tid = parts.length >= 5
+        ? parts[3]
+        : (parts.length == 3 ? parts[2] : '');
+    return ThreadViewPage(key: key, tid: tid, cacheKey: cacheKey);
+  }
+
+  /// 打开只读缓存页（通过路由，支持深链）
+  static Future<void> openCached(
+    BuildContext context, {
+    required String key,
+  }) async {
+    await context.push<void>(
+      '/thread/cache?key=${Uri.encodeQueryComponent(key)}',
+    );
+  }
 
   @override
   State<ThreadViewPage> createState() => _ThreadViewPageState();
@@ -101,6 +136,20 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   // ---- 操作状态 ----
   bool _liked = false;
+
+  // ---- 帖子缓存 ----
+  /// 自动缓存键（写入成功后可用；评论页回写需要）
+  String? _autoCacheKey;
+  Future<String?>? _autoCachePending;
+
+  /// 加载失败时可选的缓存快照
+  List<ThreadSnapshotMeta> _errorCacheCandidates = const [];
+
+  /// 只读缓存模式下当前快照
+  ThreadSnapshot? _cacheSnapshot;
+
+  /// 是否只读缓存模式（终态，不随运行变化）
+  bool get _isCacheMode => widget.cacheKey != null;
 
   /// 当前帖子是否已收藏（收藏成功后置 true，仅本次会话有效）
   bool _favorited = false;
@@ -138,7 +187,11 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       uid: () => context.read<AuthProvider>().uid,
       fallbackTid: widget.tid,
     )..addListener(_onImagesChanged);
-    _loadInitial();
+    if (_isCacheMode) {
+      _loadCacheInitial();
+    } else {
+      _loadInitial();
+    }
   }
 
   @override
@@ -158,185 +211,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     if (mounted) setState(fn);
   }
 
-  // ==================== 加载逻辑 ====================
-
-  /// 通过 redirect（允许重定向）获取 pid 对应的真实 page
-  Future<int> _resolveRedirectPage() async {
-    final pid = widget.pid;
-    if (pid == null || pid.isEmpty) return 1;
-    try {
-      final dio = ApiService().dio;
-      final response = await dio.get(
-        '/forum.php?mod=redirect&goto=findpost&pid=$pid&ptid=${widget.tid}',
-        options: Options(validateStatus: (status) => true),
-      );
-      for (final r in response.redirects.reversed) {
-        final pageStr = r.location.queryParameters['page'];
-        if (pageStr != null && pageStr.isNotEmpty) {
-          final p = int.tryParse(pageStr) ?? 1;
-          AppLogger.i('PAGE', 'redirect pid=$pid → page=$p');
-          return p;
-        }
-      }
-      return 1;
-    } catch (e) {
-      AppLogger.w('PAGE', 'resolve redirect page error: $e');
-      return 1;
-    }
-  }
-
-  /// 初始加载
-  Future<void> _loadInitial() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      int targetPage = widget.initialPage;
-      bool pidMode = false;
-      if (widget.pid != null && widget.pid!.isNotEmpty) {
-        targetPage = await _resolveRedirectPage();
-        pidMode = true;
-      }
-      // 确保表情已加载，帖子内容里的表情才能还原为 [呵呵] 文本
-      await EmojiService().load();
-      final page1Result = await detail_api.getThreadDetail(
-        ApiService().dio,
-        tid: widget.tid,
-        page: 1,
-        authorid: widget.authorid,
-      );
-      if (page1Result['success'] != true) {
-        throw Exception(page1Result['message']?.toString() ?? '加载失败');
-      }
-      final page1Data = ThreadViewData.fromMap(page1Result, widget.tid);
-      if (!mounted) return;
-      final d = page1Data;
-      _totalPages = d.totalPages;
-      _data = d;
-      _liked = d.mainPost?.isLiked ?? false;
-
-      final title = d.title.isNotEmpty ? d.title : '帖子${widget.tid}';
-      _recordThreadHistory();
-
-      _commentPages[1] = List<PostItem>.from(d.posts);
-      _currentPage = targetPage.clamp(1, _totalPages);
-      _mainPostLoaded = _currentPage == 1;
-
-      AppLogger.i(
-        'PAGE',
-        'ThreadViewPage init: tid=${widget.tid}, title=$title, '
-            'totalPages=$_totalPages, targetPage=$_currentPage${pidMode ? ' (pid)' : ''}',
-      );
-
-      setState(() {
-        _loading = false;
-      });
-      if (_currentPage > 1) await _loadCommentPage(_currentPage);
-      if (pidMode) _scrollToPid();
-    } catch (e) {
-      if (mounted) {
-        final msg = e.toString();
-        final cleanMsg = msg.startsWith('Exception: ')
-            ? msg.substring(11)
-            : msg;
-        AppLogger.w('PAGE', 'ThreadViewPage error: $cleanMsg');
-        setState(() {
-          _error = cleanMsg.isEmpty ? '加载失败' : cleanMsg;
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadCommentPage(int page, {bool force = false}) async {
-    if (_pageLoading) return;
-    if (!force && _commentPages.containsKey(page)) return;
-    setState(() {
-      _pageLoading = true;
-    });
-    try {
-      await EmojiService().load();
-      final raw = await detail_api.getThreadDetail(
-        ApiService().dio,
-        tid: widget.tid,
-        page: page,
-        authorid: widget.authorid,
-      );
-      if (raw['success'] != true) {
-        throw Exception(raw['message']?.toString() ?? '加载失败');
-      }
-      final data = ThreadViewData.fromMap(raw, widget.tid);
-      if (!mounted) return;
-      final actualPage = data.currentPage;
-      _commentPages[actualPage] = List<PostItem>.from(data.posts);
-      _currentPage = actualPage;
-      AppLogger.i(
-        'PAGE',
-        'loaded comment page $actualPage (${data.posts.length} posts)',
-      );
-    } catch (e) {
-      AppLogger.w('PAGE', 'load comment page $page error: $e');
-    }
-    if (mounted)
-      setState(() {
-        _pageLoading = false;
-      });
-  }
-
-  void _goToPage(int page) {
-    if (page < 1 || page > _totalPages || page == _currentPage) return;
-    setState(() {
-      _currentPage = page;
-    });
-    _recordThreadHistory();
-    if (!_commentPages.containsKey(page)) _loadCommentPage(page);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final posts = _commentPages[_currentPage];
-      if (posts != null && posts.isNotEmpty) {
-        final firstKey = _postKeys[posts.first.pid];
-        if (firstKey?.currentContext != null) {
-          Scrollable.ensureVisible(
-            firstKey!.currentContext!,
-            duration: const Duration(milliseconds: 200),
-            alignment: 0.0,
-          );
-        }
-      }
-    });
-  }
-
-  Future<void> _onRefresh() async {
-    AppLogger.i('PAGE', 'refresh: page1 + page$_currentPage');
-    // 先请求第 1 页（主帖 + 第 1 页评论），成功才整体替换，失败保留旧内容
-    try {
-      await EmojiService().load();
-      final raw = await detail_api.getThreadDetail(
-        ApiService().dio,
-        tid: widget.tid,
-        page: 1,
-        authorid: widget.authorid,
-      );
-      if (raw['success'] != true) {
-        throw Exception(raw['message']?.toString() ?? '加载失败');
-      }
-      if (!mounted) return;
-      final d = ThreadViewData.fromMap(raw, widget.tid);
-      setState(() {
-        _commentPages[1] = List<PostItem>.from(d.posts);
-        _totalPages = d.totalPages;
-        _data = d;
-        _liked = d.mainPost?.isLiked ?? false;
-      });
-      AppLogger.i('PAGE', 'refresh page1 ok (${d.posts.length} posts)');
-    } catch (e) {
-      AppLogger.w('PAGE', 'refresh page1 failed: $e');
-    }
-    // 当前不在第 1 页时，强制刷新当前评论页（需要时由 _loadCommentPage 自行合并）
-    if (_currentPage != 1 && mounted) {
-      await _loadCommentPage(_currentPage, force: true);
-    }
-  }
 
   // ==================== Build ====================
 
@@ -355,13 +229,18 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
         title: GestureDetector(
           onTap: _scrollToTop,
           child: Text(
-            _data?.title.isNotEmpty == true ? _data!.title : '帖子详情',
+            _data?.title.isNotEmpty == true
+                ? _data!.title
+                : (_isCacheMode ? '帖子缓存' : '帖子详情'),
             style: const TextStyle(fontSize: 15),
           ),
         ),
         surfaceTintColor: cs.surface,
         actions: [
-          if (isNarrow && _data != null && _commentPages.isNotEmpty)
+          if (!_isCacheMode &&
+              isNarrow &&
+              _data != null &&
+              _commentPages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.forum_outlined, size: 20),
               tooltip: '滚动到评论区',
@@ -384,43 +263,114 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
           ),
           PageActions(
             url: _threadUrl,
-            onRefresh: () => _loadInitial(),
+            onRefresh: _isCacheMode ? _loadCacheInitial : () => _loadInitial(),
             loading: _loading,
             copyLabel: '复制帖子链接',
             extraItems: () {
+              if (_isCacheMode) {
+                return <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'switch_version',
+                    child: Row(
+                      children: [
+                        Icon(Icons.layers_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('切换版本'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem<String>(
+                    value: 'reload_latest',
+                    child: Row(
+                      children: [
+                        Icon(Icons.refresh_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text('重新加载最新'),
+                      ],
+                    ),
+                  ),
+                ];
+              }
               final tidNum = int.tryParse(widget.tid);
-              if (tidNum == null) return <PopupMenuEntry<String>>[];
-              return [
+              return <PopupMenuEntry<String>>[
                 PopupMenuItem<String>(
-                  value: 'prev_thread',
-                  enabled: tidNum > 1,
+                  value: 'view_cache',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.history, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('查看历史缓存'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'save_offline',
+                  enabled: _data?.mainPost != null,
                   child: Row(
                     children: [
                       Icon(
-                        Icons.chevron_left,
+                        Icons.download_outlined,
                         size: 18,
-                        color: tidNum > 1
+                        color: _data?.mainPost != null
                             ? null
                             : Theme.of(context).disabledColor,
                       ),
                       const SizedBox(width: 8),
-                      const Text('上一篇'),
+                      const Text('保存离线副本'),
                     ],
                   ),
                 ),
-                PopupMenuItem<String>(
-                  value: 'next_thread',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.chevron_right, size: 18),
-                      const SizedBox(width: 8),
-                      const Text('下一篇'),
-                    ],
+                if (tidNum != null) ...[
+                  const PopupMenuDivider(),
+                  PopupMenuItem<String>(
+                    value: 'prev_thread',
+                    enabled: tidNum > 1,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.chevron_left,
+                          size: 18,
+                          color: tidNum > 1
+                              ? null
+                              : Theme.of(context).disabledColor,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('上一篇'),
+                      ],
+                    ),
                   ),
-                ),
+                  PopupMenuItem<String>(
+                    value: 'next_thread',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.chevron_right, size: 18),
+                        const SizedBox(width: 8),
+                        const Text('下一篇'),
+                      ],
+                    ),
+                  ),
+                ],
               ];
             }(),
             onExtraSelected: (action) {
+              if (_isCacheMode) {
+                switch (action) {
+                  case 'switch_version':
+                    _switchCachedVersion();
+                  case 'reload_latest':
+                    _reloadLatestFromCache();
+                }
+                return;
+              }
+              switch (action) {
+                case 'view_cache':
+                  _handleViewCached();
+                  return;
+                case 'save_offline':
+                  _handleSaveOffline();
+                  return;
+              }
               final tidNum = int.tryParse(widget.tid);
               if (tidNum == null) return;
               switch (action) {
@@ -448,15 +398,46 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
                 if (_error != null)
                   return PageErrorWidget(
                     message: _error!,
-                    onRetry: () => _loadInitial(),
+                    onRetry: _isCacheMode
+                        ? _loadCacheInitial
+                        : () => _loadInitial(),
+                    extraActions: [
+                      if (!_isCacheMode &&
+                          _errorCacheCandidates.isNotEmpty)
+                        FilledButton.tonalIcon(
+                          onPressed: () =>
+                              _openCachedPicker(metas: _errorCacheCandidates),
+                          icon: const Icon(Icons.history, size: 18),
+                          label: const Text('查看缓存'),
+                        ),
+                      if (!_isCacheMode &&
+                          ThreadCacheService.instance.isDisabled)
+                        Text(
+                          '缓存不可用',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                    ],
                   );
                 if (_data == null) return const EmptyView(text: '暂无数据');
-                if (isWide) return _buildWideLayout();
+                if (isWide) {
+                  return _isCacheMode
+                      ? Column(
+                          children: [
+                            _buildCacheBanner(),
+                            Expanded(child: _buildWideLayout()),
+                          ],
+                        )
+                      : _buildWideLayout();
+                }
                 return _buildNarrowLayout();
               },
             ),
           ),
-          _editorExpanded ? _buildMiniEditor() : _buildReplyBar(),
+          if (!_isCacheMode)
+            _editorExpanded ? _buildMiniEditor() : _buildReplyBar(),
         ],
       ),
     );

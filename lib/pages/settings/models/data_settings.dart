@@ -16,6 +16,12 @@ List<SettingsModel> dataSettings() => [
     onTap: (ctx, s) => ctx.push('/settings/cache'),
   ),
   NormalSetting(
+    title: '帖子缓存',
+    subtitle: '自动缓存与离线帖子，支持导入导出和损坏恢复',
+    icon: Icons.forum_outlined,
+    onTap: (ctx, s) => ctx.push('/settings/cache/threads'),
+  ),
+  NormalSetting(
     title: '表情管理',
     subtitle: '查看和刷新当前站点表情',
     icon: Icons.emoji_emotions,

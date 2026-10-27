@@ -50,6 +50,9 @@ class CommentSection extends StatelessWidget {
   /// 页面级"全局禁用样式"开关（顶栏 toggle），开启时禁用所有样式
   final bool globalDisableStyle;
 
+  /// 只读模式（缓存快照页）：隐藏互动入口
+  final bool readOnly;
+
   const CommentSection({
     super.key,
     required this.posts,
@@ -63,6 +66,7 @@ class CommentSection extends StatelessWidget {
     this.onRecommend,
     this.onPopupAction,
     this.globalDisableStyle = false,
+    this.readOnly = false,
   });
 
   @override
@@ -95,6 +99,7 @@ class CommentSection extends StatelessWidget {
               opUid: opUid,
               globalDisabledTags: disabledTags,
               globalDisableStyle: globalDisableStyle,
+              readOnly: readOnly,
               onReply: () => onReply?.call(post),
               onRecommend: () => onRecommend?.call(post),
               onPopupAction: (action) => onPopupAction?.call(action, post),

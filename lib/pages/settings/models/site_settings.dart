@@ -3,6 +3,7 @@ import 'package:mtbbs/core/app/site_cdn.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/config/site_config.dart';
+import 'package:mtbbs/pages/settings/cdn_dialog.dart';
 import 'package:mtbbs/pages/settings/forum_management.dart';
 import 'package:mtbbs/pages/settings/formula_dialog.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
@@ -11,7 +12,6 @@ import 'package:mtbbs/pages/settings/site_management.dart';
 import 'package:mtbbs/pages/settings/user_management_dialog.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
-import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 站点与网络组设置项
 List<SettingsModel> siteSettings() => [
@@ -41,7 +41,7 @@ List<SettingsModel> siteSettings() => [
       return detected ?? '未识别，当前使用站点地址';
     },
     icon: Icons.cloud_sync,
-    onTap: (ctx, s) => _refreshCdn(ctx),
+    onTap: (ctx, s) => CdnDialog.show(ctx),
   ),
   SwitchSetting(
     title: '模拟浏览器请求头',
@@ -94,14 +94,6 @@ List<SettingsModel> siteSettings() => [
     ),
   ),
 ];
-
-/// 重新识别当前站点 CDN（用户无需配置，识别结果自动用于表情 / 静态图片）
-Future<void> _refreshCdn(BuildContext context) async {
-  showToast('正在检测 CDN…', duration: const Duration(seconds: 1));
-  final cdn = await detectSiteCdn(host: SiteStore.instance.host, force: true);
-  if (!context.mounted) return;
-  showToast(cdn == null ? '未识别到 CDN，继续使用站点地址' : 'CDN: $cdn');
-}
 
 Future<void> _showUADialog(
   BuildContext context,

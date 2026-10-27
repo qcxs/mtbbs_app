@@ -48,6 +48,8 @@ void main() {
         // 整页受开关影响会把其它功能一起废掉
         '/search',
         '/browser?url=x&intercept=false',
+        // 只读缓存页是本地快照，没有对应站内 URL（不能被当成 tid="cache"）
+        '/thread/cache?key=offline%7Chost%7C123',
       ]) {
         expect(featureIdOf(p), isNull, reason: p);
       }

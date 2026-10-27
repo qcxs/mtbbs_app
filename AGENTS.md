@@ -35,7 +35,7 @@ Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：
 2. **日志用 `AppLogger.{d/i/w/e}(tag, msg)`**，禁 `print`/`debugPrint`（lint 未强制，靠约定执行）
 3. **import 用 `package:mtbbs/...` 绝对路径**，禁 `../` 相对导入（仅 barrel 文件的同目录 `export` 例外）
 4. **网络图片必须走 `CachedNetworkImage` + 指定 `cacheManager`**（image/avatar/emoji/medal 四层），禁 `Image.network()`、禁不带 cacheManager 的默认缓存
-5. **持久化统一走 `DatabaseHelper`（sembast 单库）**，禁新增 SharedPreferences 依赖
+5. **持久化统一走 `DatabaseHelper`（sembast 单库）**，禁新增 SharedPreferences 依赖；**唯一例外**是帖子缓存独立库 `threads.sembast`（隔离大体积正文与损坏风险，见 `docs/24`）
 6. **新增 API 必须三文件**：http 只管请求 / parse 纯解析（不打印列表日志）/ export 走 `parseWithLog` 统一输出日志
 7. **验证闭环**：改完跑 `flutter analyze lib`；涉及真实请求用探针 `tool/api_probe_test.dart`（见 docs/10）
 8. **文档与代码同步**：新增/修改能力时更新对应 `docs/`；新增文档要挂进下方路由表 + `README.md`（见 `docs/00-文档编写规范.md`）
@@ -75,6 +75,7 @@ Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：
 | 人机验证 / 站点防护（挑战页、`acw_*` cookie、验证弹窗） | 20 + 07 #80 |
 | MCP 服务端（新增工具 / 能力开关 / 安全策略） | 17 + 09 |
 | 生成图片 / 分享图（截图保存、长图拼接、新页面接入、二维码、勾选项） | 22 + 07 #91 |
+| 帖子缓存 / 离线帖子（自动/离线 Tab、导入导出、损坏恢复、只读缓存页） | 24 + 25 + 07 |
 
 ### 经验与笔记
 | 任务类型 | 必读文档 |

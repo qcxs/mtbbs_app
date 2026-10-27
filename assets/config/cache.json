@@ -4,5 +4,9 @@
     "avatar": 7,
     "image": 3,
     "medal": -1
+  },
+  "thread": {
+    "expireDays": 1,
+    "maxBytesPerThread": 4194304
   }
 }

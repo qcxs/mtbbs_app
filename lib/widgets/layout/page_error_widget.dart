@@ -19,11 +19,15 @@ class PageErrorWidget extends StatelessWidget {
   /// 是否显示"返回"按钮（默认显示，内嵌页面可关闭）
   final bool showBack;
 
+  /// 额外操作按钮（如"查看缓存"），追加在重试/返回之前
+  final List<Widget> extraActions;
+
   const PageErrorWidget({
     super.key,
     required this.message,
     this.onRetry,
     this.showBack = true,
+    this.extraActions = const [],
   });
 
   @override
@@ -51,17 +55,18 @@ class PageErrorWidget extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisSize: MainAxisSize.min,
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
               children: [
-                if (onRetry != null) ...[
+                ...extraActions,
+                if (onRetry != null)
                   FilledButton.icon(
                     onPressed: onRetry,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('重试'),
                   ),
-                  const SizedBox(width: 12),
-                ],
                 if (showBack)
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).maybePop(),

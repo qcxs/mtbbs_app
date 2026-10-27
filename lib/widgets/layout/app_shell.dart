@@ -20,6 +20,8 @@ import 'package:mtbbs/pages/user/my_profile_page.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/core/utils/screen_size_ext.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/thread_cache_database.dart';
+import 'package:mtbbs/services/thread_cache_service.dart';
 
 /// 响应式外壳（底部导航栏 + 侧边栏）
 class AppShell extends StatefulWidget {
@@ -41,6 +43,34 @@ class _AppShellState extends State<AppShell> {
 
   /// 上次点击"当前 Tab"的时间（识别 500ms 内连点 → 直接刷新）
   int _lastTabTapAt = 0;
+
+  /// 帖子缓存损坏提示：每个 App 会话只弹一次
+  bool _threadCacheToastShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ThreadCacheService.instance.health.addListener(_onThreadCacheHealth);
+  }
+
+  @override
+  void dispose() {
+    ThreadCacheService.instance.health.removeListener(_onThreadCacheHealth);
+    super.dispose();
+  }
+
+  void _onThreadCacheHealth() {
+    if (_threadCacheToastShown) return;
+    if (ThreadCacheService.instance.health.value !=
+        ThreadCacheHealth.corrupted) {
+      return;
+    }
+    _threadCacheToastShown = true;
+    showToast(
+      '帖子缓存文件损坏，缓存功能已禁用；请在缓存管理中导出备份或重建。',
+      duration: const Duration(seconds: 4),
+    );
+  }
 
   /// 切换账号/站点时，缓存里的 Tab 页面全是**旧身份**的数据，而它们"永久缓存"着，
   /// 不清就会"换了账号还显示上一个账号的消息"。整体丢弃，下次进入重新创建并拉取。

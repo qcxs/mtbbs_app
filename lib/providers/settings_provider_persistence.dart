@@ -67,6 +67,16 @@ extension SettingsPersistence on SettingsProvider {
         (await _db.getSettingInt('imageCacheDays')) ?? cacheDefaults.image;
     _medalCacheDays =
         (await _db.getSettingInt('medalCacheDays')) ?? cacheDefaults.medal;
+    // 帖子自动缓存：TTL 下限 1 天；单帖上限来自 cache.json
+    final threadConfig = DefaultConfig.instance.threadCacheConfig;
+    _threadCacheDays =
+        ((await _db.getSettingInt('threadCacheDays')) ??
+                threadConfig.expireDays)
+            .clamp(1, 365);
+    ThreadCacheService.instance.configure(
+      ttlDays: _threadCacheDays,
+      maxBytesPerThread: threadConfig.maxBytesPerThread,
+    );
     _minSnapshotWordCount =
         (await _db.getSettingInt('minSnapshotWordCount')) ?? 10;
     _autoSaveInterval = (await _db.getSettingInt('autoSaveInterval')) ?? 30;
@@ -436,6 +446,14 @@ extension SettingsPersistence on SettingsProvider {
   Future<void> setMedalCacheDays(int days) async {
     _medalCacheDays = days.clamp(-1, 365);
     await _db.setSettingInt('medalCacheDays', _medalCacheDays);
+    _notify();
+  }
+
+  /// 帖子自动缓存过期天数：下限 1 天，不提供「永不过期」
+  Future<void> setThreadCacheDays(int days) async {
+    _threadCacheDays = days.clamp(1, 365);
+    await _db.setSettingInt('threadCacheDays', _threadCacheDays);
+    ThreadCacheService.instance.configure(ttlDays: _threadCacheDays);
     _notify();
   }
 

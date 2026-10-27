@@ -33,6 +33,9 @@ class ThreadPostCard extends StatefulWidget {
   /// 页面级"全局禁用样式"开关（顶栏 toggle），开启时禁用所有样式
   final bool globalDisableStyle;
 
+  /// 只读模式（离线/缓存快照页）：隐藏回复、评分、编辑等互动入口
+  final bool readOnly;
+
   final VoidCallback? onReply;
   final VoidCallback? onRecommend;
   final void Function(PostCardAction action)? onPopupAction;
@@ -48,6 +51,7 @@ class ThreadPostCard extends StatefulWidget {
     this.opUid = '',
     this.globalDisabledTags,
     this.globalDisableStyle = false,
+    this.readOnly = false,
     this.onReply,
     this.onRecommend,
     this.onPopupAction,
@@ -253,7 +257,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
               style: TextStyle(color: cs.onSurfaceVariant),
             ),
           if (widget.post.rating != null) _buildRating(context),
-          if (!widget.post.isOp)
+          if (!widget.readOnly && !widget.post.isOp)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Align(
@@ -387,7 +391,8 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
         ),
         const SizedBox(width: 2),
         // 编辑按钮（仅自己可见）
-        if (widget.post.pid.isNotEmpty &&
+        if (!widget.readOnly &&
+            widget.post.pid.isNotEmpty &&
             widget.post.uid == widget.currentUid &&
             widget.post.uid.isNotEmpty)
           Padding(
@@ -405,30 +410,31 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                   widget.onPopupAction?.call(PostCardAction.editPost),
             ),
           ),
-        // 更多操作
-        PopupMenuButton<PostCardAction>(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-          icon: Icon(Icons.more_horiz, size: 16, color: cs.onSurfaceVariant),
-          onSelected: (action) => widget.onPopupAction?.call(action),
-          itemBuilder: (_) => [
-            const PopupMenuItem(
-              value: PostCardAction.showBbcode,
-              child: Text('查看 BBCode', style: TextStyle(fontSize: 13)),
-            ),
-            if (widget.post.postTime.length < 15)
-              PopupMenuItem(
-                value: PostCardAction.viewTime,
-                enabled: widget.post.pid.isNotEmpty,
-                child: const Text('查看时间', style: TextStyle(fontSize: 13)),
-              ),
-            if (AppCapabilities.isAvailable(AppCapability.saveImage))
+        // 更多操作（只读模式隐藏）
+        if (!widget.readOnly)
+          PopupMenuButton<PostCardAction>(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            icon: Icon(Icons.more_horiz, size: 16, color: cs.onSurfaceVariant),
+            onSelected: (action) => widget.onPopupAction?.call(action),
+            itemBuilder: (_) => [
               const PopupMenuItem(
-                value: PostCardAction.saveImage,
-                child: Text('生成图片', style: TextStyle(fontSize: 13)),
+                value: PostCardAction.showBbcode,
+                child: Text('查看 BBCode', style: TextStyle(fontSize: 13)),
               ),
-          ],
-        ),
+              if (widget.post.postTime.length < 15)
+                PopupMenuItem(
+                  value: PostCardAction.viewTime,
+                  enabled: widget.post.pid.isNotEmpty,
+                  child: const Text('查看时间', style: TextStyle(fontSize: 13)),
+                ),
+              if (AppCapabilities.isAvailable(AppCapability.saveImage))
+                const PopupMenuItem(
+                  value: PostCardAction.saveImage,
+                  child: Text('生成图片', style: TextStyle(fontSize: 13)),
+                ),
+            ],
+          ),
       ],
     );
   }

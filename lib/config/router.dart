@@ -17,6 +17,7 @@ import 'package:mtbbs/pages/settings/settings_page.dart';
 import 'package:mtbbs/pages/settings/settings_search_page.dart';
 import 'package:mtbbs/pages/settings/about_page.dart';
 import 'package:mtbbs/pages/settings/cache_settings_page.dart';
+import 'package:mtbbs/pages/settings/thread_cache_manage_page.dart';
 import 'package:mtbbs/pages/settings/editor_settings_page.dart';
 import 'package:mtbbs/pages/settings/history_format_page.dart';
 import 'package:mtbbs/pages/settings/models/developer_settings.dart';
@@ -131,6 +132,11 @@ GoRouter buildRouter({
                 const NoTransitionPage(child: CacheSettingsPage()),
           ),
           GoRoute(
+            path: '/settings/cache/threads',
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: ThreadCacheManagePage()),
+          ),
+          GoRoute(
             path: '/settings/search',
             pageBuilder: (_, __) =>
                 const NoTransitionPage(child: SettingsSearchPage()),
@@ -162,6 +168,16 @@ GoRouter buildRouter({
               child: SettingsGroupPage(
                 title: '开发者选项',
                 modelsBuilder: developerSettings,
+              ),
+            ),
+          ),
+          // 只读缓存页：必须排在 /thread/:tid 之前，否则会被当成 tid="cache"。
+          // 复用 ThreadViewPage 的 cacheKey 模式（宽/窄屏布局与正常帖子页一致）。
+          GoRoute(
+            path: '/thread/cache',
+            pageBuilder: (_, state) => NoTransitionPage(
+              child: ThreadViewPage.cached(
+                cacheKey: state.uri.queryParameters['key'] ?? '',
               ),
             ),
           ),

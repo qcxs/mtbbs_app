@@ -131,6 +131,9 @@ String? appPageRedirect(String location) {
 /// 表示**不受开关影响**。
 String? featureIdOf(String location) {
   final path = location.split('?').first;
+  // 只读缓存页 `/thread/cache?key=` 是本地快照，没有对应站内 URL；
+  // 若按 `/thread/` 识别会把 tid 当成 "cache"，关掉帖子接管时被错误回退到网页。
+  if (path == '/thread/cache') return null;
   if (path.startsWith('/thread/')) return 'thread';
   // 留言板必须排在 `/user/` 之前：它是 `/user/{uid}/wall` 的子路径，
   // 否则会被识别成"用户主页"——关掉用户主页接管时，留言板链接会被错误地

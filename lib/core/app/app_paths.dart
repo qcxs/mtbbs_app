@@ -56,6 +56,19 @@ class AppPaths {
   static Future<String> get databasePath async =>
       '${await appDataDir}${p.separator}mtbbs.sembast';
 
+  /// 帖子缓存独立数据库 `{appDataDir}/threads.sembast`
+  ///
+  /// 刻意不经过 [databasePath] 的主库：缓存正文体积大，独立文件损坏时
+  /// 不影响登录态、设置、历史等主库数据（见 docs/01 的持久化例外说明）。
+  static Future<String> get threadDatabasePath async =>
+      '${await appDataDir}${p.separator}threads.sembast';
+
+  /// 导出兜底目录 `{appDataDir}/exports/`
+  ///
+  /// 平台「另存为」不可用时，导出文件写入此目录并提示路径。
+  static Future<String> get exportsDir async =>
+      '${await appDataDir}${p.separator}exports';
+
   // ==================== Cookie ====================
 
   /// `{appDataDir}/cookies/`

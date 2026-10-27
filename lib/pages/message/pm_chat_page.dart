@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -36,6 +37,10 @@ import 'package:mtbbs/widgets/layout/state_views.dart';
 /// **实时轮询**：Discuz 没有"增量拉新消息"接口，只能按 [_kPollInterval]
 /// 周期重拉最新一页、按 pmid 去重后追加。仅在页面挂载且应用处于前台时轮询，
 /// 切后台/离开页面即停，避免无谓请求。
+///
+/// **限流保护**：整页重拉是本页最贵的请求（完整 HTML），连续失败按
+/// [_kBackoffSteps] 退避；一旦收到 403/429 说明已被站点限流，立即暂停自动
+/// 刷新（继续按原频率重试只会延长封禁窗口），由用户手动刷新解除。
 class PmChatPage extends StatefulWidget {
   /// 对方 uid
   final String touid;
@@ -49,8 +54,17 @@ class PmChatPage extends StatefulWidget {
   State<PmChatPage> createState() => _PmChatPageState();
 }
 
-/// 轮询间隔。Discuz 无增量接口，只能整页重拉；5s 兼顾及时性与请求量。
-const Duration _kPollInterval = Duration(seconds: 5);
+/// 轮询间隔。Discuz 无增量接口，只能整页重拉，间隔即请求量：
+/// 5s 约 720 次/小时，足以触发站点 WAF 的频次限制（403），故放宽到 15s。
+const Duration _kPollInterval = Duration(seconds: 15);
+
+/// 连续失败后的退避阶梯：连续第 n 次失败，下一轮推迟 `_kBackoffSteps[n-1]`
+/// （超出取末项）。成功一次即复位，避免偶发超时把间隔永久拉长。
+const List<Duration> _kBackoffSteps = [
+  Duration(seconds: 30),
+  Duration(seconds: 60),
+  Duration(seconds: 120),
+];
 
 /// 判定"用户是否已在底部"的像素阈值：超出则不因新消息自动滚屏（避免打断看历史）
 /// （reverse 列表下底部即 offset 0，故直接比较 pixels）
@@ -82,7 +96,23 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
   bool get _hasFailedMessage => _pending.any((m) => m['_status'] == 'failed');
 
   Timer? _pollTimer;
+
+  /// 轮询是否处于激活态（前台且页面存活）。定时器改为自调度后，用它判断
+  /// 一次异步轮询返回时是否还应续排下一轮——切后台期间不得续命。
+  bool _pollActive = false;
   bool _polling = false;
+
+  /// 连续失败次数（成功一次即清零），决定下一轮的退避时长
+  int _pollFailures = 0;
+
+  /// 非空表示自动刷新已因限流暂停，内容即暂停原因；手动刷新解除
+  String? _pollPausedReason;
+
+  /// 本页是否已尝试加载过表情元数据（失败也不在每轮轮询里重试）
+  bool _emojiRequested = false;
+
+  /// 首屏/刷新在途的请求，供轮询等复用以避免重复整页请求
+  Future<void>? _loadNewestInFlight;
 
   @override
   void initState() {
@@ -114,13 +144,77 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
   }
 
   void _startPolling() {
+    _pollActive = true;
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(_kPollInterval, (_) => _poll());
+    _pollTimer = null;
+    // 限流暂停期间不排下一轮，等手动刷新解除
+    if (_pollPausedReason != null) return;
+    _scheduleNextPoll(_nextPollDelay());
   }
 
   void _stopPolling() {
+    _pollActive = false;
     _pollTimer?.cancel();
     _pollTimer = null;
+  }
+
+  /// 用"跑完再排下一轮"的自调度延时替代 `Timer.periodic`：
+  /// 只有这样才能让失败按 [_kBackoffSteps] 退避，且请求耗时超过间隔时
+  /// 不会像 periodic 那样积压并发请求。
+  void _scheduleNextPoll(Duration delay) {
+    if (!_pollActive || _pollPausedReason != null) return;
+    _pollTimer?.cancel();
+    _pollTimer = Timer(delay, () async {
+      await _poll();
+      if (mounted) _scheduleNextPoll(_nextPollDelay());
+    });
+  }
+
+  Duration _nextPollDelay() {
+    if (_pollFailures <= 0) return _kPollInterval;
+    // 连续失败次数超出阶梯长度时停在同一档（120s）
+    final i = _pollFailures > _kBackoffSteps.length
+        ? _kBackoffSteps.length - 1
+        : _pollFailures - 1;
+    return _kBackoffSteps[i];
+  }
+
+  /// 记录一次轮询失败：按阶梯退避；403/429（站点限流）直接暂停自动刷新。
+  ///
+  /// 被限流后仍按原频率重试只会不断延长封禁窗口，所以必须停下，
+  /// 把恢复时机交还用户（AppBar 刷新 / 重进页面）。
+  void _notePollFailure({int? statusCode, Object? error}) {
+    _pollFailures++;
+    if (statusCode == 403 || statusCode == 429) {
+      _pollPausedReason = '请求过于频繁，已暂停自动刷新，点右上角刷新可继续';
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      AppLogger.w('PAGE', 'PmChatPage 被限流（HTTP $statusCode），暂停自动刷新');
+      if (mounted) {
+        showToast(_pollPausedReason!, duration: const Duration(seconds: 4));
+      }
+      return;
+    }
+    AppLogger.w(
+      'PAGE',
+      'PmChatPage 轮询失败（连续 $_pollFailures 次）：$error，'
+          '${_nextPollDelay().inSeconds}s 后重试',
+    );
+  }
+
+  /// 表情元数据只在本页尝试一次。
+  ///
+  /// 原实现在每轮轮询里都调 [EmojiService.load]，而失败时 `loaded` 仍为 false，
+  /// 缓存缺失或被拦截时会每轮多打一次 `common_smilies_var.js`，与消息请求
+  /// 叠加更容易触发限流。
+  Future<void> _ensureEmojiOnce() async {
+    if (_emojiRequested) return;
+    _emojiRequested = true;
+    try {
+      await EmojiService().load();
+    } catch (e) {
+      AppLogger.w('PAGE', 'PmChatPage 表情加载失败，本页不再重试: $e');
+    }
   }
 
   /// 轮询最新一页：把新增的消息追加到列表尾部
@@ -129,6 +223,8 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
   /// 底部才自动滚屏（否则正在看历史时会被打断）。
   Future<void> _poll() async {
     if (_polling || _loading || _loadingOlder || _sending || !mounted) return;
+    // 限流暂停 / 首屏或刷新在途时不轮询（避免同一页面重复整页请求）
+    if (_pollPausedReason != null || _loadNewestInFlight != null) return;
     // 页面被其他路由盖住（如从聊天页进了用户主页）时不轮询，回来再继续
     if (ModalRoute.of(context)?.isCurrent != true) return;
     _polling = true;
@@ -137,12 +233,17 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
         ? _scrollCtl.position.maxScrollExtent
         : 0.0;
     try {
-      await EmojiService().load();
+      await _ensureEmojiOnce();
       final result = await pm_api.getPmView(
         ApiService().dio,
         touid: widget.touid,
       );
-      if (!mounted || result['success'] != true) return;
+      if (!mounted) return;
+      if (result['success'] != true) {
+        _notePollFailure(error: result['message'] as String? ?? '轮询失败');
+        return;
+      }
+      _pollFailures = 0;
       // 请求期间若开始了发送 / 重拉，本次轮询结果已过期：直接丢弃，
       // 否则会把服务端那条重复灌进列表（表现为"发送中突然多出一条"）
       if (_sending || _loading) return;
@@ -177,9 +278,11 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
         // reverse 列表在底部插入新消息会顶动可视区，补偿滚动位置保持阅读点
         _preserveScroll(oldMax);
       }
+    } on DioException catch (e) {
+      // 失败不弹窗打扰（403/429 除外：会提示已暂停自动刷新），按阶梯退避重试
+      _notePollFailure(statusCode: e.response?.statusCode, error: e);
     } catch (e) {
-      // 轮询失败不打扰用户，静默留痕，下个周期重试
-      AppLogger.w('PAGE', 'PmChatPage poll error: $e');
+      _notePollFailure(error: e);
     } finally {
       _polling = false;
     }
@@ -195,21 +298,31 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
   String get _pageUrl =>
       '${SiteStore.instance.baseUrl}/home.php?mod=space&do=pm&subop=view&touid=${widget.touid}';
 
-  /// 拉取最新一页并替换列表
+  /// 拉取最新一页并替换列表（单飞：在途时复用同一请求）
+  ///
+  /// 首屏、发送成功后的重拉、下拉/按钮刷新、轮询的"整体重载"都走这里；
+  /// 若不单飞，发送与轮询会同时打出两次相同的整页请求，白白加重站点负担。
+  Future<void> _loadNewest() {
+    return _loadNewestInFlight ??= _doLoadNewest().whenComplete(() {
+      _loadNewestInFlight = null;
+    });
+  }
+
+  /// [_loadNewest] 的实际实现
   ///
   /// 替换 `_items` 与"交出已发送的本地占位"在同一帧内完成（原子交接），避免
   /// "消息消失 / 重复"的一帧。**但只有当重拉确实带回了新消息（出现新 pmid）时
   /// 才交出占位**：Discuz 私信存在"读后写"延迟，发送成功后的首次重拉可能仍返回
   /// 旧页（实测 `totalCount` 已 +1，但条目还是上一页的），此时若照删占位，
   /// 消息就会消失到下一次轮询；保留占位，等轮询拿到真身再收敛。
-  Future<void> _loadNewest() async {
+  Future<void> _doLoadNewest() async {
     final prevPmids = _items.map((e) => e['pmid']).toSet();
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await EmojiService().load();
+      await _ensureEmojiOnce();
       final result = await pm_api.getPmView(
         ApiService().dio,
         touid: widget.touid,
@@ -222,6 +335,10 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
         });
         return;
       }
+      // 成功即解除限流暂停并复位退避，恢复自动刷新
+      final resumedFromLimit = _pollPausedReason != null;
+      _pollFailures = 0;
+      _pollPausedReason = null;
       final items = _asItems(result['items']);
       final appeared = items
           .where((e) => !prevPmids.contains(e['pmid']))
@@ -239,6 +356,9 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
         _loading = false;
         _dropCoveredSentPending(appeared);
       });
+      // 只在"限流暂停后恢复"时重排轮询；其余情况轮询链自有节奏，
+      // 后台态（_pollActive=false）交给 resumed 回调重启
+      if (resumedFromLimit && _pollActive) _scheduleNextPoll(_nextPollDelay());
       _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
@@ -259,7 +379,7 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
     setState(() => _loadingOlder = true);
 
     try {
-      await EmojiService().load();
+      await _ensureEmojiOnce();
       final result = await pm_api.getPmView(
         ApiService().dio,
         touid: widget.touid,

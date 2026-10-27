@@ -42,6 +42,7 @@ extension on _ThreadViewPageState {
       child: CustomScrollView(
         controller: _scrollController,
         slivers: [
+          if (_isCacheMode) SliverToBoxAdapter(child: _buildCacheBanner()),
           if (_data!.title.isNotEmpty)
             SliverToBoxAdapter(child: _buildTitleSection()),
           if (_data!.mainPost != null) ...[
@@ -60,14 +61,10 @@ extension on _ThreadViewPageState {
                 currentPage: _currentPage,
                 totalPages: _totalPages,
                 pageLoading: _pageLoading,
-                onPrev: _currentPage > 1
-                    ? () => _goToPage(_currentPage - 1)
-                    : null,
-                onNext: _currentPage < _totalPages
-                    ? () => _goToPage(_currentPage + 1)
-                    : null,
+                onPrev: _canGoPrev ? _goPrevPage : null,
+                onNext: _canGoNext ? _goNextPage : null,
                 onPageTap: _showPagePicker,
-                onRefresh: _refreshCurrentPage,
+                onRefresh: _isCacheMode ? null : _refreshCurrentPage,
               ),
             ),
           ),
@@ -84,6 +81,14 @@ extension on _ThreadViewPageState {
 
   Widget _buildCommentContent() {
     final currentPosts = _commentPages[_currentPage];
+    // 只读缓存：缺失页 = 未缓存，与「已缓存但无评论」区分
+    if (_isCacheMode &&
+        _cacheSnapshot?.commentPages.containsKey(_currentPage) != true) {
+      return const SizedBox(
+        height: 200,
+        child: EmptyView(text: '该页未缓存'),
+      );
+    }
     if (currentPosts == null && _pageLoading) {
       return const Padding(
         padding: EdgeInsets.all(32),
@@ -99,6 +104,7 @@ extension on _ThreadViewPageState {
       tid: widget.tid,
       opUid: _data?.mainPost?.uid ?? '',
       globalDisableStyle: _globalDisableStyle,
+      readOnly: _isCacheMode,
       onReply: (post) => _replyToPost(post),
       onRecommend: _handleRecommend,
       onPopupAction: (action, post) {
@@ -126,12 +132,10 @@ extension on _ThreadViewPageState {
           currentPage: _currentPage,
           totalPages: _totalPages,
           pageLoading: _pageLoading,
-          onPrev: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
-          onNext: _currentPage < _totalPages
-              ? () => _goToPage(_currentPage + 1)
-              : null,
+          onPrev: _canGoPrev ? _goPrevPage : null,
+          onNext: _canGoNext ? _goNextPage : null,
           onPageTap: _showPagePicker,
-          onRefresh: _refreshCurrentPage,
+          onRefresh: _isCacheMode ? null : _refreshCurrentPage,
         ),
         const Divider(height: 1),
         Expanded(child: SingleChildScrollView(child: _buildCommentContent())),
@@ -145,10 +149,11 @@ extension on _ThreadViewPageState {
     final post = _data!.mainPost!;
     return MainPostSection(
       post: post,
-      isLoaded: _mainPostLoaded,
+      isLoaded: _isCacheMode || _mainPostLoaded,
       isLiked: _liked,
       tid: widget.tid,
       globalDisableStyle: _globalDisableStyle,
+      readOnly: _isCacheMode,
       onTap: () => _setState(() => _mainPostLoaded = true),
       onRecommend: () => _handleRecommend(post),
       onPopupAction: (action) {

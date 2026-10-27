@@ -79,6 +79,9 @@ extension SettingsAccessors on SettingsProvider {
   int get emojiCacheDays => _emojiCacheDays;
   int get imageCacheDays => _imageCacheDays;
   int get medalCacheDays => _medalCacheDays;
+
+  /// 帖子自动缓存过期天数（下限 1）
+  int get threadCacheDays => _threadCacheDays;
   ThemeMode get themeMode => _themeMode;
   Color get seedColor => _seedColor;
   bool get isPureBlackTheme => _isPureBlackTheme;

@@ -18,6 +18,9 @@ class MainPostSection extends StatelessWidget {
   /// 页面级"全局禁用样式"开关（顶栏 toggle），开启时禁用所有样式
   final bool globalDisableStyle;
 
+  /// 只读模式（缓存快照页）：隐藏互动入口
+  final bool readOnly;
+
   // 操作回调
   final VoidCallback? onRecommend;
   final void Function(PostCardAction action)? onPopupAction;
@@ -32,6 +35,7 @@ class MainPostSection extends StatelessWidget {
     this.onRecommend,
     this.onPopupAction,
     this.globalDisableStyle = false,
+    this.readOnly = false,
   });
 
   @override
@@ -84,6 +88,7 @@ class MainPostSection extends StatelessWidget {
       currentUid: currentUid,
       globalDisabledTags: disabledTags,
       globalDisableStyle: globalDisableStyle,
+      readOnly: readOnly,
       onRecommend: onRecommend,
       onPopupAction: onPopupAction,
     );
