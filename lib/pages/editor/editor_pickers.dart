@@ -47,20 +47,13 @@ extension on _EditorPageState {
 
   /// MT 图床上传 + 历史弹窗
   void _showMtImageDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      builder: (_) => MtImageSheet(
-        hosting: _mtImageHosting,
-        onInsert: (bbcode) {
-          _session.contentCtl.wrapInline('', '', ' $bbcode ');
-          _focusContent();
-        },
-      ),
+    showMtImageSheet(
+      context,
+      hosting: _mtImageHosting,
+      onInsert: (bbcode) {
+        _session.contentCtl.wrapInline('', '', ' $bbcode ');
+        _focusContent();
+      },
     );
   }
 

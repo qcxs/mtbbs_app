@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/staggered_emoji_image.dart';
 
 /// 表情面板 — 底部弹出，支持分组浏览/锁定连续插入/常用表情
@@ -37,20 +38,7 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 拖拽手柄
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
+        const SheetDragHandle(),
         // Tab 栏 + 关闭按钮
         Padding(
           padding: const EdgeInsets.only(right: 4),

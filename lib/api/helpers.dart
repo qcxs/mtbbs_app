@@ -65,6 +65,35 @@ Map<String, dynamic> parseThreadListPage(String body, int statusCode) {
   };
 }
 
+/// 标准分页字段：`{currentPage, totalPages, hasMore}`
+///
+/// parse 层返回结构里用 `...pagedFields(doc)` 展开，统一 `?? 1` 兜底与
+/// `hasMore = 当前页 < 总页数` 的判定，避免各文件重复同一段样板代码。
+Map<String, dynamic> pagedFields(dom.Document doc) {
+  final pagination = extractPagination(doc);
+  final currentPage = pagination['currentPage'] ?? 1;
+  final totalPages = pagination['totalPages'] ?? 1;
+  return {
+    'currentPage': currentPage,
+    'totalPages': totalPages,
+    'hasMore': currentPage < totalPages,
+  };
+}
+
+/// 取 API 结果的错误文案：成功返回 `null`，失败优先用服务端 message，
+/// 兜底「加载失败」。
+///
+/// 页面里统一写成：
+/// ```dart
+/// final err = apiErrorText(result);
+/// if (err != null) {
+///   setState(() { _error = err; _isLoading = false; });
+///   return;
+/// }
+/// ```
+String? apiErrorText(Map<String, dynamic> result) =>
+    result['success'] == true ? null : (result['message'] as String? ?? '加载失败');
+
 /// parse.dart 统一前置：HTTP 状态码校验 + 解析 DOM + Discuz 错误页/登录页检测。
 ///
 /// 失败时 [error] 非空，应直接作为 `parseResponse` 的返回值；

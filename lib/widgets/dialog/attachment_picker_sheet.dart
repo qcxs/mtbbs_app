@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 
 /// 附件管理面板 — 纯 UI 组件
 ///
@@ -61,20 +62,7 @@ class _AttachmentPickerSheetState extends State<AttachmentPickerSheet> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 拖拽手柄
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
+        const SheetDragHandle(),
         // 标题栏 + 刷新 + 关闭
         Padding(
           padding: const EdgeInsets.only(right: 4),

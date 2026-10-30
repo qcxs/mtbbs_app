@@ -11,30 +11,13 @@ extension on _MtImageSheetState {
       builder: (_, scrollCtrl) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _dragHandle(),
+          const SheetDragHandle(),
           _titleBar(),
           const Divider(height: 1),
           _toolBar(),
           const Divider(height: 1),
           Expanded(child: _buildContent(scrollCtrl)),
         ],
-      ),
-    );
-  }
-
-  Widget _dragHandle() {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
-      child: Center(
-        child: Container(
-          width: 32,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
       ),
     );
   }

@@ -44,17 +44,11 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     if (item.isNotEmpty) items.add(item);
   }
 
-  final pagination = extractPagination(doc);
-  final currentPage = pagination['currentPage'] ?? 1;
-  final totalPages = pagination['totalPages'] ?? 1;
-
   return {
     'success': true,
     'items': items,
     'count': items.length,
-    'currentPage': currentPage,
-    'totalPages': totalPages,
-    'hasMore': currentPage < totalPages,
+    ...pagedFields(doc),
   };
 }
 

@@ -45,16 +45,11 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
     if (item != null) items.add(item);
   }
 
-  final pagination = extractPagination(doc);
-  final currentPage = pagination['currentPage'] ?? 1;
-  final totalPages = pagination['totalPages'] ?? 1;
-
   return {
     'success': true,
     'items': items,
     'count': items.length,
-    'currentPage': currentPage,
-    'totalPages': totalPages,
+    ...pagedFields(doc),
     // 页面自带导航：站点实际有哪些视图 / 子类型（用于裁剪 Tab，见 parseNoticeNav）
     'nav': parseNoticeNav(doc),
   };

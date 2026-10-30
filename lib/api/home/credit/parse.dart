@@ -154,19 +154,13 @@ Map<String, dynamic> parseLogResponse(String body, int statusCode) {
     });
   }
 
-  final pg = extractPagination(doc);
-  final currentPage = pg['currentPage'] ?? 1;
-  final totalPages = pg['totalPages'] ?? 1;
+  final pg = pagedFields(doc);
+  AppLogger.i(
+    'PARSE',
+    '积分记录 第 ${pg['currentPage']}/${pg['totalPages']} 页，共 ${items.length} 条',
+  );
 
-  AppLogger.i('PARSE', '积分记录 第 $currentPage/$totalPages 页，共 ${items.length} 条');
-
-  return {
-    'success': true,
-    'items': items,
-    'currentPage': currentPage,
-    'totalPages': totalPages,
-    'hasMore': currentPage < totalPages,
-  };
+  return {'success': true, 'items': items, ...pg};
 }
 
 /// 归一为绝对 URL（数据层负责补全域名，见 docs/02「数据层 ↔ 渲染层职责边界」）。

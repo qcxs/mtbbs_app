@@ -33,7 +33,7 @@ lib/mcp/
 ├── mcp_sanitizer.dart           出站脱敏（黑名单兜底 + formhash 擦除 + 截断）
 ├── mcp_audit.dart               调用记录（内存 100 条）
 ├── mcp_token.dart               访问令牌模型（备注 / 创建时间 / 掩码）
-├── mcp_status_notice.dart       Android 前台服务通知桥（其他平台 no-op）
+├── mcp_status_notice.dart       Android / 鸿蒙的常驻通知桥（其他平台 no-op）
 ├── mcp_types.dart               能力分组枚举 + 登录态快照
 └── tools/
     ├── mcp_tool_registry.dart   组装 Server、统一调用包装（超时/审计/脱敏）
@@ -122,6 +122,7 @@ lib/mcp/
 
 - **Android**：前台服务 + 常驻通知（`McpForegroundService` + `McpStatusNotification`）。用前台服务而非普通通知：服务随任务一起结束，通知才不会变成"服务已开启"的假状态。两条退出路径都必须显式收尾——返回键退出走 `MainActivity.onDestroy()`（`isFinishing` 时 `McpStatusNotification.stop()`），划掉任务走 `android:stopWithTask="true"`（前台服务默认**不会**随任务移除而停止，见 docs/07 #65）。应用只是切到后台（Activity 未销毁）时服务继续运行，AI 客户端仍可连接——这是前台服务存在的意义，故不在 `onStop` 里停服务。Android 13+ 先请求 `POST_NOTIFICATIONS`，授权后才启动服务（看不见通知的前台服务没有意义）。
 - **Windows**：窗口标题标注 `MTBBS（已开启 MCP）`；标题栏一律由 `widgets/layout/window_title_bar.dart` 自绘（含 MCP 徽章与三个窗口按钮）。不用原生标题栏的原因见 docs/07 #61：其配色由 DWM/系统主题决定，App 无法保证可读。
+- **鸿蒙**：`notificationManager` 常驻通知（`SERVICE_INFORMATION` 槽位 + `isOngoing`），原生实现在鸿蒙仓库 `ohos/entry/src/main/ets/plugins/McpStatusNotice.ets`（Dart 侧只维护通道契约，见该文件注释）。通知的 Want 携带 `mcp_tap` 参数回到 `EntryAbility`，再由原生调通道 `onNotificationTap` 弹快捷开关；冷启动时原生先暂存，Dart 首帧后 `getPendingTap` 补取。首次发布时原生调 `requestEnableNotification` 申请通知权限，被拒则静默跳过。平台判定在 Dart 侧用 `Platform.operatingSystem == 'ohos'` 字符串（官方 Flutter 没有 `TargetPlatform.ohos`）。
 
 ### 快捷开关入口（弹窗 + 一键开关）
 
@@ -130,6 +131,7 @@ lib/mcp/
 | 入口 | 说明 |
 |------|------|
 | Android 常驻通知 | 点通知 → `EXTRA_TAP` → `MainActivity` → 通道 `onNotificationTap` → 弹窗 |
+| 鸿蒙常驻通知 | 点通知 → Want 参数 `mcp_tap` → `EntryAbility` → 通道 `onNotificationTap` → 弹窗（冷启动由 `getPendingTap` 补取） |
 | Windows 标题栏徽章 | `_McpBadge` **常驻显示**（开/关两态分别为「MCP 已开启」「MCP 已关闭」），可点开弹窗快捷开关（关闭态也能点，用于快速开启） |
 | 「我的」页顶部按钮 | 主题模式左侧，**一键直接开/关**（不走弹窗，toast 反馈） |
 

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 
 /// 图片管理面板 — 纯 UI 组件
 ///
@@ -110,20 +111,7 @@ class _ImagePickerSheetState extends State<ImagePickerSheet> {
       mainAxisSize: widget.embedded ? MainAxisSize.max : MainAxisSize.min,
       children: [
         // 拖拽手柄（仅底部抽屉）
-        if (!widget.embedded)
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 4),
-            child: Center(
-              child: Container(
-                width: 32,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-          ),
+        if (!widget.embedded) const SheetDragHandle(),
         // 标题栏 + 恢复 + 关闭
         Padding(
           padding: const EdgeInsets.only(right: 4),

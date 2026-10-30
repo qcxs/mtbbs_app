@@ -716,17 +716,10 @@ class _PmChatPageState extends State<PmChatPage> with WidgetsBindingObserver {
 
   /// 私信图片：直接插入 MT 图床外链 `[img]`（私信无论坛附件上传）
   void _showMtImage() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      builder: (_) => MtImageSheet(
-        hosting: _mtImageHosting,
-        onInsert: (bbcode) => _inputCtl.wrapInline('', '', ' $bbcode '),
-      ),
+    showMtImageSheet(
+      context,
+      hosting: _mtImageHosting,
+      onInsert: (bbcode) => _inputCtl.wrapInline('', '', ' $bbcode '),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:provider/provider.dart';
 
 /// 首页区块面板 — 调顺序、显隐、默认展开的唯一入口。
@@ -8,14 +9,8 @@ import 'package:provider/provider.dart';
 /// 首页里当场折叠与这里改的"默认"是同一份持久化状态，
 /// 所以面板里的值始终就是首页当前的表现。
 Future<void> showHomeSectionsSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showAppSheet<void>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-    ),
     builder: (_) => const _HomeSectionsSheet(),
   );
 }
@@ -29,58 +24,29 @@ class _HomeSectionsSheet extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final sections = settings.homeSections;
 
-    return Column(
-      children: [
-        // 拖拽手柄
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
+    return AppSheetScaffold(
+      title: '首页区块',
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              '拖动调整顺序；「默认展开」决定进入首页时是否展开；'
+              '关闭显示后该区块不再出现，可随时重新开启。',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  '首页区块',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                tooltip: '关闭',
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
+          Expanded(
+            child: ReorderableListView.builder(
+              itemCount: sections.length,
+              onReorderItem: settings.moveHomeSection,
+              buildDefaultDragHandles: false,
+              itemBuilder: (_, i) =>
+                  _sectionTile(context, settings, sections[i], i),
+            ),
           ),
-        ),
-        Divider(height: 1, color: cs.outlineVariant),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text(
-            '拖动调整顺序；「默认展开」决定进入首页时是否展开；'
-            '关闭显示后该区块不再出现，可随时重新开启。',
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-          ),
-        ),
-        Expanded(
-          child: ReorderableListView.builder(
-            itemCount: sections.length,
-            onReorderItem: settings.moveHomeSection,
-            buildDefaultDragHandles: false,
-            itemBuilder: (_, i) => _sectionTile(context, settings, sections[i], i),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

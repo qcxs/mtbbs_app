@@ -4,17 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
-/// MCP 运行状态常驻通知（**仅 Android**，其他平台 no-op）。
+/// MCP 运行状态常驻通知（**Android / 鸿蒙**，其他平台 no-op）。
 ///
-/// 用普通"正在进行"通知而不是前台服务：MCP 只在本进程存活时才可用，
+/// Android 用普通"正在进行"通知而不是前台服务：MCP 只在本进程存活时才可用，
 /// 进程结束通知本身也没意义，不值得为此引入前台服务、服务类型声明与额外权限。
 ///
+/// 鸿蒙用 `notificationManager` 的常驻通知，原生实现由鸿蒙仓库提供
+/// （`ohos/entry/src/main/ets/plugins/McpStatusNotice.ets`）。Dart 侧只维护
+/// 以下通道契约，两端实现必须一致：
+/// `show(endpoint)` / `hide` / `getPendingTap` / `onNotificationTap`。
+///
 /// Android 13+ 需要通知权限，未授予时原生侧会发起一次系统授权弹窗；
+/// 鸿蒙首次发布时由原生调用 `requestEnableNotification` 申请；
 /// 授权被拒则静默跳过（不影响 MCP 服务本身）。
+///
+/// 平台判定用 `Platform.operatingSystem` 字符串：官方 Flutter 没有
+/// `TargetPlatform.ohos`，直接引用会让主线（Android/Windows）编译失败。
 class McpStatusNotice {
   McpStatusNotice._();
 
   static const MethodChannel _channel = MethodChannel('mtbbs/mcp_status');
+
+  static bool get _supported =>
+      Platform.isAndroid || Platform.operatingSystem == 'ohos';
 
   static VoidCallback? _onTap;
 
@@ -27,7 +39,7 @@ class McpStatusNotice {
   /// 补取刻意等**首帧之后**再做：冷启动时根 Navigator 尚未挂载，
   /// 那时弹窗会因为没有 Overlay 而静默失败（见 `showMcpQuickDialog`）。
   static Future<void> init({required VoidCallback onNotificationTap}) async {
-    if (!Platform.isAndroid) return;
+    if (!_supported) return;
     _onTap = onNotificationTap;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onNotificationTap') _onTap?.call();
@@ -45,7 +57,7 @@ class McpStatusNotice {
   }
 
   static Future<void> show(String endpoint) async {
-    if (!Platform.isAndroid) return;
+    if (!_supported) return;
     try {
       await _channel.invokeMethod('show', {'endpoint': endpoint});
     } catch (e) {
@@ -54,7 +66,7 @@ class McpStatusNotice {
   }
 
   static Future<void> hide() async {
-    if (!Platform.isAndroid) return;
+    if (!_supported) return;
     try {
       await _channel.invokeMethod('hide');
     } catch (e) {

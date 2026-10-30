@@ -30,7 +30,7 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
   if (pre.error != null) return pre.error!;
   final doc = pre.doc!;
 
-  final pagination = extractPagination(doc);
+  final pg = pagedFields(doc);
   final hasList = doc.querySelector(_kListContainerSelector) != null;
 
   // 登录页 / Discuz 消息页兜底。
@@ -64,8 +64,8 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
       'success': true,
       'threads': <Map<String, dynamic>>[],
       'count': 0,
-      'currentPage': pagination['currentPage'] ?? 1,
-      'totalPages': pagination['totalPages'] ?? 1,
+      'currentPage': pg['currentPage'],
+      'totalPages': pg['totalPages'],
       'hasMore': false,
       'noMatch': true,
       '_health': const {'parser': 'skipped', 'missing': <String>[]},
@@ -74,16 +74,12 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
 
   final info = parseThreadListInfo(body);
   final threads = info.items;
-  final cp = pagination['currentPage'] ?? 1;
-  final tp = pagination['totalPages'] ?? 1;
 
   return {
     'success': true,
     'threads': threads.map((t) => t.toJson()).toList(),
     'count': threads.length,
-    'currentPage': cp,
-    'totalPages': tp,
-    'hasMore': cp < tp,
+    ...pg,
     'noMatch': threads.isEmpty,
     '_health': {
       'parser': info.parser,

@@ -58,17 +58,11 @@ Map<String, dynamic> parseWallPage(String body, int statusCode) {
   // 容器缺失 = 页面结构变更（区别于"墙为空"：空墙仍有 #comment_ul）
   final hasList = doc.querySelector('#comment_ul') != null;
 
-  final pagination = extractPagination(doc);
-  final currentPage = pagination['currentPage'] ?? 1;
-  final totalPages = pagination['totalPages'] ?? 1;
-
   return {
     'success': true,
     'comments': comments,
     'count': comments.length,
-    'currentPage': currentPage,
-    'totalPages': totalPages,
-    'hasMore': currentPage < totalPages,
+    ...pagedFields(doc),
     'formhash': formhash,
     'canPost': canPost,
     '_health': {

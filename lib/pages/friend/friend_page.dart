@@ -101,7 +101,8 @@ class _FriendPageState extends State<FriendPage> {
           // 已有内容时保留旧列表（刷新失败不切错误页），无内容才报错
           if (_items.isEmpty) {
             _error =
-                result['message'] as String? ?? (privacy ? '无权查看该用户的好友' : '加载失败');
+                result['message'] as String? ??
+                (privacy ? '无权查看该用户的好友' : '加载失败');
           }
           _isLoading = false;
         });
@@ -164,16 +165,10 @@ class _FriendPageState extends State<FriendPage> {
           _buildSearchBar(),
           Expanded(child: _buildBody()),
           if (_totalPages > 1 && !_isLoading && _error == null)
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                child: PaginationBar(
-                  page: _page,
-                  totalPages: _totalPages,
-                  onGoToPage: _goToPage,
-                ),
-              ),
+            BottomPaginationBar(
+              page: _page,
+              totalPages: _totalPages,
+              onGoToPage: _goToPage,
             ),
         ],
       ),

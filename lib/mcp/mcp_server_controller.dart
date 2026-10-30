@@ -238,7 +238,7 @@ class McpServerController extends ChangeNotifier {
         'MCP',
         '服务已启动 $endpointUrl${_allowRemote ? '（已允许非本机连接）' : ''}',
       );
-      // Android：通知栏常驻状态，让用户明确 MCP 正在运行
+      // Android / 鸿蒙：通知栏常驻状态，让用户明确 MCP 正在运行
       unawaited(McpStatusNotice.show(endpointUrl));
     } catch (e) {
       _server = null;

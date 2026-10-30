@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/api/forum/darkroom/export.dart' as darkroom_api;
+import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/filter_search_field.dart';
@@ -59,9 +60,10 @@ class _DarkroomPageState extends State<DarkroomPage> {
       final result = await darkroom_api.getList(ApiService().dio);
       if (!mounted) return;
 
-      if (result['success'] != true) {
+      final err = apiErrorText(result);
+      if (err != null) {
         setState(() {
-          _error = result['message'] as String? ?? '加载失败';
+          _error = err;
           _isLoading = false;
         });
         return;

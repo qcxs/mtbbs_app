@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/forum/online/export.dart' as online_api;
+import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
@@ -53,9 +54,10 @@ class _OnlinePageState extends State<OnlinePage> {
       final result = await online_api.fetchOnlineUsers(ApiService().dio);
       if (!mounted) return;
 
-      if (result['success'] != true) {
+      final err = apiErrorText(result);
+      if (err != null) {
         setState(() {
-          _error = result['message'] as String? ?? '加载失败';
+          _error = err;
           _isLoading = false;
         });
         return;

@@ -186,18 +186,12 @@ Map<String, dynamic> parseCategoryGroups(String body, int statusCode) {
     });
   }
 
-  final pagination = extractPagination(doc);
-  final cp = pagination['currentPage'] ?? 1;
-  final tp = pagination['totalPages'] ?? 1;
-
   return {
     'success': true,
     'categoryName': sanitizeText(doc.querySelector('h1')?.text),
     'groups': groups,
     'count': groups.length,
-    'currentPage': cp,
-    'totalPages': tp,
-    'hasMore': cp < tp,
+    ...pagedFields(doc),
     '_health': {
       'parser': 'group_category',
       // 容器存在却解析不出圈子 = 结构可能变了（区别于"该分类确实没有圈子"）。

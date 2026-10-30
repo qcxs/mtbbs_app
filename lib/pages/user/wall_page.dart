@@ -313,17 +313,10 @@ class _WallPageState extends State<WallPage> {
 
   /// 插入 MT 图床外链
   void _showMtImage(BBCodeController ctl) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      builder: (_) => MtImageSheet(
-        hosting: _mtImageHosting,
-        onInsert: (bbcode) => ctl.wrapInline('', '', ' $bbcode '),
-      ),
+    showMtImageSheet(
+      context,
+      hosting: _mtImageHosting,
+      onInsert: (bbcode) => ctl.wrapInline('', '', ' $bbcode '),
     );
   }
 
@@ -345,16 +338,10 @@ class _WallPageState extends State<WallPage> {
         children: [
           Expanded(child: _buildBody()),
           if (_totalPages > 1 && !_loading && _error == null)
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                child: PaginationBar(
-                  page: _page,
-                  totalPages: _totalPages,
-                  onGoToPage: _goToPage,
-                ),
-              ),
+            BottomPaginationBar(
+              page: _page,
+              totalPages: _totalPages,
+              onGoToPage: _goToPage,
             ),
           if (_canPost) _buildMiniEditor(),
         ],
@@ -538,17 +525,10 @@ class _WallEditorSheetState extends State<_WallEditorSheet> {
   }
 
   void _showMtImage() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      builder: (_) => MtImageSheet(
-        hosting: widget.hosting,
-        onInsert: (bbcode) => _ctl.wrapInline('', '', ' $bbcode '),
-      ),
+    showMtImageSheet(
+      context,
+      hosting: widget.hosting,
+      onInsert: (bbcode) => _ctl.wrapInline('', '', ' $bbcode '),
     );
   }
 

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'package:mtbbs/core/parser/md2bbcode.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
@@ -166,30 +167,13 @@ class _MdImportSheetState extends State<_MdImportSheet> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _dragHandle(),
+        const SheetDragHandle(bottom: 6),
         _header(),
         const Divider(height: 1),
         Expanded(child: _body()),
         const Divider(height: 1),
         _actionBar(),
       ],
-    );
-  }
-
-  Widget _dragHandle() {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 6),
-      child: Center(
-        child: Container(
-          width: 32,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ),
     );
   }
 

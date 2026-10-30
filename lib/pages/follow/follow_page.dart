@@ -181,16 +181,10 @@ class _FollowPageState extends State<FollowPage> {
           _buildSearchBar(),
           Expanded(child: _buildBody()),
           if (_totalPages > 1 && !_isLoading && _error == null)
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                child: PaginationBar(
-                  page: _page,
-                  totalPages: _totalPages,
-                  onGoToPage: _goToPage,
-                ),
-              ),
+            BottomPaginationBar(
+              page: _page,
+              totalPages: _totalPages,
+              onGoToPage: _goToPage,
             ),
         ],
       ),

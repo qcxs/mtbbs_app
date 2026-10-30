@@ -66,3 +66,35 @@ class PaginationBar extends StatelessWidget {
     );
   }
 }
+
+/// 作为页面底部固定条使用的分页栏
+///
+/// 在 [PaginationBar] 外套一层统一的 `SafeArea + Padding`，避免各页自己
+/// 手写同一套内边距（页面之间容易漂移）。
+class BottomPaginationBar extends StatelessWidget {
+  final int page;
+  final int totalPages;
+  final ValueChanged<int> onGoToPage;
+
+  const BottomPaginationBar({
+    super.key,
+    required this.page,
+    required this.totalPages,
+    required this.onGoToPage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+        child: PaginationBar(
+          page: page,
+          totalPages: totalPages,
+          onGoToPage: onGoToPage,
+        ),
+      ),
+    );
+  }
+}

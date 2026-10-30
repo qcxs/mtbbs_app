@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
@@ -43,9 +44,7 @@ class _FavoritePageState extends State<FavoritePage> {
       builder: (ctx) => AlertDialog(
         title: const Text('取消收藏'),
         // 帖子标题可能很长：content 可滚动，避免多行标题撑破弹窗
-        content: SingleChildScrollView(
-          child: Text('确定要取消收藏「$title」吗？'),
-        ),
+        content: SingleChildScrollView(child: Text('确定要取消收藏「$title」吗？')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -129,9 +128,10 @@ class _FavoritePageState extends State<FavoritePage> {
       );
       if (!mounted) return;
 
-      if (result['success'] != true) {
+      final err = apiErrorText(result);
+      if (err != null) {
         setState(() {
-          _error = result['message'] as String? ?? '加载失败';
+          _error = err;
           _isLoading = false;
         });
         return;

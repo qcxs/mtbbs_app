@@ -8,10 +8,31 @@ import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/pages/settings/mt_image_manage_sheet.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/services/clipboard_paste.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 part 'mt_image_sheet_build.dart';
 part 'mt_image_sheet_widgets.dart';
+
+/// 打开 MT 图床抽屉。
+///
+/// 各页面（完整编辑器 / 迷你编辑器 / 留言板 / 私信 / 帖子内回复）用同一套
+/// 弹出参数，避免每处各写一份 `showModalBottomSheet` 配置。
+Future<void> showMtImageSheet(
+  BuildContext context, {
+  required MtImageHosting hosting,
+  required void Function(String bbcode) onInsert,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+    ),
+    builder: (_) => MtImageSheet(hosting: hosting, onInsert: onInsert),
+  );
+}
 
 /// MT 图床底部抽屉 — 上传图片 + 历史记录
 class MtImageSheet extends StatefulWidget {

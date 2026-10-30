@@ -4,6 +4,7 @@ import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 import 'package:mtbbs/widgets/image_preview/image_preview.dart';
@@ -12,14 +13,9 @@ import 'package:mtbbs/widgets/image_preview/image_preview.dart';
 ///
 /// 只有列表操作、没有设置表单，因此以底部面板承载，不再占用独立路由。
 Future<void> showMtImageManageSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showAppSheet<void>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    constraints: const BoxConstraints(maxWidth: 560, maxHeight: 600),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-    ),
+    maxHeight: 600,
     builder: (_) => const _MtImageManageSheet(),
   );
 }
@@ -83,44 +79,7 @@ class _MtImageManageSheetState extends State<_MtImageManageSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Column(
-      children: [
-        // 拖拽手柄
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'MT 图床管理',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                tooltip: '关闭',
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        ),
-        Divider(height: 1, color: cs.outlineVariant),
-        Expanded(child: _buildBody(cs)),
-      ],
-    );
+    return AppSheetScaffold(title: 'MT 图床管理', child: _buildBody(cs));
   }
 
   Widget _buildBody(ColorScheme cs) {

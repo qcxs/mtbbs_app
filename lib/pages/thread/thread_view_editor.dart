@@ -190,18 +190,11 @@ extension on _ThreadViewPageState {
 
   /// 迷你编辑器图片：插入 MT 图床外链（论坛附件上传走「完整版」）
   void _showMtImage() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      builder: (_) => MtImageSheet(
-        hosting: _mtImageHosting,
-        onInsert: (bbcode) =>
-            _editorSession.contentCtl.wrapInline('', '', ' $bbcode '),
-      ),
+    showMtImageSheet(
+      context,
+      hosting: _mtImageHosting,
+      onInsert: (bbcode) =>
+          _editorSession.contentCtl.wrapInline('', '', ' $bbcode '),
     );
   }
 

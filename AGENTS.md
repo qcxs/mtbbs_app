@@ -11,8 +11,12 @@ Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：
 ## 相关项目
 
 - **鸿蒙独立版**：[qcxs/mtbbs_app_ohos](https://github.com/qcxs/mtbbs_app_ohos)
-  - 只面向 Flutter-OH；`lib/` 与主线保持一致
+  - 只面向 Flutter-OH；`lib/` 的上游文件与本仓库保持一致
   - 跨平台能力开关与降级见 `docs/23-可选能力与平台降级.md`
+  - **鸿蒙专属功能不要写进本仓库的 `lib/`**：Dart 实现放鸿蒙仓库的 `lib/ohos/`（该目录
+    上游永不存在，合并零冲突）；原生实现（通知、权限、窗口、系统 API）放 `ohos/`。
+    与本仓库共享的通用能力（如 MCP 通知的通道契约）才在 `lib/` 里做，
+    平台判定用 `Platform.operatingSystem == 'ohos'` 字符串。
 
 ## 了解项目
 
@@ -53,6 +57,7 @@ Discuz（MT 论坛克米模板）的 Flutter 客户端。Discuz 无官方 API：
 | 状态管理 / 站点切换 / 持久化 | 04 |
 | 可选能力 / 平台降级（鸿蒙等） | 23 + 02 |
 | 主题 / 夜间模式 / 配色 | 08 |
+| 通用组件 / 弹层 / 列表分页 / 状态视图复用 | 26 + 02 |
 | 依赖行为确认 / 升级 | 09 |
 
 ### 流程与清单

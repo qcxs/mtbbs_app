@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/models/managed_item.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 统一有序列表管理面板（底部抽屉）
@@ -68,15 +69,8 @@ Future<void> showManagedListDialog({
   final itemsSnapshot = List<ManagedItem>.from(items);
   final initialIds = itemsSnapshot.map((e) => e.id).toSet();
 
-  return showModalBottomSheet<void>(
+  return showAppSheet<void>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    // maxHeight 必须给：面板内容是 Column + Expanded，无上界会直接崩
-    constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-    ),
     builder: (_) => _ManagedListSheetContent(
       title: title,
       items: itemsSnapshot,
@@ -248,160 +242,119 @@ class _ManagedListSheetContentState extends State<_ManagedListSheetContent> {
         ? _items.where((e) => e.visible).toList()
         : _items;
 
-    return Column(
-      children: [
-        // 拖拽手柄
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
+    return AppSheetScaffold(
+      title: widget.title,
+      actions: [
+        if (widget.allowFilterVisible)
+          IconButton(
+            icon: Icon(
+              _onlyVisible ? Icons.filter_alt : Icons.filter_alt_off,
+              size: 20,
             ),
+            tooltip: _onlyVisible ? '显示全部' : '只看已显示项',
+            color: _onlyVisible ? cs.primary : null,
+            onPressed: () => setState(() => _onlyVisible = !_onlyVisible),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (widget.allowFilterVisible)
-                IconButton(
-                  icon: Icon(
-                    _onlyVisible ? Icons.filter_alt : Icons.filter_alt_off,
-                    size: 20,
-                  ),
-                  tooltip: _onlyVisible ? '显示全部' : '只看已显示项',
-                  color: _onlyVisible ? cs.primary : null,
-                  onPressed: () => setState(() => _onlyVisible = !_onlyVisible),
-                ),
-              if (widget.titleActions != null) ...widget.titleActions!,
-              if (widget.allowAdd)
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline, size: 22),
-                  tooltip: '新增',
-                  onPressed: _loading ? null : _handleAdd,
-                ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                tooltip: '关闭',
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
+        if (widget.titleActions != null) ...widget.titleActions!,
+        if (widget.allowAdd)
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, size: 22),
+            tooltip: '新增',
+            onPressed: _loading ? null : _handleAdd,
           ),
-        ),
-        Divider(height: 1, color: cs.outlineVariant),
-        Expanded(
-          child: displayed.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(
-                      _onlyVisible ? '没有已显示的项' : widget.emptyHint,
-                      style: TextStyle(color: cs.onSurfaceVariant),
-                    ),
-                  ),
-                )
-              : _loading
-              ? const Center(child: CircularProgressIndicator())
-              : ReorderableListView.builder(
-                  itemCount: displayed.length,
-                  onReorderItem: _handleReorder,
-                  buildDefaultDragHandles: false,
-                  itemBuilder: (ctx, i) {
-                    final item = displayed[i];
-                    final isVisible = item.visible;
-                    return ListTile(
-                      key: ValueKey(item.id),
-                      leading: widget.allowReorder
-                          ? ReorderableDragStartListener(
-                              index: i,
-                              child: const Padding(
-                                padding: EdgeInsets.all(2),
-                                child: Icon(Icons.drag_handle, size: 18),
-                              ),
-                            )
-                          : null,
-                      title: widget.itemBuilder != null
-                          ? widget.itemBuilder!(item, isVisible)
-                          : Text(
-                              item.name,
-                              style: TextStyle(
-                                color: isVisible ? null : cs.onSurfaceVariant,
-                              ),
-                            ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (widget.allowToggleVisibility &&
-                              (widget.canToggleVisibility?.call(item) ?? true))
-                            IconButton(
-                              icon: Icon(
-                                isVisible
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
-                                size: 18,
-                                color: cs.onSurfaceVariant,
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: 28,
-                              ),
-                              tooltip: isVisible ? '隐藏' : '显示',
-                              onPressed: _loading
-                                  ? null
-                                  : () => _handleToggleVisibility(item),
-                            ),
-                          if (widget.allowEdit &&
-                              (widget.canEdit?.call(item) ?? true))
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined, size: 18),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: 28,
-                              ),
-                              tooltip: '编辑',
-                              onPressed: _loading
-                                  ? null
-                                  : () => _handleEdit(item),
-                            ),
-                          if (widget.allowDelete &&
-                              (widget.canDelete?.call(item) ?? true))
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: 28,
-                              ),
-                              tooltip: '删除',
-                              color: cs.error,
-                              onPressed: _loading
-                                  ? null
-                                  : () => _handleDelete(item),
-                            ),
-                        ],
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    );
-                  },
-                ),
-        ),
       ],
+      child: displayed.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  _onlyVisible ? '没有已显示的项' : widget.emptyHint,
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
+              ),
+            )
+          : _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ReorderableListView.builder(
+              itemCount: displayed.length,
+              onReorderItem: _handleReorder,
+              buildDefaultDragHandles: false,
+              itemBuilder: (ctx, i) {
+                final item = displayed[i];
+                final isVisible = item.visible;
+                return ListTile(
+                  key: ValueKey(item.id),
+                  leading: widget.allowReorder
+                      ? ReorderableDragStartListener(
+                          index: i,
+                          child: const Padding(
+                            padding: EdgeInsets.all(2),
+                            child: Icon(Icons.drag_handle, size: 18),
+                          ),
+                        )
+                      : null,
+                  title: widget.itemBuilder != null
+                      ? widget.itemBuilder!(item, isVisible)
+                      : Text(
+                          item.name,
+                          style: TextStyle(
+                            color: isVisible ? null : cs.onSurfaceVariant,
+                          ),
+                        ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.allowToggleVisibility &&
+                          (widget.canToggleVisibility?.call(item) ?? true))
+                        IconButton(
+                          icon: Icon(
+                            isVisible ? Icons.visibility : Icons.visibility_off,
+                            size: 18,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                          tooltip: isVisible ? '隐藏' : '显示',
+                          onPressed: _loading
+                              ? null
+                              : () => _handleToggleVisibility(item),
+                        ),
+                      if (widget.allowEdit &&
+                          (widget.canEdit?.call(item) ?? true))
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                          tooltip: '编辑',
+                          onPressed: _loading ? null : () => _handleEdit(item),
+                        ),
+                      if (widget.allowDelete &&
+                          (widget.canDelete?.call(item) ?? true))
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                          tooltip: '删除',
+                          color: cs.error,
+                          onPressed: _loading
+                              ? null
+                              : () => _handleDelete(item),
+                        ),
+                    ],
+                  ),
+                  visualDensity: VisualDensity.compact,
+                );
+              },
+            ),
     );
   }
 }
