@@ -21,6 +21,16 @@ extension on _ThreadCacheManagePageState {
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Column(
             children: [
+              SwitchListTile(
+                dense: true,
+                secondary: const Icon(Icons.save_outlined, size: 20),
+                title: const Text('自动缓存新帖'),
+                subtitle: const Text('关闭后不再写入新缓存，已有缓存仍可查看'),
+                value: settings.threadCacheEnabled,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setThreadCacheEnabled(v),
+              ),
+              const Divider(height: 1),
               ListTile(
                 dense: true,
                 leading: const Icon(Icons.schedule, size: 20),

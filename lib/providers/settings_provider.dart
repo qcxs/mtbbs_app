@@ -108,6 +108,10 @@ class SettingsProvider extends ChangeNotifier {
   /// 帖子自动缓存过期天数（下限 1，不提供「永不过期」）
   int _threadCacheDays = DefaultConfig.instance.threadCacheConfig.expireDays;
 
+  /// 帖子自动缓存总开关（默认开启）。关闭后不再写入新缓存，
+  /// 已有缓存仍可查看/管理。
+  bool _threadCacheEnabled = true;
+
   /// 用户自定义站点列表（持久化）
   List<Site> _sites = [];
 

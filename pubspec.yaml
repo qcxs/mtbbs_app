@@ -96,7 +96,7 @@ dependencies:
   qr: ^3.0.2
 
   # 内嵌 JS 引擎（QuickJS）：在本地执行站点的人机验证挑战脚本，
-  # 免去弹 WebView 打断用户（见 lib/core/app/acw_solver.dart）。
+  # 免去弹 WebView 打断用户（见 lib/core/app/js_challenge_solver.dart）。
   # 全平台同一 QuickJS（无 Apple JSC 分叉），须显式调小栈上限，并给不可信脚本设超时/内存上限。
   flutter_qjs_next: ^1.5.2
 

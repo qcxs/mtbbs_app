@@ -130,7 +130,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 - `cookie=acw_sc__v2=<值>` 手动注入**已不需要**：该值只与服务端**本轮**下发的 `arg1` 配对，
   跨轮次 / 跨客户端复制过来的必然失效（见下方踩坑表）。
 - 探针跑的是 App 完整链路，`ApiService` 内还有一层**内嵌 JS 引擎自解**
-  （`lib/core/app/acw_solver.dart`）。引擎可用时挑战先被它解掉，`acwSolved` 会是 0
+  （`lib/core/app/js_challenge_solver.dart`）。引擎可用时挑战先被它解掉，`acwSolved` 会是 0
   （探针的纯 Dart 兜底未被动用），属正常；引擎不可用时日志打 `acw 自解失败` 再走纯 Dart。
 
 ## 6. 踩坑记录（历史教训，勿重蹈）

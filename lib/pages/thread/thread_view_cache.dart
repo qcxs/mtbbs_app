@@ -231,6 +231,9 @@ extension on _ThreadViewPageState {
   /// 写入自动缓存（不 await），并记录缓存键供评论页回写
   void _writeAutoCache(ThreadViewData data) {
     if (_isCacheMode) return;
+    // 用户可在「帖子缓存管理」里关闭自动缓存：关闭后只停止写入，
+    // 已有缓存仍可在缓存管理页查看/导出。
+    if (!context.read<SettingsProvider>().threadCacheEnabled) return;
     final service = ThreadCacheService.instance;
     if (service.isDisabled) return;
     final auth = context.read<AuthProvider>();

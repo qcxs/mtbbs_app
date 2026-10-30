@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -54,6 +55,16 @@ class WindowTitleBar extends StatefulWidget {
 class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
   bool _maximized = false;
 
+  /// 窗口几何变化（最大化/还原/拖拽缩放）期间是否禁用 Tooltip。
+  ///
+  /// Flutter 的 Tooltip 走 OverlayPortal：窗口尺寸在同一帧内变化时，
+  /// overlay 子树的旧约束与新 theater 尺寸会短暂不一致，框架
+  /// `overlay.dart` 的 `assert(size == theater.size)` 随之触发
+  /// （实测 Windows 最大化后鼠标落回首页，悬浮到 IconButton 即复现）。
+  /// 这里在几何变化时关闭 TooltipVisibility 并延迟恢复，避开这一窗口期。
+  bool _suppressTooltips = false;
+  Timer? _tooltipSuppressTimer;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +75,7 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
 
   @override
   void dispose() {
+    _tooltipSuppressTimer?.cancel();
     windowManager.removeListener(this);
     super.dispose();
   }
@@ -75,79 +87,111 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
     } catch (_) {}
   }
 
-  @override
-  void onWindowMaximize() => _syncMaximized();
+  /// 窗口几何变化时，先关掉正在显示的 tooltip，并在随后一小段时间内
+  /// 禁止新建 tooltip（`Tooltip` 在 `TooltipVisibility` 不可见时根本不创建
+  /// 会走 OverlayPortal 的那层 UI）。
+  void _suppressTooltipsTemporarily() {
+    Tooltip.dismissAllToolTips();
+    _tooltipSuppressTimer?.cancel();
+    _tooltipSuppressTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && _suppressTooltips) {
+        setState(() => _suppressTooltips = false);
+      }
+    });
+    if (!_suppressTooltips) {
+      setState(() => _suppressTooltips = true);
+    }
+  }
 
   @override
-  void onWindowUnmaximize() => _syncMaximized();
+  void onWindowResized() => _suppressTooltipsTemporarily();
+
+  @override
+  void onWindowMaximize() {
+    _suppressTooltipsTemporarily();
+    _syncMaximized();
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    _suppressTooltipsTemporarily();
+    _syncMaximized();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // 外面套 Material：InkWell 需要有 Material 祖先
-    return Material(
-      color: cs.surfaceContainer,
-      child: Column(
-        children: [
-          SizedBox(
-            height: WindowTitleBar.height,
-            child: Row(
-              children: [
-                // 左侧：可拖拽的标题区（DragToMoveArea 自带双击最大化）
-                Expanded(
-                  child: DragToMoveArea(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12, right: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.forum_outlined,
-                            size: 16,
-                            color: cs.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            kBaseWindowTitle,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: cs.onSurface,
+    // 外面套 Material：InkWell 需要有 Material 祖先。
+    // TooltipVisibility 覆盖整棵子树（含首页内容里的 IconButton tooltip）。
+    return TooltipVisibility(
+      visible: !_suppressTooltips,
+      child: Material(
+        color: cs.surfaceContainer,
+        child: Column(
+          children: [
+            SizedBox(
+              height: WindowTitleBar.height,
+              child: Row(
+                children: [
+                  // 左侧：可拖拽的标题区（DragToMoveArea 自带双击最大化）
+                  Expanded(
+                    child: DragToMoveArea(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.forum_outlined,
+                              size: 16,
+                              color: cs.onSurfaceVariant,
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          const _McpBadge(),
-                        ],
+                            const SizedBox(width: 8),
+                            Text(
+                              kBaseWindowTitle,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const _McpBadge(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                _WindowButton(
-                  icon: Icons.remove,
-                  tooltip: '最小化',
-                  onPressed: windowManager.minimize,
-                ),
-                _WindowButton(
-                  icon: _maximized ? Icons.filter_none : Icons.crop_square,
-                  tooltip: _maximized ? '向下还原' : '最大化',
-                  onPressed: () async {
-                    if (await windowManager.isMaximized()) {
-                      await windowManager.unmaximize();
-                    } else {
-                      await windowManager.maximize();
-                    }
-                  },
-                ),
-                _WindowButton(
-                  icon: Icons.close,
-                  tooltip: '关闭',
-                  danger: true,
-                  onPressed: windowManager.close,
-                ),
-              ],
+                  _WindowButton(
+                    icon: Icons.remove,
+                    tooltip: '最小化',
+                    onPressed: windowManager.minimize,
+                  ),
+                  _WindowButton(
+                    icon: _maximized ? Icons.filter_none : Icons.crop_square,
+                    tooltip: _maximized ? '向下还原' : '最大化',
+                    onPressed: () async {
+                      // 点击瞬间先收掉 tooltip 并进入抑制期：按钮的
+                      // tooltip 此时往往正显示，最大化会让它跨窗口尺寸重排。
+                      _suppressTooltipsTemporarily();
+                      if (await windowManager.isMaximized()) {
+                        await windowManager.unmaximize();
+                      } else {
+                        await windowManager.maximize();
+                      }
+                    },
+                  ),
+                  _WindowButton(
+                    icon: Icons.close,
+                    tooltip: '关闭',
+                    danger: true,
+                    onPressed: windowManager.close,
+                  ),
+                ],
+              ),
             ),
-          ),
-          Expanded(child: widget.child),
-        ],
+            Expanded(child: widget.child),
+          ],
+        ),
       ),
     );
   }

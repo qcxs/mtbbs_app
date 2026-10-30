@@ -4,6 +4,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/core/parser/html2markdown.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 
 /// Html2BBCode — 将 Discuz 帖子 HTML 转换为 BBCode 字符串
@@ -81,10 +82,23 @@ class Html2BBCode {
   }
 
   String _format(String text) {
-    return text
+    // [code] 内部空行与缩进属于代码语义，不能进空白收敛规则
+    final codes = <String>[];
+    var out = text.replaceAllMapped(
+      RegExp(r'\[code\][\s\S]*?\[/code\]', caseSensitive: false),
+      (m) {
+        codes.add(m.group(0)!);
+        return '\x00CODE${codes.length - 1}\x00';
+      },
+    );
+    out = out
         .replaceAll(RegExp(r'\n{2,}'), '\n')
         .replaceAll(RegExp(r'[ \t]+'), ' ')
         .trim();
+    for (var i = 0; i < codes.length; i++) {
+      out = out.replaceFirst('\x00CODE$i\x00', codes[i]);
+    }
+    return out;
   }
 
   /// 从 CSS 内联样式字符串中提取指定属性的值。
@@ -139,17 +153,14 @@ class Html2BBCode {
       }
       return '';
     }
-    // 52pojie 代码块：<div class="parsedown-markdown"><pre><code data-highlighted="yes"> → [code]
-    // 需跳过 <em> 按钮（复制代码/隐藏代码），只取 <code> 内的代码文本
-    if (cls.contains('parsedown-markdown')) {
-      final code = el.querySelector('code');
-      if (code != null) {
-        // code.text 由 dart:html 自动解码 HTML 实体（&amp; → & 等）
-        // 保留原始换行和缩进，不调用 _parseChildren（会混入 <em> 按钮文本）
-        return '\n[code]${code.text}[/code]\n';
-      }
-      return _parseChildren(el);
+    // 52pojie Markdown 插件：<div class="parsedown-markdown"> 内是 Parsedown
+    // **服务端渲染后的 HTML**（页面里没有 md 原文）。先逆向还原为 Markdown，
+    // 再复用既有 markdownToBbcode 转成标准 BBCode 走渲染管线。
+    if (el.classes.contains('parsedown-markdown')) {
+      return '\n${parsedownHtmlToBbcode(el)}\n';
     }
+    // 结束标记：<div class="parsedown-markdown-end_FLAG_xxx">（隐藏、无内容）
+    if (cls.contains('parsedown-markdown-end')) return '';
 
     // PC 模板代码块：.blockcode → [code]
     if (cls == 'blockcode') {

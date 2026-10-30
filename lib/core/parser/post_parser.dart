@@ -112,8 +112,11 @@ Map<String, dynamic> parsePostFromTable(
       bbcode = converter.convertElementContent(msgEl);
     }
 
-    // 帖内标题：div.pcb > h2（不在 td.t_f 内）
-    final pcbTitle = plc.querySelector('div.pcb h2');
+    // 帖内标题：div.pcb 内的 h2，但必须排除正文区 td.t_f。
+    // 不能用 `div.pcb h2` 直接取：Markdown 帖（52pojie parsedown 插件）的正文
+    // 标题本身就是 td.t_f 里的第一个 h2，会被误当"帖内标题"再前置一次，
+    // 与正文里的标题重复。
+    final pcbTitle = _findPostTitle(plc);
     if (pcbTitle != null) {
       final titleCode = sanitizeText(pcbTitle.text).trim();
       if (titleCode.isNotEmpty) {
@@ -221,12 +224,15 @@ Map<String, dynamic> parsePostFromTable(
       final headerText = headerLink?.text.trim() ?? '';
       final detailUrl = resolveUrl(headerLink?.attributes['href'] ?? '');
 
-      // 汇总行
+      // 汇总行：克米模板的 p.ratc 是纯文本汇总；52pojie 同一位置是
+      // 「查看全部评分」操作链接，不能当汇总文案显示，改用表头
+      // （「参与人数 15」）作为汇总。
       String totalScore = '';
       final p = rateDl.querySelector('p.ratc');
-      if (p != null) {
-        totalScore = p.text.trim();
+      if (p != null && p.querySelector('a[href*="viewratings"]') == null) {
+        totalScore = sanitizeText(p.text).trim();
       }
+      if (totalScore.isEmpty) totalScore = headerText;
 
       // 列出每条评分
       final entries = <Map<String, dynamic>>[];
@@ -247,8 +253,9 @@ Map<String, dynamic> parsePostFromTable(
       for (final row in rows) {
         final allTds = row.querySelectorAll('td');
         if (allTds.isEmpty) continue;
-        // 用户名列：第一个 td 中的 a.xg1
-        final nameLink = allTds[0].querySelector('a.xg1');
+        // 用户名列：克米模板是 `a.xg1`；52pojie 没有该类名，且首个 <a>
+        // 是头像链接（文本为空），见 _findRateUserNameLink。
+        final nameLink = _findRateUserNameLink(allTds[0]);
         // 评分列：按表头位置逐个取 td
         final scores = scoreColIndices
             .map((i) => i < allTds.length ? allTds[i].text.trim() : '')
@@ -259,7 +266,8 @@ Map<String, dynamic> parsePostFromTable(
             : '';
         if (nameLink != null) {
           final href = nameLink.attributes['href'] ?? '';
-          final uidMatch = RegExp(r'space-uid-(\d+)').firstMatch(href);
+          // 克米：`space-uid-123`；52pojie：`home.php?mod=space&uid=123`
+          final uidMatch = RegExp(r'space.*?uid[=-](\d+)').firstMatch(href);
           entries.add({
             'username': nameLink.text.trim(),
             'uid': uidMatch?.group(1) ?? '',
@@ -295,6 +303,43 @@ Map<String, dynamic> parsePostFromTable(
     'rating': rating,
     'isStickReply': isStickReply,
   };
+}
+
+/// 评分记录行里的用户名链接。
+///
+/// - 克米模板：`<a class="xg1">昵称</a>`（首选，保持原行为）；
+/// - 52pojie：`<a href="home.php?mod=space&uid=…"><img …></a><a …>昵称</a>`
+///   —— 没有 `xg1`，且首个链接是头像（文本为空），因此退化为
+///   「第一个带可见文本的链接」。
+dom.Element? _findRateUserNameLink(dom.Element cell) {
+  final xg1 = cell.querySelector('a.xg1');
+  if (xg1 != null && sanitizeText(xg1.text).trim().isNotEmpty) return xg1;
+  for (final a in cell.querySelectorAll('a')) {
+    if (sanitizeText(a.text).trim().isNotEmpty) return a;
+  }
+  return null;
+}
+
+/// 找「帖内标题」：`div.pcb` 内、但不在正文区 `td.t_f` 里的 h2。
+///
+/// 模板把帖内标题渲染在正文区之外；而 52pojie 的 Markdown 插件会把作者写的
+/// `## 标题` 输出成正文区内的第一个 `<h2>`。若直接用后代选择器 `div.pcb h2`
+/// 取，会把正文标题当成帖内标题再前置一次，造成标题重复。
+dom.Element? _findPostTitle(dom.Element plc) {
+  for (final h2 in plc.querySelectorAll('div.pcb h2')) {
+    if (!_isInsideContentCell(h2)) return h2;
+  }
+  return null;
+}
+
+/// [el] 是否位于楼层正文单元格（`td.t_f` / `.t_fsz`）内
+bool _isInsideContentCell(dom.Element el) {
+  for (dom.Node? node = el.parent; node != null; node = node.parent) {
+    if (node is! dom.Element) continue;
+    final cls = node.className;
+    if (cls == 't_f' || cls == 't_fsz') return true;
+  }
+  return false;
 }
 
 /// 中文楼层名 → 楼层号

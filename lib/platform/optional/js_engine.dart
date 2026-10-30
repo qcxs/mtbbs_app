@@ -13,8 +13,8 @@ class JsRunResult {
 /// 本地 JS 引擎适配器。
 ///
 /// **唯一** import `flutter_qjs_next` 的地方。平台没有该插件实现时返回 null，
-/// 由 `AcwSolver` 切到纯 Dart 算法；调用异常时同时关闭 [AppCapability.localJsSolver]，
-/// 避免后续请求反复尝试。
+/// 由 `JsChallengeSolver` 切到纯 Dart 算法；调用异常时同时关闭
+/// [AppCapability.localJsSolver]，避免后续请求反复尝试。
 abstract final class JsEngine {
   JsEngine._();
 

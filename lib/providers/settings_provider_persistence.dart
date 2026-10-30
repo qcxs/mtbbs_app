@@ -73,6 +73,8 @@ extension SettingsPersistence on SettingsProvider {
         ((await _db.getSettingInt('threadCacheDays')) ??
                 threadConfig.expireDays)
             .clamp(1, 365);
+    _threadCacheEnabled =
+        (await _db.getSettingBool('threadCacheEnabled')) ?? true;
     ThreadCacheService.instance.configure(
       ttlDays: _threadCacheDays,
       maxBytesPerThread: threadConfig.maxBytesPerThread,
@@ -454,6 +456,13 @@ extension SettingsPersistence on SettingsProvider {
     _threadCacheDays = days.clamp(1, 365);
     await _db.setSettingInt('threadCacheDays', _threadCacheDays);
     ThreadCacheService.instance.configure(ttlDays: _threadCacheDays);
+    _notify();
+  }
+
+  /// 帖子自动缓存总开关。关闭只影响**后续写入**，已有缓存照常可读/可管理。
+  Future<void> setThreadCacheEnabled(bool enabled) async {
+    _threadCacheEnabled = enabled;
+    await _db.setSettingBool('threadCacheEnabled', enabled);
     _notify();
   }
 

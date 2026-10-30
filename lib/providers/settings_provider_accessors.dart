@@ -82,6 +82,9 @@ extension SettingsAccessors on SettingsProvider {
 
   /// 帖子自动缓存过期天数（下限 1）
   int get threadCacheDays => _threadCacheDays;
+
+  /// 帖子自动缓存总开关（默认开启）
+  bool get threadCacheEnabled => _threadCacheEnabled;
   ThemeMode get themeMode => _themeMode;
   Color get seedColor => _seedColor;
   bool get isPureBlackTheme => _isPureBlackTheme;

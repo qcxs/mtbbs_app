@@ -18,7 +18,7 @@ import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/app_shortcuts.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/site_cdn.dart';
-import 'package:mtbbs/core/app/acw_solver.dart';
+import 'package:mtbbs/core/app/js_challenge_solver.dart';
 import 'package:mtbbs/core/app/verification_gate.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
@@ -115,7 +115,7 @@ void main() async {
 
   // 设置项「人机验证改用网页完成」：打开后跳过 L1 本地自解，强制走 WebView，
   // 用于排查验证页本身的问题（L1 上线后 L2 平时不会被触发）。
-  AcwSolver.instance.skipLocalSolve = () => settings.acwForceWebview;
+  JsChallengeSolver.instance.skipLocalSolve = () => settings.acwForceWebview;
 
   // 订阅站点切换事件 — ApiService 已就绪，可安全调用 switchSite
   EventBus.stream.where((e) => e is SiteChangedEvent).listen((_) async {
