@@ -12,9 +12,17 @@ final _lockedAppdataRe = RegExp(
 ///
 /// 通过 `part of` 与 thread_view_page.dart 共享库内私有成员。
 extension on _ThreadViewPageState {
+  /// 跨站点临时会话是只读的：默认账号只用于"看"，写操作必须先切站点。
+  bool _guardReadOnly() {
+    if (!_session.temporary) return false;
+    showToast('跨站点浏览为只读，发帖/评论请先切换到目标站点');
+    return true;
+  }
+
   /// 打开评分弹窗（支持帖子或评论）
   /// 评分 API 两站一致，直接拼接 forum.php?mod=misc&action=rate&tid=&pid=
   Future<void> _handleRate(PostItem post) async {
+    if (_guardReadOnly()) return;
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       showToast('请先登录');
@@ -22,7 +30,7 @@ extension on _ThreadViewPageState {
     }
     if (post.pid.isEmpty) return;
     final rateUrl =
-        '${SiteStore.instance.baseUrl}/forum.php?mod=misc&action=rate'
+        '${_session.baseUrl}/forum.php?mod=misc&action=rate'
         '&tid=${widget.tid}&pid=${post.pid}';
     final success = await showRateDialog(context, rateUrl);
     if (success == true && mounted) {
@@ -33,6 +41,7 @@ extension on _ThreadViewPageState {
 
   /// 收藏帖子（带备注）：仿手机端弹窗输入备注后直接 POST API
   Future<void> _handleFavorite() async {
+    if (_guardReadOnly()) return;
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       showToast('请先登录');
@@ -49,7 +58,7 @@ extension on _ThreadViewPageState {
     _setState(() => _favoriting = true);
     try {
       final result = await favorite_api.addFavorite(
-        ApiService().dio,
+        _dio,
         tid: widget.tid,
         note: note.isEmpty ? null : note,
       );
@@ -69,6 +78,7 @@ extension on _ThreadViewPageState {
 
   Future<void> _handleRecommend(PostItem post) async {
     if (post.recommendUrl.isEmpty) return;
+    if (_guardReadOnly()) return;
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       showToast('请先登录');
@@ -76,7 +86,7 @@ extension on _ThreadViewPageState {
     }
     try {
       final result = await action_api.doRecommend(
-        ApiService().dio,
+        _dio,
         post.recommendUrl,
       );
       if (!mounted) return;
@@ -91,10 +101,13 @@ extension on _ThreadViewPageState {
   /// 记录帖子浏览历史（含当前页码）
   void _recordThreadHistory() {
     if (_data == null) return;
+    // 跨站点浏览不写历史：历史条目按"当前站点"归类，写进去后会指错站点
+    if (_session.temporary) return;
+    final host = _session.host;
     context.read<HistoryProvider>().addRecord(
       BrowseRecord(
-        id: '${SiteStore.instance.host}:thread_${widget.tid}',
-        host: SiteStore.instance.host,
+        id: '$host:thread_${widget.tid}',
+        host: host,
         type: 'thread',
         routePath: '/thread/${widget.tid}',
         timestamp: DateTime.now(),
@@ -106,7 +119,7 @@ extension on _ThreadViewPageState {
           'time': _data!.mainPost?.postTime ?? '',
           'page': _currentPage,
           'url':
-              '${SiteStore.instance.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}',
+              '${_session.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}',
         },
       ),
     );
@@ -169,10 +182,13 @@ extension on _ThreadViewPageState {
       tid: widget.tid,
       threadTitle: _data?.title ?? '',
       opUid: _data?.mainPost?.uid ?? '',
+      siteHost: _session.host,
+      siteBaseUrl: _session.baseUrl,
     );
   }
 
   void _editPost(PostItem post) {
+    if (_guardReadOnly()) return;
     final isOp = post.pid == _data?.mainPost?.pid;
     _openEditor(
       '/editor?type=${isOp ? 'editPost' : 'editReply'}&tid=${widget.tid}&pid=${post.pid}',
@@ -184,7 +200,7 @@ extension on _ThreadViewPageState {
     final url =
         '/forum.php?mod=post&action=reply&fid=2&tid=${widget.tid}&repquote=${post.pid}&page=1';
     try {
-      final resp = await ApiService().dio.get<String>(url);
+      final resp = await _dio.get<String>(url);
       if (!mounted) return;
       final body = resp.data is String ? (resp.data as String) : '';
       final doc = htmlParser.parse(body);

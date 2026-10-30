@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:mtbbs/api/forum/search/export.dart' as search_api;
 import 'package:mtbbs/controllers/thread_list_controller.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/app/site_session.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/thread/thread_grid.dart';
 
@@ -36,6 +38,13 @@ class SearchResultPage extends StatefulWidget {
 class _SearchResultPageState extends State<SearchResultPage> {
   late final TextEditingController _inputCtrl;
   final _focusNode = FocusNode();
+
+  /// 页面作用域会话（跨站点打开时 = 目标站默认账号/游客，只读）
+  SiteSession _session = const GlobalSiteSession();
+  Dio get _dio => _session.dio;
+  bool _sessionBound = false;
+
+  /// 列表控制器需要会话 Dio，延迟到会话绑定后再建
   late final ThreadListController _listCtrl;
 
   /// 当前关键词（重搜时更新；fetchFn 闭包在调用时读取）
@@ -56,10 +65,18 @@ class _SearchResultPageState extends State<SearchResultPage> {
     super.initState();
     _keyword = widget.keyword;
     _inputCtrl = TextEditingController(text: widget.keyword);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _session = SiteScope.of(context);
+    if (_sessionBound) return;
+    _sessionBound = true;
     _listCtrl = ThreadListController(
       fetchFn: ({required int page}) async {
         final r = await search_api.searchThreads(
-          ApiService().dio,
+          _dio,
           keyword: _keyword,
           page: page,
           searchId: _searchId,
@@ -76,10 +93,12 @@ class _SearchResultPageState extends State<SearchResultPage> {
   @override
   void dispose() {
     _countdown?.cancel();
-    _listCtrl.removeListener(_onCtrlChanged);
+    if (_sessionBound) {
+      _listCtrl.removeListener(_onCtrlChanged);
+      _listCtrl.dispose();
+    }
     _inputCtrl.dispose();
     _focusNode.dispose();
-    _listCtrl.dispose();
     super.dispose();
   }
 
@@ -207,6 +226,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
               searchId: _searchId,
               page: _listCtrl.page,
               srchFilter: widget.searchFilter,
+              baseUrl: _session.baseUrl,
             ),
             // 用 refresh 而非 loadInitial：保留 searchid，刷新复用同一次搜索会话，
             // 不会在服务端新建搜索（避免触发搜索频率限制）

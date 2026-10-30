@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/controllers/thread_list_controller.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/models/thread_item.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/widgets/thread/thread_card.dart';

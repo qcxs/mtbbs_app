@@ -82,19 +82,11 @@ class _SearchPageState extends State<SearchPage> {
     final fullUrl = input.contains('://')
         ? input
         : '${SiteStore.instance.baseUrl}/$input';
-    final result = UrlRouter.parse(fullUrl);
-
-    if (result.isOtherSite) {
-      if (!mounted) return;
-      showToast(
-        '请切换站点${result.siteName ?? ""}后再打开',
-        duration: const Duration(seconds: 3),
-      );
-      return;
-    }
-
-    if (result.appPath != null && mounted) {
-      context.push(result.appPath!);
+    // 统一决策点：跨站已支持页面 → 带 `site=` 的 App 内路径（临时身份只读访问），
+    // 其余不支持的 → 内置浏览器兜底
+    final target = UrlRouter.resolveTarget(fullUrl);
+    if (target != null && mounted) {
+      context.push(target);
     }
   }
 

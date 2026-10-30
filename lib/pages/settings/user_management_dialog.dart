@@ -220,6 +220,8 @@ class UserManagementDialog extends StatelessWidget {
               },
             ),
 
+            const Divider(height: 1),
+
             // 底部：左(导入/导出) 右(关闭)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),

@@ -19,8 +19,8 @@ extension on _ThreadViewPageState {
       showToast('作者筛选视图不支持离线保存');
       return;
     }
-    final host = SiteStore.instance.host;
-    final auth = context.read<AuthProvider>();
+    final host = _session.host;
+    final viewer = _session.uid;
     if (await service.hasOffline(host: host, tid: widget.tid)) {
       if (!mounted) return;
       final overwrite = await showConfirmDialog(
@@ -60,7 +60,7 @@ extension on _ThreadViewPageState {
       data: data,
       commentPages: pages,
       host: host,
-      viewer: auth.uid,
+      viewer: viewer,
     );
     if (!mounted) return;
     await _showOfflineSaveResult(
@@ -201,8 +201,8 @@ extension on _ThreadViewPageState {
             final retry = await ThreadCacheService.instance.saveOffline(
               data: data,
               commentPages: reduced,
-              host: SiteStore.instance.host,
-              viewer: context.read<AuthProvider>().uid,
+              host: _session.host,
+              viewer: _session.uid,
             );
             if (!mounted) return;
             await _showOfflineSaveResult(

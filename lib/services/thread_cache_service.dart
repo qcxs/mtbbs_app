@@ -59,7 +59,6 @@ class ThreadCacheService {
   int _maxBytesPerThread = defaultMaxBytesPerThread;
 
   Future<void> _queue = Future<void>.value();
-  bool _expiredCleaned = false;
 
   /// 数据库健康状态（App 壳层监听以提示一次损坏 Toast）
   ValueNotifier<ThreadCacheHealth> get health => _db.health;
@@ -139,7 +138,6 @@ class ThreadCacheService {
   }) async {
     if (isDisabled) return;
     if (!await _db.ensureReady()) return;
-    await _ensureExpiredCleaned();
 
     final main = data.mainPost;
     if (main == null) return;
@@ -482,7 +480,7 @@ class ThreadCacheService {
 
   Future<bool> clearOffline() => _db.clearKind(ThreadCacheKind.offline);
 
-  /// 清理已过期的自动缓存，返回条数（每进程首次写操作/管理页刷新时调用）
+  /// 清理已过期的自动缓存，返回条数（App 启动时与管理页刷新时调用）
   Future<int> cleanExpired() async => _db.deleteExpired(DateTime.now());
 
   Future<ThreadCacheStats> stats() => _db.stats();
@@ -491,26 +489,15 @@ class ThreadCacheService {
 
   /// 重建缓存库（保留损坏备份）
   Future<bool> rebuild({bool deleteIfRenameFails = false}) async {
-    _expiredCleaned = false;
     return _db.rebuild(deleteIfRenameFails: deleteIfRenameFails);
   }
 
   /// 清空并重建缓存库（离线副本会丢失）
   Future<bool> clearAndRebuild() async {
-    _expiredCleaned = false;
     return _db.clearAndRebuild();
   }
 
   // ==================== 内部 ====================
-
-  Future<void> _ensureExpiredCleaned() async {
-    if (_expiredCleaned) return;
-    _expiredCleaned = true;
-    final removed = await _db.deleteExpired(DateTime.now());
-    if (removed > 0) {
-      AppLogger.i('THREAD_CACHE', 'expired auto caches removed: $removed');
-    }
-  }
 
   /// 单链队列：所有写操作串行执行
   Future<T> _enqueue<T>(Future<T> Function() action) {

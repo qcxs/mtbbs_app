@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -54,6 +56,11 @@ class UserAvatar extends StatefulWidget {
   /// 自定义点击回调，仅在 [tapAction] 为 [AvatarTapAction.custom] 时生效
   final VoidCallback? onTap;
 
+  /// 指定头像所属站点（默认取页面作用域站点）。
+  ///
+  /// 用于展示"不属于当前页面站点"的账号，例如「用户设置」里其它站点的账号。
+  final String? siteHost;
+
   const UserAvatar({
     super.key,
     required this.uid,
@@ -62,6 +69,7 @@ class UserAvatar extends StatefulWidget {
     this.showBorder = false,
     this.tapAction = AvatarTapAction.openUserSpace,
     this.onTap,
+    this.siteHost,
   });
 
   @override
@@ -85,13 +93,26 @@ class _UserAvatarState extends State<UserAvatar> {
   bool _reResolvedAfterError = false;
 
   /// 按当前尺寸策略生成原始头像 URL：站点配置的模板，未配置时回退默认 API 方案
-  String _originalUrlFor(AvatarSizeMode mode) => resolveAvatarUrl(
-    template: SiteStore.instance.current.avatarTemplate ?? '',
-    baseUrl: SiteStore.instance.baseUrl,
-    cdn: SiteStore.instance.cdnUrl,
-    uid: widget.uid,
-    size: resolveAvatarSize(mode, widget.radius),
-  );
+  ///
+  /// 走页面作用域（[SiteScope]）而不是全局站点：跨站点帖子/用户页里的头像
+  /// 必须去**目标站点**取，否则会拿当前站点的头像接口要别人的头像（显示错误/空白）。
+  String _originalUrlFor(AvatarSizeMode mode) {
+    final host = widget.siteHost ?? SiteScope.read(context).host;
+    final site =
+        SessionRegistry.instance.siteForHost(host) ??
+        SiteStore.instance.current;
+    // CDN 属于全局设置（按当前站点配置），跨站点不套用
+    final isGlobal = host == SiteStore.instance.host;
+    return resolveAvatarUrl(
+      template: site.avatarTemplate ?? '',
+      baseUrl:
+          SessionRegistry.instance.baseUrlForHost(host) ??
+          SiteStore.instance.baseUrl,
+      cdn: isGlobal ? SiteStore.instance.cdnUrl : '',
+      uid: widget.uid,
+      size: resolveAvatarSize(mode, widget.radius),
+    );
+  }
 
   /// 原始头像 URL：按站点配置的模板解析，未配置时回退默认 API 方案
   String get _originalUrl =>
@@ -306,7 +327,17 @@ class _UserAvatarState extends State<UserAvatar> {
           showToast('请先登录');
           return;
         }
-        context.push('/user/${widget.uid}');
+        // 跨站页面续接 site 参数，用户主页才不会被当成全局身份打开；
+        // 指定了 siteHost 的头像（如其它站点账号列表）直接指向该站点
+        context.push(
+          widget.siteHost != null &&
+                  widget.siteHost != SiteStore.instance.host
+              ? withSiteParam(
+                  '/user/${widget.uid}',
+                  widget.siteHost!,
+                )
+              : SiteScope.pathFor(context, '/user/${widget.uid}'),
+        );
         return;
     }
   }

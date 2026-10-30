@@ -11,6 +11,7 @@ import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/services/thread_cache_service.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
 import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/core/app/default_config.dart';
@@ -37,6 +38,9 @@ class SettingsProvider extends ChangeNotifier {
 
   /// 默认启动 Tab (0=首页, 1=导读, 2=社区, 3=我的)
   int _defaultTabIndex = 0;
+
+  /// Android 返回键在默认页的「双击退出」（默认开；关闭后按一次返回即退出）
+  bool _doubleBackExit = true;
 
   /// 自定义快捷键（key = 动作ID, value = 按键字符串, 如 "Ctrl+T"）
   Map<String, String> _shortcuts = Map.from(ShortcutHelper.defaults);

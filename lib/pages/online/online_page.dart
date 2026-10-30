@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/forum/online/export.dart' as online_api;
 import 'package:mtbbs/api/helpers.dart';
-import 'package:mtbbs/core/app/site_store.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/app/site_session.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/widgets/common/filter_search_field.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
@@ -29,9 +30,17 @@ class _OnlinePageState extends State<OnlinePage> {
   String? _error;
   String _stats = '';
 
+  /// 页面作用域会话（跨站点打开时 = 目标站默认账号/游客，只读）
+  SiteSession _session = const GlobalSiteSession();
+  Dio get _dio => _session.dio;
+  bool _sessionBound = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _session = SiteScope.of(context);
+    if (_sessionBound) return;
+    _sessionBound = true;
     _fetch();
   }
 
@@ -51,7 +60,7 @@ class _OnlinePageState extends State<OnlinePage> {
     });
 
     try {
-      final result = await online_api.fetchOnlineUsers(ApiService().dio);
+      final result = await online_api.fetchOnlineUsers(_dio);
       if (!mounted) return;
 
       final err = apiErrorText(result);
@@ -96,7 +105,7 @@ class _OnlinePageState extends State<OnlinePage> {
         title: const Text('在线用户'),
         actions: [
           PageActions(
-            url: '${SiteStore.instance.baseUrl}/forum.php?showoldetails=yes',
+            url: '${_session.baseUrl}/forum.php?showoldetails=yes',
             onRefresh: _onRefresh,
             loading: _isLoading,
             copyLabel: '复制在线列表链接',

@@ -10,6 +10,7 @@ extension SettingsPersistence on SettingsProvider {
     _currentSiteIndex = (await _db.getSettingInt('currentSiteIndex')) ?? 0;
     _defaultTabIndex = ((await _db.getSettingInt('defaultTabIndex')) ?? 0)
         .clamp(0, 3);
+    _doubleBackExit = (await _db.getSettingBool('doubleBackExit')) ?? true;
 
     _autoDetectUrls = (await _db.getSettingBool('autoDetectUrls')) ?? true;
     // 消息未读徽标：样式 / 是否检查 / 计入的分组（见 NoticeBadgeController）
@@ -318,6 +319,13 @@ extension SettingsPersistence on SettingsProvider {
     _simulateBrowserHeaders = enabled;
     applyBrowserHeaders(enabled);
     await _db.setSettingBool('simulateBrowserHeaders', enabled);
+    _notify();
+  }
+
+  /// 开关"返回键双击退出"（关闭后默认页按一次返回即退出，仅 Android）
+  Future<void> setDoubleBackExit(bool enabled) async {
+    _doubleBackExit = enabled;
+    await _db.setSettingBool('doubleBackExit', enabled);
     _notify();
   }
 

@@ -21,6 +21,32 @@ const String kInterstitialHandledFlag = 'mtbbsInterstitialHandled';
 /// 前缀（MT 论坛是 `cQWy_2132_`）由站点配置决定，所以按后缀匹配，不写死全名。
 const String kBrowseModeCookieSuffix = '_mobile';
 
+/// 拦截页恢复上下文 —— "这次被拦的请求属于哪个客户端 / 罐 / 站点"。
+///
+/// 无状态化后 Dio 不再唯一（全局 + 各站点作用域），恢复流程不能再从
+/// `SiteStore` / `activeCookieJar` 猜；由拦截器显式传入，验证结果才能写回
+/// 正确的罐（跨站点页面验证自己的站点，而不是全局活跃罐）。
+class InterstitialContext {
+  final Dio client;
+  final CookieJar jar;
+  final String baseUrl;
+
+  /// 这个客户端是否为全局 [ApiService.dio]（而不是站点作用域 Dio）。
+  ///
+  /// 全局客户端的罐 / baseUrl 会在切账号、切站点时被换掉，验证流程因此要区别
+  /// 对待（是否镜像到其它罐、登录 cookie 从 `AuthProvider` 取还是从罐里取）。
+  /// 显式标记而不是 `identical(ctx.client, ApiService().dio)`：`dio` 是 `late final`，
+  /// 初始化前访问会抛 `LateInitializationError`（见 docs/07 #105）。
+  final bool isGlobal;
+
+  const InterstitialContext({
+    required this.client,
+    required this.jar,
+    required this.baseUrl,
+    this.isGlobal = false,
+  });
+}
+
 /// API 服务 — 基于 Dio + CookieManager 的统一 HTTP 客户端
 ///
 /// Cookie 按站点隔离：
@@ -40,7 +66,11 @@ class ApiService {
   ///
   /// 返回 true 表示"已通过人机验证"。做成注入点而不是直接依赖 UI/WebView，
   /// 是为了让 services 层不反向依赖 pages / flutter_inappwebview。
-  Future<bool> Function(RequestOptions options)? interstitialHandler;
+  ///
+  /// 无状态化后 Dio 不再唯一（全局 + 各站点作用域），处理器必须知道"这次用的是
+  /// 哪个客户端 / 罐 / 站点"，否则验证结果会写进错误的罐。
+  Future<bool> Function(RequestOptions options, InterstitialContext ctx)?
+  interstitialHandler;
 
   /// 当前活跃的 CookieJar（游客或当前账号）—— 写入目标
   CookieJar? _activeJar;
@@ -84,9 +114,21 @@ class ApiService {
       ignoreExpires: true,
     );
     final url = baseUrl ?? SiteStore.instance.baseUrl;
-    dio = Dio(
+    dio = _createDio(url, _guestJar!, isGlobal: true);
+    _activeJar = _guestJar!;
+    _initialized = true;
+  }
+
+  /// 构建绑定指定 baseUrl + CookieJar 的 Dio（含全部拦截器）。
+  ///
+  /// 全局 [dio] 与跨站点作用域 Dio（见 [scopedDio]）共用同一套拦截器逻辑，
+  /// 只有 baseUrl / CookieJar 不同 —— 这样"cookie 绑定在单例上"的限制被解开。
+  /// [isGlobal] 标记"这个 Dio 是否就是全局 [dio]" —— 只有它的罐 / baseUrl 会
+  /// 在切账号、切站点时被替换，恢复流程需要取实时值。
+  Dio _createDio(String baseUrl, CookieJar jar, {bool isGlobal = false}) {
+    final d = Dio(
       BaseOptions(
-        baseUrl: url,
+        baseUrl: baseUrl,
         // 默认 UA 为 PC 版（Discuz 按 UA 返回不同模板）；
         // 个别接口（导读/版块/我的帖子）按需用 Options 覆盖为站点配置 UA
         headers: {
@@ -96,7 +138,7 @@ class ApiService {
           'X-Requested-With': 'XMLHttpRequest',
           // 浏览器仿真头：按设置开关决定是否携带
           if (_simulateBrowserHeaders) ...{
-            'Referer': url,
+            'Referer': baseUrl,
             'Accept': _browserAccept,
           },
         },
@@ -137,9 +179,13 @@ class ApiService {
       ),
     );
 
-    _replaceCookieManager(_guestJar!);
+    // 顺序有意义：CookieManager 先把罐里的 Cookie 合成请求头，过滤器才能从里面
+    // 摘掉「浏览方式」Cookie
+    d.interceptors.add(CookieManager(jar));
+    d.interceptors.add(_browseModeFilter);
+
     // 统一日志 + 错误处理拦截器
-    dio.interceptors.add(
+    d.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           options.extra['_start'] = DateTime.now().millisecondsSinceEpoch;
@@ -167,10 +213,24 @@ class ApiService {
             'DIO',
             '$path → $status (${formatBytes(size)}, ${elapsed}ms)',
           );
-          // 通用拦截页（人机验证 / 防火墙）：交由注入的处理器恢复，成功后重放
-          if (await _recoverFromInterstitial(response)) {
+          // 通用拦截页（人机验证 / 防火墙）：交由注入的处理器恢复，成功后重放。
+          //
+          // 全局 Dio 的罐 / baseUrl 在切账号、切站点后会被换掉（见
+          // switchToAccount / switchSite），这里必须取**实时值**：上面闭包捕获的
+          // 只是创建时的快照，用它会把自解 cookie 写进已被替换的旧罐、或按旧站点
+          // 域写入 —— 症状是"验证过了还是被拦"，且因为自解返回成功而不再回退
+          // WebView。作用域 Dio 的二者创建后不变，直接用捕获值。
+          final liveJar = isGlobal ? (activeCookieJar ?? jar) : jar;
+          final liveBaseUrl = isGlobal ? d.options.baseUrl : baseUrl;
+          if (await _recoverFromInterstitial(
+            response,
+            client: d,
+            jar: liveJar,
+            baseUrl: liveBaseUrl,
+            isGlobal: isGlobal,
+          )) {
             try {
-              handler.resolve(await dio.fetch(response.requestOptions));
+              handler.resolve(await d.fetch(response.requestOptions));
               return;
             } catch (e) {
               AppLogger.w('DIO', '$path 拦截页重放失败: $e');
@@ -204,7 +264,7 @@ class ApiService {
     // 把**每个请求**的 UA 改写为覆盖值 —— 这样"不显式设站点 UA 的接口"
     // （帖子详情/排行/在线/圈子/留言板…）也会一起换成指定模板，
     // 从而让"换 UA 复测所有 API"成立。无覆盖时完全不干预（默认 PC UA 保持）。
-    dio.interceptors.add(
+    d.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           if (browseModeOverrideActive()) {
@@ -215,7 +275,63 @@ class ApiService {
       ),
     );
 
-    _initialized = true;
+    return d;
+  }
+
+  // ==================== 站点作用域 Dio（无状态化） ====================
+
+  /// 作用域 Dio 缓存：`{host}|{账号}` → Dio。
+  ///
+  /// 与全局 [dio] 并列存在：跨站点页面用这里的 Dio 访问目标站点，
+  /// 全局 [dio] 的行为与以前完全一致（零迁移成本）。
+  final Map<String, Dio> _scopedDios = {};
+
+  /// 作用域 Dio 的 CookieJar（供验证流程 / 图片下载取 Cookie 用）
+  final Map<String, CookieJar> _scopedJars = {};
+
+  String _scopeKey(String host, String? account) =>
+      '$host|${account ?? ''}';
+
+  /// 获取（必要时创建）绑定到指定站点 + 账号的 Dio。
+  ///
+  /// [account] 为 null 表示游客罐（`cookies/{host}/`），否则为账号罐
+  /// （`cookies/{host}/{account}/`）—— 与全局切换用的是同一套磁盘目录，
+  /// 因此登录态、人机验证 Cookie 都是共享的，不存在"两套登录态"。
+  Future<Dio> scopedDio({
+    required String host,
+    required String baseUrl,
+    String? account,
+  }) async {
+    final key = _scopeKey(host, account);
+    final cached = _scopedDios[key];
+    if (cached != null) return cached;
+
+    final dir = account == null
+        ? await AppPaths.cookiesDirForHost(host)
+        : await AppPaths.cookiesDirForAccount(host, account);
+    final jar = PersistCookieJar(
+      storage: FileStorage(dir),
+      ignoreExpires: true,
+    );
+    final d = _createDio(baseUrl, jar);
+    _scopedDios[key] = d;
+    _scopedJars[key] = jar;
+    return d;
+  }
+
+  /// 取作用域 CookieJar（图片 / 验证等非 Dio 场景需要带上登录 Cookie）
+  CookieJar? scopedJar({required String host, String? account}) =>
+      _scopedJars[_scopeKey(host, account)];
+
+  /// 丢弃某站点的全部作用域 Dio（账号登录态变化 / 站点配置变更后重建）
+  void dropScopedForHost(String host) {
+    final keys = _scopedDios.keys
+        .where((k) => k.startsWith('$host|'))
+        .toList(growable: false);
+    for (final k in keys) {
+      _scopedDios.remove(k);
+      _scopedJars.remove(k);
+    }
   }
 
   /// 按当前开关状态刷新 Dio 默认头。
@@ -226,13 +342,16 @@ class ApiService {
   /// [init] 尚未完成时直接返回 —— 那时模块级开关已是最终值，init 会读它。
   void refreshBrowserHeaders() {
     if (!_initialized) return;
-    final headers = dio.options.headers;
-    if (_simulateBrowserHeaders) {
-      headers['Referer'] = dio.options.baseUrl;
-      headers['Accept'] = _browserAccept;
-    } else {
-      headers.remove('Referer');
-      headers.remove('Accept');
+    final all = <Dio>[dio, ..._scopedDios.values];
+    for (final d in all) {
+      final headers = d.options.headers;
+      if (_simulateBrowserHeaders) {
+        headers['Referer'] = d.options.baseUrl;
+        headers['Accept'] = _browserAccept;
+      } else {
+        headers.remove('Referer');
+        headers.remove('Accept');
+      }
     }
   }
 
@@ -409,7 +528,13 @@ class ApiService {
   /// 返回 true 表示**已通过验证且可以重放本次请求**（打了重放标记）。
   /// 仅 GET 自动重放：写操作（发帖/评论）重放有重复提交风险，验证通过后
   /// 交给用户手动重试。
-  Future<bool> _recoverFromInterstitial(Response<dynamic> response) async {
+  Future<bool> _recoverFromInterstitial(
+    Response<dynamic> response, {
+    required Dio client,
+    required CookieJar jar,
+    required String baseUrl,
+    bool isGlobal = false,
+  }) async {
     final options = response.requestOptions;
     if (options.extra[kInterstitialHandledFlag] == true) return false;
     if (response.statusCode != 200) return false;
@@ -432,7 +557,13 @@ class ApiService {
     AppLogger.w('DIO', '${options.path} 命中非论坛页（${body.length}B），尝试自动恢复');
 
     // ① 本地自解（JS 引擎执行挑战页脚本）：成功即与浏览器一样无感
-    if (await _solveJsChallengeLocally(body, options.uri)) {
+    if (await _solveJsChallengeLocally(
+      body,
+      options.uri,
+      client: client,
+      jar: jar,
+      baseUrl: baseUrl,
+    )) {
       if (options.method != 'GET') {
         AppLogger.i('DIO', '${options.path} 已本地自解验证，但非 GET 请求不自动重放');
         return false;
@@ -442,10 +573,20 @@ class ApiService {
       return true;
     }
 
-    // ② 自解不了（交互式验证 / 结构变化）→ 交给人工验证弹窗
+    // ② 自解不了（交互式验证 / 结构变化）→ 交给人工验证弹窗。
+    //    把本次请求的客户端 / 罐 / 站点一起传过去：跨站点页面也能验证，
+    //    cookie 回流到它自己的罐，而不是"只能回流全局活跃罐故不启用"。
     final recover = interstitialHandler;
     if (recover == null) return false;
-    final recovered = await recover(options);
+    final recovered = await recover(
+      options,
+      InterstitialContext(
+        client: client,
+        jar: jar,
+        baseUrl: baseUrl,
+        isGlobal: isGlobal,
+      ),
+    );
     if (!recovered) {
       AppLogger.w('DIO', '${options.path} 未通过人机验证，按原样返回');
       return false;
@@ -471,19 +612,23 @@ class ApiService {
   ///   （IP + UA 指纹）标记为已通过——此后普通请求一段时间内不再被挑战，**无需 cookie**。
   ///
   /// 失败（脚本结构变化 / 跳转仍被拦）返回 false，由调用方回退到 WebView。
-  Future<bool> _solveJsChallengeLocally(String body, Uri pageUri) async {
+  Future<bool> _solveJsChallengeLocally(
+    String body,
+    Uri pageUri, {
+    required Dio client,
+    required CookieJar jar,
+    required String baseUrl,
+  }) async {
     final solution = JsChallengeSolver.instance.solve(
       body,
       pageUrl: pageUri.toString(),
     );
     if (solution == null || solution.isEmpty) return false;
 
-    final base = Uri.tryParse(SiteStore.instance.baseUrl);
+    final base = Uri.tryParse(baseUrl);
     if (base == null || base.host.isEmpty) return false;
 
     if (solution.cookies.isNotEmpty) {
-      final jar = activeCookieJar;
-      if (jar == null) return false;
       try {
         await jar.saveFromResponse(
           base,
@@ -515,7 +660,7 @@ class ApiService {
     }
 
     try {
-      final res = await dio.get<String>(
+      final res = await client.get<String>(
         target.toString(),
         options: Options(
           // 该请求自己也可能被拦，但这里不再递归自解，失败就交给 L2

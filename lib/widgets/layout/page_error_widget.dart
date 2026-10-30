@@ -22,12 +22,17 @@ class PageErrorWidget extends StatelessWidget {
   /// 额外操作按钮（如"查看缓存"），追加在重试/返回之前
   final List<Widget> extraActions;
 
+  /// 「网页验证」入口 —— 站点返回人机验证 / 防火墙页导致加载失败时，
+  /// 让用户直接在真实浏览器里通过验证（见 `VerificationGate.verifyManually`）。
+  final VoidCallback? onVerify;
+
   const PageErrorWidget({
     super.key,
     required this.message,
     this.onRetry,
     this.showBack = true,
     this.extraActions = const [],
+    this.onVerify,
   });
 
   @override
@@ -61,6 +66,12 @@ class PageErrorWidget extends StatelessWidget {
               alignment: WrapAlignment.center,
               children: [
                 ...extraActions,
+                if (onVerify != null)
+                  OutlinedButton.icon(
+                    onPressed: onVerify,
+                    icon: const Icon(Icons.verified_user_outlined, size: 18),
+                    label: const Text('网页验证'),
+                  ),
                 if (onRetry != null)
                   FilledButton.icon(
                     onPressed: onRetry,

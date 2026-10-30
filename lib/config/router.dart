@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/core/app/app_page_gate.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/widgets/layout/global_shortcuts.dart';
 import 'package:mtbbs/widgets/layout/window_title_bar.dart';
 import 'package:mtbbs/widgets/layout/app_shell.dart';
@@ -15,6 +17,7 @@ import 'package:mtbbs/pages/group/group_category_page.dart';
 import 'package:mtbbs/pages/user/my_profile_page.dart';
 import 'package:mtbbs/pages/settings/settings_page.dart';
 import 'package:mtbbs/pages/settings/settings_search_page.dart';
+import 'package:mtbbs/pages/settings/user_settings_page.dart';
 import 'package:mtbbs/pages/settings/about_page.dart';
 import 'package:mtbbs/pages/settings/cache_settings_page.dart';
 import 'package:mtbbs/pages/settings/thread_cache_manage_page.dart';
@@ -61,9 +64,19 @@ GoRouter buildRouter({
     routes: [
       ShellRoute(
         // 套一层窗口外壳：Windows 自绘标题栏（含 MCP 状态），不再用原生标题栏。
-        // 放在这里而不是 MaterialApp.builder：需要 Theme / Overlay / Material 祖先
-        builder: (_, __, child) =>
-            WindowChrome(child: GlobalShortcutsWrapper(child: child)),
+        // 放在这里而不是 MaterialApp.builder：需要 Theme / Overlay / Material 祖先。
+        //
+        // 同时在这里注入「站点会话」作用域：location 上的 `site=<host>`（可选
+        // `as=<账号>`）表示这一页临时以别的站点身份访问（见 core/app/site_session.dart）。
+        // 所有子路由都在作用域内，页面用 SiteScope.of(context) 取代全局单例。
+        builder: (_, state, child) {
+          final session = SessionRegistry.instance.sessionForLocation(state.uri);
+          final wrapped = WindowChrome(
+            child: GlobalShortcutsWrapper(child: child),
+          );
+          if (session == null) return wrapped;
+          return SiteScope(session: session, child: wrapped);
+        },
         routes: [
           ShellRoute(
             builder: (_, __, child) => AppShell(child: child),
@@ -140,6 +153,21 @@ GoRouter buildRouter({
             path: '/settings/search',
             pageBuilder: (_, __) =>
                 const NoTransitionPage(child: SettingsSearchPage()),
+          ),
+          // 用户设置：以账号为键的跨站身份/行为配置
+          GoRoute(
+            path: '/settings/users',
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: UserSettingsPage()),
+          ),
+          GoRoute(
+            path: '/settings/user',
+            pageBuilder: (_, state) => NoTransitionPage(
+              child: UserSettingsDetailPage(
+                host: state.uri.queryParameters['host'] ?? '',
+                username: state.uri.queryParameters['username'] ?? '',
+              ),
+            ),
           ),
           GoRoute(
             path: '/settings/about',

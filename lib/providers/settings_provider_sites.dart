@@ -178,11 +178,20 @@ extension SettingsSites on SettingsProvider {
   }
 
   Future<void> _persistSites() async {
+    final prevSig = _sitesSignature(SiteStore.instance.sites);
     SiteStore.instance.replaceSites(_sites);
     SiteStore.instance.switchTo(_currentSiteIndex.clamp(0, _sites.length - 1));
     await _db.setSitesRaw(jsonEncode(_sites.map((s) => s.toJson()).toList()));
+    // 站点增删 / 域名变更 → 重建跨站会话（新站点也要有"默认账号 / 游客"作用域 Dio）。
+    // 只有站点集合变了才重建：板块排序等纯 UI 配置不动它会话缓存。
+    if (_sitesSignature(_sites) != prevSig) {
+      await SessionRegistry.instance.reloadAll();
+    }
     _notify();
   }
+
+  String _sitesSignature(List<Site> sites) =>
+      sites.map((s) => '${s.host}|${s.baseUrl}').join(',');
 
   // ==================== 站点切换 ====================
 

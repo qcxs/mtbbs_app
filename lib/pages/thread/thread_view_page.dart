@@ -7,7 +7,10 @@ import 'package:provider/provider.dart';
 import 'package:html/parser.dart' as htmlParser;
 import 'package:dio/dio.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/site_session.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
+import 'package:mtbbs/core/app/verification_gate.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
@@ -21,7 +24,6 @@ import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as detail_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
-import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/models/thread_detail.dart';
@@ -113,6 +115,15 @@ class ThreadViewPage extends StatefulWidget {
 }
 
 class _ThreadViewPageState extends State<ThreadViewPage> {
+  /// 本页所属的站点会话（跨站点链接会固定另一个站点 + 默认账号）
+  SiteSession _session = const GlobalSiteSession();
+
+  /// 绑定到会话站点的 Dio（主会话时就是全局 Dio，行为不变）
+  Dio get _dio => _session.dio;
+
+  /// 会话已绑定（didChangeDependencies 只启动一次加载）
+  bool _sessionBound = false;
+
   // ---- 帖子基本信息（加载一次，来自第 1 页） ----
   ThreadViewData? _data;
   bool _loading = true;
@@ -184,9 +195,19 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     _images = ForumImageController(
       contentCtl: _editorSession.contentCtl,
       pageData: () => _editorSession.pageData,
-      uid: () => context.read<AuthProvider>().uid,
+      uid: () => _session.uid,
       fallbackTid: widget.tid,
     )..addListener(_onImagesChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 站点会话只能在依赖阶段读取（initState 里不允许依赖 InheritedWidget）。
+    // 首次拿到会话后再启动加载，保证请求走的是本页站点的 Dio。
+    _session = SiteScope.of(context);
+    if (_sessionBound) return;
+    _sessionBound = true;
     if (_isCacheMode) {
       _loadCacheInitial();
     } else {
@@ -215,7 +236,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
   // ==================== Build ====================
 
   String get _threadUrl =>
-      '${SiteStore.instance.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}';
+      '${_session.baseUrl}/forum.php?mod=viewthread&tid=${widget.tid}';
 
   @override
   Widget build(BuildContext context) {
@@ -391,6 +412,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
       // 与私信页（pm_chat_page）保持同一范式。
       body: Column(
         children: [
+          if (!_isCacheMode && _session.temporary) _buildCrossSiteBanner(),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -401,6 +423,9 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
                     onRetry: _isCacheMode
                         ? _loadCacheInitial
                         : () => _loadInitial(),
+                    // 人机验证 / 防火墙拦截时自动恢复可能失败（自解不了或写错罐），
+                    // 给用户一个直接过验证的入口
+                    onVerify: _isCacheMode ? null : _verifyFromErrorPage,
                     extraActions: [
                       if (!_isCacheMode &&
                           _errorCacheCandidates.isNotEmpty)
@@ -436,7 +461,8 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
               },
             ),
           ),
-          if (!_isCacheMode)
+          // 跨站点临时会话只读：不显示回复栏 / 迷你编辑器
+          if (!_isCacheMode && !_session.temporary)
             _editorExpanded ? _buildMiniEditor() : _buildReplyBar(),
         ],
       ),

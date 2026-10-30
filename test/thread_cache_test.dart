@@ -288,9 +288,12 @@ void main() {
   });
 
   group('isNewThreadTime', () {
+    // 固定「现在」，避免用例随系统时间漂移
+    final now = DateTime(2026, 10, 30, 20, 0);
+
     test('相对时间视为新帖', () {
       for (final text in ['刚刚', '昨天', '前天', '25分钟前', '2 天前', '3 小时前']) {
-        expect(isNewThreadTime(text), isTrue, reason: text);
+        expect(isNewThreadTime(text, now: now), isTrue, reason: text);
       }
     });
 
@@ -306,27 +309,67 @@ void main() {
         '两个半小时前',
         '刚才',
         '昨天 12:34',
+        '今天 13:04',
       ]) {
-        expect(isNewThreadTime(text), isTrue, reason: text);
+        expect(isNewThreadTime(text, now: now), isTrue, reason: text);
       }
     });
 
     test('无法确认的文本默认按新帖处理（排除法）', () {
       for (final text in ['半年前', '1 个月前', '2026-10']) {
-        expect(isNewThreadTime(text), isTrue, reason: text);
+        expect(isNewThreadTime(text, now: now), isTrue, reason: text);
       }
     });
 
-    test('完整日期、时分与空串视为非新帖', () {
+    test('完整时间按与当前时间的差值判断（52pojie 场景）', () {
+      // 52pojie 不显示相对时间：窗口内的完整时间也是新帖
       for (final text in [
+        '2026-10-30 13:04',
+        '2026-10-24 13:04',
+        '2026/10/30 08:00',
+        '2026年10月30日 13:04',
+        '10-30 13:04',
+        '10月30日 13:04',
+        '2026-10-23 20:00', // 距 now 正好 7 天
+      ]) {
+        expect(isNewThreadTime(text, now: now), isTrue, reason: text);
+      }
+    });
+
+    test('超出窗口的完整时间、时分与空串视为非新帖', () {
+      for (final text in [
+        '2026-10-23 19:59',
         '2026-10-11',
         '2026/10/11 08:00',
         '2026年10月11日',
         '10-11 08:00',
+        '08:00',
         '',
       ]) {
-        expect(isNewThreadTime(text), isFalse, reason: text);
+        expect(isNewThreadTime(text, now: now), isFalse, reason: text);
       }
+    });
+
+    test('parsePostTime 支持常见格式并拒绝非法日期', () {
+      expect(
+        parsePostTime('2026-10-30 13:04', now: now),
+        DateTime(2026, 10, 30, 13, 4),
+      );
+      expect(
+        parsePostTime('2026/10/30 13:04:56', now: now),
+        DateTime(2026, 10, 30, 13, 4, 56),
+      );
+      expect(
+        parsePostTime('2026年10月30日 13:04', now: now),
+        DateTime(2026, 10, 30, 13, 4),
+      );
+      expect(
+        parsePostTime('10-30', now: now),
+        DateTime(2026, 10, 30),
+      );
+      expect(parsePostTime('2026-13-40', now: now), isNull);
+      expect(parsePostTime('2026-02-30', now: now), isNull);
+      expect(parsePostTime('3 小时前', now: now), isNull);
     });
   });
 

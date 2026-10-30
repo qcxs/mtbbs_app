@@ -42,7 +42,8 @@ String searchPageUrl({
   String? searchId,
   int page = 1,
   String srchFilter = '',
+  String? baseUrl,
 }) {
-  final base = SiteStore.instance.baseUrl;
+  final base = baseUrl ?? SiteStore.instance.baseUrl;
   return '$base${http.searchPath(keyword: keyword, page: page, searchId: searchId, srchFilter: srchFilter)}';
 }

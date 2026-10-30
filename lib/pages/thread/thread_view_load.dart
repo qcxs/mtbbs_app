@@ -6,12 +6,26 @@ part of 'thread_view_page.dart';
 extension on _ThreadViewPageState {
   // ==================== 加载逻辑 ====================
 
+  /// 错误页「网页验证」：直接打开验证浏览器，通过后重新加载。
+  ///
+  /// 与自动恢复（Dio 拦截器）走同一套回流 / 探测逻辑，只是入口是用户手动点；
+  /// 自动恢复失败时（挑战需要交互、或自解写错罐）才用得上。
+  Future<void> _verifyFromErrorPage() async {
+    final ok = await VerificationGate.instance.verifyManually(url: _threadUrl);
+    if (!mounted) return;
+    if (ok) {
+      await _loadInitial();
+    } else {
+      showToast('网页验证未通过，请重试');
+    }
+  }
+
   /// 通过 redirect（允许重定向）获取 pid 对应的真实 page
   Future<int> _resolveRedirectPage() async {
     final pid = widget.pid;
     if (pid == null || pid.isEmpty) return 1;
     try {
-      final dio = ApiService().dio;
+      final dio = _dio;
       final response = await dio.get(
         '/forum.php?mod=redirect&goto=findpost&pid=$pid&ptid=${widget.tid}',
         options: Options(validateStatus: (status) => true),
@@ -47,7 +61,7 @@ extension on _ThreadViewPageState {
       // 确保表情已加载，帖子内容里的表情才能还原为 [呵呵] 文本
       await EmojiService().load();
       final page1Result = await detail_api.getThreadDetail(
-        ApiService().dio,
+        _dio,
         tid: widget.tid,
         page: 1,
         authorid: widget.authorid,
@@ -114,7 +128,7 @@ extension on _ThreadViewPageState {
     try {
       await EmojiService().load();
       final raw = await detail_api.getThreadDetail(
-        ApiService().dio,
+        _dio,
         tid: widget.tid,
         page: page,
         authorid: widget.authorid,
@@ -223,7 +237,7 @@ extension on _ThreadViewPageState {
     try {
       await EmojiService().load();
       final raw = await detail_api.getThreadDetail(
-        ApiService().dio,
+        _dio,
         tid: widget.tid,
         page: 1,
         authorid: widget.authorid,

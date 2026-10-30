@@ -77,6 +77,34 @@ extension on _ThreadViewPageState {
     );
   }
 
+  // ==================== 跨站点提示 ====================
+
+  /// 跨站点临时身份提示条 —— 明确"这是别的站点的只读视图"
+  Widget _buildCrossSiteBanner() {
+    final cs = Theme.of(context).colorScheme;
+    final siteName = SessionRegistry.instance.siteNameForHost(_session.host);
+    final who = _session.username.isNotEmpty ? _session.username : '游客';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: cs.surfaceContainerHigh,
+      child: Row(
+        children: [
+          Icon(Icons.public, size: 14, color: cs.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '正在以「$siteName」$who 身份只读浏览 · 发帖/评论请先切换站点',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ==================== 评论区 ====================
 
   Widget _buildCommentContent() {
@@ -104,7 +132,7 @@ extension on _ThreadViewPageState {
       tid: widget.tid,
       opUid: _data?.mainPost?.uid ?? '',
       globalDisableStyle: _globalDisableStyle,
-      readOnly: _isCacheMode,
+      readOnly: _isCacheMode || _session.temporary,
       onReply: (post) => _replyToPost(post),
       onRecommend: _handleRecommend,
       onPopupAction: (action, post) {
@@ -153,7 +181,7 @@ extension on _ThreadViewPageState {
       isLiked: _liked,
       tid: widget.tid,
       globalDisableStyle: _globalDisableStyle,
-      readOnly: _isCacheMode,
+      readOnly: _isCacheMode || _session.temporary,
       onTap: () => _setState(() => _mainPostLoaded = true),
       onRecommend: () => _handleRecommend(post),
       onPopupAction: (action) {

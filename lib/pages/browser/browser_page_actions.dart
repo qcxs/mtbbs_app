@@ -79,53 +79,81 @@ extension _BrowserPageActions on _BrowserPageState {
 
     final result = await showModalBottomSheet<int>(
       context: context,
-      builder: (ctx) => SafeArea(
-        // 账号数量不定：整体可滚动，避免账号一多就溢出（默认弹层高度上限为 9/16 屏高）
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  '切换账号',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                ),
-              ),
-              const Divider(height: 1),
-              ...List.generate(accounts.length, (i) {
-                final a = accounts[i];
-                final isActive = i == activeIdx;
-                final isGuest = a.uid == '0';
-                return ListTile(
-                  leading: CircleAvatar(
-                    radius: 16,
+      showDragHandle: true,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          // 账号数量不定：整体可滚动，避免账号一多就溢出（默认弹层高度上限为 9/16 屏高）
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
                     child: Text(
-                      isGuest
-                          ? '?'
-                          : (a.username.isNotEmpty
-                                ? a.username[0].toUpperCase()
-                                : '?'),
-                      style: const TextStyle(fontSize: 14),
+                      '切换账号',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: cs.onSurface,
+                      ),
                     ),
                   ),
-                  title: Text(
-                    isGuest ? '游客' : a.username,
-                    style: TextStyle(
-                      fontWeight: isActive
-                          ? FontWeight.w600
-                          : FontWeight.normal,
+                ),
+                const Divider(height: 1),
+                ...List.generate(accounts.length, (i) {
+                  final a = accounts[i];
+                  final isActive = i == activeIdx;
+                  final isGuest = a.uid == '0';
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    leading: isGuest
+                        ? CircleAvatar(
+                            radius: 18,
+                            backgroundColor: cs.surfaceContainerHigh,
+                            child: Icon(
+                              Icons.person_outline,
+                              size: 20,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          )
+                        : UserAvatar(
+                            uid: a.uid,
+                            nickname: a.username,
+                            radius: 18,
+                            tapAction: AvatarTapAction.none,
+                          ),
+                    title: Text(
+                      isGuest ? '游客' : a.username,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isActive
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
                     ),
-                  ),
-                  subtitle: isGuest ? null : Text('UID: ${a.uid}'),
-                  trailing: isActive ? const Icon(Icons.check, size: 18) : null,
-                  onTap: () => Navigator.of(ctx).pop(i),
-                );
-              }),
-            ],
+                    subtitle: isGuest
+                        ? null
+                        : Text(
+                            'UID ${a.uid}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                    trailing: isActive
+                        ? Icon(Icons.check, size: 18, color: cs.primary)
+                        : null,
+                    onTap: () => Navigator.of(ctx).pop(i),
+                  );
+                }),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     if (result == null || result == activeIdx || !mounted) return;
@@ -184,22 +212,15 @@ extension _BrowserPageActions on _BrowserPageState {
 
   /// 用 App 本地页面打开当前 URL（如果支持）
   void _openInApp() {
-    final result = UrlRouter.parse(_currentUrl);
-
-    // 检查是否属于其他站点
-    if (result.isOtherSite && mounted) {
-      showToast(
-        '请切换站点${result.siteName ?? ""}后再打开',
-        duration: const Duration(seconds: 3),
-      );
+    if (!mounted) return;
+    final target = UrlRouter.resolveTarget(_currentUrl);
+    if (target == null) return;
+    // 落到内置浏览器兜底 = 解析不出 App 页面；此时已经在内置浏览器里，给出提示即可
+    if (target.startsWith('/browser?')) {
+      showToast('不支持在当前页面打开：${UrlRouter.parse(_currentUrl).label}');
       return;
     }
-
-    if (result.appPath != null && mounted) {
-      context.push(result.appPath!);
-    } else if (mounted) {
-      showToast('不支持在当前页面打开：${result.label}');
-    }
+    context.push(target);
   }
 
   // ==================== WebView 回调 ====================

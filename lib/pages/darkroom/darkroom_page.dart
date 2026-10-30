@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:mtbbs/api/forum/darkroom/export.dart' as darkroom_api;
 import 'package:mtbbs/api/helpers.dart';
-import 'package:mtbbs/core/app/site_store.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/app/site_session.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/widgets/common/filter_search_field.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
@@ -33,9 +34,17 @@ class _DarkroomPageState extends State<DarkroomPage> {
 
   static const double _gap = 8;
 
+  /// 页面作用域会话（跨站点打开时 = 目标站默认账号/游客，只读）
+  SiteSession _session = const GlobalSiteSession();
+  Dio get _dio => _session.dio;
+  bool _sessionBound = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _session = SiteScope.of(context);
+    if (_sessionBound) return;
+    _sessionBound = true;
     _fetch();
   }
 
@@ -57,7 +66,7 @@ class _DarkroomPageState extends State<DarkroomPage> {
 
     try {
       // 第 1 页：不传 cid
-      final result = await darkroom_api.getList(ApiService().dio);
+      final result = await darkroom_api.getList(_dio);
       if (!mounted) return;
 
       final err = apiErrorText(result);
@@ -78,7 +87,7 @@ class _DarkroomPageState extends State<DarkroomPage> {
       // 第 2 页：如果还有下一页，立即再取一页
       if (hasMore && nextCid.isNotEmpty) {
         final result2 = await darkroom_api.getList(
-          ApiService().dio,
+          _dio,
           cid: nextCid,
         );
         if (!mounted) return;
@@ -123,7 +132,7 @@ class _DarkroomPageState extends State<DarkroomPage> {
 
     try {
       final result = await darkroom_api.getList(
-        ApiService().dio,
+        _dio,
         cid: _nextCid,
       );
       if (!mounted) return;
@@ -157,7 +166,7 @@ class _DarkroomPageState extends State<DarkroomPage> {
         actions: [
           PageActions(
             url:
-                '${SiteStore.instance.baseUrl}/forum.php?mod=misc&action=showdarkroom',
+                '${_session.baseUrl}/forum.php?mod=misc&action=showdarkroom',
             onRefresh: _onRefresh,
             loading: _isLoading,
             copyLabel: '复制小黑屋链接',

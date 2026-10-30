@@ -17,6 +17,7 @@ import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 

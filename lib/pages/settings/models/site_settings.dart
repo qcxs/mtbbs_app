@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mtbbs/core/app/site_cdn.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/stagger_queue.dart';
@@ -27,6 +28,12 @@ List<SettingsModel> siteSettings() => [
     icon: Icons.person,
     onTap: (ctx, s) =>
         showDialog(context: ctx, builder: (_) => const UserManagementDialog()),
+  ),
+  NormalSetting(
+    title: '用户设置',
+    subtitle: '按账号设置跨站身份与行为（如默认用户）',
+    icon: Icons.manage_accounts_outlined,
+    onTap: (ctx, s) => ctx.push('/settings/users'),
   ),
   NormalSetting(
     title: '浏览模式',

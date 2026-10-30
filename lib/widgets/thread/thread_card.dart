@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/models/thread_item.dart';
 import 'package:mtbbs/models/thread_detail.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/widgets/common/highlighted_text.dart';
+import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/image_preview/image_preview.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
@@ -283,7 +285,8 @@ class ThreadCard extends StatelessWidget {
             children: [
               Flexible(
                 child: GestureDetector(
-                  onTap: () => context.push('/user/${item.uid ?? ''}'),
+                  onTap: () =>
+                      context.push(SiteScope.pathFor(context, '/user/${item.uid ?? ''}')),
                   child: Text(
                     item.nickname ?? '匿名',
                     style: const TextStyle(
@@ -461,9 +464,13 @@ class ThreadCard extends StatelessWidget {
           Flexible(
             child: GestureDetector(
               onTap: () {
-                if (fid != null) {
-                  context.push('/forum?fid=$fid');
+                if (fid == null) return;
+                // 板块页尚未迁移到作用域会话：跨站点时提示切站，避免用全局身份打开
+                if (SiteScope.read(context).temporary) {
+                  showToast('跨站点浏览为只读：板块页请先切换到目标站点');
+                  return;
                 }
+                context.push('/forum?fid=$fid');
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

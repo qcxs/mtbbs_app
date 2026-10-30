@@ -44,6 +44,9 @@ extension SettingsAccessors on SettingsProvider {
   ];
   int get currentSiteIndex => _currentSiteIndex;
   int get defaultTabIndex => _defaultTabIndex;
+
+  /// 「返回键双击退出」开关（仅 Android 返回键生效）
+  bool get doubleBackExit => _doubleBackExit;
   List<Site> get sites => _sites;
 
   Map<String, String> get shortcuts => Map.unmodifiable(_shortcuts);

@@ -110,7 +110,10 @@ extension on _ThreadGridState {
             highlight: widget.highlight,
             onTap: () {
               final tid = item.threadId;
-              if (tid != null && tid > 0) context.push('/thread/$tid');
+              if (tid != null && tid > 0) {
+                // 跨站点列表（如跨站搜索结果）续接 site，避免退回全局身份
+                context.push(SiteScope.pathFor(context, '/thread/$tid'));
+              }
             },
             onViewReplies: widget.onViewReplies != null
                 ? () => widget.onViewReplies!(item)
@@ -144,7 +147,10 @@ extension on _ThreadGridState {
             highlight: widget.highlight,
             onTap: () {
               final tid = item.threadId;
-              if (tid != null && tid > 0) context.push('/thread/$tid');
+              if (tid != null && tid > 0) {
+                // 跨站点列表（如跨站搜索结果）续接 site，避免退回全局身份
+                context.push(SiteScope.pathFor(context, '/thread/$tid'));
+              }
             },
             onViewReplies: widget.onViewReplies != null
                 ? () => widget.onViewReplies!(item)

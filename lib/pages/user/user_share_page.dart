@@ -29,6 +29,9 @@ class UserSharePreview extends StatefulWidget {
   /// 文件名前缀，最终为 `{prefix}_{时间戳}`
   final String filePrefix;
 
+  /// 所属站点 host（跨站点用户主页用）；null = 当前站点
+  final String? siteHost;
+
   final VoidCallback onClose;
 
   const UserSharePreview({
@@ -37,6 +40,7 @@ class UserSharePreview extends StatefulWidget {
     required this.userLabel,
     required this.qrUrl,
     required this.filePrefix,
+    this.siteHost,
     required this.onClose,
   });
 
@@ -194,7 +198,7 @@ class _UserSharePreviewState extends State<UserSharePreview> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'MTBBS · ${SiteStore.instance.host}',
+                  'MTBBS · ${widget.siteHost ?? SiteStore.instance.host}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

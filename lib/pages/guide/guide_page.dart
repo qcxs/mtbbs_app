@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:mtbbs/core/app/event_bus.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/tab_retap.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show listEquals;
@@ -33,6 +35,14 @@ class _GuidePageState extends State<GuidePage> {
   String _focusView = '';
   static final Map<String, ThreadListController> _ctrlMap = {};
 
+  /// [_ctrlMap] 里的控制器属于哪个站点。
+  ///
+  /// 静态表比页面实例活得久，切站后必须按站点整体作废（见 [_ensureCtrls]），
+  /// 否则再进导读页会直接复用另一个站点的列表 / 页码。
+  static String _ctrlHost = '';
+
+  StreamSubscription<AppEvent>? _siteSub;
+
   /// 重复点击「导读」Tab：对**当前子 Tab 的列表**回顶 / 刷新（规则见 TabReTap）
   late final Future<void> Function() _reTap = () async {
     final c = _ctrlMap[_focusView];
@@ -44,13 +54,31 @@ class _GuidePageState extends State<GuidePage> {
   void initState() {
     super.initState();
     TabReTap.instance.register('/guide', _reTap);
+    _siteSub = EventBus.stream
+        .where((e) => e is SiteChangedEvent)
+        .listen(_onSiteChanged);
   }
 
   @override
   void dispose() {
     TabReTap.instance.unregister('/guide', _reTap);
+    _siteSub?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// 切换站点：导读列表按站点抓取，旧列表（含页码 / 滚动位置）属于另一个站点，
+  /// 不能继续展示。丢掉控制器并更换 PageView 的 key，让每个 ThreadGrid 重新
+  /// `loadInitial`（新列表从第 1 页开始、滚动回到顶部）。
+  void _onSiteChanged(AppEvent _) {
+    if (!mounted) return;
+    // 空串 → build 时回退到第一个可见 Tab（与 Tab 顺序变化时的处理一致）；
+    // 控制器与 PageView 的作废在 [_ensureCtrls] / PageView key 里按站点完成。
+    setState(() => _focusView = '');
+    // 新站点的列表从第一个 Tab 开始，别停在旧站点翻到的页上
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _pageController.hasClients) _pageController.jumpToPage(0);
+    });
   }
 
   /// Tab 顺序的"冻结键"（用户设置变化时才重排）
@@ -75,6 +103,11 @@ class _GuidePageState extends State<GuidePage> {
   }
 
   void _ensureCtrls(Iterable<String> views) {
+    final host = SiteStore.instance.host;
+    if (host != _ctrlHost) {
+      _ctrlMap.clear();
+      _ctrlHost = host;
+    }
     for (final v in views) {
       _ctrlMap.putIfAbsent(
         v,
@@ -233,7 +266,9 @@ class _GuidePageState extends State<GuidePage> {
                 child: !hasTabs
                     ? const Center(child: Text('暂无可用标签'))
                     : PageView(
-                        key: ValueKey(views.join(',')),
+                        // 站点也在 key 里：切站后整棵树重建，ThreadGrid 才会重新
+                        // loadInitial（否则旧 State 的 _everLoaded=true 会跳过加载）
+                        key: ValueKey('$_ctrlHost|${views.join(',')}'),
                         controller: _pageController,
                         onPageChanged: (i) {
                           if (i >= 0 && i < views.length) {

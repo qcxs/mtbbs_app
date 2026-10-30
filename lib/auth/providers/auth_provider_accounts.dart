@@ -430,6 +430,7 @@ extension AuthAccounts on AuthProvider {
       await _restoreCookieString(account.cookieString);
     }
     _saveActive();
+    await SessionRegistry.instance.onAccountsChanged(_host);
     _notify();
   }
 
@@ -467,6 +468,8 @@ extension AuthAccounts on AuthProvider {
       jsonEncode(_currentAccounts.map((a) => a.toJson()).toList()),
     );
     await _saveActive();
+    // 账号变化后重建该站点的作用域 Dio：跨站点页面按默认账号访问时要拿到新登录态
+    await SessionRegistry.instance.onAccountsChanged(_host);
   }
 
   Future<void> _saveActive() async {

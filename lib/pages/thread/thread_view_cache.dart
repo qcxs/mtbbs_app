@@ -236,11 +236,10 @@ extension on _ThreadViewPageState {
     if (!context.read<SettingsProvider>().threadCacheEnabled) return;
     final service = ThreadCacheService.instance;
     if (service.isDisabled) return;
-    final auth = context.read<AuthProvider>();
     final pending = service.onThreadLoaded(
       data: data,
-      host: SiteStore.instance.host,
-      viewer: auth.uid,
+      host: _session.host,
+      viewer: _session.uid,
       authorid: widget.authorid,
     );
     _autoCachePending = pending;
@@ -254,9 +253,9 @@ extension on _ThreadViewPageState {
     final service = ThreadCacheService.instance;
     if (service.isDisabled) return;
     final list = await service.snapshotsForThread(
-      host: SiteStore.instance.host,
+      host: _session.host,
       tid: widget.tid,
-      viewer: context.read<AuthProvider>().uid,
+      viewer: _session.uid,
     );
     if (!mounted) return;
     _setState(() => _errorCacheCandidates = list);
@@ -297,9 +296,9 @@ extension on _ThreadViewPageState {
     final list =
         metas ??
         await ThreadCacheService.instance.snapshotsForThread(
-          host: SiteStore.instance.host,
+          host: _session.host,
           tid: widget.tid,
-          viewer: context.read<AuthProvider>().uid,
+          viewer: _session.uid,
         );
     if (!mounted) return;
     if (list.isEmpty) {
@@ -327,7 +326,7 @@ extension on _ThreadViewPageState {
     final list = await ThreadCacheService.instance.snapshotsForThread(
       host: current.host,
       tid: current.tid,
-      viewer: context.read<AuthProvider>().uid,
+      viewer: _session.uid,
     );
     if (!mounted) return;
     if (list.length <= 1) {

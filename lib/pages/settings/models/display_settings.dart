@@ -35,6 +35,13 @@ List<SettingsModel> displaySettings() => [
     subtitleBuilder: (s) => _tabNameFor(s.defaultTabIndex),
     onTap: (ctx, s) => DefaultTabDialog.show(ctx, s),
   ),
+  SwitchSetting(
+    title: '返回键双击退出',
+    subtitle: '关闭后，在默认页按一次返回键即退出（仅 Android）',
+    icon: Icons.keyboard_return,
+    value: (s) => s.doubleBackExit,
+    onChanged: (ctx, s, v) => s.setDoubleBackExit(v),
+  ),
   NormalSetting(
     title: '首页区块',
     icon: Icons.dashboard_customize,

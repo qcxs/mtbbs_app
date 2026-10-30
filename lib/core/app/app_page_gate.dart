@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 
 /// 可被内置浏览器「接管回退」的 App 页面注册表 + 开关状态。
@@ -167,7 +168,13 @@ String? siteUrlFor(String appPath) {
   final uri = Uri.tryParse(appPath);
   final id = featureIdOf(appPath);
   if (uri == null || id == null) return null;
-  final base = SiteStore.instance.baseUrl;
+  // 跨站点页面（location 带 site=<host>）：按目标站点拼站内 URL，
+  // 否则"页面接管关闭"时会回退到当前站点的错误地址
+  final siteHost = uri.queryParameters['site'];
+  final base = (siteHost == null || siteHost.isEmpty)
+      ? SiteStore.instance.baseUrl
+      : (SessionRegistry.instance.baseUrlForHost(siteHost) ??
+            SiteStore.instance.baseUrl);
   final q = uri.queryParameters;
   // 路径第 2 段（如 /thread/{tid} 的 tid）
   final seg = uri.pathSegments.length > 1 ? uri.pathSegments[1] : '';

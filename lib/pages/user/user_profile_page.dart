@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/app_capabilities.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/site_session.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/auth/providers/auth_provider.dart';
-import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/models/user_profile.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/models/browse_record.dart';
@@ -46,13 +47,34 @@ class _UserProfilePageState extends State<UserProfilePage> {
   String? _error;
   bool _showRawSignature = false;
 
+  /// 当前页面作用域的站点会话（跨站点打开时 = 目标站默认账号/游客，只读）
+  SiteSession _session = const GlobalSiteSession();
+  Dio get _dio => _session.dio;
+  bool _sessionBound = false;
+
   /// 「生成图片」预览模式：正文区切换为预览（复用本页区块，见 _contentSections）
   bool _sharing = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _session = SiteScope.of(context);
+    if (_sessionBound) return;
+    _sessionBound = true;
     _load();
+  }
+
+  /// 跨站点只读守卫：命中时提示并返回 true
+  bool _guardReadOnly() {
+    if (!_session.temporary) return false;
+    showToast('跨站点浏览为只读：发帖/留言/私信请先切换到目标站点');
+    return true;
+  }
+
+  /// 打开 App 内页面；跨站时目标页未迁移 → 提示先切站点
+  void _openAppPath(String appPath) {
+    if (_guardReadOnly()) return;
+    context.push(appPath);
   }
 
   /// 供 part 扩展使用（扩展无法直接访问受保护的 setState）
@@ -67,7 +89,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     });
     try {
       final raw = await space_api.getUserProfile(
-        ApiService().dio,
+        _dio,
         uid: widget.uid == 'self' ? '' : widget.uid,
       );
       final profile = raw['success'] == true && raw['profile'] != null
@@ -84,12 +106,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _profile = profile.toMap();
         _loading = false;
       });
-      // 加载成功保存浏览记录
-      if (context.mounted) {
+      // 加载成功保存浏览记录（跨站点临时浏览不计入当前站点历史）
+      if (context.mounted && !_session.temporary) {
         context.read<HistoryProvider>().addRecord(
           BrowseRecord(
-            id: '${SiteStore.instance.host}:user_${widget.uid}',
-            host: SiteStore.instance.host,
+            id: '${_session.host}:user_${widget.uid}',
+            host: _session.host,
             type: 'user',
             routePath: '/user/${widget.uid}',
             timestamp: DateTime.now(),
@@ -98,7 +120,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               'nickname': profile.nickname,
               'avatar': profile.avatar,
               'url':
-                  '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
+                  '${_session.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
             },
           ),
         );
@@ -113,7 +135,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   int? get _uidNum => int.tryParse(widget.uid);
 
-  void _navigateToUid(int uid) => GoRouter.of(context).replace('/user/$uid');
+  void _navigateToUid(int uid) => GoRouter.of(
+    context,
+  ).replace(SiteScope.pathFor(context, '/user/$uid'));
 
   void _showUidPicker() {
     showDialog(
@@ -193,7 +217,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         actions: [
           PageActions(
             url:
-                '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
+                '${_session.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
             onRefresh: _load,
             loading: _loading,
             copyLabel: '复制个人主页链接',
@@ -324,7 +348,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
           : '$nickname · uid=${widget.uid}',
       qrUrl: spaceUrl.isNotEmpty
           ? spaceUrl
-          : '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
+          : '${_session.baseUrl}/home.php?mod=space&uid=${widget.uid}&do=profile&from=space',
+      siteHost: _session.host,
       filePrefix: 'MTBBS_user_${widget.uid}',
       onClose: () => setState(() => _sharing = false),
     );

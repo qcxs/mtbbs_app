@@ -10,6 +10,7 @@ extension on _ThreadViewPageState {
   ///   并检查是否需要重新取一次主帖
   /// - 审核中：不追加（与网页一致，只由编辑器提示）
   Future<bool> _openEditor(String path, {String? editingPid}) async {
+    if (_guardReadOnly()) return false;
     final r = await context.push<Map<String, dynamic>>(path);
     if (!mounted || r == null || r['success'] != true) return false;
     final result = r['result'] as SubmitResult?;
@@ -33,6 +34,7 @@ extension on _ThreadViewPageState {
   /// 展开迷你编辑器，目标 = 评论帖子
   Future<void> _startComment() async {
     if (_data == null) return;
+    if (_guardReadOnly()) return;
     if (!context.read<AuthProvider>().isLoggedIn) {
       showToast('请先登录');
       return;
@@ -48,6 +50,7 @@ extension on _ThreadViewPageState {
 
   /// 展开迷你编辑器，目标 = 回复某条评论
   Future<void> _startReply(PostItem post) async {
+    if (_guardReadOnly()) return;
     if (!context.read<AuthProvider>().isLoggedIn) {
       showToast('请先登录');
       return;
@@ -255,7 +258,7 @@ extension on _ThreadViewPageState {
     try {
       await EmojiService().load();
       final raw = await viewpid_api.getPostByPid(
-        ApiService().dio,
+        _dio,
         tid: widget.tid,
         viewpid: pid,
       );
@@ -314,7 +317,7 @@ extension on _ThreadViewPageState {
     try {
       await EmojiService().load();
       final raw = await detail_api.getThreadDetail(
-        ApiService().dio,
+        _dio,
         tid: widget.tid,
         page: 1,
         authorid: widget.authorid,

@@ -41,8 +41,10 @@ extension on _UserProfilePageState {
       // 积分记录入口（仅自己）：好评/金币/信誉 → 对应类型的积分记录页
       // （`spacecp&ac=credit&op=log` 只能查看当前登录用户，故仅在本人空间可点）
       final isSelf =
-          widget.uid == 'self' ||
-          context.select<AuthProvider, String>((a) => a.uid) == widget.uid;
+          !_session.temporary &&
+          (widget.uid == 'self' ||
+              context.select<AuthProvider, String>((a) => a.uid) ==
+                  widget.uid);
 
       add(
         '积分',
@@ -56,21 +58,21 @@ extension on _UserProfilePageState {
         points['reputation']?.toString() ?? '0',
         Icons.thumb_up_outlined,
         const Color(0xFF4CAF50),
-        onTap: isSelf ? () => context.push('/credit-log?exttype=1') : null,
+        onTap: isSelf ? () => _openAppPath('/credit-log?exttype=1') : null,
       );
       add(
         '金币',
         points['goldCoins']?.toString() ?? '0',
         Icons.workspace_premium_outlined,
         const Color(0xFFFFC107),
-        onTap: isSelf ? () => context.push('/credit-log?exttype=2') : null,
+        onTap: isSelf ? () => _openAppPath('/credit-log?exttype=2') : null,
       );
       add(
         '信誉',
         points['credit']?.toString() ?? '0',
         Icons.verified_outlined,
         const Color(0xFF2196F3),
-        onTap: isSelf ? () => context.push('/credit-log?exttype=3') : null,
+        onTap: isSelf ? () => _openAppPath('/credit-log?exttype=3') : null,
       );
     }
     // 人气（移动模板独有；PC 无 → 不显示）——由头部右侧移入瓦片区
@@ -92,7 +94,7 @@ extension on _UserProfilePageState {
           stats['friends'].toString(),
           Icons.people_outlined,
           const Color(0xFFE91E63),
-          onTap: () => context.push('/friends?uid=$uid'),
+          onTap: () => _openAppPath('/friends?uid=$uid'),
         );
       }
       if (stats['replies'] != null) {
@@ -101,7 +103,7 @@ extension on _UserProfilePageState {
           stats['replies'].toString(),
           Icons.reply_outlined,
           const Color(0xFF00BCD4),
-          onTap: () => context.push('/my-threads?type=reply&uid=$uid'),
+          onTap: () => _openAppPath('/my-threads?type=reply&uid=$uid'),
         );
       }
       if (stats['threads'] != null) {
@@ -110,7 +112,7 @@ extension on _UserProfilePageState {
           stats['threads'].toString(),
           Icons.article_outlined,
           const Color(0xFF9C27B0),
-          onTap: () => context.push('/my-threads?uid=$uid'),
+          onTap: () => _openAppPath('/my-threads?uid=$uid'),
         );
       }
       if (stats['shares'] != null) {
@@ -133,7 +135,7 @@ extension on _UserProfilePageState {
         following ?? '—',
         Icons.visibility_outlined,
         const Color(0xFF3F51B5),
-        onTap: () => context.push('/follow?type=following&uid=$uid'),
+        onTap: () => _openAppPath('/follow?type=following&uid=$uid'),
       );
     }
     if (_uidNum != null || followers != null) {
@@ -142,7 +144,7 @@ extension on _UserProfilePageState {
         followers ?? '—',
         Icons.people_outline,
         const Color(0xFF00897B),
-        onTap: () => context.push('/follow?type=follower&uid=$uid'),
+        onTap: () => _openAppPath('/follow?type=follower&uid=$uid'),
       );
     }
 
@@ -163,13 +165,15 @@ extension on _UserProfilePageState {
   List<Widget> _headerActions() {
     if (widget.uid.isEmpty) return const [];
     final isSelf =
-        context.select<AuthProvider, String>((a) => a.uid) == widget.uid;
+        !_session.temporary &&
+        (context.select<AuthProvider, String>((a) => a.uid) == widget.uid);
 
     return [
       _actionItem(
         icon: Icons.forum_outlined,
         label: '留言板',
         onTap: () {
+          if (_guardReadOnly()) return;
           final nickname = _profile!['nickname'] as String? ?? '';
           context.push(
             '/user/${widget.uid}/wall'
@@ -182,6 +186,7 @@ extension on _UserProfilePageState {
           icon: Icons.mail_outline,
           label: '私信',
           onTap: () {
+            if (_guardReadOnly()) return;
             final nickname = _profile!['nickname'] as String? ?? '';
             context.push(
               '/pm/chat?touid=${widget.uid}'

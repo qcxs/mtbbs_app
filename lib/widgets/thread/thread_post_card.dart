@@ -7,6 +7,7 @@ import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
@@ -75,6 +76,10 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     return combined;
   }
 
+  /// 帖内最多展示的评分条数：52pojie 的评分列表常有一二十条，
+  /// 全量铺开会把楼层撑得很长，其余统一收进「查看全部」弹层
+  static const int _ratingPreviewRows = 10;
+
   Widget _buildRating(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final rating = widget.post.rating!;
@@ -86,126 +91,153 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     final hasReason = entries.any(
       (e) => (e['reason'] as String? ?? '').isNotEmpty,
     );
+    final preview = entries.length > _ratingPreviewRows
+        ? entries.sublist(0, _ratingPreviewRows)
+        : entries;
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.outlineVariant, width: 0.5),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (totalScore.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                totalScore,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Table(
-              border: TableBorder.all(color: cs.outline, width: 0.5),
-              defaultColumnWidth: const IntrinsicColumnWidth(),
-              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          // 标题行：图标 + 「评分」 + 汇总（克米是金额汇总，52pojie 是参与人数）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+            child: Row(
               children: [
-                // 表头行
-                TableRow(
-                  decoration: BoxDecoration(color: cs.surfaceContainerHigh),
-                  children: [
-                    _rateCell(Text('用户', style: _rateHeaderStyle(cs))),
-                    ...columns.map(
-                      (c) => _rateCell(
-                        Text(c.toString(), style: _rateHeaderStyle(cs)),
-                      ),
-                    ),
-                    if (hasReason)
-                      _rateCell(Text('理由', style: _rateHeaderStyle(cs))),
-                  ],
+                Icon(Icons.star_rounded, size: 14, color: cs.primary),
+                const SizedBox(width: 4),
+                const Text(
+                  '评分',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
-                // 数据行
-                ...entries.map((e) {
-                  final m = e as Map<String, dynamic>;
-                  final username = m['username'] as String? ?? '';
-                  final uid = m['uid'] as String? ?? '';
-                  final scores = m['scores'] as List<dynamic>? ?? [];
-                  final reason = m['reason'] as String? ?? '';
-                  return TableRow(
-                    children: [
-                      _rateCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            UserAvatar(
-                              uid: uid,
-                              nickname: username,
-                              radius: 10,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              username,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ...scores.map(
-                        (s) => _rateCell(
-                          Text(
-                            s.toString(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (hasReason)
-                        _rateCell(
-                          Text(
-                            reason,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                  );
-                }),
+                if (totalScore.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      totalScore,
+                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
+          if (entries.isNotEmpty)
+            ConstrainedBox(
+              // 兜底：10 条约 300px，即使系统字号放大也不会撑破楼层
+              constraints: const BoxConstraints(maxHeight: 340),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: _RatingTable(
+                  columns: columns,
+                  entries: preview,
+                  hasReason: hasReason,
+                ),
+              ),
+            ),
+          if (entries.length > preview.length)
+            _ratingViewAllButton(context, entries.length),
         ],
       ),
     );
   }
 
-  TextStyle _rateHeaderStyle(ColorScheme cs) => TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-    color: cs.onSurfaceVariant,
-  );
+  /// 「查看全部 N 条评分」入口
+  Widget _ratingViewAllButton(BuildContext context, int total) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showAllRatings(context),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: cs.outlineVariant, width: 0.5),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.format_list_bulleted, size: 14, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(
+                '查看全部 $total 条评分',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: cs.primary,
+                ),
+              ),
+              const Spacer(),
+              Icon(Icons.chevron_right, size: 16, color: cs.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-  /// 评分表格单元格
-  Widget _rateCell(Widget child) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: child,
+  /// 弹层展示完整评分列表（可上下滚动，列超宽时横向滚动）
+  void _showAllRatings(BuildContext context) {
+    final rating = widget.post.rating;
+    if (rating == null) return;
+    final totalScore = rating['totalScore'] as String? ?? '';
+    final columns = rating['columns'] as List<dynamic>? ?? [];
+    final entries = rating['entries'] as List<dynamic>? ?? [];
+    if (entries.isEmpty) return;
+    final hasReason = entries.any(
+      (e) => (e['reason'] as String? ?? '').isNotEmpty,
+    );
+
+    showAppSheet(
+      context: context,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AppSheetScaffold(
+          title: '评分记录（${entries.length} 人）',
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (totalScore.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      totalScore,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: _RatingTable(
+                    columns: columns,
+                    entries: entries,
+                    hasReason: hasReason,
+                    wrapReason: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -468,6 +500,125 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
           style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
         ),
       ),
+    );
+  }
+}
+
+/// 评分表格：帖内传截断后的 [entries]，弹层传全量并允许理由换行。
+class _RatingTable extends StatelessWidget {
+  const _RatingTable({
+    required this.columns,
+    required this.entries,
+    required this.hasReason,
+    this.wrapReason = false,
+  });
+
+  final List<dynamic> columns;
+  final List<dynamic> entries;
+  final bool hasReason;
+  final bool wrapReason;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Table(
+        border: TableBorder(
+          top: BorderSide(color: cs.outlineVariant, width: 0.5),
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+          horizontalInside: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+        defaultColumnWidth: const IntrinsicColumnWidth(),
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          // 表头行
+          TableRow(
+            decoration: BoxDecoration(color: cs.surfaceContainerHigh),
+            children: [
+              _cell(Text('用户', style: _headerStyle(cs))),
+              ...columns.map(
+                (c) =>
+                    _cell(Text(c.toString(), style: _headerStyle(cs))),
+              ),
+              if (hasReason) _cell(Text('理由', style: _headerStyle(cs))),
+            ],
+          ),
+          // 数据行（斑马纹便于横向阅读）
+          ...entries.asMap().entries.map((pair) {
+            final index = pair.key;
+            final m = pair.value as Map<String, dynamic>;
+            final username = m['username'] as String? ?? '';
+            final uid = m['uid'] as String? ?? '';
+            final scores = m['scores'] as List<dynamic>? ?? [];
+            final reason = m['reason'] as String? ?? '';
+            return TableRow(
+              decoration: BoxDecoration(
+                color: index.isOdd ? cs.surfaceContainer : null,
+              ),
+              children: [
+                _cell(
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      UserAvatar(uid: uid, nickname: username, radius: 10),
+                      const SizedBox(width: 4),
+                      Text(
+                        username,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ...scores.map(
+                  (s) => _cell(
+                    Text(
+                      s.toString(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                if (hasReason)
+                  _cell(
+                    ConstrainedBox(
+                      // 弹层里给理由列一个上限宽度，长理由才会换行
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(
+                        reason,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
+                        ),
+                        maxLines: wrapReason ? 3 : 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  TextStyle _headerStyle(ColorScheme cs) => TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    color: cs.onSurfaceVariant,
+  );
+
+  /// 评分表格单元格
+  Widget _cell(Widget child) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: child,
     );
   }
 }

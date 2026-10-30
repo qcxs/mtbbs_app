@@ -8,6 +8,7 @@ import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/services/api_service.dart';
 
@@ -60,9 +61,11 @@ class IgnoreCacheFileService extends FileService {
     Map<String, String>? headers,
   }) async {
     AppLogger.i('CACHE', 'download: ${_shortenUrl(url)}');
-    // 模拟浏览器行为：携带当前站点的 Referer（受「模拟浏览器请求头」设置控制）
+    // 模拟浏览器行为：携带图片所属站点的 Referer（受「模拟浏览器请求头」设置控制）。
+    // 跨站点帖子里引用目标站点的图片时，Referer 必须是目标站点，否则防盗链会拒绝。
     final reqHeaders = <String, String>{
-      if (browserHeadersEnabled()) 'Referer': SiteStore.instance.baseUrl,
+      if (browserHeadersEnabled())
+        'Referer': SessionRegistry.instance.refererForUrl(url),
       ...?headers,
     };
 

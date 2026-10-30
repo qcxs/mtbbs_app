@@ -61,7 +61,11 @@ class _GlobalShortcutsWrapperState extends State<GlobalShortcutsWrapper>
       context.go(navItems[defaultIdx].path);
       return;
     }
-    // 默认 tab → 双击退出
+    // 默认 tab → 双击退出（设置里可关闭，关闭后单次返回即退出）
+    if (!context.read<SettingsProvider>().doubleBackExit) {
+      SystemNavigator.pop();
+      return;
+    }
     final now = DateTime.now();
     if (_lastBackPress != null &&
         now.difference(_lastBackPress!).inMilliseconds < 2000) {

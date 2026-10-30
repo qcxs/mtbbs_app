@@ -22,6 +22,9 @@ class ThreadSharePage {
     required String tid,
     String threadTitle = '',
     String opUid = '',
+    // 跨站点帖子要用水印/二维码所属站点的信息；不传 = 当前站点（旧行为）
+    String? siteHost,
+    String? siteBaseUrl,
   }) {
     final settings = context.read<SettingsProvider>();
     // 「只生成内容图」：只出正文，去掉作者信息 / 评分 / 页脚（此时不显示勾选项）
@@ -45,6 +48,8 @@ class ThreadSharePage {
         tid: tid,
         threadTitle: threadTitle,
         opUid: opUid,
+        siteHost: siteHost,
+        siteBaseUrl: siteBaseUrl,
         contentOnly: contentOnly,
         renderRating: enabled.contains('rating'),
         renderQr: enabled.contains('qr'),
@@ -76,6 +81,12 @@ class _ShareCard extends StatelessWidget {
   /// 只输出正文（不含作者信息 / 评分、页脚与定位信息）
   final bool contentOnly;
 
+  /// 所属站点（跨站点帖子）；null = 当前站点
+  final String? siteHost;
+
+  /// 所属站点 baseUrl（二维码链接用）；null = 当前站点
+  final String? siteBaseUrl;
+
   const _ShareCard({
     required this.post,
     required this.threadTitle,
@@ -85,6 +96,8 @@ class _ShareCard extends StatelessWidget {
     this.renderRating = true,
     this.renderQr = true,
     this.contentOnly = false,
+    this.siteHost,
+    this.siteBaseUrl,
   });
 
   @override
@@ -218,7 +231,7 @@ class _ShareCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'MTBBS · ${SiteStore.instance.host}',
+                'MTBBS · ${siteHost ?? SiteStore.instance.host}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -263,7 +276,7 @@ class _ShareCard extends StatelessWidget {
 
   /// 二维码内容：帖子的 findpost 直达链接（无 pid 时退回帖子链接）
   String get _qrUrl {
-    final base = SiteStore.instance.baseUrl;
+    final base = siteBaseUrl ?? SiteStore.instance.baseUrl;
     if (post.pid.isNotEmpty) {
       return '$base/forum.php?mod=redirect&goto=findpost'
           '&ptid=$tid&pid=${post.pid}';

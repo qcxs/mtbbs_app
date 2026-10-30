@@ -1,3 +1,5 @@
+import 'package:mtbbs/core/app/session_registry.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 
 /// URL 路由解析结果
@@ -518,6 +520,34 @@ class UrlRouter {
       );
     }
 
+    // ==================== 站内搜索 ====================
+
+    // search.php?mod=forum&srchtxt=关键词[&srchfilter=digest]
+    if (path.endsWith('search.php')) {
+      final kw = query['srchtxt'] ?? query['kw'] ?? query['keyword'] ?? '';
+      if (kw.isNotEmpty) {
+        final filter = query['srchfilter'] ?? '';
+        final params = <String, String>{
+          'kw': kw,
+          if (filter.isNotEmpty) 'filter': filter,
+        };
+        final qs =
+            '?${params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}';
+        return UrlRouteResult(
+          label: '搜索「$kw」',
+          appPath: '/search/result$qs',
+          siteHost: otherSiteHost,
+          siteName: otherSiteName,
+        );
+      }
+      return UrlRouteResult(
+        label: '搜索（缺少关键词）',
+        appPath: null,
+        siteHost: otherSiteHost,
+        siteName: otherSiteName,
+      );
+    }
+
     // ==================== 不支持的页面 ====================
 
     return UrlRouteResult(
@@ -531,7 +561,9 @@ class UrlRouter {
   /// 决定一个链接的落地位置 —— **链接 → 页面的唯一决策点**。
   ///
   /// - 能映射到 App 内页面、且属于当前站点 → 返回 App 内路由路径
-  /// - 解析不出、属于其他站点、或不是 http(s) 链接 → 返回内置浏览器兜底路径
+  /// - 属于**其他已配置站点**、且该页面已支持跨站点访问 → 返回带 `site=<host>`
+  ///   的 App 内路径，由页面以"该站默认账号/游客"的临时身份打开
+  /// - 解析不出、属于未配置站点、或其他尚未迁移的页面 → 返回内置浏览器兜底路径
   /// - 空串 → 返回 null（调用方不跳转）
   ///
   /// 兜底路径带 `intercept=false`：内置浏览器不再二次拦截，否则会出现
@@ -554,8 +586,50 @@ class UrlRouter {
       return text;
     }
     final result = parse(text);
-    if (result.appPath != null && !result.isOtherSite) return result.appPath;
+    if (result.appPath != null) {
+      if (!result.isOtherSite) return result.appPath;
+      // 跨站点：已配置 + 页面已支持作用域访问 → 直接进 App 内（临时身份）
+      final host = result.siteHost!;
+      if (SessionRegistry.instance.baseUrlForHost(host) != null &&
+          supportsCrossSite(result.appPath!)) {
+        return withSiteParam(result.appPath!, host);
+      }
+    }
     return '/browser?url=${Uri.encodeComponent(text)}&intercept=false';
+  }
+
+  /// 已迁移到"作用域会话（SiteScope）"的页面。
+  ///
+  /// 逐步扩大：新增页面接入后把它加进来；未加入的跨站链接仍走内置浏览器，
+  /// 避免"页面用全局身份打开别的站点 → 看到错误数据"。
+  static const Set<String> crossSitePages = {
+    'thread',
+    'user',
+    'online',
+    'ranklist',
+    'darkroom',
+    'search',
+  };
+
+  /// 该 App 内路径是否支持以别的站点身份打开
+  static bool supportsCrossSite(String appPath) {
+    final path = appPath.split('?').first;
+    // 只读缓存页没有站内地址，不参与
+    if (path == '/thread/cache') return false;
+    if (path.startsWith('/thread/')) return crossSitePages.contains('thread');
+    // 用户主页：仅资料页只读；留言板（/user/x/wall）与本人(self)有写操作/本地语义，不参与
+    if (path.startsWith('/user/')) {
+      if (path.endsWith('/wall')) return false;
+      if (path == '/user/self') return false;
+      return crossSitePages.contains('user');
+    }
+    // 纯只读列表页：在线用户 / 用户排行 / 小黑屋
+    if (path == '/online' || path == '/ranklist' || path == '/darkroom') {
+      return crossSitePages.contains(path.substring(1));
+    }
+    // 搜索结果页（只读）
+    if (path == '/search/result') return crossSitePages.contains('search');
+    return false;
   }
 
   /// 构建帖子路由路径，page > 1 时附加 ?page=N

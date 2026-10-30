@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/forum/ranklist/export.dart' as ranklist_api;
-import 'package:mtbbs/core/app/site_store.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/app/site_session.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
@@ -39,11 +40,24 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
   final _loading = <String, bool>{};
   final _errors = <String, String?>{};
 
+  /// 页面作用域会话（跨站点打开时 = 目标站默认账号/游客，只读）
+  SiteSession _session = const GlobalSiteSession();
+  Dio get _dio => _session.dio;
+  bool _sessionBound = false;
+
   @override
   void initState() {
     super.initState();
     final idx = _kViews.indexWhere((v) => v.id == widget.initialView);
     _tabIndex = idx < 0 ? 0 : idx;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _session = SiteScope.of(context);
+    if (_sessionBound) return;
+    _sessionBound = true;
     _fetch(_kViews[_tabIndex].id);
   }
 
@@ -57,7 +71,7 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
     });
     try {
       final result = await ranklist_api.getMemberRanklist(
-        ApiService().dio,
+        _dio,
         view: view,
       );
       if (!mounted) return;
@@ -97,7 +111,7 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
         actions: [
           PageActions(
             url:
-                '${SiteStore.instance.baseUrl}/misc.php?mod=ranklist&type=member&view=$_currentView',
+                '${_session.baseUrl}/misc.php?mod=ranklist&type=member&view=$_currentView',
             onRefresh: () => _fetch(_currentView, force: true),
             loading: _loading[_currentView] ?? false,
             copyLabel: '复制排行榜链接',

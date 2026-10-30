@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/config/build_config.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
@@ -32,8 +33,30 @@ class AboutPage extends StatefulWidget {
   /// 宽屏设置页把本页放进右栏时传 false（外层已有自己的框架）
   final bool showAppBar;
 
-  /// 开发者 UID（唯一硬编码项，其余资料按它动态获取）
-  static const String authorUid = '88062';
+  /// 开发者 UID：作者在 MT 论坛与 52pojie 都有账号。
+  ///
+  /// 当前浏览站点是 52pojie 时用它的 UID，其它情况（MT 论坛 / 未知站点）用 MT 的。
+  static const String authorUidMt = '88062';
+  static const String authorUid52 = '2284282';
+  static const String site52Host = 'www.52pojie.cn';
+
+  /// 开发者所属站点：跟随"当前站点是否为 52pojie"
+  ///
+  /// 单独标注站点后，头像地址、个人空间链接与请求的 Referer 标识都按该站点生成，
+  /// 即使当前正在浏览别的站点也能正确取到对应论坛的资源；
+  /// 未来增加其它论坛的作者/鸣谢时，各自带自己的 host 即可。
+  static String get authorSiteHost => SiteStore.instance.host == site52Host
+      ? site52Host
+      : SpecialThanks.defaultSiteHost;
+
+  /// 作者在该站点的 UID
+  static String get authorUid =>
+      SiteStore.instance.host == site52Host ? authorUid52 : authorUidMt;
+
+  /// 作者所属站点的兜底地址（用户把该站点从配置里删掉时使用）
+  static String get authorBaseUrl => authorSiteHost == site52Host
+      ? 'https://www.52pojie.cn'
+      : 'https://bbs.binmt.cc';
 
   /// 开源仓库
   static const String repoUrl = BuildConfig.repoUrl;
@@ -64,9 +87,13 @@ class _AboutPageState extends State<AboutPage> {
   /// 开发者资料（首次从站点获取后持久化，之后读缓存）
   UserProfile? _author;
 
-  /// 开发者空间地址（跟随当前站点）
+  /// 当前 [_author] 对应的站点（切换站点后需重新加载，避免显示别的站的资料）
+  String? _authorLoadedHost;
+
+  /// 开发者空间地址（固定指向作者所属站点）
   String get _authorSpaceUrl =>
-      '${SiteStore.instance.baseUrl}/home.php?mod=space&uid=${AboutPage.authorUid}&do=profile';
+      '${SessionRegistry.instance.baseUrlForHost(AboutPage.authorSiteHost) ?? AboutPage.authorBaseUrl}'
+      '/home.php?mod=space&uid=${AboutPage.authorUid}&do=profile';
 
   /// 等级展示文本：优先「等级 + 头衔」，都为空时退回用户组
   String get _authorLevelText {
@@ -94,7 +121,11 @@ class _AboutPageState extends State<AboutPage> {
 
   /// 加载开发者资料：先读持久化缓存，缺失时按 UID 抓取一次并写回
   Future<void> _loadAuthor() async {
-    final key = 'aboutAuthorProfile_${SiteStore.instance.host}';
+    // 固定本次加载所用的站点与 UID，避免加载途中切换站点导致串号
+    final host = AboutPage.authorSiteHost;
+    final uid = AboutPage.authorUid;
+    _authorLoadedHost = host;
+    final key = 'aboutAuthorProfile_$host';
     final cached = await DatabaseHelper.instance.getSetting(key);
     if (cached != null && cached.isNotEmpty) {
       try {
@@ -106,9 +137,16 @@ class _AboutPageState extends State<AboutPage> {
       }
     }
     try {
+      // 作者资料固定在作者所属站点获取：用该站点的作用域 Dio，
+      // 头像/页面请求携带的目标站点标识（Cookie、Referer）不会跟着当前站点漂移
+      final dio = await ApiService().scopedDio(
+        host: host,
+        baseUrl: SessionRegistry.instance.baseUrlForHost(host) ??
+            AboutPage.authorBaseUrl,
+      );
       final raw = await space_api.getUserProfile(
-        ApiService().dio,
-        uid: AboutPage.authorUid,
+        dio,
+        uid: uid,
         // 作者资料是「进入关于页」附带的非关键请求：命中人机验证 / 防火墙时
         // 不能弹全局验证页（会盖在关于页上、且此请求并非用户主动发起）。
         // 打上「已处理」标记，让拦截器直接返回原响应，静默失败保留占位即可。
@@ -164,6 +202,11 @@ class _AboutPageState extends State<AboutPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
+    // 切换站点后作者身份（UID/所属站点）会变，重新读该站点的资料
+    if (_authorLoadedHost != AboutPage.authorSiteHost) {
+      _author = null;
+      _loadAuthor();
+    }
     final hash = BuildConfig.commitHash;
     final shortHash = hash.length > 7 ? hash.substring(0, 7) : hash;
     // 未注入时 buildTime 为 0，显示占位而非 1970
@@ -319,6 +362,7 @@ class _AboutPageState extends State<AboutPage> {
                 uid: AboutPage.authorUid,
                 nickname: nickname,
                 radius: 28,
+                siteHost: AboutPage.authorSiteHost,
                 tapAction: AvatarTapAction.none,
               ),
               const SizedBox(width: 16),
@@ -363,6 +407,8 @@ class _AboutPageState extends State<AboutPage> {
                         ],
                       ],
                     ),
+                    const SizedBox(height: 5),
+                    _siteBadge(cs, AboutPage.authorSiteHost),
                     if (signature.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Text(
@@ -415,20 +461,29 @@ class _AboutPageState extends State<AboutPage> {
               uid: entry.uid,
               nickname: entry.username,
               radius: 20,
+              siteHost: entry.siteHost,
               tapAction: AvatarTapAction.none,
             ),
             const SizedBox(width: 12),
-            // 左侧：用户名
+            // 左侧：用户名 + 所属站点标识
             Expanded(
               flex: 3,
-              child: Text(
-                entry.username,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    entry.username,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  _siteBadge(cs, entry.siteHost),
+                ],
               ),
             ),
             const SizedBox(width: 12),
@@ -468,21 +523,35 @@ class _AboutPageState extends State<AboutPage> {
     );
   }
 
+  /// 用户所属站点标识（如 MT论坛）：头像、链接与 Referer 都按该站点归属
+  Widget _siteBadge(ColorScheme cs, String host) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        border: Border.all(color: cs.outlineVariant),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.forum_outlined, size: 10, color: cs.onSurfaceVariant),
+          const SizedBox(width: 3),
+          Text(
+            SessionRegistry.instance.siteNameForHost(host),
+            style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 优先用 URL 路由匹配站内页面，匹配不到（或属于其他站点）再交给内置浏览器
   void _openLink(String url) {
     if (url.isEmpty) return;
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      final routeResult = UrlRouter.parse(url);
-      if (routeResult.appPath != null && !routeResult.isOtherSite) {
-        context.push(routeResult.appPath!);
-      } else {
-        context.push(
-          '/browser?url=${Uri.encodeComponent(url)}&intercept=false',
-        );
-      }
-    } else {
-      context.push(url);
-    }
+    // resolveTarget 会为"已配置且已支持作用域"的站点补齐 site 参数，
+    // 因此鸣谢里的 MT 论坛帖子/用户页在其它站点下也能直接进 App（只读）
+    final target = UrlRouter.resolveTarget(url);
+    if (target != null) context.push(target);
   }
 
   Widget _sectionTitle(String text) {

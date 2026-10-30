@@ -6,6 +6,7 @@ import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/services/thread_cache_service.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
@@ -17,6 +18,8 @@ import 'package:mtbbs/core/app/app_link.dart';
 import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/app_shortcuts.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
+import 'package:mtbbs/core/app/site_session.dart';
 import 'package:mtbbs/core/app/site_cdn.dart';
 import 'package:mtbbs/core/app/js_challenge_solver.dart';
 import 'package:mtbbs/core/app/verification_gate.dart';
@@ -104,6 +107,9 @@ void main() async {
   // （flutter_cache_manager 本身不主动删过期文件，见 docs/01 图片缓存规范）
   cleanupExpiredCaches();
 
+  // 帖子缓存同理：过期自动缓存只在启动时清一次，不阻塞首屏
+  unawaited(ThreadCacheService.instance.cleanExpired());
+
   // 用 settings 中的站点配置初始化 ApiService
   await ApiService().init(baseUrl: SiteStore.instance.baseUrl);
 
@@ -127,6 +133,18 @@ void main() async {
 
   final auth = AuthProvider();
   await auth.tryRestore();
+
+  // 站点会话注册表：把"身份"从 ApiService 单例里解耦。
+  // 主会话跟随 AuthProvider；其它站点按"默认账号（缺省游客）"预建作用域 Dio，
+  // 这样跨站点链接可以直接在 App 内打开（见 core/app/session_registry.dart）。
+  SessionRegistry.instance.bindIdentity(
+    () => SiteIdentity(
+      uid: auth.uid,
+      username: auth.username,
+      isLoggedIn: auth.isLoggedIn,
+    ),
+  );
+  await SessionRegistry.instance.init();
 
   // 人机验证页只注入登录 cookie 串（而非整个罐）：罐里可能存着服务端已判过期的
   // 防护 cookie，灌进验证页会让挑战继续拿到旧值，形成"每次冷启动都要验证"的死锁。
