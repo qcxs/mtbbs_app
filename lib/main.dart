@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/services/thread_cache_service.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/providers/search_history_provider.dart';
@@ -24,7 +25,6 @@ import 'package:mtbbs/core/app/site_cdn.dart';
 import 'package:mtbbs/core/app/js_challenge_solver.dart';
 import 'package:mtbbs/core/app/verification_gate.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
-import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/app/event_bus.dart';
 import 'package:mtbbs/core/app/notice_badge.dart';
 import 'package:mtbbs/core/app/notice_nav_store.dart';
@@ -32,7 +32,6 @@ import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/api/forum/misc/export.dart' as forum_misc;
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/models/post_preview.dart';
-import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/core/app/desktop_window.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/max_screen_size.dart';
@@ -80,28 +79,12 @@ void main() async {
   final settings = SettingsProvider();
   await settings.load(); // 加载持久化站点列表覆盖默认值
 
-  // 恢复上次自动识别的站点 CDN（供 SiteStore.cdnUrl 同步读取）
-  await SiteCdnStore.instance.loadIfNeeded();
-
   // 桌面窗口初始化：最小尺寸 + 恢复上次窗口尺寸/位置/最大化状态
   // （依赖 settings.themeMode，故放在 settings 加载后）
   await initDesktopWindow(brightness: windowBrightnessFor(settings.themeMode));
 
-  // 同步通用错峰间隔到全局队列
-  setStaggerInterval(Duration(milliseconds: settings.staggerInterval));
-
-  // 用用户配置初始化缓存管理器
-  initCacheManagers(
-    emojiDays: settings.emojiCacheDays,
-    avatarDays: settings.avatarCacheDays,
-    imageDays: settings.imageCacheDays,
-    medalDays: settings.medalCacheDays,
-  );
-
-  // 头像重定向映射有效期与头像缓存周期一致（-1 表示永不过期）
-  AvatarRedirectStore.instance.cacheTtl = Duration(
-    days: settings.avatarCacheDays,
-  );
+  // 把错峰间隔、缓存管理器、头像重定向有效期同步到全局服务
+  settings.applyRuntimeConfig();
 
   // 过期缓存自动删除：仅启动时清一次
   // （flutter_cache_manager 本身不主动删过期文件，见 docs/01 图片缓存规范）
@@ -117,11 +100,15 @@ void main() async {
   // 弹出浏览器让用户通过验证，通过后自动重放原请求。
   // 检测见 ApiService._recoverFromInterstitial / looksLikeInterstitialPage。
   ApiService().interstitialHandler = VerificationGate.instance.handle;
-  VerificationGate.instance.isEnabled = () => settings.interstitialAutoVerify;
+  VerificationGate.instance.isEnabled = (host) =>
+      SettingsRepository.instance.site(host).network.interstitialAutoVerify;
 
   // 设置项「人机验证改用网页完成」：打开后跳过 L1 本地自解，强制走 WebView，
   // 用于排查验证页本身的问题（L1 上线后 L2 平时不会被触发）。
-  JsChallengeSolver.instance.skipLocalSolve = () => settings.acwForceWebview;
+  JsChallengeSolver.instance.skipLocalSolve = (pageUrl) {
+    final host = Uri.tryParse(pageUrl)?.host ?? SiteStore.instance.host;
+    return SettingsRepository.instance.site(host).network.acwForceWebview;
+  };
 
   // 订阅站点切换事件 — ApiService 已就绪，可安全调用 switchSite
   EventBus.stream.where((e) => e is SiteChangedEvent).listen((_) async {

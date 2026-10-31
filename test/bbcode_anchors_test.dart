@@ -75,11 +75,11 @@ void main() {
   });
 
   group('切分粒度', () {
-    test('空行分段', () {
+    test('每行一个锚点，空行并入前一行', () {
       const src = '第一段\n还是第一段\n\n第二段\n\n第三段';
       final a = bbAnchors(src);
-      expect(a.length, 3);
-      expect(a.map((e) => e.start).toList(), [0, 11, 16]);
+      expect(a.length, 4);
+      expect(a.map((e) => e.start).toList(), [0, 4, 11, 16]);
       expect(a.map((e) => e.kind).toSet(), {BbBlockKind.text});
     });
 
@@ -92,13 +92,13 @@ void main() {
         BbBlockKind.code,
       ]);
       // 引用块内的换行不拆锚点（粒度只到顶层块）
-      expect(a[0].raw, '[quote]引用\n第二行[/quote]');
-      // 文本锚点的"行"取内容首字所在行，不是切片起点（切片以 \n 开头）
-      expect(a[1].raw, '\n普通文字\n');
+      expect(a[0].raw, '[quote]引用\n第二行[/quote]\n');
+      // 文本锚点的"行"取内容首字所在行
+      expect(a[1].raw, '普通文字\n');
       expect(a[1].line, 2);
     });
 
-    test('整行加粗标题也算一段（论坛最常见的小节写法）', () {
+    test('连续多行（含加粗标题）逐行成锚点', () {
       const src =
           '[b]搜索[/b]\n'
           '支持uid、tid、username\n'
@@ -106,14 +106,15 @@ void main() {
           '利用已有信息反推积分\n'
           '[b]内置浏览器[/b]';
       final a = bbAnchors(src);
-      expect(a.length, 3);
-      expect(a.map((e) => e.line).toList(), [0, 2, 4]);
-      expect(a.map((e) => e.label).toList(), ['搜索', '积分分析', '内置浏览器']);
+      expect(a.length, 5);
+      expect(a.map((e) => e.line).toList(), [0, 1, 2, 3, 4]);
+      expect(a.first.label, '搜索');
+      expect(a.map((e) => e.raw).join(), src);
     });
 
-    test('加粗只包住句首时不当作标题', () {
+    test('加粗只包住句首也按行切分', () {
       const src = '[b]注意[/b]这里只是句首加粗，整行不是标题\n第二行';
-      expect(bbAnchors(src).length, 1);
+      expect(bbAnchors(src).length, 2);
     });
 
     test('行内标签不产生锚点边界', () {
@@ -121,6 +122,20 @@ void main() {
       final a = bbAnchors(src);
       expect(a.length, 1);
       expect(a.first.raw, src);
+    });
+
+    test('跨行行内标签不切开（否则两块各带半个标签）', () {
+      const src = '[color=red]第一行\n第二行[/color]\n第三行';
+      final a = bbAnchors(src);
+      expect(a.map((e) => e.raw).toList(), [
+        '[color=red]第一行\n第二行[/color]\n',
+        '第三行',
+      ]);
+    });
+
+    test('未闭合标签内部不切（畸形输入也不撕开）', () {
+      const src = '[quote]第一行\n第二行\n第三行';
+      expect(bbAnchors(src).length, 1);
     });
   });
 
@@ -134,7 +149,7 @@ void main() {
         BbBlockKind.text,
       ]);
       expect(a[1].label, '图片');
-      expect(a[1].raw, '[img]https://a.com/1.png[/img]');
+      expect(a[1].raw, '[img]https://a.com/1.png[/img]\n');
       expect(a[2].label, '文字2');
     });
 
@@ -146,8 +161,8 @@ void main() {
     test('纯空白锚点并入相邻锚点（不单独成一个渲染单元）', () {
       const src = '开头\n[hr]\n[hr]\n结尾';
       final a = bbAnchors(src);
-      // 两个 [hr] 之间只有一个换行，它会并进前一个 hr，而不是自成一块
-      expect(a.map((e) => e.raw).toList(), ['开头\n', '[hr]\n', '[hr]', '\n结尾']);
+      // 两个 [hr] 之间的换行并入前一个 hr，而不是自成一块
+      expect(a.map((e) => e.raw).toList(), ['开头\n', '[hr]\n', '[hr]\n', '结尾']);
       for (final e in a) {
         expect(e.raw.trim(), isNotEmpty);
       }

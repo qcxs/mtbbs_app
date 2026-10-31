@@ -494,6 +494,97 @@ void main() {
     });
   });
 
+  group('标题状态徽标（回收站 / 关闭）解析', () {
+    test('克米移动卡片：状态进入 statusLabels，不混入标题', () {
+      const html =
+          ''
+          '<ul>'
+          '<li class="forumlist_li comiis_znalist">'
+          '<div class="mmlist_li_box cl">'
+          '<h2><a href="thread-173563-1-1.html">'
+          '<span class="comiis_xifont f_g">回收站</span>mt论坛app新增mcp</a></h2>'
+          '</div>'
+          '</li>'
+          '<li class="forumlist_li comiis_znalist">'
+          '<div class="mmlist_li_box cl">'
+          '<h2><a href="thread-167874-1-1.html">'
+          '<span class="bg_del f_f">关闭</span>麻烦处理一下广告</a></h2>'
+          '</div>'
+          '</li>'
+          '<li class="forumlist_li comiis_znalist">'
+          '<div class="mmlist_li_box cl">'
+          '<h2><a href="thread-2000-1-1.html">'
+          '<span class="bg_c f_f">精</span>'
+          '<span class="bg_a f_f" title="热度: 116"><i class="comiis_font kmhotico"></i></span>'
+          '精华帖子标题</a></h2>'
+          '</div>'
+          '</li>'
+          '</ul>';
+      final result = parseThreadList(html);
+      expect(result.length, 3);
+
+      expect(result[0].title, 'mt论坛app新增mcp');
+      expect(result[0].statusLabels, ['回收站']);
+
+      expect(result[1].title, '麻烦处理一下广告');
+      expect(result[1].statusLabels, ['关闭']);
+
+      // 「精」仍走 digest；纯图标 span（热度）不算状态
+      expect(result[2].digest, 1);
+      expect(result[2].statusLabels, isNull);
+      expect(result[2].title, '精华帖子标题');
+    });
+
+    test('标准 Discuz 空间表格：recy 类 / span.xg1 已关闭', () {
+      const html =
+          ''
+          '<div class="tl"><form><table>'
+          '<tr class="th">'
+          '<td class="icn">&nbsp;</td><th>主题</th>'
+          '<td class="frm">版块/群组</td><td class="num">回复/查看</td>'
+          '<td class="by"><cite>最后发帖</cite></td>'
+          '</tr>'
+          '<tr>'
+          '<td class="icn"><a href="forum.php?mod=viewthread&tid=173563">'
+          '<img src="folder_common.gif"></a></td>'
+          '<th><a href="thread-173563-1-1.html" class="recy">mt论坛app新增mcp</a>'
+          '<span class="tps">... <a>1</a></span></th>'
+          '<td><a href="forum-42-1.html">编程开发</a></td>'
+          '<td class="num"><a>10</a><em>100</em></td>'
+          '<td class="by"><cite><a>u</a></cite><em><a>昨天 02:55</a></em></td>'
+          '</tr>'
+          '<tr>'
+          '<td class="icn"><a><img src="folder_lock.gif"></a></td>'
+          '<th><a href="thread-167874-1-1.html">麻烦康哥处理一下广告</a>'
+          '<span class="xg1">已关闭</span></th>'
+          '<td><a href="forum-40-1.html">休闲灌水</a></td>'
+          '<td class="num"><a>1</a><em>2</em></td>'
+          '<td class="by"><cite><a>u2</a></cite><em><a>6天前</a></em></td>'
+          '</tr>'
+          '</table></form></div>';
+      final result = parseThreadList(html);
+      expect(result.length, 2);
+
+      expect(result[0].title, 'mt论坛app新增mcp');
+      expect(result[0].statusLabels, ['回收站']);
+
+      expect(result[1].title, '麻烦康哥处理一下广告');
+      expect(result[1].statusLabels, ['已关闭']);
+    });
+
+    test('无状态徽标的卡片 statusLabels 为 null', () {
+      const html =
+          ''
+          '<ul><li class="forumlist_li comiis_znalist">'
+          '<div class="mmlist_li_box cl">'
+          '<h2><a href="thread-1-1-1.html">普通标题</a></h2>'
+          '</div></li></ul>';
+      final result = parseThreadList(html);
+      expect(result.length, 1);
+      expect(result[0].statusLabels, isNull);
+    });
+  });
+
   group('多模板混合 - 工厂自动选择', () {
     test('同一 HTML 包含三种特征时，ComiisCardParser 优先', () {
       // 同时包含 comiis_znalist、th.common、comiis_postlist

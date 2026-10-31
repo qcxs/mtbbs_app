@@ -68,6 +68,12 @@ class _FixedFontSettings extends SettingsProvider {
   double get fontSize => 24;
 }
 
+/// 代码块不限制行数（设置项填 0）
+class _NoLimitCodeSettings extends SettingsProvider {
+  @override
+  int get codeBlockMaxLines => 0;
+}
+
 /// 取「包含指定文本的 RichText」的字号
 double? _fontSizeOf(String s) {
   for (final el in find.byType(RichText).evaluate()) {
@@ -557,6 +563,70 @@ void main() {
         find.byType(BbcodeCodeBlock),
       );
       expect(block.fontSize, 24);
+    });
+  });
+
+  group('⑬ 代码块行数折叠', () {
+    testWidgets('长代码折叠；「查看全部代码」打开抽屉，关闭后仍折叠', (tester) async {
+      await tester.pumpWidget(_post('[code]var x = 1;[/code]'));
+      await _settle(tester);
+      expect(find.text('查看全部代码'), findsNothing);
+
+      final long = List.generate(60, (i) => 'line$i();').join('\n');
+      await tester.pumpWidget(_post('[code]$long[/code]'));
+      await _settle(tester);
+      expect(find.text('查看全部代码'), findsOneWidget);
+
+      final collapsedHeight = tester
+          .getSize(find.byType(BbcodeCodeBlock))
+          .height;
+
+      await tester.ensureVisible(find.text('查看全部代码'));
+      await tester.tap(find.text('查看全部代码'));
+      await tester.pumpAndSettle();
+      // 抽屉标题：代码 · 语言（60 行）
+      expect(find.textContaining('代码 · '), findsOneWidget);
+      expect(find.textContaining('（60 行）'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('关闭'));
+      await tester.pumpAndSettle();
+      // 正文里仍是折叠态（抽屉只做查看，不原地展开）
+      expect(find.text('查看全部代码'), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(BbcodeCodeBlock)).height,
+        collapsedHeight,
+      );
+    });
+
+    testWidgets('设置变更即时生效：18 行 → 不限制', (tester) async {
+      final long = List.generate(60, (i) => 'line$i();').join('\n');
+      await tester.pumpWidget(
+        _wrap(PostHtmlWidget(bbcode: '[code]$long[/code]')),
+      );
+      await _settle(tester);
+      expect(find.text('查看全部代码'), findsOneWidget);
+
+      // 换成「不限制」后应立即展开（设置项变化要能穿透 HtmlWidget 的 html 缓存）
+      await tester.pumpWidget(
+        _wrap(
+          PostHtmlWidget(bbcode: '[code]$long[/code]'),
+          settings: _NoLimitCodeSettings(),
+        ),
+      );
+      await _settle(tester);
+      expect(find.text('查看全部代码'), findsNothing);
+    });
+
+    testWidgets('设置项为 0（不限制）时不折叠', (tester) async {
+      final long = List.generate(60, (i) => 'line$i();').join('\n');
+      await tester.pumpWidget(
+        _wrap(
+          PostHtmlWidget(bbcode: '[code]$long[/code]'),
+          settings: _NoLimitCodeSettings(),
+        ),
+      );
+      await _settle(tester);
+      expect(find.text('查看全部代码'), findsNothing);
     });
   });
 }

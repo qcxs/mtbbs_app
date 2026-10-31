@@ -11,9 +11,13 @@
 /// 3. **无损**：`anchors.map((a) => a.raw).join() == 原文`，且首尾相接。
 ///    切分只切分、不改写，因此切完之后两边渲染的内容与整篇渲染完全同源。
 ///
-/// 切分粒度 = 顶层块（复用 [splitBbcodeBlocks]）+ 文本块内的**空行分段**
-/// + 整行加粗标题。理由：论坛正文里"段"就是作者心里的最小单位，
-/// 一张图、一段引用、一行小标题各成一个锚点，标记槽不会糊成一片。
+/// 切分粒度 = 顶层块（复用 [splitBbcodeBlocks]）+ 文本块内**每一行**各成一个
+/// 锚点。理由：连续多行文字若只算一个锚点，预览的标记槽就只剩一个点，
+/// 长段落里根本没法定位；按行切之后每一行都能双向跳转。
+///
+/// 唯一例外是**跨行标签**：某行起点仍在 `[b]` / `[color]` / `[url]` / 未闭合
+/// 块标签内部时，切下去会得到两个各带半个标签的切片，各自渲染都会坏。
+/// 这种行只能并入上一个锚点——宁可粗，不可错。
 library;
 
 import 'dart:math' as math;
@@ -79,14 +83,8 @@ const _kindLabels = <BbBlockKind, String>{
   BbBlockKind.hr: '分隔线',
 };
 
-/// 整行就是一个加粗标题（`[b]…[/b]`）—— 论坛正文最常见的小节写法。
-///
-/// `[b]` 是行内标签、不产生块边界；不特判的话，"标题 + 正文 + 图片"这种
-/// 没有空行的帖子几乎没有分段可用。
-final _wholeLineBoldTitle = RegExp(
-  r'^\s*\[b\][\s\S]*?\[/b\]\s*$',
-  caseSensitive: false,
-);
+/// 匹配任意 BBCode 标记 —— 只用于判断"某行起点是否还在标签内部"。
+final _bbTagPattern = RegExp(r'\[(/)?([a-zA-Z*]+)(?:=[^\]]*)?\]');
 
 /// 标签提示最多取几个字
 const _labelMaxChars = 16;
@@ -212,30 +210,66 @@ BbAnchor _anchor(
   );
 }
 
-/// 文本块内的段落起点（升序，首个恒为 [start]）。
+/// 文本块内的锚点起点（升序，首个恒为 [start]）。
 ///
-/// 段落边界只有两种：
-/// * 空行之后的第一行（作者用空行分段）
-/// * 整行加粗标题（论坛里的小节写法，通常不配空行）
+/// **每行一个起点**：一大段连续文字逐行都能定位，标记槽不会只剩一个点。
+/// 纯空行也在这里产生起点，但随后被 [_mergeBlank] 并回相邻锚点，
+/// 不会单独占一个渲染单元。
+/// 跨行标签内部的行首不切（见 [_lineStartsInsideTags]）。
 List<int> _paragraphStarts(
   String source,
   List<BbSourceLine> lines,
   int start,
   int end,
 ) {
+  final locked = _lineStartsInsideTags(source, lines, start, end);
   final starts = <int>[start];
   for (var i = _lineOf(lines, start); i < lines.length; i++) {
     final lineStart = lines[i].start;
     if (lineStart >= end) break;
     if (lineStart <= start) continue; // [start] 所在行（或更前）不产生新段
-    final text = lines[i].text;
-    if (text.trim().isEmpty) continue;
-    final blankBefore = lines[i - 1].text.trim().isEmpty;
-    if (blankBefore || _wholeLineBoldTitle.hasMatch(text)) {
-      if (starts.last != lineStart) starts.add(lineStart);
-    }
+    if (locked.contains(lineStart)) continue;
+    if (starts.last != lineStart) starts.add(lineStart);
   }
   return starts;
+}
+
+/// 文本块内**仍处于未闭合标签内部**的行首偏移。
+///
+/// 多行行内标签（`[b]`/`[color]`/`[url]`…）或未闭合的块级标签（畸形输入）
+/// 会把"标签"横跨到下一行：在行首切一刀，两个切片各带半个标签，
+/// 各自渲染都会坏。这类行首进入返回值，[_paragraphStarts] 据此不切。
+///
+/// 只扫本文本块区间；`[hr]` 这类自闭合标签不参与配对（见 [isBbcodePairedTag]）。
+Set<int> _lineStartsInsideTags(
+  String source,
+  List<BbSourceLine> lines,
+  int start,
+  int end,
+) {
+  final locked = <int>{};
+  final open = <String>[];
+  for (var i = _lineOf(lines, start); i < lines.length; i++) {
+    final lineStart = lines[i].start;
+    if (lineStart >= end) break;
+    if (lineStart > start && open.isNotEmpty) locked.add(lineStart);
+    // 首个行可能从块起点之前开始（块边界落在行中间），只扫块内部分
+    final scanStart = math.max(lineStart, start);
+    final scanEnd = math.min(end, lineStart + lines[i].text.length);
+    if (scanStart >= scanEnd) continue;
+    for (final m in _bbTagPattern.allMatches(source, scanStart)) {
+      if (m.start >= scanEnd) break;
+      final tag = m.group(2)!.toLowerCase();
+      if (!isBbcodePairedTag(tag)) continue;
+      if (m.group(1) == '/') {
+        final idx = open.lastIndexWhere((t) => t == tag);
+        if (idx >= 0) open.removeRange(idx, open.length);
+      } else {
+        open.add(tag);
+      }
+    }
+  }
+  return locked;
 }
 
 /// 该区间内第一个非空白字符的偏移；整段皆空白时返回 null

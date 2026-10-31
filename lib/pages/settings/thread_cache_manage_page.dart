@@ -8,6 +8,7 @@ import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/thread_cache_database.dart';
 import 'package:mtbbs/models/thread_snapshot.dart';
+import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/pages/thread/thread_view_page.dart';
 import 'package:mtbbs/platform/optional/file_pick.dart';
 import 'package:mtbbs/platform/optional/file_save.dart';

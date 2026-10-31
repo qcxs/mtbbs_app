@@ -51,8 +51,10 @@ extension SettingsAccessors on SettingsProvider {
 
   Map<String, String> get shortcuts => Map.unmodifiable(_shortcuts);
 
-  bool get simulateBrowserHeaders => _simulateBrowserHeaders;
-  bool get interstitialAutoVerify => _interstitialAutoVerify;
+  bool get simulateBrowserHeaders =>
+      _currentSite.network.simulateBrowserHeaders;
+  bool get interstitialAutoVerify =>
+      _currentSite.network.interstitialAutoVerify;
 
   /// 消息未读标记样式（隐藏 / 红点 / 数字）
   NoticeBadgeMode get noticeBadgeMode => _noticeBadgeMode;
@@ -63,21 +65,25 @@ extension SettingsAccessors on SettingsProvider {
   /// 计入底栏未读的分组 id
   Set<String> get noticeBadgeGroups => Set.unmodifiable(_noticeBadgeGroups);
 
-  /// 跳过本地自解，强制走内置浏览器完成人机验证
-  bool get acwForceWebview => _acwForceWebview;
+  /// 跳过本地自解，强制走内置浏览器完成人机验证（当前站点）
+  bool get acwForceWebview => _currentSite.network.acwForceWebview;
 
   /// 开发者选项是否已解锁
   bool get developerMode => _developerMode;
 
-  /// 该页面是否仍由 App 接管（false = 已改为走内置浏览器）
-  bool isAppPageEnabled(String id) => appPageEnabled(id);
+  /// 该页面是否仍由 App 接管（当前站点；false = 已改为走内置浏览器）
+  bool isAppPageEnabled(String id) =>
+      !_currentSite.pages.disabledPageIds.contains(id);
 
-  /// 是否处于"整体退化为内置浏览器"模式（逃生阀）
-  bool get browserOnlyMode => _browserOnlyMode;
+  /// 当前站点是否整体退化为内置浏览器
+  bool get browserOnlyMode => _currentSite.pages.browserOnly;
   int get staggerInterval => _staggerInterval;
 
-  /// 站点正文字数上限（编辑器 / 留言板共用），未配置时返回默认 65535
-  int get postMaxLength => _postMaxLength;
+  /// 站点正文字数上限（当前站点）
+  int get postMaxLength => _currentSite.content.postMaxLength;
+
+  /// 当前站点的个人空间数据源覆盖
+  String get spaceSource => _currentSite.content.spaceSource;
   int get avatarCacheDays => _avatarCacheDays;
   int get emojiCacheDays => _emojiCacheDays;
   int get imageCacheDays => _imageCacheDays;
@@ -88,6 +94,12 @@ extension SettingsAccessors on SettingsProvider {
 
   /// 帖子自动缓存总开关（默认开启）
   bool get threadCacheEnabled => _threadCacheEnabled;
+
+  /// 每帖保留的自动缓存正文版本数
+  int get threadCacheMaxVersions => _threadCacheMaxVersions;
+
+  /// 单帖最大缓存大小（KB）
+  int get threadCacheMaxKB => _threadCacheMaxKB;
   ThemeMode get themeMode => _themeMode;
   Color get seedColor => _seedColor;
   bool get isPureBlackTheme => _isPureBlackTheme;
@@ -127,10 +139,10 @@ extension SettingsAccessors on SettingsProvider {
   /// 用户已跳过的新版本 tag（'' = 未跳过）
   String get skippedUpdateVersion => _skippedUpdateVersion;
 
-  String get creditFormula => _creditFormula;
+  String get creditFormula => _currentSite.creditFormula;
 
   List<ManagedItem> get shortcutLinks =>
-      List.unmodifiable(_shortcutLinks[SiteStore.instance.host] ?? []);
+      List.unmodifiable(_currentSite.shortcutLinks);
 
   int get minSnapshotWordCount => _minSnapshotWordCount;
   int get autoSaveInterval => _autoSaveInterval;

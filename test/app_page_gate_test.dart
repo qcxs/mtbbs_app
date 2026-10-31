@@ -1,17 +1,34 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
+import 'package:mtbbs/models/settings/site_settings.dart';
 
 /// 「页面接管」开关：页面注册表、appPath ↔ 站内 URL 互查、以及唯一决策点
 /// [appPageRedirect]（GoRouter 顶层 redirect 调它）。
 void main() {
   SiteStore.instance.init();
   final base = SiteStore.instance.baseUrl;
+  final host = SiteStore.instance.host;
+  final repo = SettingsRepository.instance;
 
-  setUp(() {
-    applyDisabledAppPages(const <String>{}); // 每个用例前复位为"全部开启"
-    applyBrowserOnlyMode(false); // 复位降级模式
-  });
+  void reset() {
+    repo.debugSetSite(SiteSettings.defaults(host));
+  }
+
+  void closePages(Set<String> ids) {
+    final s = repo.site(host);
+    repo.debugSetSite(
+      s.copyWith(pages: s.pages.copyWith(disabledPageIds: ids)),
+    );
+  }
+
+  void setBrowserOnly(bool value) {
+    final s = repo.site(host);
+    repo.debugSetSite(s.copyWith(pages: s.pages.copyWith(browserOnly: value)));
+  }
+
+  setUp(reset); // 每个用例前复位为"全部开启 / 不降级"
 
   group('featureIdOf - App 路径 → 页面 id', () {
     test('内容页命中（带 query 也能识别）', () {
@@ -170,7 +187,7 @@ void main() {
     });
 
     test('关闭某页 → 回退内置浏览器（URL 已编码 + intercept=false）', () {
-      applyDisabledAppPages({'thread'});
+      closePages({'thread'});
       final target = appPageRedirect('/thread/123');
       expect(
         target,
@@ -181,17 +198,17 @@ void main() {
     });
 
     test('关闭但算不出站内地址 → 仍走 App（不硬凑地址）', () {
-      applyDisabledAppPages({'editor'});
+      closePages({'editor'});
       expect(appPageRedirect('/editor?type=comment'), isNull);
     });
 
     test('关闭"用户主页"不误伤留言板（子路径已按 wall 识别）', () {
-      applyDisabledAppPages({'user'});
+      closePages({'user'});
       expect(appPageRedirect('/user/1'), isNotNull); // 主页按开关回退浏览器
       // 留言板走自己的开关（默认开）→ 仍进 App，不会被错拼成主页 URL
       expect(appPageRedirect('/user/1/wall'), isNull);
       // 单独关闭留言板 → 回退到留言板 URL（而非主页 URL）
-      applyDisabledAppPages({'wall'});
+      closePages({'wall'});
       expect(
         appPageRedirect('/user/1/wall'),
         contains(Uri.encodeComponent('do=wall')),
@@ -199,7 +216,7 @@ void main() {
     });
 
     test('关闭"站内搜索结果"不影响搜索中心入口页', () {
-      applyDisabledAppPages({'search'});
+      closePages({'search'});
       expect(appPageRedirect('/search'), isNull); // 入口页照常进 App
       expect(
         appPageRedirect('/search/result?kw=abc'),
@@ -208,21 +225,21 @@ void main() {
     });
 
     test('PC 专属页（在线用户 / 小黑屋）回退时带 ua=pc', () {
-      applyDisabledAppPages({'online', 'darkroom'});
+      closePages({'online', 'darkroom'});
       expect(
         appPageRedirect('/online'),
         '/browser?url=${Uri.encodeComponent('$base/forum.php?showoldetails=yes')}&ua=pc&intercept=false',
       );
       expect(appPageRedirect('/darkroom'), contains('&ua=pc'));
       // 普通页不受影响，不带 ua=pc
-      applyDisabledAppPages({'thread'});
+      closePages({'thread'});
       expect(appPageRedirect('/thread/1'), isNot(contains('ua=pc')));
     });
   });
 
   group('终极降级（browserOnlyMode）', () {
     test('开启后除浏览器 / 设置外全部走浏览器', () {
-      applyBrowserOnlyMode(true);
+      setBrowserOnly(true);
       // 有站内地址的内容页 → 用该页地址
       expect(appPageRedirect('/thread/123'), contains('/browser?url='));
       expect(
@@ -241,15 +258,15 @@ void main() {
     });
 
     test('PC 专属页在降级模式下仍带 ua=pc', () {
-      applyBrowserOnlyMode(true);
+      setBrowserOnly(true);
       expect(appPageRedirect('/online'), contains('&ua=pc'));
       expect(appPageRedirect('/thread/1'), isNot(contains('ua=pc')));
     });
 
     test('关闭降级后恢复正常（逐页开关重新生效）', () {
-      applyBrowserOnlyMode(false);
+      setBrowserOnly(false);
       expect(appPageRedirect('/thread/123'), isNull);
-      applyDisabledAppPages({'thread'});
+      closePages({'thread'});
       expect(appPageRedirect('/thread/123'), contains('/browser?url='));
     });
 
@@ -269,7 +286,7 @@ void main() {
     });
 
     test('applyDisabledAppPages 过滤不在注册表内的 id', () {
-      applyDisabledAppPages({'thread', '不存在的页面'});
+      closePages({'thread', '不存在的页面'});
       expect(appPageEnabled('thread'), isFalse);
       expect(disabledAppPages, {'thread'});
     });

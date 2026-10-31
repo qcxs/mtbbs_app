@@ -26,6 +26,44 @@ List<SettingsModel> contentSettings() => [
     ),
   ),
   NormalSetting(
+    title: '代码块最大行数',
+    icon: Icons.code,
+    subtitleBuilder: (s) => s.codeBlockMaxLines <= 0
+        ? '不限制（完整展开）'
+        : '${s.codeBlockMaxLines} 行，超出折叠',
+    onTap: (ctx, s) => showNumberDialog(
+      context: ctx,
+      title: '代码块最大行数',
+      description:
+          '代码块超过该行数时折叠，底部出现「查看全部代码」，点开可展开 / 收起。'
+          '默认 18 行；填 0 = 不限制。',
+      initValue: s.codeBlockMaxLines,
+      min: 0,
+      max: 200,
+      helperText: '默认 18 行；0 = 不限制',
+      onSave: (v) => s.setCodeBlockMaxLines(v),
+    ),
+  ),
+  NormalSetting(
+    title: '评分区最多显示',
+    icon: Icons.star_outline,
+    subtitleBuilder: (s) => s.ratingMaxRows <= 0
+        ? '不限制（全部显示）'
+        : '${s.ratingMaxRows} 条',
+    onTap: (ctx, s) => showNumberDialog(
+      context: ctx,
+      title: '评分区最多显示',
+      description:
+          '楼层内评分表最多显示多少条，其余收进「查看全部 N 条评分」入口。'
+          '默认 10 条；填 0 = 全部显示。',
+      initValue: s.ratingMaxRows,
+      min: 0,
+      max: 100,
+      helperText: '默认 10 条；0 = 不限制',
+      onSave: (v) => s.setRatingMaxRows(v),
+    ),
+  ),
+  NormalSetting(
     title: '禁用样式标签',
     icon: Icons.palette_outlined,
     subtitleBuilder: (s) => s.disabledBbcodeTags.isEmpty

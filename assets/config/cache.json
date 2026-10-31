@@ -7,6 +7,6 @@
   },
   "thread": {
     "expireDays": 1,
-    "maxBytesPerThread": 4194304
+    "maxBytesPerThread": 131072
   }
 }

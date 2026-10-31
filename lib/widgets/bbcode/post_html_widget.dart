@@ -113,6 +113,10 @@ class PostHtmlWidget extends StatelessWidget {
     final maxImageWidth = context.select<SettingsProvider, int>(
       (s) => s.maxImageWidth,
     );
+    // 代码块折叠行数（0 = 不限制）
+    final codeBlockMaxLines = context.select<SettingsProvider, int>(
+      (s) => s.codeBlockMaxLines,
+    );
     // 正文字号：显式值优先，否则跟随设置项（与 disabledTags 同一套"可覆盖"约定）
     final textSize =
         fontSize ?? context.select<SettingsProvider, double>((s) => s.fontSize);
@@ -134,6 +138,21 @@ class PostHtmlWidget extends StatelessWidget {
 
     final htmlWidget = HtmlWidget(
       html,
+      // flutter_widget_from_html 按 html 字符串缓存 widget 树，html 不变就
+      // 不重建、也不会重跑 customWidgetBuilder。而 [code] 原文是走
+      // `codeBlocks` 旁路注入的（HTML 里只有占位 div），代码变化时 html
+      // 完全相同 → 缓存命中 → 代码块沿用旧内容；同理，只影响注入参数
+      // （字号/图片宽度/代码块行数）的设置变更也不会生效。
+      // 用「html + 注入参数 + 代码原文」的指纹作 key，任一变化即整体重建。
+      key: ValueKey(
+        Object.hashAll([
+          html,
+          textSize,
+          maxImageWidth,
+          codeBlockMaxLines,
+          ...codeBlocks,
+        ]),
+      ),
       // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
       buildAsync: false,
       // height 即 CSS line-height（渲染器按 line-height 语义处理）。
@@ -161,6 +180,7 @@ class PostHtmlWidget extends StatelessWidget {
             code: codeBlocks[i],
             // 代码块跟随正文字号，上限同步设置项上限（曾封顶 16，字号调大后代码块不跟）
             fontSize: textSize.clamp(11, 32).toDouble(),
+            maxLines: codeBlockMaxLines,
           );
         }
         // img → 表情内联 / 帖子图片块级

@@ -7,6 +7,7 @@ import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/site_session.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
@@ -135,9 +136,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   int? get _uidNum => int.tryParse(widget.uid);
 
-  void _navigateToUid(int uid) => GoRouter.of(
-    context,
-  ).replace(SiteScope.pathFor(context, '/user/$uid'));
+  void _navigateToUid(int uid) =>
+      GoRouter.of(context).replace(SiteScope.pathFor(context, '/user/$uid'));
 
   void _showUidPicker() {
     showDialog(
@@ -192,8 +192,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   /// 设置本页数据源并重新加载（'' = 跟随浏览模式 / 'mobile' / 'desktop'）
+  String get _spaceSource =>
+      SettingsRepository.instance.site(_session.host).content.spaceSource;
+
   Future<void> _setSpaceSource(String value) async {
-    await context.read<SettingsProvider>().setSpaceSource(value);
+    await SettingsRepository.instance.updateSite(
+      _session.host,
+      (s) => s.copyWith(content: s.content.copyWith(spaceSource: value)),
+    );
     if (mounted) await _load();
   }
 
@@ -242,7 +248,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 child: _sourceMenuRow(
                   icon: Icons.sync,
                   label: '跟随浏览模式',
-                  selected: space_api.spaceSourceOverride.isEmpty,
+                  selected: _spaceSource.isEmpty,
                 ),
               ),
               PopupMenuItem<String>(
@@ -250,7 +256,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 child: _sourceMenuRow(
                   icon: Icons.smartphone_outlined,
                   label: '移动版',
-                  selected: space_api.spaceSourceOverride == 'mobile',
+                  selected: _spaceSource == 'mobile',
                 ),
               ),
               PopupMenuItem<String>(
@@ -258,7 +264,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 child: _sourceMenuRow(
                   icon: Icons.desktop_windows_outlined,
                   label: '桌面版',
-                  selected: space_api.spaceSourceOverride == 'desktop',
+                  selected: _spaceSource == 'desktop',
                 ),
               ),
               if (uidNum != null) ...[

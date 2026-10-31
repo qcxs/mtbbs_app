@@ -4,7 +4,6 @@ import 'package:mtbbs/pages/settings/models/data_settings.dart';
 import 'package:mtbbs/pages/settings/models/display_settings.dart';
 import 'package:mtbbs/pages/settings/models/editor_settings.dart';
 import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
-import 'package:mtbbs/pages/settings/models/page_gate_settings.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/models/site_settings.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -32,12 +31,17 @@ class SettingsGroupDef {
 /// （快捷键明细、关于页内的项、开发者选项），见 `settings_search_page.dart`。
 final settingsGroups = <SettingsGroupDef>[
   SettingsGroupDef(
-    title: '站点与网络',
+    title: '站点设置',
     icon: Icons.dns,
     models: (_) => siteSettings(),
   ),
   SettingsGroupDef(
-    title: '外观',
+    title: '账号设置',
+    icon: Icons.manage_accounts_outlined,
+    models: (_) => accountSettings(),
+  ),
+  SettingsGroupDef(
+    title: '外观与启动',
     icon: Icons.palette,
     models: (_) => displaySettings(),
   ),
@@ -55,11 +59,6 @@ final settingsGroups = <SettingsGroupDef>[
     title: '存储与工具',
     icon: Icons.storage,
     models: (_) => dataSettings(),
-  ),
-  SettingsGroupDef(
-    title: '页面接管',
-    icon: Icons.pages,
-    models: (_) => pageGateSettings(),
   ),
   SettingsGroupDef(
     title: 'MCP 服务',

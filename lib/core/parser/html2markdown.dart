@@ -59,13 +59,56 @@ class _Html2Markdown {
 
   // ==================== 块级 ====================
 
-  String _blocksOf(dom.Element el) => el.nodes.map(_block).join();
+  /// Parsedown 容器里可能**混排**块级元素与容器级行内流
+  /// （如 `文字 <code>x</code> 文字<br>` 直接挂在 `div.parsedown-markdown`
+  /// 下，没有 `<p>` 包裹）。行内节点必须攒成一段再输出——逐个当块处理会把
+  /// 一句话拆成多段、行内代码独占一行。
+  String _blocksOf(dom.Element el) {
+    final buf = StringBuffer();
+    final inlineRun = StringBuffer();
+
+    void flushInline() {
+      final text = inlineRun.toString().trim();
+      inlineRun.clear();
+      if (text.isEmpty) return;
+      buf.write('${_escapeBlockStart(text)}\n\n');
+    }
+
+    for (final node in el.nodes) {
+      if (_isBlockNode(node)) {
+        flushInline();
+        buf.write(_block(node));
+      } else {
+        inlineRun.write(_inline(node));
+      }
+    }
+    flushInline();
+    return buf.toString();
+  }
+
+  /// 块级标签集合（与 [_block] 的 switch 对齐）
+  static const _blockTags = <String>{
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'p',
+    'pre',
+    'blockquote',
+    'ul',
+    'ol',
+    'table',
+    'hr',
+    'div',
+    'ignore_js_op',
+  };
+
+  bool _isBlockNode(dom.Node node) =>
+      node is dom.Element && _blockTags.contains(node.localName);
 
   String _block(dom.Node node) {
-    if (node.nodeType == dom.Node.TEXT_NODE) {
-      final text = (node.text ?? '').trim();
-      return text.isEmpty ? '' : '${_escapeText(text)}\n\n';
-    }
     if (node is! dom.Element) return '';
     final tag = node.localName ?? '';
     switch (tag) {

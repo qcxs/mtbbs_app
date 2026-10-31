@@ -10,7 +10,7 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 
 export 'package:mtbbs/platform/optional/webview_support.dart'
     show clearWebViewCache;
@@ -61,11 +61,16 @@ class IgnoreCacheFileService extends FileService {
     Map<String, String>? headers,
   }) async {
     AppLogger.i('CACHE', 'download: ${_shortenUrl(url)}');
-    // 模拟浏览器行为：携带图片所属站点的 Referer（受「模拟浏览器请求头」设置控制）。
-    // 跨站点帖子里引用目标站点的图片时，Referer 必须是目标站点，否则防盗链会拒绝。
+    // 模拟浏览器行为：携带图片所属站点的 Referer（受该站点的
+    // 「模拟浏览器请求头」设置控制）。跨站点帖子里的图片按 URL host 归属站点。
+    final referer = SessionRegistry.instance.refererForUrl(url);
+    final siteHost = Uri.tryParse(referer)?.host ?? SiteStore.instance.host;
+    final enabled = SettingsRepository.instance
+        .site(siteHost)
+        .network
+        .simulateBrowserHeaders;
     final reqHeaders = <String, String>{
-      if (browserHeadersEnabled())
-        'Referer': SessionRegistry.instance.refererForUrl(url),
+      if (enabled) 'Referer': referer,
       ...?headers,
     };
 

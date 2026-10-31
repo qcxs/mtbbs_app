@@ -8,7 +8,7 @@ import 'package:mtbbs/models/thread_detail.dart';
 /// 改必填性或调整嵌套层级（见 `docs/24-帖子缓存与离线帖子.md` 第 4 节）。
 const int kThreadSnapshotSchemaVersion = 1;
 
-/// 每个帖子最多保留的自动缓存正文版本数。
+/// 每个帖子默认保留的自动缓存正文版本数（用户可在缓存管理页调整）。
 const int kThreadAutoMaxVersions = 3;
 
 /// 导出文件顶层标记。

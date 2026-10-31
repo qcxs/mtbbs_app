@@ -76,10 +76,6 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     return combined;
   }
 
-  /// 帖内最多展示的评分条数：52pojie 的评分列表常有一二十条，
-  /// 全量铺开会把楼层撑得很长，其余统一收进「查看全部」弹层
-  static const int _ratingPreviewRows = 10;
-
   Widget _buildRating(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final rating = widget.post.rating!;
@@ -91,8 +87,12 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     final hasReason = entries.any(
       (e) => (e['reason'] as String? ?? '').isNotEmpty,
     );
-    final preview = entries.length > _ratingPreviewRows
-        ? entries.sublist(0, _ratingPreviewRows)
+    // 最多显示的评分条数（设置项，0 = 全部显示）；其余收进「查看全部」
+    final maxRows = context.select<SettingsProvider, int>(
+      (s) => s.ratingMaxRows,
+    );
+    final preview = maxRows > 0 && entries.length > maxRows
+        ? entries.sublist(0, maxRows)
         : entries;
 
     return Container(
@@ -134,16 +134,12 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
             ),
           ),
           if (entries.isNotEmpty)
-            ConstrainedBox(
-              // 兜底：10 条约 300px，即使系统字号放大也不会撑破楼层
-              constraints: const BoxConstraints(maxHeight: 340),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: _RatingTable(
-                  columns: columns,
-                  entries: preview,
-                  hasReason: hasReason,
-                ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: _RatingTable(
+                columns: columns,
+                entries: preview,
+                hasReason: hasReason,
               ),
             ),
           if (entries.length > preview.length)

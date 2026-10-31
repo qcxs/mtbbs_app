@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_session.dart';
+import 'package:mtbbs/core/app/site_cdn.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
@@ -15,7 +17,7 @@ import 'package:mtbbs/services/api_service.dart';
 /// - [GlobalSiteSession]：全局当前站点 + 当前账号（行为不变）；
 /// - [FixedSiteSession]：某站点的默认账号（未设置 → 游客），供跨站点页面临时使用。
 ///
-/// 默认账号持久化在主库 settings 的 `defaultAccount_{host}`；
+/// 默认账号持久化在站点设置 `SiteSettings.identity.defaultAccount`；
 /// 账号数据直接读 `_accountsStore`（不依赖 AuthProvider，避免循环依赖）。
 ///
 /// 只在启动时和"账号/站点变化"时刷新内存缓存，页面读取是同步的。
@@ -152,8 +154,7 @@ class SessionRegistry {
     final info = _hosts[host];
     if (info == null) return null;
     final chosen = _pickAccount(info, account);
-    return _sessions['$host|${chosen?.username ?? ''}'] ??
-        _sessions['$host|'];
+    return _sessions['$host|${chosen?.username ?? ''}'] ?? _sessions['$host|'];
   }
 
   /// 站点 baseUrl（跨站页面拼 URL 用；未配置返回 null）
@@ -199,14 +200,16 @@ class SessionRegistry {
 
   /// 设置某站点的默认账号（null / 空串 = 游客）
   Future<void> setDefaultAccount(String host, String? username) async {
-    final db = DatabaseHelper.instance;
-    final key = 'defaultAccount_$host';
     final name = username?.trim() ?? '';
-    if (name.isEmpty) {
-      await db.deleteMeta(key);
-    } else {
-      await db.setMeta(key, name);
-    }
+    await SettingsRepository.instance.updateSite(
+      host,
+      (s) => s.copyWith(
+        identity: s.identity.copyWith(
+          defaultAccount: name.isEmpty ? null : name,
+          clear: name.isEmpty,
+        ),
+      ),
+    );
     await refreshHost(host);
   }
 
@@ -220,6 +223,12 @@ class SessionRegistry {
     for (final site in SiteStore.instance.sites) {
       final siteHost = Uri.tryParse(site.baseUrl)?.host;
       if (siteHost != null && siteHost == imageHost) {
+        return site.baseUrl;
+      }
+      // 站点 CDN 域名（如 icdn.binmt.cc）也归属该站点
+      final cdn = SiteCdnStore.instance.cdnFor(site.host);
+      final cdnHost = cdn == null ? null : Uri.tryParse(cdn)?.host;
+      if (cdnHost != null && cdnHost == imageHost) {
         return site.baseUrl;
       }
     }
@@ -272,9 +281,8 @@ class SessionRegistry {
   }
 
   Future<String?> _readDefaultAccount(String host) async {
-    final v = await DatabaseHelper.instance.getMeta('defaultAccount_$host');
-    final name = v?.trim() ?? '';
-    return name.isEmpty ? null : name;
+    final name = SettingsRepository.instance.site(host).identity.defaultAccount;
+    return name == null || name.isEmpty ? null : name;
   }
 }
 

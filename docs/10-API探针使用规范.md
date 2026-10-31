@@ -126,7 +126,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 - **正常**：日志出现 `命中人机验证，已自算 acw_sc__v2 并重放（第 1 次）`，输出多一个
   `acwSolved` 字段（本次自解次数），请求照常拿到真页；自解得到的 token 落盘复用。
 - **失败**：连续自解 3 次仍被拦（或挑战结构变化、认不出 `arg1`）才在输出里带 `reminder`，
-  此时按提示核对 [tool/acw_challenge.dart](../tool/acw_challenge.dart)。
+  此时按提示核对 [tool/acw_challenge.dart](tool/acw_challenge.dart)。
 - `cookie=acw_sc__v2=<值>` 手动注入**已不需要**：该值只与服务端**本轮**下发的 `arg1` 配对，
   跨轮次 / 跨客户端复制过来的必然失效（见下方踩坑表）。
 - 探针跑的是 App 完整链路，`ApiService` 内还有一层**内嵌 JS 引擎自解**
@@ -153,8 +153,8 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 
 新增一个只读 API 的测试：
 
-1. 在 [api_scenarios.dart](../tool/api_scenarios.dart) 注册一条 `ApiScenario`：`desc`（说明用途，AI 可读）、`params`（参数说明，`*` 前缀 = 必填，自动校验）、`needsLogin`（需登录设 true，无 Cookie 自动拦截）、`run`（调用对应 `lib/api/**/export.dart` 函数）。
-2. 若参数键不在 [api_probe_test.dart](../tool/api_probe_test.dart) 的 `args` 白名单，需显式补一行 `const String.fromEnvironment('键')`。
+1. 在 [api_scenarios.dart](tool/api_scenarios.dart) 注册一条 `ApiScenario`：`desc`（说明用途，AI 可读）、`params`（参数说明，`*` 前缀 = 必填，自动校验）、`needsLogin`（需登录设 true，无 Cookie 自动拦截）、`run`（调用对应 `lib/api/**/export.dart` 函数）。
+2. 若参数键不在 [api_probe_test.dart](tool/api_probe_test.dart) 的 `args` 白名单，需显式补一行 `const String.fromEnvironment('键')`。
 3. 跑 `cmd=help` 确认新场景已自动出现在清单，再实际执行验证。
 
 开发新 API（http/parse/export 未完成时）的调试循环：

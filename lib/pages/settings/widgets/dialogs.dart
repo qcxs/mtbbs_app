@@ -141,7 +141,7 @@ Future<T?> showSelectDialog<T>({
   required BuildContext context,
   required String title,
   required List<SelectOption<T>> options,
-  required T selected,
+  T? selected,
 }) {
   final cs = Theme.of(context).colorScheme;
   return showDialog<T>(

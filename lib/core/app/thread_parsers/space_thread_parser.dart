@@ -62,12 +62,12 @@ class SpaceThreadParser implements ThreadListParser {
   ThreadItem _parseRow(dom.Element tr) {
     int? threadId;
     String? title, threadUrl;
+    dom.Element? titleLink;
 
     // 标题：<th> 内取第一个非分页的链接（排除 .tps 内的分页数字）
     final titleCell = tr.querySelector('th');
     if (titleCell != null) {
       final allLinks = titleCell.querySelectorAll('a');
-      dom.Element? titleLink;
       for (final link in allLinks) {
         // 跳过分页链接（.tps 内的数字页码）
         final parent = link.parent;
@@ -90,6 +90,12 @@ class SpaceThreadParser implements ThreadListParser {
         if (threadUrl.isNotEmpty) threadUrl = normalizeUrl(threadUrl);
       }
     }
+
+    // 状态：回收站 = 标题链接带 `recy` 类；已关闭 = 标题单元格内 `span.xg1`
+    final statusLabels = parseTitleStatusLabels(
+      titleLink,
+      scope: titleCell,
+    );
 
     // 版块：查找含 forum 链接的 <td>
     final board = parseBoardFields(
@@ -131,6 +137,7 @@ class SpaceThreadParser implements ThreadListParser {
       comments: replies,
       views: views,
       digest: digest,
+      statusLabels: statusLabels.isEmpty ? null : statusLabels,
     );
   }
 }

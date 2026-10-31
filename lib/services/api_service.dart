@@ -10,6 +10,7 @@ import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
@@ -136,11 +137,6 @@ class ApiService {
           // X-Requested-With 决定是否按 AJAX 格式返回（去掉会拿到整页 HTML）
           'User-Agent': Site.uaPc,
           'X-Requested-With': 'XMLHttpRequest',
-          // 浏览器仿真头：按设置开关决定是否携带
-          if (_simulateBrowserHeaders) ...{
-            'Referer': baseUrl,
-            'Accept': _browserAccept,
-          },
         },
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 15),
@@ -189,6 +185,20 @@ class ApiService {
       InterceptorsWrapper(
         onRequest: (options, handler) {
           options.extra['_start'] = DateTime.now().millisecondsSinceEpoch;
+          // 浏览器仿真头按**目标站点**取开关：全局 Dio 与跨站作用域 Dio 共用，
+          // 不再依赖切站时 push 的模块变量（见 docs/04 设置分层）。
+          final host = Uri.tryParse(options.baseUrl)?.host ?? '';
+          final enabled = SettingsRepository.instance
+              .site(host)
+              .network
+              .simulateBrowserHeaders;
+          if (enabled) {
+            options.headers['Referer'] = options.baseUrl;
+            options.headers['Accept'] = _browserAccept;
+          } else {
+            options.headers.remove('Referer');
+            options.headers.remove('Accept');
+          }
           final path = options.path;
           final method = options.method;
           final qp = options.queryParameters;
@@ -289,8 +299,7 @@ class ApiService {
   /// 作用域 Dio 的 CookieJar（供验证流程 / 图片下载取 Cookie 用）
   final Map<String, CookieJar> _scopedJars = {};
 
-  String _scopeKey(String host, String? account) =>
-      '$host|${account ?? ''}';
+  String _scopeKey(String host, String? account) => '$host|${account ?? ''}';
 
   /// 获取（必要时创建）绑定到指定站点 + 账号的 Dio。
   ///
@@ -334,35 +343,12 @@ class ApiService {
     }
   }
 
-  /// 按当前开关状态刷新 Dio 默认头。
-  ///
-  /// 关闭时只移除 Referer / Accept，User-Agent 与 X-Requested-With 是
-  /// 功能性头，始终保留。
-  ///
-  /// [init] 尚未完成时直接返回 —— 那时模块级开关已是最终值，init 会读它。
-  void refreshBrowserHeaders() {
-    if (!_initialized) return;
-    final all = <Dio>[dio, ..._scopedDios.values];
-    for (final d in all) {
-      final headers = d.options.headers;
-      if (_simulateBrowserHeaders) {
-        headers['Referer'] = d.options.baseUrl;
-        headers['Accept'] = _browserAccept;
-      } else {
-        headers.remove('Referer');
-        headers.remove('Accept');
-      }
-    }
-  }
-
   /// 切换站点 — 更新 baseUrl + 重建 guest jar
   Future<void> switchSite() async {
     _currentHost = SiteStore.instance.host;
     final newUrl = SiteStore.instance.baseUrl;
     dio.options.baseUrl = newUrl;
     dio.options.headers['User-Agent'] = Site.uaPc;
-    // Referer 要跟着新站点走；开关关闭时这里只会移除它
-    refreshBrowserHeaders();
 
     _guestJar = PersistCookieJar(
       storage: FileStorage(await AppPaths.cookiesDirForHost(_currentHost)),
@@ -684,22 +670,4 @@ class ApiService {
       return false;
     }
   }
-}
-
-// ==================== 浏览器仿真头 ====================
-
-/// 是否携带 `Referer` / `Accept` 等"浏览器仿真头"，默认开启。
-///
-/// 放在模块级而不是 [ApiService] 的实例字段上：`SettingsProvider.load()`
-/// 早于 `ApiService.init()` 执行，那时实例还没建好、`dio` 也不存在。
-/// init 会读这个值构建请求头，因此设置能在任何时机安全写入。
-bool _simulateBrowserHeaders = true;
-
-/// 当前是否携带浏览器仿真头（图片下载等非 Dio 请求共用此状态）
-bool browserHeadersEnabled() => _simulateBrowserHeaders;
-
-/// 开关浏览器仿真头，立即作用于后续请求。
-void applyBrowserHeaders(bool enabled) {
-  _simulateBrowserHeaders = enabled;
-  ApiService().refreshBrowserHeaders();
 }

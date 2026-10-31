@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 
 /// 可被内置浏览器「接管回退」的 App 页面注册表 + 开关状态。
 ///
@@ -13,10 +14,9 @@ import 'package:mtbbs/core/app/site_store.dart';
 /// 所有导航（链接点击 / 帖子卡片 / 头像 / 入口 ListTile / 系统入站链接 / 深链）
 /// 都要过 redirect，因此**不需要在每个调用点埋判断**，也不会漏掉将来的新入口。
 ///
-/// 为什么开关状态放在模块级变量、而不是只放 Provider：
-/// 与 `api_service.dart` 的 `_simulateBrowserHeaders` 同理 —— GoRouter 的
-/// redirect 回调没有 Provider 依赖，而 `SettingsProvider.load()` 早于 UI 构建、
-/// 启动早期就要写入，模块变量最省依赖（也避免 router ↔ provider 的循环 import）。
+/// 为什么这里直接读 `SettingsRepository` 而不是 Provider：
+/// GoRouter 的 redirect 回调没有 context，而站点设置已在启动时加载为同步
+/// 内存快照；按目标 host 读取即可，也避免 router ↔ provider 的循环 import。
 class AppPage {
   /// 稳定 id（用于持久化，勿改）
   final String id;
@@ -52,20 +52,20 @@ const List<AppPage> appPages = [
 
 final Set<String> _allPageIds = {for (final p in appPages) p.id};
 
-/// 已关闭 App 接管的页面 id（空集合 = 全部走 App 页）
-Set<String> _disabledPages = <String>{};
-
-/// 写入开关状态（由 `SettingsProvider` 的 load / setter 调用）。
-/// 自动过滤掉已不在注册表内的历史 id，避免"UI 上无处取消、却仍然生效"。
-void applyDisabledAppPages(Set<String> ids) {
-  _disabledPages = ids.where(_allPageIds.contains).toSet();
+/// 当前站点被关闭接管的页面 id（自动过滤不在注册表内的历史 id）
+Set<String> get disabledAppPages {
+  final host = SiteStore.instance.host;
+  return Set.unmodifiable(
+    SettingsRepository.instance
+        .site(host)
+        .pages
+        .disabledPageIds
+        .where(_allPageIds.contains),
+  );
 }
 
-/// 当前被关闭接管的页面 id（只读副本）
-Set<String> get disabledAppPages => Set.unmodifiable(_disabledPages);
-
-/// 该页面是否走 App（默认 true）
-bool appPageEnabled(String id) => !_disabledPages.contains(id);
+/// 该页面是否走 App（当前站点，默认 true）
+bool appPageEnabled(String id) => !disabledAppPages.contains(id);
 
 /// 回退到内置浏览器时**强制 PC UA** 的页面。
 ///
@@ -74,19 +74,12 @@ bool appPageEnabled(String id) => !_disabledPages.contains(id);
 /// 「桌面模式」菜单手动切回。
 const Set<String> _desktopUaPageIds = {'online', 'darkroom'};
 
-/// 终极降级开关：App 整体退化为内置浏览器。
+/// 当前站点是否整体退化为内置浏览器（站点级逃生阀）。
 ///
-/// 用途是"逃生阀"：App 侧页面被反复人机验证 / 防盗链卡住时，一键把所有页面
-/// 交给内置浏览器（WebView 能真正过验证码），至少保证论坛可用。
-bool _browserOnlyMode = false;
-
-/// 写入终极开关（由 `SettingsProvider` 的 load / setter 调用）
-void applyBrowserOnlyMode(bool enabled) {
-  _browserOnlyMode = enabled;
-}
-
-/// 是否处于"整体退化为内置浏览器"模式
-bool get browserOnlyMode => _browserOnlyMode;
+/// 用途是"逃生阀"：某站点反复被人机验证 / 防盗链卡住时，只降级该站点，
+/// 其它站点仍走 App 页面。
+bool get browserOnlyMode =>
+    SettingsRepository.instance.site(SiteStore.instance.host).pages.browserOnly;
 
 /// 降级模式下**放行**的路由：浏览器自身 + 设置（含子路由）。
 ///
@@ -112,9 +105,15 @@ String? appPageRedirect(String location) {
   final id = featureIdOf(location);
   final desktopUa = id != null && _desktopUaPageIds.contains(id);
 
-  // 终极降级：除浏览器 / 设置外，一律交给内置浏览器。
+  // 取目标站点的设置：location 带 site=<host> 时用该 host，否则用当前站点
+  final uri = Uri.tryParse(location);
+  final targetHost = uri?.queryParameters['site'] ?? '';
+  final host = targetHost.isNotEmpty ? targetHost : SiteStore.instance.host;
+  final pages = SettingsRepository.instance.site(host).pages;
+
+  // 站点级降级：除浏览器 / 设置外，一律交给内置浏览器。
   // 算不出该页站内地址时退化到站点首页（浏览器至少能打开），不留在 App 页。
-  if (_browserOnlyMode) {
+  if (pages.browserOnly) {
     if (isBrowserOnlyExempt(location)) return null;
     return browserFallbackPath(
       siteUrlFor(location) ?? SiteStore.instance.baseUrl,
@@ -122,7 +121,7 @@ String? appPageRedirect(String location) {
     );
   }
 
-  if (id == null || appPageEnabled(id)) return null; // 非内容页 / 未关闭
+  if (id == null || !pages.disabledPageIds.contains(id)) return null;
   final url = siteUrlFor(location);
   if (url == null) return null; // 算不出对应站内地址 → 保持走 App 页
   return browserFallbackPath(url, desktopUa: desktopUa);

@@ -59,23 +59,8 @@ List<ManagedItem> syncToolbarWithDefaults(
 extension SettingsManagedLists on SettingsProvider {
   // ==================== 工具栏 ====================
 
-  Future<List<ManagedItem>> _loadSyncedToolbar() async {
-    final canonical = defaultToolbarItems();
-    final jsonStr = await _db.getToolbarItemsRaw();
-    if (jsonStr == null || jsonStr.isEmpty) return canonical;
-    try {
-      return syncToolbarWithDefaults(
-        ManagedItem.decodeList(jsonStr),
-        canonical,
-      );
-    } catch (_) {
-      return canonical;
-    }
-  }
-
   Future<void> _persistToolbar() async {
-    await _db.setToolbarItemsRaw(ManagedItem.encodeList(_toolbarItems));
-    await _db.setToolbarShortcutsRaw(jsonEncode(_toolbarShortcuts));
+    await _persistApp();
     _notify();
   }
 
@@ -158,7 +143,7 @@ extension SettingsManagedLists on SettingsProvider {
   // ==================== 帖子迷你编辑器常用语 ====================
 
   Future<void> _persistQuickReplies() async {
-    await _db.setSetting('quickReplies', ManagedItem.encodeList(_quickReplies));
+    await _persistApp();
     _notify();
   }
 
@@ -191,48 +176,46 @@ extension SettingsManagedLists on SettingsProvider {
 
   /// 恢复默认常用语
   Future<void> resetQuickReplies() async {
-    _quickReplies = defaultQuickReplies();
+    _quickReplies = settings_defaults.defaultQuickReplies();
     await _persistQuickReplies();
   }
 
   // ==================== 快捷链接 CRUD ====================
 
   List<ManagedItem> _linksForCurrent() =>
-      _shortcutLinks.putIfAbsent(SiteStore.instance.host, () => []);
+      List<ManagedItem>.from(_currentSite.shortcutLinks);
 
-  Future<void> _persistLinks() async {
-    await _db.setShortcutLinksRaw(
-      SiteStore.instance.host,
-      ManagedItem.encodeList(_linksForCurrent()),
-    );
-    _notify();
-  }
+  Future<void> _persistLinks(List<ManagedItem> links) =>
+      _updateCurrentSite((s) => s.copyWith(shortcutLinks: links));
 
   Future<void> addShortcutLink(ManagedItem item) async {
-    _linksForCurrent().add(item);
-    await _persistLinks();
+    final links = _linksForCurrent()..add(item);
+    await _persistLinks(links);
   }
 
   Future<void> removeShortcutLink(String id) async {
-    _linksForCurrent().removeWhere((e) => e.id == id);
-    await _persistLinks();
+    final links = _linksForCurrent()..removeWhere((e) => e.id == id);
+    await _persistLinks(links);
   }
 
   Future<void> updateShortcutLink(String id, ManagedItem newValue) async {
-    final idx = _linksForCurrent().indexWhere((e) => e.id == id);
+    final links = _linksForCurrent();
+    final idx = links.indexWhere((e) => e.id == id);
     if (idx < 0) return;
-    _linksForCurrent()[idx] = newValue;
-    await _persistLinks();
+    links[idx] = newValue;
+    await _persistLinks(links);
   }
 
   Future<void> moveShortcutLink(int from, int to) async {
-    reorderManagedItems(_linksForCurrent(), from, to);
-    await _persistLinks();
+    final links = _linksForCurrent();
+    reorderManagedItems(links, from, to);
+    await _persistLinks(links);
   }
 
   Future<void> toggleShortcutLink(String id) async {
-    toggleManagedItem(_linksForCurrent(), id);
-    await _persistLinks();
+    final links = _linksForCurrent();
+    toggleManagedItem(links, id);
+    await _persistLinks(links);
   }
 
   // ==================== 导读 Tab ====================
@@ -240,7 +223,7 @@ extension SettingsManagedLists on SettingsProvider {
   Future<void> moveTab(int from, int to) async {
     reorderManagedItems(_guideTabs, from, to);
     // 用户手排 = 以这份顺序为准 → 清空常用记录，之后重新累计
-    _clearTabUsage(kTabUsageGuide);
+    _clearTabUsage(settings_defaults.kTabUsageGuide);
     await _persistGuideTabs();
   }
 
@@ -250,8 +233,7 @@ extension SettingsManagedLists on SettingsProvider {
   }
 
   Future<void> _persistGuideTabs() async {
-    await _db.setSetting('guideTabs', ManagedItem.encodeList(_guideTabs));
-    await _persistTabUsage();
+    await _persistApp();
     _notify();
   }
 
@@ -260,7 +242,7 @@ extension SettingsManagedLists on SettingsProvider {
   Future<void> moveNoticeTab(int from, int to) async {
     reorderManagedItems(_noticeTabs, from, to);
     // 同上：手排后清空常用记录
-    _clearTabUsage(kTabUsageNotice);
+    _clearTabUsage(settings_defaults.kTabUsageNotice);
     await _persistNoticeTabs();
   }
 
@@ -270,8 +252,7 @@ extension SettingsManagedLists on SettingsProvider {
   }
 
   Future<void> _persistNoticeTabs() async {
-    await _db.setSetting('noticeTabs', ManagedItem.encodeList(_noticeTabs));
-    await _persistTabUsage();
+    await _persistApp();
     _notify();
   }
 
@@ -290,13 +271,11 @@ extension SettingsManagedLists on SettingsProvider {
   Future<void> setAutoFrequentTabs(bool value) async {
     if (_autoFrequentTabs == value) return;
     _autoFrequentTabs = value;
-    await _db.setSetting('autoFrequentTabs', value ? '1' : '0');
+    await _persistApp();
     _notify();
   }
 
-  Future<void> _persistTabUsage() async {
-    await _db.setSetting('tabUsage', jsonEncode(_tabUsage));
-  }
+  Future<void> _persistTabUsage() => _persistApp();
 
   // ==================== 首页区块 ====================
 
@@ -324,7 +303,7 @@ extension SettingsManagedLists on SettingsProvider {
   }
 
   Future<void> _persistHomeSections() async {
-    await _db.setSetting('homeSections', ManagedItem.encodeList(_homeSections));
+    await _persistApp();
     _notify();
   }
 }

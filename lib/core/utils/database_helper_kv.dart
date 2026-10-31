@@ -64,6 +64,82 @@ extension DatabaseHelperKv on DatabaseHelper {
     await _settingsStore.record(key).delete(db);
   }
 
+  // =================== 分层设置（应用 / 站点 / 账号） ===================
+
+  /// 应用设置文档（key 固定为 `app`）
+  Future<String?> getAppSettingsRaw() async {
+    final db = await database;
+    final record = await _appSettingsDocStore.record('app').get(db);
+    return record?['value'] as String?;
+  }
+
+  Future<void> setAppSettingsRaw(String json) async {
+    final db = await database;
+    await _appSettingsDocStore.record('app').put(db, {'value': json});
+  }
+
+  /// 站点设置（按 host）
+  Future<String?> getSiteSettingsRaw(String host) async {
+    final db = await database;
+    final record = await _siteSettingsStore.record(host).get(db);
+    return record?['value'] as String?;
+  }
+
+  Future<void> setSiteSettingsRaw(String host, String json) async {
+    final db = await database;
+    await _siteSettingsStore.record(host).put(db, {'value': json});
+  }
+
+  Future<void> deleteSiteSettings(String host) async {
+    final db = await database;
+    await _siteSettingsStore.record(host).delete(db);
+  }
+
+  /// 账号设置（按 host + uid）
+  Future<String?> getAccountSettingsRaw(String host, String uid) async {
+    final db = await database;
+    final record = await _accountSettingsStore.record('$host|$uid').get(db);
+    return record?['value'] as String?;
+  }
+
+  Future<void> setAccountSettingsRaw(
+    String host,
+    String uid,
+    String json,
+  ) async {
+    final db = await database;
+    await _accountSettingsStore.record('$host|$uid').put(db, {'value': json});
+  }
+
+  /// 站点派生状态（key = `host|kind`）
+  Future<String?> getSiteStateRaw(String host, String kind) async {
+    final db = await database;
+    final record = await _siteStateStore.record('$host|$kind').get(db);
+    return record?['value'] as String?;
+  }
+
+  Future<void> setSiteStateRaw(String host, String kind, String json) async {
+    final db = await database;
+    await _siteStateStore.record('$host|$kind').put(db, {'value': json});
+  }
+
+  Future<void> deleteSiteState(String host, {String? kind}) async {
+    final db = await database;
+    if (kind != null) {
+      await _siteStateStore.record('$host|$kind').delete(db);
+      return;
+    }
+    final records = await _siteStateStore.find(
+      db,
+      finder: Finder(
+        filter: Filter.matches(Field.key, '^${RegExp.escape(host)}\\|'),
+      ),
+    );
+    for (final record in records) {
+      await _siteStateStore.record(record.key).delete(db);
+    }
+  }
+
   // =================== 站点列表 ===================
 
   Future<String?> getSitesRaw() async {
@@ -113,19 +189,6 @@ extension DatabaseHelperKv on DatabaseHelper {
     await _lastAccountStore.record(host).delete(db);
   }
 
-  // =================== 积分公式（按站点） ===================
-
-  Future<String?> getCreditFormula(String host) async {
-    final db = await database;
-    final record = await _creditFormulaStore.record(host).get(db);
-    return record?['value'] as String?;
-  }
-
-  Future<void> setCreditFormula(String host, String formula) async {
-    final db = await database;
-    await _creditFormulaStore.record(host).put(db, {'value': formula});
-  }
-
   // =================== 图床历史 ===================
 
   Future<String?> getImageHistoryRaw() async {
@@ -137,73 +200,6 @@ extension DatabaseHelperKv on DatabaseHelper {
   Future<void> setImageHistoryRaw(String json) async {
     final db = await database;
     await _imageHistoryStore.record('history').put(db, {'value': json});
-  }
-
-  // =================== 快捷链接（按站点） ===================
-
-  Future<String?> getShortcutLinksRaw(String host) async {
-    final db = await database;
-    final record = await _shortcutLinksStore.record(host).get(db);
-    return record?['value'] as String?;
-  }
-
-  Future<void> setShortcutLinksRaw(String host, String json) async {
-    final db = await database;
-    await _shortcutLinksStore.record(host).put(db, {'value': json});
-  }
-
-  // =================== 工具栏配置 ===================
-
-  Future<String?> getToolbarItemsRaw() async {
-    final db = await database;
-    final record = await _toolbarItemsStore.record('items').get(db);
-    return record?['value'] as String?;
-  }
-
-  Future<void> setToolbarItemsRaw(String json) async {
-    final db = await database;
-    await _toolbarItemsStore.record('items').put(db, {'value': json});
-  }
-
-  // =================== 快捷键映射 ===================
-
-  Future<String?> getShortcutsRaw() async {
-    final db = await database;
-    final record = await _shortcutsStore.record('shortcuts').get(db);
-    return record?['value'] as String?;
-  }
-
-  Future<void> setShortcutsRaw(String json) async {
-    final db = await database;
-    await _shortcutsStore.record('shortcuts').put(db, {'value': json});
-  }
-
-  // =================== 工具栏快捷键 ===================
-
-  Future<String?> getToolbarShortcutsRaw() async {
-    final db = await database;
-    final record = await _toolbarShortcutsStore.record('tb_shortcuts').get(db);
-    return record?['value'] as String?;
-  }
-
-  Future<void> setToolbarShortcutsRaw(String json) async {
-    final db = await database;
-    await _toolbarShortcutsStore.record('tb_shortcuts').put(db, {
-      'value': json,
-    });
-  }
-
-  // =================== 禁用的 BBCode 标签 ===================
-
-  Future<String?> getDisabledBbcodeRaw() async {
-    final db = await database;
-    final record = await _disabledBbcodeStore.record('disabled').get(db);
-    return record?['value'] as String?;
-  }
-
-  Future<void> setDisabledBbcodeRaw(String json) async {
-    final db = await database;
-    await _disabledBbcodeStore.record('disabled').put(db, {'value': json});
   }
 
   // =================== 元数据存储（通用键值对） ===================
@@ -218,10 +214,5 @@ extension DatabaseHelperKv on DatabaseHelper {
   Future<void> setMeta(String key, String value) async {
     final db = await database;
     await _settingsStore.record(key).put(db, {'value': value});
-  }
-
-  Future<void> deleteMeta(String key) async {
-    final db = await database;
-    await _settingsStore.record(key).delete(db);
   }
 }

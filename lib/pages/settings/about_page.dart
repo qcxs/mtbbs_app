@@ -1,27 +1,36 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/config/build_config.dart';
+import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
-import 'package:mtbbs/core/utils/database_helper.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
 import 'package:mtbbs/models/special_thanks.dart';
 import 'package:mtbbs/models/user_profile.dart';
 import 'package:mtbbs/pages/settings/models/about_settings.dart';
+import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
+import 'package:mtbbs/platform/optional/file_pick.dart';
+import 'package:mtbbs/platform/optional/file_save.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/services/data_portability.dart';
 import 'package:mtbbs/services/update_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 关于页 — 应用标识、作者、相关链接、版本信息与特别鸣谢。
 ///
@@ -125,8 +134,10 @@ class _AboutPageState extends State<AboutPage> {
     final host = AboutPage.authorSiteHost;
     final uid = AboutPage.authorUid;
     _authorLoadedHost = host;
-    final key = 'aboutAuthorProfile_$host';
-    final cached = await DatabaseHelper.instance.getSetting(key);
+    final cached = await SettingsRepository.instance.getSiteState(
+      host,
+      'about_author',
+    );
     if (cached != null && cached.isNotEmpty) {
       try {
         final map = jsonDecode(cached) as Map<String, dynamic>;
@@ -137,13 +148,19 @@ class _AboutPageState extends State<AboutPage> {
       }
     }
     try {
-      // 作者资料固定在作者所属站点获取：用该站点的作用域 Dio，
-      // 头像/页面请求携带的目标站点标识（Cookie、Referer）不会跟着当前站点漂移
-      final dio = await ApiService().scopedDio(
-        host: host,
-        baseUrl: SessionRegistry.instance.baseUrlForHost(host) ??
-            AboutPage.authorBaseUrl,
-      );
+      // 作者资料固定在作者所属站点获取，携带的 Cookie/Referer 不会跟着当前站点漂移。
+      // 当前站点必须用全局 Dio（带当前登录账号）：scopedDio 默认是游客罐，
+      // 而个人空间页对游客可能直接返回拦截页（见 docs/27 的"当前站点不建作用域会话"）。
+      final isCurrentSite = host == SiteStore.instance.host;
+      final dio = isCurrentSite
+          ? ApiService().dio
+          : await ApiService().scopedDio(
+              host: host,
+              baseUrl:
+                  SessionRegistry.instance.baseUrlForHost(host) ??
+                  AboutPage.authorBaseUrl,
+              account: SessionRegistry.instance.defaultAccountFor(host),
+            );
       final raw = await space_api.getUserProfile(
         dio,
         uid: uid,
@@ -156,8 +173,9 @@ class _AboutPageState extends State<AboutPage> {
       final profile = UserProfile.fromMap(
         (raw['profile'] as Map).cast<String, dynamic>(),
       );
-      await DatabaseHelper.instance.setSetting(
-        key,
+      await SettingsRepository.instance.setSiteState(
+        host,
+        'about_author',
         jsonEncode(profile.toMap()),
       );
       if (mounted) setState(() => _author = profile);
@@ -270,6 +288,37 @@ class _AboutPageState extends State<AboutPage> {
             ),
           ]),
 
+          _sectionTitle('数据管理'),
+          _card([
+            _linkTile(
+              icon: Icons.save_outlined,
+              title: '导出设置',
+              subtitle: '应用设置 + 各站点设置（不含缓存）',
+              onTap: _exportSettings,
+            ),
+            const Divider(height: 1, indent: 56),
+            _linkTile(
+              icon: Icons.settings_backup_restore_outlined,
+              title: '导入设置',
+              subtitle: '覆盖应用设置与各站点设置',
+              onTap: _importSettings,
+            ),
+            const Divider(height: 1, indent: 56),
+            _linkTile(
+              icon: Icons.cookie_outlined,
+              title: '导出账号 Cookie',
+              subtitle: '各站点账号列表与 Cookie（可跨设备恢复登录）',
+              onTap: _exportCookies,
+            ),
+            const Divider(height: 1, indent: 56),
+            _linkTile(
+              icon: Icons.file_download_outlined,
+              title: '导入账号 Cookie',
+              subtitle: '覆盖各站点账号的 Cookie',
+              onTap: _importCookies,
+            ),
+          ]),
+
           _sectionTitle('版本信息'),
           _card([
             _infoTile('当前版本', BuildConfig.versionName),
@@ -297,6 +346,167 @@ class _AboutPageState extends State<AboutPage> {
         ],
       ),
     );
+  }
+
+  // ==================== 数据管理 ====================
+
+  Future<void> _exportSettings() async {
+    try {
+      final json = await DataPortability.exportSettingsJson();
+      if (!mounted) return;
+      await _exportText(json, 'mtbbs_settings');
+    } catch (e) {
+      if (mounted) showToast('导出设置失败：$e');
+    }
+  }
+
+  Future<void> _importSettings() async {
+    final text = await _readImportText();
+    if (text == null || !mounted) return;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '导入设置',
+      message: '将覆盖当前应用设置与各站点设置；缓存、账号与 Cookie 不受影响。是否继续？',
+      confirmText: '导入',
+      danger: true,
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final count = await DataPortability.importSettingsJson(text);
+      final settings = context.read<SettingsProvider>();
+      await settings.load();
+      settings.applyRuntimeConfig();
+      if (mounted) showToast('已导入设置（$count 个站点）');
+    } catch (e) {
+      if (mounted) showToast('导入设置失败：$e');
+    }
+  }
+
+  Future<void> _exportCookies() async {
+    try {
+      final json = await DataPortability.exportCookiesJson();
+      if (!mounted) return;
+      await _exportText(json, 'mtbbs_cookies');
+    } catch (e) {
+      if (mounted) showToast('导出 Cookie 失败：$e');
+    }
+  }
+
+  Future<void> _importCookies() async {
+    final text = await _readImportText();
+    if (text == null || !mounted) return;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '导入账号 Cookie',
+      message: '将覆盖各站点账号的 Cookie 与账号列表。导入后登录态可能立即变化，是否继续？',
+      confirmText: '导入',
+      danger: true,
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final result = await DataPortability.importCookiesJson(text);
+      for (final host in result.hosts) {
+        await SessionRegistry.instance.onAccountsChanged(host);
+      }
+      if (!mounted) return;
+      if (result.hosts.contains(SiteStore.instance.host)) {
+        await context.read<AuthProvider>().onSiteChanged();
+      }
+      if (mounted) {
+        showToast('已导入 ${result.hosts.length} 个站点、${result.jars} 份 Cookie');
+      }
+    } catch (e) {
+      if (mounted) showToast('导入 Cookie 失败：$e');
+    }
+  }
+
+  Future<String?> _readImportText() async {
+    final mode = await _pickTransferMode(exporting: false, title: '导入方式');
+    if (mode == null || !mounted) return null;
+    if (mode == 'clipboard') {
+      final text = await ClipboardHelper.read();
+      if (text == null || text.trim().isEmpty) {
+        if (mounted) showToast('剪切板为空');
+        return null;
+      }
+      return text;
+    }
+    final result = await FilePick.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+      withData: true,
+    );
+    final files = result?.files;
+    if (files == null || files.isEmpty) return null;
+    final file = files.first;
+    final bytes = file.bytes;
+    if (bytes != null) return utf8.decode(bytes);
+    final path = file.path;
+    if (path != null) return File(path).readAsString();
+    if (mounted) showToast('无法读取文件');
+    return null;
+  }
+
+  Future<void> _exportText(String text, String prefix) async {
+    final mode = await _pickTransferMode(exporting: true, title: '导出方式');
+    if (mode == null || !mounted) return;
+    if (mode == 'clipboard') {
+      await ClipboardHelper.write(text);
+      if (mounted) showToast('已复制到剪切板');
+      return;
+    }
+    final fileName = '${prefix}_${_timestamp()}.json';
+    final outcome = await FileSave.saveText(
+      text,
+      fileName: fileName,
+      allowedExtensions: const ['json'],
+    );
+    if (!mounted) return;
+    switch (outcome) {
+      case FileSaveOutcome.saved:
+        showToast('已保存');
+        break;
+      case FileSaveOutcome.canceled:
+        break;
+      case FileSaveOutcome.unavailable:
+        // 平台没有「另存为」：退回应用导出目录，至少让文件落地
+        final dir = await AppPaths.exportsDir;
+        await Directory(dir).create(recursive: true);
+        final path = p.join(dir, fileName);
+        await File(path).writeAsString(text);
+        if (mounted) showToast('已保存到 $path');
+        break;
+      case FileSaveOutcome.failed:
+        showToast('保存失败');
+        break;
+    }
+  }
+
+  Future<String?> _pickTransferMode({
+    required bool exporting,
+    required String title,
+  }) => showSelectDialog<String>(
+    context: context,
+    title: title,
+    options: [
+      SelectOption(
+        value: 'clipboard',
+        icon: exporting ? Icons.copy_all_outlined : Icons.content_paste,
+        label: exporting ? '复制到剪切板' : '从剪切板导入',
+      ),
+      SelectOption(
+        value: 'file',
+        icon: exporting ? Icons.save_alt : Icons.folder_open,
+        label: exporting ? '保存为文件' : '从文件导入',
+      ),
+    ],
+  );
+
+  String _timestamp() {
+    final n = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${n.year}${two(n.month)}${two(n.day)}_'
+        '${two(n.hour)}${two(n.minute)}${two(n.second)}';
   }
 
   /// 顶部应用标识

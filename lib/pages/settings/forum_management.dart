@@ -65,9 +65,13 @@ class ForumManagement {
           icon: Icon(Icons.refresh, size: 18, color: cs.onSurfaceVariant),
           tooltip: '从 API 刷新',
           onPressed: () async {
-            // 先关弹窗（弹窗在根 Navigator 上）
+            // 先关面板。showAppSheet → showModalBottomSheet 默认
+            // useRootNavigator: false，面板挂在离调用方最近的 Navigator
+            // （首页/设置页在 ShellRoute 的子 Navigator 里）。用
+            // rootNavigator: true 会关掉根 Navigator 上的 ShellRoute 本身
+            // （'currentConfiguration.isNotEmpty' 断言崩溃）。
             if (context.mounted) {
-              Navigator.of(context, rootNavigator: true).pop();
+              Navigator.of(context).pop();
             }
             // 后台刷新
             final result = await forum_misc.fetchForumNav(ApiService().dio);

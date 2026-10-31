@@ -2,32 +2,25 @@ import 'package:dio/dio.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 
 /// 用户空间主页 HTTP 请求 — 基于 Dio
 ///
 /// baseUrl 由 Dio 实例的 BaseOptions 提供。
 ///
 /// UA 默认跟随站点「浏览模式」（移动→克米移动模板；桌面→标准 PC 模板），
-/// 但本页支持**页面级覆盖**（见 [spaceSourceOverride]）：用户可在空间页菜单里
-/// 单独切换数据源，不影响导读/板块等其它页面。两类模板结构不同，由 parse 层
-/// 按 DOM 分流（见 parse.dart）。
+/// 但本页支持**站点级覆盖**：用户可在空间页菜单或站点设置里单独切换数据源。
+/// 两类模板结构不同，由 parse 层按 DOM 分流（见 parse.dart）。
 
-/// 个人空间数据源覆盖：`''` = 跟随站点「浏览模式」；`'mobile'`/`'desktop'` = 本页强制。
+/// 本页请求实际使用的 UA：请求级覆盖（探针 / MCP）> 站点设置 > 站点「浏览模式」。
 ///
-/// 放在模块级（同 `_simulateBrowserHeaders`）：`SettingsProvider.load()` 在请求之前
-/// 执行且需同步读取；持久化由 `SettingsProvider` 负责写入。
-String _sourceOverride = '';
-
-/// 写入覆盖值（由 SettingsProvider 在加载/修改时调用）
-void applySpaceSourceOverride(String value) => _sourceOverride = value;
-
-/// 当前覆盖设置（`''` 表示未覆盖，跟随「浏览模式」）
-String get spaceSourceOverride => _sourceOverride;
-
-/// 本页请求实际使用的 UA：请求级覆盖（探针 / MCP）> 本页覆盖 > 站点「浏览模式」
-String _resolvedUserAgent() {
+/// 数据源是**目标站点的站点设置**（`SiteSettings.content.spaceSource`），
+/// 跨站点空间页也按该站点自己的配置取，不跟随当前站点。
+String _resolvedUserAgent(Dio dio) {
   if (browseModeOverrideActive()) return resolveRequestUserAgent();
-  switch (_sourceOverride) {
+  final host = Uri.tryParse(dio.options.baseUrl)?.host ?? '';
+  final source = SettingsRepository.instance.site(host).content.spaceSource;
+  switch (source) {
     case 'mobile':
       return Site.uaAndroid;
     case 'desktop':
@@ -53,7 +46,7 @@ Future<Response<String>> getUserProfile(
 }) {
   final path = _buildPath(uid, username);
   final opts = options ?? Options();
-  opts.headers = {...?opts.headers, 'User-Agent': _resolvedUserAgent()};
+  opts.headers = {...?opts.headers, 'User-Agent': _resolvedUserAgent(dio)};
   return dio.get<String>(path, options: opts);
 }
 

@@ -9,6 +9,7 @@ import 'package:mtbbs/core/app/notice_badge.dart';
 import 'package:mtbbs/core/app/notice_nav_store.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/models/settings/settings_defaults.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/pages/message/message_pm_tab.dart';
 import 'package:mtbbs/pages/message/message_mypost_tab.dart';

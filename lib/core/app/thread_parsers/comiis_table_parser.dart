@@ -86,6 +86,12 @@ class ComiisTableParser implements ThreadListParser {
     // 注意：MT 的克米 PC 列表实测**不渲染**精华徽标，此处为兼容其它站点/变体。
     final digest = parseDigestBadge(postlist) ?? (hasDigestBadge(titleSpan) ? 1 : null);
 
+    // 状态：回收站 = 标题链接带 `recy` 类；已关闭等 = `.comiis_common` 内的状态 span
+    final statusLabels = parseTitleStatusLabels(
+      titleSpan,
+      scope: postlist.querySelector('.comiis_common') ?? titleSpan,
+    );
+
     // 统计
     final num = parseNumCell(
       p,
@@ -147,6 +153,7 @@ class ComiisTableParser implements ThreadListParser {
       comments: replies,
       views: views,
       digest: digest,
+      statusLabels: statusLabels.isEmpty ? null : statusLabels,
     );
   }
 }

@@ -50,13 +50,25 @@ class ThreadCacheService {
   /// 自动缓存默认保留天数（不含「永不过期」）
   static const int defaultTtlDays = 1;
 
-  /// 单帖默认上限：4 MiB
-  static const int defaultMaxBytesPerThread = 4 * 1024 * 1024;
+  /// 单帖默认上限：128 KiB（纯文字快照足够，用户可在管理页调整）
+  static const int defaultMaxBytesPerThread = 128 * 1024;
+
+  /// 每帖默认保留的自动缓存正文版本数
+  static const int defaultMaxVersions = kThreadAutoMaxVersions;
+
+  /// 版本数可调范围
+  static const int minMaxVersions = 1;
+  static const int maxMaxVersions = 10;
+
+  /// 单帖上限可调范围（KB）
+  static const int minMaxKB = 16;
+  static const int maxMaxKB = 10240;
 
   final ThreadCacheDatabase _db = ThreadCacheDatabase.instance;
 
   int _ttlDays = defaultTtlDays;
   int _maxBytesPerThread = defaultMaxBytesPerThread;
+  int _maxVersions = defaultMaxVersions;
 
   Future<void> _queue = Future<void>.value();
 
@@ -67,12 +79,16 @@ class ThreadCacheService {
 
   int get ttlDays => _ttlDays;
   int get maxBytesPerThread => _maxBytesPerThread;
+  int get maxVersions => _maxVersions;
 
-  /// 由设置层注入（TTL 下限 1 天；上限来自 cache.json）
-  void configure({int? ttlDays, int? maxBytesPerThread}) {
+  /// 由设置层注入（TTL 下限 1 天；上限与版本数来自设置，缺省取 cache.json）
+  void configure({int? ttlDays, int? maxBytesPerThread, int? maxVersions}) {
     if (ttlDays != null) _ttlDays = ttlDays <= 0 ? defaultTtlDays : ttlDays;
     if (maxBytesPerThread != null && maxBytesPerThread > 0) {
       _maxBytesPerThread = maxBytesPerThread;
+    }
+    if (maxVersions != null && maxVersions > 0) {
+      _maxVersions = maxVersions;
     }
   }
 
@@ -297,7 +313,7 @@ class ThreadCacheService {
       ..sort((a, b) => a.sortTime.compareTo(b.sortTime));
 
     final toDelete = <String>[];
-    while (metas.length + 1 > kThreadAutoMaxVersions) {
+    while (metas.length + 1 > _maxVersions) {
       toDelete.add(metas.removeAt(0).key);
     }
     var total = incomingBytes + metas.fold<int>(0, (s, m) => s + m.approxBytes);

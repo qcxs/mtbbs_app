@@ -174,11 +174,11 @@ class DefaultConfig {
     );
   }
 
-  // ==================== 帖子缓存（非关键，缺省 1 天 / 4 MiB） ====================
+  // ==================== 帖子缓存（非关键，缺省 1 天 / 128 KiB） ====================
 
   /// 帖子自动缓存配置：过期天数（**下限 1**，没有「永不过期」）与单帖上限。
   ({int expireDays, int maxBytesPerThread}) get threadCacheConfig {
-    const fallbackBytes = 4 * 1024 * 1024;
+    const fallbackBytes = 128 * 1024;
     final map = _cache?['thread'] as Map<String, dynamic>?;
     final days =
         (map?['expireDays'] as num?)?.toInt() ??

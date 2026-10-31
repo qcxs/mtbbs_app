@@ -155,6 +155,15 @@ class BbBlock {
 /// （图片 / 附件 / 分隔线——它们的"取消包裹"没有语义，去掉标签只剩一个裸地址）。
 bool isBbContainerTag(String tag) => _containerTags.contains(tag);
 
+/// 该标签是否参与配对（行内 / 块级容器 / 块级原子）。
+///
+/// 供「按行切锚点」判断某行起点是否仍在某个标签内部：跨行标签不能切，
+/// 否则两个切片各带半个标签，各自渲染都会坏。
+bool isBbcodePairedTag(String tag) =>
+    _containerTags.contains(tag) ||
+    _pairedAtomicTags.contains(tag) ||
+    _inlineTags.contains(tag);
+
 /// 顶层块级标签名 → 块类型。
 ///
 /// 供文档模型/编辑器在**自行构造**块（而非从 [splitBbcodeBlocks] 切出来）时复用，

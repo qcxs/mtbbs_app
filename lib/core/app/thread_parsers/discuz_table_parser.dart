@@ -61,15 +61,22 @@ class DiscuzTableParser implements ThreadListParser {
 
     // 标题列：th 内的 a.xst 或 a[href*=thread-]
     final titleCell = tr.querySelector('th');
+    dom.Element? titleLink;
     if (titleCell != null) {
-      final link = titleCell.querySelector('a.xst, a[href*="thread-"]');
-      if (link != null) {
-        title = sanitizeText(link.text);
-        threadUrl = link.attributes['href'] ?? '';
+      titleLink = titleCell.querySelector('a.xst, a[href*="thread-"]');
+      if (titleLink != null) {
+        title = sanitizeText(titleLink.text);
+        threadUrl = titleLink.attributes['href'] ?? '';
         threadId = extractThreadIdFromUrl(threadUrl);
         if (threadUrl.isNotEmpty) threadUrl = normalizeUrl(threadUrl);
       }
     }
+
+    // 状态：回收站 = 标题链接带 `recy` 类；已关闭等 = 标题列内的 `span.xg1`
+    final statusLabels = parseTitleStatusLabels(
+      titleLink,
+      scope: titleCell,
+    );
 
     // 版块：td.by 内有 forum 链接的
     String? boardName;
@@ -132,6 +139,7 @@ class DiscuzTableParser implements ThreadListParser {
       comments: replies,
       views: views,
       digest: digest,
+      statusLabels: statusLabels.isEmpty ? null : statusLabels,
     );
   }
 }

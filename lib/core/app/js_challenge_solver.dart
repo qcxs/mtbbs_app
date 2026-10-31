@@ -49,7 +49,7 @@ class JsChallengeSolver {
   ///
   /// 存在的理由：L1 上线后 L2（`VerifyBrowserPage`）平时**不会被触发**，也就无从验证
   /// 它是否可用；打开该开关即可强制复现那条链路。默认关闭。
-  bool Function() skipLocalSolve = () => false;
+  bool Function(String pageUrl) skipLocalSolve = (_) => false;
 
   static final RegExp _scriptRe = RegExp(r'<script[^>]*>([\s\S]*?)</script>');
 
@@ -63,7 +63,7 @@ class JsChallengeSolver {
   /// 2. **纯 Dart 算法兜底**——没有 JS 引擎实现（如鸿蒙）或脚本执行失败时，
   ///    仅覆盖阿里云 ESC 的 `arg1` 算法（与探针共用 `acw_pure_dart.dart`）。
   JsChallengeSolution? solve(String html, {String pageUrl = ''}) {
-    if (skipLocalSolve()) {
+    if (skipLocalSolve(pageUrl)) {
       AppLogger.i('DIO', '已按设置跳过本地自解，改由 WebView 处理');
       return null;
     }

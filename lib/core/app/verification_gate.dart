@@ -28,8 +28,8 @@ class VerificationGate {
 
   static final VerificationGate instance = VerificationGate._();
 
-  /// 是否启用 —— 由 main.dart 绑定到设置项（关闭后完全不介入）
-  bool Function() isEnabled = () => true;
+  /// 是否启用 —— 由 main.dart 绑定到**站点设置**（关闭后该站点完全不介入）
+  bool Function(String host) isEnabled = (_) => true;
 
   /// 当前账号的登录 cookie 串 —— 由 main.dart 绑定到 `AuthProvider`。
   ///
@@ -52,7 +52,8 @@ class VerificationGate {
 
   /// Dio 拦截器入口。返回 true 表示"已通过验证"。
   Future<bool> handle(RequestOptions options, InterstitialContext ctx) async {
-    if (!isEnabled()) return false;
+    final host = Uri.tryParse(ctx.baseUrl)?.host ?? '';
+    if (!isEnabled(host)) return false;
 
     // 无 UI 上下文（启动早期 / 后台任务 / MCP 服务端请求）→ 无处可弹，直接失败。
     // 不能在这里挂起等待：那些场景没有用户，会把请求无限卡住。
@@ -88,10 +89,7 @@ class VerificationGate {
   /// 的罐（跨站点页面回流到它自己的作用域罐，而不是全局活跃罐）。
   ///
   /// 不走冷却期：这是用户显式发起的操作。
-  Future<bool> verifyManually({
-    required String url,
-    String? userAgent,
-  }) async {
+  Future<bool> verifyManually({required String url, String? userAgent}) async {
     final nav = rootNavigatorKey.currentState;
     if (nav == null) return false;
     final ctx = _contextForUrl(url);
@@ -104,12 +102,7 @@ class VerificationGate {
 
     final completer = Completer<bool>();
     _inFlight = completer;
-    final ok = await _run(
-      nav: nav,
-      url: url,
-      userAgent: userAgent,
-      ctx: ctx,
-    );
+    final ok = await _run(nav: nav, url: url, userAgent: userAgent, ctx: ctx);
     _inFlight = null;
     if (!completer.isCompleted) completer.complete(ok);
     return ok;

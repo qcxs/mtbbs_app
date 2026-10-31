@@ -20,6 +20,12 @@ class ThreadItem {
   /// 精华等级（>0 = 精华帖；null/0 = 普通帖）。
   final int? digest;
 
+  /// 标题前的状态徽标（如「回收站」「关闭」「审核中」）。
+  ///
+  /// 来自列表模板标题链接内的前置 `<span>`，与 [digest]（「精」）分开：
+  /// 精华是正向荣誉、单独盖章；状态是提示，渲染成普通小标签。
+  final List<String>? statusLabels;
+
   const ThreadItem({
     this.uid,
     this.nickname,
@@ -38,6 +44,7 @@ class ThreadItem {
     this.views,
     this.images,
     this.digest,
+    this.statusLabels,
   });
 
   factory ThreadItem.fromJson(Map<String, dynamic> json) => ThreadItem(
@@ -60,6 +67,9 @@ class ThreadItem {
         ? (json['images'] as List).cast<String>()
         : null,
     digest: json['digest'] as int?,
+    statusLabels: json['statusLabels'] != null
+        ? (json['statusLabels'] as List).map((e) => e.toString()).toList()
+        : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -80,5 +90,6 @@ class ThreadItem {
     'views': views,
     'images': images,
     'digest': digest,
+    'statusLabels': statusLabels,
   };
 }

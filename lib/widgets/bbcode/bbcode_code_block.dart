@@ -6,6 +6,7 @@ import 'package:flutter_highlight/themes/github.dart';
 import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/languages/all.dart';
 import 'package:mtbbs/config/brand_colors.dart';
+import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 常用语言列表（用于语言切换选择器）
@@ -57,7 +58,18 @@ class BbcodeCodeBlock extends StatefulWidget {
   final String code;
   final double fontSize;
 
-  const BbcodeCodeBlock({super.key, required this.code, this.fontSize = 13});
+  /// 折叠态最多显示的行数；<= 0 表示不限制（完整展开）。
+  ///
+  /// 默认 18 行；实际值来自设置项「代码块最大行数」，
+  /// 由 [PostHtmlWidget] 注入。高度按「行数 × 行高」换算。
+  final int maxLines;
+
+  const BbcodeCodeBlock({
+    super.key,
+    required this.code,
+    this.fontSize = 13,
+    this.maxLines = 18,
+  });
 
   @override
   State<BbcodeCodeBlock> createState() => _BbcodeCodeBlockState();
@@ -105,11 +117,58 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
   String _language = '';
   bool _wordWrap = true;
 
+  /// 代码行高倍数与内容内边距（与 [HighlightView] 的 textStyle/padding 对齐）
+  static const double _kLineHeight = 1.5;
+  static const double _kPadding = 12;
+
+  final ScrollController _codeController = ScrollController();
+  bool _truncated = false;
+
+  /// 不限制行数（设置项填 0）时不做折叠/测量
+  bool get _unlimited => widget.maxLines <= 0;
+
+  /// 折叠高度 = 行数 × 行高 + 上下内边距
+  double get _collapsedHeight =>
+      widget.maxLines * widget.fontSize * _kLineHeight + _kPadding * 2;
+
   @override
   void initState() {
     super.initState();
     _detectLanguage();
+    _scheduleTruncationCheck();
   }
+
+  @override
+  void didUpdateWidget(covariant BbcodeCodeBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.code != widget.code) {
+      _truncated = false;
+      _detectLanguage();
+      _scheduleTruncationCheck();
+    } else if (oldWidget.maxLines != widget.maxLines) {
+      // 设置项变更：按新行数重新判断是否需要折叠
+      _truncated = false;
+      _scheduleTruncationCheck();
+    }
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  /// 折叠态是否真的超出高度（靠不可滚动的滚动视图的 maxScrollExtent 判断，
+  /// 与分享页 `_ClampedBody` 同一套做法）
+  void _scheduleTruncationCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_codeController.hasClients) return;
+      final truncated = _codeController.position.maxScrollExtent > 0;
+      if (truncated != _truncated) setState(() => _truncated = truncated);
+    });
+  }
+
+  int get _lineCount => widget.code.split('\n').length;
 
   /// 使用 re_highlight 的 highlightAuto 自动检测语言
   void _detectLanguage() {
@@ -272,6 +331,28 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
   Widget _buildShell(ColorScheme cs, {required bool fill}) {
     final isDark = cs.brightness == Brightness.dark;
     final codeTheme = isDark ? monokaiSublimeTheme : githubTheme;
+    final highlighted = HighlightView(
+      widget.code,
+      language: _renderLanguage,
+      theme: codeTheme,
+      padding: const EdgeInsets.all(_kPadding),
+      textStyle: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: widget.fontSize,
+        height: _kLineHeight,
+      ),
+    );
+    // 自动换行：直接纵向排版；关闭换行：横向滚动（长行不折断）
+    final body = _wordWrap
+        ? highlighted
+        : SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: highlighted,
+          );
+
+    const bottomRadius = BorderRadius.vertical(bottom: Radius.circular(6));
+    // 设置项填 0 = 不限制：始终完整展开，不做测量/折叠
+    final showFooter = !_unlimited && _truncated;
 
     return Container(
       width: fill ? double.infinity : null,
@@ -288,40 +369,137 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
         children: [
           _buildTopBar(cs, fill: fill),
           ClipRRect(
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(6),
-              bottomRight: Radius.circular(6),
+            borderRadius: showFooter ? BorderRadius.zero : bottomRadius,
+            child: _unlimited ? body : _buildCollapsedBody(cs, body),
+          ),
+          if (showFooter)
+            ClipRRect(
+              borderRadius: bottomRadius,
+              child: _buildFooter(cs, fill: fill),
             ),
-            child: _wordWrap
-                ? SingleChildScrollView(
-                    child: HighlightView(
-                      widget.code,
-                      language: _renderLanguage,
-                      theme: codeTheme,
-                      padding: const EdgeInsets.all(12),
-                      textStyle: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: widget.fontSize,
-                        height: 1.5,
-                      ),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: HighlightView(
-                      widget.code,
-                      language: _renderLanguage,
-                      theme: codeTheme,
-                      padding: const EdgeInsets.all(12),
-                      textStyle: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: widget.fontSize,
-                        height: 1.5,
-                      ),
+        ],
+      ),
+    );
+  }
+
+  /// 折叠态：裁到设置的行数高度；确实超出时底部画一层渐隐，提示还有内容
+  Widget _buildCollapsedBody(ColorScheme cs, Widget body) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: _collapsedHeight),
+      child: Stack(
+        children: [
+          SingleChildScrollView(
+            // 不可滚动：只为测量/裁切（与分享页 _ClampedBody 同一套做法）
+            controller: _codeController,
+            physics: const NeverScrollableScrollPhysics(),
+            child: body,
+          ),
+          if (_truncated)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  height: 32,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        cs.codeBlockBg.withValues(alpha: 0),
+                        cs.codeBlockBg,
+                      ],
                     ),
                   ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 底部「查看全部代码」入口：打开抽屉看完整代码（与评分区的「查看全部」同位置）
+  Widget _buildFooter(ColorScheme cs, {required bool fill}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _showFullCodeSheet,
+        child: Container(
+          width: fill ? double.infinity : null,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: cs.outlineVariant, width: 0.5),
+            ),
+          ),
+          child: Row(
+            // 无限宽约束下不能用 MainAxisSize.max / Spacer
+            mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              Icon(Icons.unfold_more, size: 14, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(
+                '查看全部代码',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: cs.primary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '共 $_lineCount 行',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+              if (fill) const Spacer() else const SizedBox(width: 10),
+              Icon(Icons.chevron_right, size: 16, color: cs.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 抽屉：完整代码（可纵向滚动、可复制）。
+  ///
+  /// 不在正文里原地展开——长代码展开后「收起」会被推到很远的下方，
+  /// 用户滚不回去；抽屉可随时下滑/点关闭收起。
+  void _showFullCodeSheet() {
+    final cs = Theme.of(context).colorScheme;
+    final codeTheme = cs.brightness == Brightness.dark
+        ? monokaiSublimeTheme
+        : githubTheme;
+    showAppSheet(
+      context: context,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+      builder: (ctx) => AppSheetScaffold(
+        title: '代码 · $_languageLabel（$_lineCount 行）',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_rounded, size: 20),
+            tooltip: '复制代码',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: widget.code));
+              showToast('已复制', duration: const Duration(seconds: 1));
+            },
           ),
         ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+          child: HighlightView(
+            widget.code,
+            language: _renderLanguage,
+            theme: codeTheme,
+            padding: const EdgeInsets.all(_kPadding),
+            textStyle: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: widget.fontSize,
+              height: _kLineHeight,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -364,9 +542,12 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
             ),
           ),
           if (fill) const Spacer() else const SizedBox(width: 6),
-          // 自动换行切换
+          // 自动换行切换（高度/行数会变，折叠判断需重算）
           GestureDetector(
-            onTap: () => setState(() => _wordWrap = !_wordWrap),
+            onTap: () {
+              setState(() => _wordWrap = !_wordWrap);
+              _scheduleTruncationCheck();
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(

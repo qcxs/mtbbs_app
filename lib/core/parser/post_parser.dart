@@ -112,6 +112,17 @@ Map<String, dynamic> parsePostFromTable(
       bbcode = converter.convertElementContent(msgEl);
     }
 
+    // 分类信息（threadtype，如 52pojie「招聘」版）：完整内容放在
+    // div.pcb > div.typeoption 里，位于 td.t_f 之外；浏览器中它显示在正文
+    // 上方，这里单独转换后前置。不处理会整块丢失（只剩 t_f 里的补充说明）。
+    final typeOptionEl = plc.querySelector('.typeoption');
+    if (typeOptionEl != null) {
+      final typeBbcode = converter.convertElement(typeOptionEl);
+      if (typeBbcode.isNotEmpty) {
+        bbcode = bbcode.isEmpty ? typeBbcode : '$typeBbcode\n$bbcode';
+      }
+    }
+
     // 帖内标题：div.pcb 内的 h2，但必须排除正文区 td.t_f。
     // 不能用 `div.pcb h2` 直接取：Markdown 帖（52pojie parsedown 插件）的正文
     // 标题本身就是 td.t_f 里的第一个 h2，会被误当"帖内标题"再前置一次，

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:mtbbs/core/app/site_store.dart';
-import 'package:mtbbs/core/utils/database_helper.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/api/home/smiley/export.dart' as smiley_api;
 
@@ -27,7 +27,7 @@ class EmojiService {
   _SiteEmojiData get _current =>
       _siteData.putIfAbsent(_host, () => _SiteEmojiData());
 
-  DatabaseHelper get _db => DatabaseHelper.instance;
+  SettingsRepository get _settings => SettingsRepository.instance;
 
   /// insertText → imageUrl（如 "[呵呵]" → "https://..."）
   Map<String, String> get map => _current.map;
@@ -102,13 +102,17 @@ class EmojiService {
 
   Future<void> _saveUsage() async {
     try {
-      await _db.setMeta('emoji_usage_$_host', jsonEncode(_current.usageCount));
+      await _settings.setSiteState(
+        _host,
+        'emoji_usage',
+        jsonEncode(_current.usageCount),
+      );
     } catch (_) {}
   }
 
   Future<void> _loadUsage() async {
     try {
-      final json = await _db.getMeta('emoji_usage_$_host');
+      final json = await _settings.getSiteState(_host, 'emoji_usage');
       if (json != null && json.isNotEmpty) {
         final decoded = jsonDecode(json) as Map<String, dynamic>;
         _current.usageCount = decoded.map(
@@ -124,7 +128,7 @@ class EmojiService {
   /// 若 CDN 配置已变更则丢弃缓存，触发重新请求。
   Future<bool> _loadFromCache() async {
     try {
-      final json = await _db.getMeta('smilie_data_$_host');
+      final json = await _settings.getSiteState(_host, 'emoji');
       if (json == null || json.isEmpty) return false;
       final data = jsonDecode(json) as Map<String, dynamic>;
       if (data['cdnUrl']?.toString() != SiteStore.instance.cdnUrl) return false;
@@ -146,8 +150,9 @@ class EmojiService {
   /// 将当前表情数据持久化到 DatabaseHelper
   Future<void> _save() async {
     try {
-      await _db.setMeta(
-        'smilie_data_$_host',
+      await _settings.setSiteState(
+        _host,
+        'emoji',
         jsonEncode({
           'cdnUrl': SiteStore.instance.cdnUrl,
           'map': _current.map,
@@ -164,8 +169,8 @@ class EmojiService {
   Future<void> clearCache() async {
     _current.reset();
     try {
-      await _db.deleteMeta('smilie_data_$_host');
-      await _db.deleteMeta('emoji_usage_$_host');
+      await _settings.deleteSiteState(_host, kind: 'emoji');
+      await _settings.deleteSiteState(_host, kind: 'emoji_usage');
     } catch (_) {}
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as htmlParser;
+import 'package:mtbbs/api/forum/viewthread/detail/parse.dart' as detail;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/html2bbcode.dart';
 import 'package:mtbbs/core/parser/html2markdown.dart';
@@ -104,6 +105,19 @@ void main() {
       expect(out, contains(r'a \*b\* \[c\] \_d\_ \<e\>'));
     });
 
+    test('容器级行内流（无 <p> 包裹）：行内 code 与正文同段', () {
+      // 52pojie 真实结构（thread-2056733）：文字、<code>、<br> 直接挂在
+      // div.parsedown-markdown 下。行内流必须攒成一段，不能把 code 当独立块。
+      final out = md(
+        '<div class="parsedown-markdown">'
+        '<p>前文</p>'
+        '<br>'
+        '可以通过搜索 <code>call r8</code> 对应的字节码。<br>'
+        '</div>',
+      );
+      expect(out, contains('可以通过搜索 `call r8` 对应的字节码。'));
+    });
+
     test('列表项开头的短横不会被误判为引用/列表（正文转义）', () {
       final out = md(
         '<div class="parsedown-markdown"><p>- 不是列表</p><p># 不是标题</p></div>',
@@ -175,6 +189,22 @@ void main() {
       expect(out, isNot(contains('复制代码')));
     });
 
+    test('容器级行内 code 渲染后不换行（端到端）', () {
+      final out = conv(
+        '<div class="parsedown-markdown">'
+        '可以通过搜索 <code>call r8</code> 对应的字节码。'
+        '</div>',
+      );
+      expect(
+        out,
+        contains(
+          '可以通过搜索 '
+          '[color=#333333][backcolor=#f4f4f4]call r8[/backcolor][/color] '
+          '对应的字节码。',
+        ),
+      );
+    });
+
     test('结束标记 div 不输出内容', () {
       final out = conv(
         '<div class="parsedown-markdown-end_FLAG_ZXSQ" style="display:none">'
@@ -231,6 +261,68 @@ void main() {
         buildTable('正文', head: '<h2>帖内标题</h2>'),
       );
       expect(post['bbcode'], startsWith('[b]帖内标题[/b]\n正文'));
+    });
+  });
+
+  group('parsePostFromTable - 分类信息（threadtype，招聘帖）', () {
+    /// 真实结构：完整分类信息在 div.pcb > div.typeoption（td.t_f 之外），
+    /// t_f 里只有补充说明。
+    dom.Element buildPost() => htmlParser
+        .parse(
+          '<div id="postlist">'
+          '<table id="pid55145978" class="plhin"><tr>'
+          '<td class="pls"></td>'
+          '<td class="plc"><div class="pct"><div class="pcb">'
+          '<div class="typeoption">'
+          '<table summary="分类信息" class="cgtl mbm">'
+          '<caption>招聘</caption><tbody>'
+          '<tr><th>公司名称:</th><td>360 </td></tr>'
+          '<tr><th>职位名称:</th><td>高级Web安全研究员</td></tr>'
+          '<tr><th>职位描述:</th><td>【要求】<br>1、挖洞<br>2、审计</td></tr>'
+          '<tr><th>性别要求:</th><td>&nbsp;</td></tr>'
+          '</tbody></table>'
+          '</div>'
+          '<div class="t_fsz"><table><tr>'
+          '<td class="t_f" id="postmessage_55145978">简历请注明来自吾爱</td>'
+          '</tr></table></div>'
+          '</div></div></td>'
+          '</tr></table>'
+          '</div>',
+        )
+        .querySelector('table#pid55145978')!;
+
+    test('typeoption 前置到正文，标签/值成两列表格，空值项不占行', () {
+      final post = parsePostFromTable(buildPost());
+      final bbcode = post['bbcode'] as String;
+      expect(bbcode, startsWith('[b]招聘[/b]\n[table]'));
+      expect(bbcode, contains('[tr][td]公司名称:[/td][td]360[/td][/tr]'));
+      expect(
+        bbcode,
+        contains('[tr][td]职位描述:[/td][td]【要求】\n1、挖洞\n2、审计[/td][/tr]'),
+      );
+      expect(bbcode, isNot(contains('性别要求')));
+      // t_f 里的补充说明排在分类信息之后
+      expect(bbcode.indexOf('简历请注明来自吾爱'), greaterThan(bbcode.indexOf('[table]')));
+    });
+  });
+
+  group('帖子详情 - tid 提取', () {
+    test('分类信息版块：sortid=48 不会被误当成 tid', () {
+      // 真实页面（thread-2103384）首个 a[href*=tid=] 是建帖链接
+      // `...&sortid=48`，未锚定的 `tid=(\d+)` 会把 tid 解析成 48。
+      const html =
+          '<html><body>'
+          '<a href="forum.php?mod=post&action=newthread&fid=39&sortid=48">招聘</a>'
+          '<a href="forum.php?mod=redirect&goto=nextoldset&tid=2103384">下一主题</a>'
+          '<div id="postlist"><table id="pid1" class="plhin"><tr>'
+          '<td class="pls"></td><td class="plc"><div class="pct"><div class="pcb">'
+          '<div class="t_fsz"><table><tr>'
+          '<td class="t_f" id="postmessage_1">正文</td>'
+          '</tr></table></div></div></div></td></tr></table></div>'
+          '</body></html>';
+      final result = detail.parseResponse(html, 200);
+      expect(result['success'], true);
+      expect(result['tid'], '2103384');
     });
   });
 

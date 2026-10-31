@@ -107,3 +107,34 @@ bool hasDigestBadge(dom.Element? titleLink) {
   }
   return false;
 }
+
+/// 状态徽标词表（标题处的 `<span>`，实测：回收站 / 关闭 / 已关闭）。
+const _titleStatusWords = {'回收站', '关闭', '已关闭', '审核中', '待审核', '已忽略'};
+
+/// 标题状态徽标（如「回收站」「已关闭」「审核中」）。
+///
+/// 两种模板的位置不同：
+/// - **克米移动卡片**：标题链接内的前置 `<span class="comiis_xifont f_g">回收站</span>`
+/// - **标准 Discuz 表格**：标题链接带 `recy` 类（回收站，如 `a.recy`），
+///   或标题单元格内的 `<span class="xg1">已关闭</span>`
+///
+/// [scope] 传标题单元格（表格模板的 `th`）；缺省只在 [titleLink] 内找（卡片模板）。
+/// 只认 [_titleStatusWords] 与 `recy` 类：同处还有推荐「荐」、热度图标（纯 `<i>`）、
+/// 分页 `span.tps` 等，按词表过滤可避免把非状态徽标当成状态。无状态返回空列表。
+List<String> parseTitleStatusLabels(
+  dom.Element? titleLink, {
+  dom.Element? scope,
+}) {
+  final labels = <String>[];
+  if (titleLink != null && titleLink.classes.contains('recy')) {
+    labels.add('回收站');
+  }
+  final root = scope ?? titleLink;
+  if (root == null) return labels;
+  for (final span in root.querySelectorAll('span')) {
+    final text = sanitizeText(span.text);
+    if (!_titleStatusWords.contains(text)) continue;
+    if (!labels.contains(text)) labels.add(text);
+  }
+  return labels;
+}

@@ -239,11 +239,15 @@ String _extractKickUrl(dom.Document doc) {
 // ============================================================
 
 String _extractTid(dom.Document doc) {
+  // 参数名必须锚定到 `?`/`&`：分类信息版块（threadtype）的链接里有
+  // `...&sortid=48`，未锚定的 `tid=(\d+)` 会误命中其中的 `tid=48`，
+  // 把 tid 解析成分类 ID（同类锚定问题见 docs/07 #20）。
+  final tidRe = RegExp(r'[?&]tid=(\d+)');
   for (final a in doc.querySelectorAll(
     'a[href*="tid="], a[href*="viewthread"]',
   )) {
     final href = a.attributes['href'] ?? '';
-    final m = RegExp(r'tid=(\d+)').firstMatch(href);
+    final m = tidRe.firstMatch(href);
     if (m != null) return m.group(1)!;
   }
   return '';

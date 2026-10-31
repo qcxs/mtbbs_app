@@ -71,4 +71,28 @@ void main() {
     expect(find.text('精'), findsOneWidget);
     expect(find.text('帖子标题'), findsOneWidget);
   });
+
+  testWidgets('帖子卡片：回收站状态徽标显示在标题上方', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    const item = ThreadItem(
+      uid: 0,
+      nickname: '',
+      time: '刚刚',
+      title: '被删除的帖子',
+      threadId: 2,
+      statusLabels: ['回收站'],
+    );
+    await tester.pumpWidget(harness(const ThreadCard(item: item)));
+    await tester.pump();
+
+    expect(find.text('回收站'), findsOneWidget);
+    expect(find.text('被删除的帖子'), findsOneWidget);
+    // 徽标在标题上方
+    final badgeY = tester.getTopLeft(find.text('回收站')).dy;
+    final titleY = tester.getTopLeft(find.text('被删除的帖子')).dy;
+    expect(badgeY, lessThan(titleY));
+  });
 }

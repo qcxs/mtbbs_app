@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
 import 'package:mtbbs/pages/settings/shortcut_sheet.dart';
-import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 
 /// 编辑与快捷键组设置项
@@ -33,23 +32,6 @@ List<SettingsModel> editorSettings() => [
     icon: Icons.edit_note,
     value: (s) => s.threadMiniEditorEnabled,
     onChanged: (ctx, s, v) => s.setThreadMiniEditorEnabled(v),
-  ),
-  NormalSetting(
-    title: '站点字数限制',
-    icon: Icons.text_fields,
-    subtitleBuilder: (s) => '${s.postMaxLength} 字（编辑器 / 留言板共用）',
-    onTap: (ctx, s) => showNumberDialog(
-      context: ctx,
-      title: '站点字数限制',
-      description:
-          '站点允许的单帖 / 留言最大字数。Discuz 默认 65535；不同站点可能不同，'
-          '超限内容会被服务端截断。编辑器与留言板均按此值限制。',
-      initValue: s.postMaxLength,
-      min: 1,
-      max: 1000000,
-      helperText: '默认 65535',
-      onSave: (v) => s.setPostMaxLength(v),
-    ),
   ),
   NormalSetting(
     title: '插入格式',

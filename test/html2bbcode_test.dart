@@ -247,6 +247,66 @@ void main() {
       expect(result, contains('v452 = v34'));
     });
 
+    test('SyntaxHighlighter 插件代码块（td.gutter 行号 + div.line 逐行）', () {
+      // 52pojie 的 SyntaxHighlighter 插件把 [code] 渲染成
+      // div.syntaxhighlighter > table > tr > [td.gutter 行号, td.code 代码]，
+      // 每行一个 div.line，缩进用 &nbsp; 表示；头部还有
+      // 「[Python] 纯文本查看 复制代码」工具行。
+      // 回归点：不能变成 [table]（行号成列、代码各行挤成一行），
+      // 也不能残留工具行文案。
+      const html =
+          '<div style="padding:15px 0;">'
+          '<div style="font-size:12px;">[Python] '
+          '<em class="viewsource" num="0">纯文本查看</em> '
+          '<em class="copycode" num="0">复制代码</em></div>'
+          '<div>'
+          '<div id="highlighter_1" class="syntaxhighlighter notranslate python">'
+          '<div class="toolbar"><span>'
+          '<a href="#" class="toolbar_item command_help help">?</a>'
+          '</span></div>'
+          '<table><tbody><tr>'
+          '<td class="gutter">'
+          '<div class="line number1 index0 alt2">01</div>'
+          '<div class="line number2 index1 alt1">02</div>'
+          '</td>'
+          '<td class="code"><div class="container">'
+          '<div class="line number1 index0 alt2">'
+          '<code class="python keyword">def</code> '
+          '<code class="python plain">f():</code></div>'
+          '<div class="line number2 index1 alt1">'
+          '<code class="python spaces">&nbsp;&nbsp;&nbsp;&nbsp;</code>'
+          '<code class="python keyword">return</code> '
+          '<code class="python plain">1</code></div>'
+          '</div></td>'
+          '</tr></tbody></table>'
+          '</div>'
+          '</div>'
+          '</div>';
+      final result = Html2BBCode().convert(html);
+      expect(result, '[code]def f():\n    return 1[/code]');
+      expect(result, isNot(contains('[table]')));
+      expect(result, isNot(contains('复制代码')));
+      expect(result, isNot(contains('纯文本查看')));
+    });
+
+    test('SyntaxHighlighter 原始 HTML（<pre class="brush: …">）：代码在头部容器内', () {
+      // App 拿到的是**未执行插件 JS** 的服务端 HTML：代码是头部 div 里的
+      // <pre class="brush: …">，而不是浏览器 DOM 里的 div.syntaxhighlighter 表格。
+      // 回归点：丢弃「[Python] 纯文本查看 复制代码」时不能连整块代码一起丢掉。
+      const html =
+          '<div style="padding:15px 0;">'
+          '<div style="font-size:12px;">[Python] '
+          '<em class="viewsource">纯文本查看</em> '
+          '<em class="copycode">复制代码</em></div>'
+          '<pre class="brush: python; gutter: true">    def f():\n        return 1</pre>'
+          '</div>';
+      final result = Html2BBCode().convert(html);
+      expect(result, '[code]    def f():\n        return 1[/code]');
+      expect(result, isNot(contains('复制代码')));
+      expect(result, isNot(contains('纯文本查看')));
+      expect(result, isNot(contains('[Python]')));
+    });
+
     test('parsedown-markdown 无 <code> 时回退到子节点', () {
       // 如果 parsedown-markdown 内没有 <code>，不应产生 [code]
       const html = '<div class="parsedown-markdown"><p>普通内容</p></div>';

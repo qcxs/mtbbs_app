@@ -178,15 +178,28 @@ extension SettingsSites on SettingsProvider {
   }
 
   Future<void> _persistSites() async {
+    final prevHosts = SiteStore.instance.sites.map((s) => s.host).toSet();
     final prevSig = _sitesSignature(SiteStore.instance.sites);
     SiteStore.instance.replaceSites(_sites);
     SiteStore.instance.switchTo(_currentSiteIndex.clamp(0, _sites.length - 1));
     await _db.setSitesRaw(jsonEncode(_sites.map((s) => s.toJson()).toList()));
+
+    // 站点设置文档：新站点补默认值，删除的站点级联清理
+    final nextHosts = _sites.map((s) => s.host).toSet();
+    for (final host in nextHosts) {
+      // 新增站点也要加载已存在的站点设置文档（如导入设置后尚未配置的站点）
+      await _settings.loadSite(host);
+    }
+    for (final host in prevHosts.difference(nextHosts)) {
+      await _settings.deleteSite(host);
+    }
+
     // 站点增删 / 域名变更 → 重建跨站会话（新站点也要有"默认账号 / 游客"作用域 Dio）。
     // 只有站点集合变了才重建：板块排序等纯 UI 配置不动它会话缓存。
     if (_sitesSignature(_sites) != prevSig) {
       await SessionRegistry.instance.reloadAll();
     }
+    await _persistApp();
     _notify();
   }
 
@@ -198,34 +211,20 @@ extension SettingsSites on SettingsProvider {
   Future<void> switchSite(int index) async {
     if (index == _currentSiteIndex) return;
     _currentSiteIndex = index;
-    await _db.setSettingInt('currentSiteIndex', index);
+    await _persistApp();
     _notify();
   }
 
-  Future<void> reloadSiteConfig() async {
-    _creditFormula = await _loadFormulaForHost(SiteStore.instance.host);
-    _notify();
-  }
-
-  Future<void> setCreditFormula(String formula) async {
-    _creditFormula = formula;
-    await _db.setCreditFormula(SiteStore.instance.host, formula);
-    _notify();
-  }
-
-  Future<String> _loadFormulaForHost(String host) async {
-    return (await _db.getCreditFormula(host)) ??
-        SettingsProvider.defaultFormula;
-  }
+  Future<void> setCreditFormula(String formula) =>
+      _updateCurrentSite((s) => s.copyWith(creditFormula: formula));
 
   Future<String?> fetchAndUpdateFormula() async {
     try {
       final result = await credit_api.fetch(ApiService().dio);
       if (result['success'] == true && result['formula'] != null) {
-        _creditFormula = result['formula'] as String;
-        await _db.setCreditFormula(SiteStore.instance.host, _creditFormula);
-        _notify();
-        return _creditFormula;
+        final formula = result['formula'] as String;
+        await setCreditFormula(formula);
+        return formula;
       }
       return null;
     } catch (e) {

@@ -42,6 +42,29 @@ extension on _ThreadCacheManagePageState {
                 ),
               ),
               const Divider(height: 1),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.layers_outlined, size: 20),
+                title: Text('每帖保留版本数：${settings.threadCacheMaxVersions} 个'),
+                subtitle: const Text('内容变化时保留的历史版本上限'),
+                trailing: TextButton(
+                  onPressed: () =>
+                      _showVersionLimitPicker(settings.threadCacheMaxVersions),
+                  child: const Text('修改'),
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.data_usage, size: 20),
+                title: Text('单帖最大缓存：${settings.threadCacheMaxKB} KB'),
+                subtitle: const Text('自动缓存与离线副本共用；超限淘汰或跳过'),
+                trailing: TextButton(
+                  onPressed: () => _showMaxSizePicker(settings.threadCacheMaxKB),
+                  child: const Text('修改'),
+                ),
+              ),
+              const Divider(height: 1),
               Row(
                 children: [
                   Expanded(
@@ -137,7 +160,7 @@ extension on _ThreadCacheManagePageState {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
-              '选择要查看的版本（最多保留 ${kThreadAutoMaxVersions} 个）',
+              '选择要查看的版本（最多保留 ${_service.maxVersions} 个）',
               style: TextStyle(
                 fontSize: 14,
                 color: Theme.of(ctx).colorScheme.onSurfaceVariant,
@@ -215,6 +238,39 @@ extension on _ThreadCacheManagePageState {
     if (picked == null || !mounted) return;
     await context.read<SettingsProvider>().setThreadCacheDays(picked);
     if (mounted) showToast('已设置为 $picked 天');
+  }
+
+  Future<void> _showVersionLimitPicker(int current) async {
+    await showNumberDialog(
+      context: context,
+      title: '每帖保留版本数',
+      description: '内容变化时最多保留的历史版本数量。调低后在该帖下次写入时裁剪。',
+      initValue: current,
+      min: ThreadCacheService.minMaxVersions,
+      max: ThreadCacheService.maxMaxVersions,
+      helperText:
+          '${ThreadCacheService.minMaxVersions} - '
+          '${ThreadCacheService.maxMaxVersions}'
+          '（默认 ${ThreadCacheService.defaultMaxVersions}）',
+      onSave: (v) =>
+          context.read<SettingsProvider>().setThreadCacheMaxVersions(v),
+    );
+  }
+
+  Future<void> _showMaxSizePicker(int currentKB) async {
+    await showNumberDialog(
+      context: context,
+      title: '单帖最大缓存',
+      description: '自动缓存与离线副本共用的单帖上限；超出时淘汰最旧版本或跳过写入。',
+      initValue: currentKB,
+      min: ThreadCacheService.minMaxKB,
+      max: ThreadCacheService.maxMaxKB,
+      helperText:
+          '单位 KB，${ThreadCacheService.minMaxKB} - '
+          '${ThreadCacheService.maxMaxKB}'
+          '（默认 ${ThreadCacheService.defaultMaxBytesPerThread ~/ 1024}）',
+      onSave: (v) => context.read<SettingsProvider>().setThreadCacheMaxKB(v),
+    );
   }
 
   Future<void> _handleCleanExpired() async {

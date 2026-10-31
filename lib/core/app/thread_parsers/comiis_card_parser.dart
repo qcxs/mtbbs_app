@@ -115,6 +115,9 @@ class ComiisCardParser implements ThreadListParser {
     // 精华：克米卡片把徽标渲染为标题链接内的前置 `<span>精</span>`
     final digest = hasDigestBadge(titleLinkEl) ? 1 : null;
 
+    // 状态徽标（回收站 / 关闭 / 审核中）：同样是标题链接内的前置 `<span>`
+    final statusLabels = parseTitleStatusLabels(titleLinkEl);
+
     // 版块
     final boardEl = li.querySelector(
       '.comiis_xznalist_bk a, .comiis_znalist_bk a, a[href*="forum-"], a[href*="forumdisplay"]',
@@ -180,6 +183,7 @@ class ComiisCardParser implements ThreadListParser {
       views: views,
       images: images,
       digest: digest,
+      statusLabels: statusLabels.isEmpty ? null : statusLabels,
     );
   }
 

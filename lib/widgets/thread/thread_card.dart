@@ -336,7 +336,7 @@ class ThreadCard extends StatelessWidget {
 
   Widget _buildTitle(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return HighlightedText(
+    final title = HighlightedText(
       item.title ?? '',
       keyword: highlight,
       style: const TextStyle(
@@ -349,6 +349,43 @@ class ThreadCard extends StatelessWidget {
         fontWeight: FontWeight.w700,
       ),
       maxLines: 2,
+    );
+    final labels = item.statusLabels ?? const <String>[];
+    if (labels.isEmpty) return title;
+    // 状态（回收站 / 关闭…）独立成一行：标题常为两行且要关键词高亮，
+    // 混排会把标题挤窄，也不利于一眼看到「回收站」。
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [for (final label in labels) _statusChip(cs, label)],
+        ),
+        const SizedBox(height: 4),
+        title,
+      ],
+    );
+  }
+
+  /// 状态徽标：「回收站」用 error 色强调（内容已不可见），其余用中性色。
+  Widget _statusChip(ColorScheme cs, String label) {
+    final color = label.contains('回收站') ? cs.error : cs.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 

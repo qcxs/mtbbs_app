@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/core/app/default_config.dart';
 import 'package:mtbbs/models/managed_item.dart';
-import 'package:mtbbs/providers/settings_provider.dart';
+import 'package:mtbbs/models/settings/settings_defaults.dart';
 import 'package:mtbbs/widgets/dialog/quick_reply_dialog.dart';
 
 /// `assets/config/quick_replies.json` 是手工维护的配置：asset 未声明或 JSON

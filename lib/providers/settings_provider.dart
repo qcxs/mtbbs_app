@@ -6,20 +6,25 @@ import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
-import 'package:mtbbs/api/home/space/export.dart' as space_api;
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/services/thread_cache_service.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/avatar_url.dart';
-import 'package:mtbbs/core/app/app_page_gate.dart';
+import 'package:mtbbs/core/app/avatar_redirect_store.dart';
 import 'package:mtbbs/core/app/default_config.dart';
+import 'package:mtbbs/core/app/stagger_queue.dart' as stagger_queue;
 import 'package:mtbbs/core/parser/bbcode2html.dart';
+import 'package:mtbbs/core/settings/settings_repository.dart';
+import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/database_helper.dart';
 import 'package:mtbbs/core/utils/frequent_order.dart';
+import 'package:mtbbs/models/settings/app_settings.dart';
+import 'package:mtbbs/models/settings/settings_defaults.dart'
+    as settings_defaults;
+import 'package:mtbbs/models/settings/site_settings.dart';
 
-part 'settings_provider_defaults.dart';
 part 'settings_provider_accessors.dart';
 part 'settings_provider_content.dart';
 part 'settings_provider_managed_lists.dart';
@@ -29,11 +34,10 @@ part 'settings_provider_persistence.dart';
 /// 设置管理 — 统一通过 [DatabaseHelper] 持久化
 class SettingsProvider extends ChangeNotifier {
   double _fontSize = 16;
-  String _creditFormula = defaultFormula;
-  List<ManagedItem> _guideTabs = defaultGuideTabs();
+  List<ManagedItem> _guideTabs = settings_defaults.defaultGuideTabs();
 
-  /// 首页区块（顺序 + 显隐 + 默认展开），见 [defaultHomeSections]
-  List<ManagedItem> _homeSections = defaultHomeSections();
+  /// 首页区块（顺序 + 显隐 + 默认展开）
+  List<ManagedItem> _homeSections = settings_defaults.defaultHomeSections();
   int _currentSiteIndex = 0;
 
   /// 默认启动 Tab (0=首页, 1=导读, 2=社区, 3=我的)
@@ -51,6 +55,12 @@ class SettingsProvider extends ChangeNotifier {
   /// 自动识别并链接 URL
   bool _autoDetectUrls = true;
 
+  /// 代码块折叠态最大行数；0 = 不限制
+  int _codeBlockMaxLines = 18;
+
+  /// 楼层内评分区最多显示条数；0 = 不限制
+  int _ratingMaxRows = 10;
+
   /// 消息未读标记样式（隐藏 / 红点 / 数字）
   NoticeBadgeMode _noticeBadgeMode = NoticeBadgeMode.number;
 
@@ -60,8 +70,8 @@ class SettingsProvider extends ChangeNotifier {
   /// 计入底栏未读的分组 id（默认全部，见 notice_config 的 noticeGroups）
   Set<String> _noticeBadgeGroups = noticeGroupIds;
 
-  /// 消息页 Tab（顺序 + 显隐），见 [defaultNoticeTabs]
-  List<ManagedItem> _noticeTabs = defaultNoticeTabs();
+  /// 消息页 Tab（顺序 + 显隐）
+  List<ManagedItem> _noticeTabs = settings_defaults.defaultNoticeTabs();
 
   /// 「常用项自动前排」：按使用次数把常用的 Tab 排到前面（默认开）
   bool _autoFrequentTabs = true;
@@ -69,33 +79,11 @@ class SettingsProvider extends ChangeNotifier {
   /// Tab 使用次数：scope → id → 次数（scope 见 [kTabUsageGuide] / [kTabUsageNotice]）
   Map<String, Map<String, int>> _tabUsage = {};
 
-  /// 请求携带 Referer / Accept 等浏览器仿真头（模拟浏览器访问）
-  bool _simulateBrowserHeaders = true;
-
-  /// 站点返回"非论坛页"（人机验证 / 防火墙）时，自动弹浏览器让用户通过验证
-  bool _interstitialAutoVerify = true;
-
-  /// 跳过本地自解，强制用内置浏览器完成人机验证（排查验证页异常时用，默认关）
-  bool _acwForceWebview = false;
-
   /// 开发者选项是否已解锁（关于页图标连点解锁）。解锁后关于页图标单击即进入
   bool _developerMode = false;
 
-  /// 关闭 App 接管、改用内置浏览器打开的页面 id（空 = 全部走 App 页）
-  Set<String> _browserFallbackPages = <String>{};
-
-  /// 终极降级：App 整体退化为内置浏览器（逃生阀）
-  bool _browserOnlyMode = false;
-
-  /// 个人空间页数据源覆盖（'' = 跟随「浏览模式」；'mobile'/'desktop' = 本页强制）
-  String _spaceSource = '';
-
   /// 通用错峰间隔（毫秒），头像/预览等批量请求逐个放行
   int _staggerInterval = 40;
-
-  /// 站点正文字数上限（编辑器 / 留言板共用），Discuz 默认 65535。
-  /// 未配置时一律按 65535 计。
-  int _postMaxLength = kDefaultPostMaxLength;
 
   /// 头像缓存天数（-1 表示永不过期），默认取自 cache.json
   int _avatarCacheDays = DefaultConfig.instance.cacheExpireDays.avatar;
@@ -116,11 +104,15 @@ class SettingsProvider extends ChangeNotifier {
   /// 已有缓存仍可查看/管理。
   bool _threadCacheEnabled = true;
 
+  /// 每帖保留的自动缓存正文版本数（默认 3）
+  int _threadCacheMaxVersions = ThreadCacheService.defaultMaxVersions;
+
+  /// 单帖最大缓存大小（KB，默认取自 cache.json，当前 128 KB）
+  int _threadCacheMaxKB =
+      DefaultConfig.instance.threadCacheConfig.maxBytesPerThread ~/ 1024;
+
   /// 用户自定义站点列表（持久化）
   List<Site> _sites = [];
-
-  /// 快捷链接（按域名存储, key = host）
-  final Map<String, List<ManagedItem>> _shortcutLinks = {};
 
   /// 工具栏项配置（全局，只排序+显隐）
   List<ManagedItem> _toolbarItems = defaultToolbarItems();
@@ -132,7 +124,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _threadMiniEditor = true;
 
   /// 帖子迷你编辑器「常用语」（可增删排序；内容限 100 字）
-  List<ManagedItem> _quickReplies = defaultQuickReplies();
+  List<ManagedItem> _quickReplies = settings_defaults.defaultQuickReplies();
 
   // ==================== 编辑器配置 ====================
 
@@ -189,39 +181,21 @@ class SettingsProvider extends ChangeNotifier {
 
   static const String defaultFormula = '';
 
-  /// 生成默认导读 Tab 列表（全量含可见性）
-  static List<ManagedItem> defaultGuideTabs() => [
-    for (final id in _defaultTabIds)
-      ManagedItem(id: id, name: tabLabels[id] ?? id),
-  ];
-
-  /// 生成默认首页区块列表
-  static List<ManagedItem> defaultHomeSections() => [
-    for (final d in _homeSectionDefaults)
-      ManagedItem(
-        id: d['id'] as String,
-        name: d['name'] as String,
-        visible: d['visible'] as bool,
-        data: {'expanded': d['expanded']},
-      ),
-  ];
+  static List<ManagedItem> defaultHomeSections() =>
+      settings_defaults.defaultHomeSections();
 
   /// 读取区块的展开状态（缺字段视为折叠）
   static bool homeSectionExpanded(ManagedItem item) =>
       item.data?['expanded'] == true;
 
-  static const tabLabels = {
-    'newthread': '最新发表',
-    'hot': '热门',
-    'new': '最新回复',
-    'digest': '精华',
-    'sofa': '抢沙发',
-    'my': '我的帖子',
-  };
+  static const tabLabels = settings_defaults.kSettingsTabLabels;
 
   // ==================== 数据库快捷引用 ====================
 
   DatabaseHelper get _db => DatabaseHelper.instance;
+
+  /// 分层设置的唯一读写入口
+  SettingsRepository get _settings => SettingsRepository.instance;
 
   /// 通知监听者（供 part 扩展复用，规避 @protected 限制）
   void _notify() => notifyListeners();
@@ -260,13 +234,16 @@ class SettingsProvider extends ChangeNotifier {
 
   double get fontSize => _fontSize;
 
+  /// 代码块折叠态最大行数；0 = 不限制
+  int get codeBlockMaxLines => _codeBlockMaxLines;
+
+  /// 楼层内评分区最多显示条数；0 = 不限制
+  int get ratingMaxRows => _ratingMaxRows;
+
   Set<String> get disabledBbcodeTags => Set.unmodifiable(_disabledBbcodeTags);
   bool get autoDetectUrls => _autoDetectUrls;
   int get historyMaxCount => _historyMaxCount;
   bool get editorStartupCheck => _editorStartupCheck;
-
-  /// 个人空间页数据源覆盖（'' = 跟随「浏览模式」）
-  String get spaceSource => _spaceSource;
 
   List<ManagedItem> get toolbarItems => List.unmodifiable(_toolbarItems);
 
@@ -278,44 +255,44 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setShortcut(String action, String keyString) async {
     _shortcuts[action] = keyString;
-    await _db.setShortcutsRaw(jsonEncode(_shortcuts));
+    await _persistApp();
     notifyListeners();
   }
 
   Future<void> setAutoDetectUrls(bool enabled) async {
     _autoDetectUrls = enabled;
-    await _db.setSettingBool('autoDetectUrls', enabled);
+    await _persistApp();
     notifyListeners();
   }
 
   Future<void> setToolbarShortcut(String id, String keyString) async {
     _toolbarShortcuts[id] = keyString;
-    await _db.setToolbarShortcutsRaw(jsonEncode(_toolbarShortcuts));
+    await _persistApp();
     notifyListeners();
   }
 
   Future<void> setEditorStartupCheck(bool value) async {
     _editorStartupCheck = value;
-    await _db.setSettingBool('editorStartupCheck', value);
+    await _persistApp();
     notifyListeners();
   }
 
   /// 开关"工具栏项被隐藏时其快捷键仍然生效"
   Future<void> setToolbarShortcutWhenHidden(bool value) async {
     _toolbarShortcutWhenHidden = value;
-    await _db.setSettingBool('toolbarShortcutWhenHidden', value);
+    await _persistApp();
     notifyListeners();
   }
 
   Future<void> setFontSize(double size) async {
     _fontSize = size.clamp(12, 32);
-    await _db.setSettingDouble('fontSize', _fontSize);
+    await _persistApp();
     notifyListeners();
   }
 
   Future<void> setHistoryMaxCount(int count) async {
     _historyMaxCount = count.clamp(10, 1000);
-    await _db.setSettingInt('historyMaxCount', _historyMaxCount);
+    await _persistApp();
     notifyListeners();
   }
 }

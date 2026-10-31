@@ -100,8 +100,8 @@ final Map<String, ApiScenario> readScenarios = {
     },
     run: (a) => ranklist_api.getThreadRanklist(
       ApiService().dio,
-      view: a['view'] ?? 'heats',
-      orderby: a['orderby'] ?? 'thisweek',
+      view: (a['view'] ?? '').isEmpty ? 'heats' : a['view']!,
+      orderby: (a['orderby'] ?? '').isEmpty ? 'thisweek' : a['orderby']!,
     ),
   ),
   'ranklist.member': ApiScenario(
@@ -112,7 +112,7 @@ final Map<String, ApiScenario> readScenarios = {
     },
     run: (a) => ranklist_api.getMemberRanklist(
       ApiService().dio,
-      view: a['view'] ?? 'beauty',
+      view: (a['view'] ?? '').isEmpty ? 'beauty' : a['view']!,
     ),
   ),
   'ranklist.forum': ApiScenario(
@@ -120,7 +120,7 @@ final Map<String, ApiScenario> readScenarios = {
     params: {'view': 'threads/posts/today（默认 threads）'},
     run: (a) => ranklist_api.getForumRanklist(
       ApiService().dio,
-      view: a['view'] ?? 'threads',
+      view: (a['view'] ?? '').isEmpty ? 'threads' : a['view']!,
     ),
   ),
   'online.list': ApiScenario(

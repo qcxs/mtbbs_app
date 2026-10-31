@@ -83,7 +83,22 @@ Map<String, dynamic> parseThreadResponse(String body, int statusCode) {
     return (doc: null, error: {'success': false, 'message': '解析 XML 失败'});
   }
   final pre = prepareDoc(xmlResult.cdataHtml, statusCode);
-  return (doc: pre.doc, error: pre.error);
+  if (pre.error != null) return (doc: null, error: pre.error);
+  // 站点关闭某类排行时返回的是「提示信息」弹窗（如 52pojie 版块排行
+  // 「此排行功能已关闭」）。原样把文案带出，避免上层当成"空列表"。
+  final alert = pre.doc!.querySelector('.alert_error');
+  if (alert != null) {
+    // 提示文案后面常跟一段内联 errorhandle JS，去掉再取文本
+    for (final s in alert.querySelectorAll('script')) {
+      s.remove();
+    }
+    final msg = _text(alert);
+    return (
+      doc: null,
+      error: {'success': false, 'message': msg.isEmpty ? '该排行不可用' : msg},
+    );
+  }
+  return (doc: pre.doc, error: null);
 }
 
 // ==================== 策略1：桌面 PC 模板（table 结构） ====================
@@ -109,8 +124,16 @@ List<RankItem> _parseTable(dom.Document doc) {
     final icnTd = row.querySelector('td.icn');
     final frmTd = row.querySelector('td.frm');
     final byTd = row.querySelector('td.by');
-    final allTds = row.querySelectorAll('td');
-    final countTd = allTds.length >= 5 ? allTds.last : null;
+    // 统计列：行内最后一个非 icn/frm/by 的 td。
+    // 不能按 td 数量写死（MT 与 52pojie 的列数不同：52 只有 4 个 td），
+    // 否则 count 恒为空。
+    dom.Element? countTd;
+    for (final td in row.querySelectorAll('td').reversed) {
+      final c = td.className;
+      if (c.contains('icn') || c.contains('frm') || c.contains('by')) continue;
+      countTd = td;
+      break;
+    }
 
     if (th == null) continue;
 
@@ -339,8 +362,36 @@ Map<String, dynamic> parseMemberResponse(String body, int statusCode) {
     if (item != null) items.add(item);
   }
 
+  final views = _parseMemberViews(doc);
+
   AppLogger.i('PARSE', 'member ranklist: ${items.length} items');
-  return {'success': true, 'items': items.map((e) => e.toMap()).toList()};
+  return {
+    'success': true,
+    'items': items.map((e) => e.toMap()).toList(),
+    if (views.isNotEmpty) 'views': views,
+  };
+}
+
+/// 站点实际提供的用户子榜（页面顶部 `ul.tb` 的导航，如「美女排行」）。
+///
+/// 各站点开放的子榜不同（52pojie 没有「邀请 / 在线时间」），页面必须按站点
+/// 返回的列表渲染 Tab；写死 7 项会让不存在的子榜报错。
+List<Map<String, String>> _parseMemberViews(dom.Document doc) {
+  final out = <String, Map<String, String>>{};
+  for (final a in doc.querySelectorAll('ul.tb a[href*="mod=ranklist"]')) {
+    final href = a.attributes['href'] ?? '';
+    final m = RegExp(r'[?&]view=(\w+)').firstMatch(href);
+    if (m == null) continue;
+    final id = m.group(1)!;
+    if (out.containsKey(id)) continue;
+    // 「美女排行」→「美女」；无后缀时保留原文
+    final label = _text(
+      a,
+    ).replaceAll(RegExp(r'排行$'), '').trim();
+    if (label.isEmpty) continue;
+    out[id] = {'id': id, 'label': label};
+  }
+  return out.values.toList();
 }
 
 MemberRankItem? _parseMemberDl(dom.Element dl) {
@@ -359,7 +410,11 @@ MemberRankItem? _parseMemberDl(dom.Element dl) {
       break;
     }
   }
-  final nameLink = nameDt?.querySelector('a[href*=space-uid-]');
+  // 昵称链接：克米是 `space-uid-123`；52pojie 是 `home.php?mod=space&uid=123`
+  // （只认前者会让 52 的每一条都取不到 uid/用户名而被整条丢弃）
+  final nameLink = nameDt?.querySelector(
+    'a[href*="space-uid-"], a[href*="mod=space"][href*="uid="]',
+  );
   final username = _text(nameLink);
   final uid = _extractUid(nameLink?.attributes['href'] ?? '');
   final online = nameDt?.querySelector('img[alt=online]') != null;

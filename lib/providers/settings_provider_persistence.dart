@@ -4,109 +4,22 @@ part of 'settings_provider.dart';
 extension SettingsPersistence on SettingsProvider {
   // ==================== 加载 ====================
 
-  Future<void> load() async {
-    // 基本数值设置
-    _fontSize = (await _db.getSettingDouble('fontSize')) ?? 16;
-    _currentSiteIndex = (await _db.getSettingInt('currentSiteIndex')) ?? 0;
-    _defaultTabIndex = ((await _db.getSettingInt('defaultTabIndex')) ?? 0)
-        .clamp(0, 3);
-    _doubleBackExit = (await _db.getSettingBool('doubleBackExit')) ?? true;
-
-    _autoDetectUrls = (await _db.getSettingBool('autoDetectUrls')) ?? true;
-    // 消息未读徽标：样式 / 是否检查 / 计入的分组（见 NoticeBadgeController）
-    final badgeIdx =
-        (await _db.getSettingInt('noticeBadgeMode')) ??
-        NoticeBadgeMode.number.index;
-    _noticeBadgeMode = NoticeBadgeMode
-        .values[badgeIdx.clamp(0, NoticeBadgeMode.values.length - 1)];
-    _noticeCheckEnabled =
-        (await _db.getSettingBool('noticeCheckEnabled')) ?? true;
-    final groupsJson = await _db.getSetting('noticeBadgeGroups');
-    if (groupsJson != null && groupsJson.isNotEmpty) {
-      try {
-        final parsed = (jsonDecode(groupsJson) as List<dynamic>)
-            .map((e) => e.toString())
-            .where(noticeGroupIds.contains)
-            .toSet();
-        _noticeBadgeGroups = parsed;
-      } catch (_) {}
-    }
-    // 浏览器仿真头：此处在 ApiService.init 之前，只登记开关值，init 会读它
-    _simulateBrowserHeaders =
-        (await _db.getSettingBool('simulateBrowserHeaders')) ?? true;
-    applyBrowserHeaders(_simulateBrowserHeaders);
-    _interstitialAutoVerify =
-        (await _db.getSettingBool('interstitialAutoVerify')) ?? true;
-    _acwForceWebview = (await _db.getSettingBool('acwForceWebview')) ?? false;
-    _developerMode = (await _db.getSettingBool('developerMode')) ?? false;
-    // 页面接管：被关闭的页面 id（JSON 数组），默认空 = 全部走 App 页
-    final fallbackJson = await _db.getSetting('browserFallbackPages');
-    if (fallbackJson != null && fallbackJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(fallbackJson) as List<dynamic>;
-        _browserFallbackPages = parsed.map((e) => e.toString()).toSet();
-      } catch (_) {}
-    }
-    applyDisabledAppPages(_browserFallbackPages);
-    // 终极降级开关（逃生阀）：默认关
-    _browserOnlyMode = (await _db.getSettingBool('browserOnlyMode')) ?? false;
-    applyBrowserOnlyMode(_browserOnlyMode);
-    // 个人空间页数据源覆盖（'' = 跟随浏览模式），请求发起前登记
-    _spaceSource = (await _db.getSetting('spaceSource')) ?? '';
-    space_api.applySpaceSourceOverride(_spaceSource);
-    _staggerInterval = (await _db.getSettingInt('staggerInterval')) ?? 40;
-    // 站点正文字数上限（编辑器 / 留言板共用），无配置按 Discuz 默认 65535
-    _postMaxLength =
-        (await _db.getSettingInt('postMaxLength')) ?? kDefaultPostMaxLength;
-    // 缓存过期天数（默认取自 cache.json，无配置或 JSON 错误时为 1 天）
-    final cacheDefaults = DefaultConfig.instance.cacheExpireDays;
-    _avatarCacheDays =
-        (await _db.getSettingInt('avatarCacheDays')) ?? cacheDefaults.avatar;
-    _emojiCacheDays =
-        (await _db.getSettingInt('emojiCacheDays')) ?? cacheDefaults.emoji;
-    _imageCacheDays =
-        (await _db.getSettingInt('imageCacheDays')) ?? cacheDefaults.image;
-    _medalCacheDays =
-        (await _db.getSettingInt('medalCacheDays')) ?? cacheDefaults.medal;
-    // 帖子自动缓存：TTL 下限 1 天；单帖上限来自 cache.json
-    final threadConfig = DefaultConfig.instance.threadCacheConfig;
-    _threadCacheDays =
-        ((await _db.getSettingInt('threadCacheDays')) ??
-                threadConfig.expireDays)
-            .clamp(1, 365);
-    _threadCacheEnabled =
-        (await _db.getSettingBool('threadCacheEnabled')) ?? true;
-    ThreadCacheService.instance.configure(
-      ttlDays: _threadCacheDays,
-      maxBytesPerThread: threadConfig.maxBytesPerThread,
+  /// 把应用设置中需要推送到全局服务的值同步一次。
+  ///
+  /// 启动时由 main 调用；导入设置后也调用，避免缓存天数/错峰间隔要等重启。
+  void applyRuntimeConfig() {
+    stagger_queue.setStaggerInterval(Duration(milliseconds: _staggerInterval));
+    initCacheManagers(
+      emojiDays: _emojiCacheDays,
+      avatarDays: _avatarCacheDays,
+      imageDays: _imageCacheDays,
+      medalDays: _medalCacheDays,
     );
-    _minSnapshotWordCount =
-        (await _db.getSettingInt('minSnapshotWordCount')) ?? 10;
-    _autoSaveInterval = (await _db.getSettingInt('autoSaveInterval')) ?? 30;
-    _maxAutoSnapshots = (await _db.getSettingInt('maxAutoSnapshots')) ?? 10;
-    _historyMaxCount = (await _db.getSettingInt('historyMaxCount')) ?? 200;
+    AvatarRedirectStore.instance.cacheTtl = Duration(days: _avatarCacheDays);
+  }
 
-    _historyFormatThread =
-        (await _db.getSetting('historyFormat_thread')) ?? '{title}';
-    _historyFormatUser =
-        (await _db.getSetting('historyFormat_user')) ?? '{nickname}';
-    _historyTitleFormatThread =
-        (await _db.getSetting('historyTitleFormat_thread')) ?? '{title}';
-    _historyTitleFormatUser =
-        (await _db.getSetting('historyTitleFormat_user')) ?? '{nickname}';
-    _historyTitleFormatMythread =
-        (await _db.getSetting('historyTitleFormat_mythread')) ??
-        '{typeLabel}(UID={uid}, 第{page}页)';
-    _historyTitleFormatReply =
-        (await _db.getSetting('historyTitleFormat_reply')) ??
-        '{typeLabel}(UID={uid}, 第{page}页)';
-
-    // 积分公式（按站点）
-    _creditFormula =
-        (await _db.getCreditFormula(SiteStore.instance.host)) ??
-        SettingsProvider.defaultFormula;
-
-    // 恢复站点列表
+  Future<void> load() async {
+    // 1. 站点列表（站点身份仍存在 app_sites）
     final sitesJson = await _db.getSitesRaw();
     if (sitesJson != null && sitesJson.isNotEmpty) {
       final list = jsonDecode(sitesJson) as List<dynamic>;
@@ -117,420 +30,411 @@ extension SettingsPersistence on SettingsProvider {
     if (_sites.isEmpty) {
       _sites = SiteConfig.defaultSites();
     }
-    _currentSiteIndex = _currentSiteIndex.clamp(0, _sites.length - 1);
+
+    // 2. 应用设置 + 各站点设置（文档不存在时使用默认值）
+    await _settings.loadAll(_sites.map((s) => s.host));
+    _applyAppSettings(_settings.app);
+
+    // 3. 当前站点：用 host 定位，站点排序/删除后不漂移
+    final host = _settings.app.currentSiteHost;
+    final idx = _sites.indexWhere((s) => s.host == host);
+    _currentSiteIndex = (idx >= 0 ? idx : 0).clamp(0, _sites.length - 1);
     SiteStore.instance.replaceSites(_sites);
-    _currentSiteIndex = _currentSiteIndex.clamp(0, _sites.length - 1);
     SiteStore.instance.switchTo(_currentSiteIndex);
 
-    // 导读 Tab（完整列表含可见性；兼容旧版 tabOrder 逗号字符串迁移）
-    final guideJson = await _db.getSetting('guideTabs');
-    if (guideJson != null && guideJson.isNotEmpty) {
-      try {
-        final loaded = ManagedItem.decodeList(
-          guideJson,
-        ).where((e) => SettingsProvider.tabLabels.containsKey(e.id)).toList();
-        if (loaded.isNotEmpty) _guideTabs = loaded;
-      } catch (_) {}
-    } else {
-      final legacy = await _db.getSetting('tabOrder');
-      if (legacy != null && legacy.isNotEmpty) {
-        final visible = legacy.split(',').toSet();
-        _guideTabs = [
-          for (final id in _defaultTabIds)
-            ManagedItem(
-              id: id,
-              name: SettingsProvider.tabLabels[id] ?? id,
-              visible: visible.contains(id),
-            ),
-        ];
-      }
-    }
-
-    // 首页区块（顺序/显隐/默认展开；缺失或损坏时回退默认）
-    final homeJson = await _db.getSetting('homeSections');
-    if (homeJson != null && homeJson.isNotEmpty) {
-      try {
-        final loaded = ManagedItem.decodeList(
-          homeJson,
-        ).where((e) => _homeSectionIds.contains(e.id)).toList();
-        if (loaded.isNotEmpty) _homeSections = loaded;
-      } catch (_) {}
-    }
-
-    // 消息页 Tab（顺序/显隐）与「常用项自动前排」+ 使用次数
-    final noticeTabsJson = await _db.getSetting('noticeTabs');
-    if (noticeTabsJson != null && noticeTabsJson.isNotEmpty) {
-      try {
-        final loaded = ManagedItem.decodeList(
-          noticeTabsJson,
-        ).where((e) => _noticeTabIds.contains(e.id)).toList();
-        if (loaded.isNotEmpty) _noticeTabs = loaded;
-      } catch (_) {}
-    }
-    _autoFrequentTabs = (await _db.getSetting('autoFrequentTabs')) != '0';
-    final usageJson = await _db.getSetting('tabUsage');
-    if (usageJson != null && usageJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(usageJson) as Map<String, dynamic>;
-        _tabUsage = {
-          for (final e in parsed.entries)
-            e.key: {
-              for (final kv in (e.value as Map).entries)
-                kv.key: (kv.value as num).toInt(),
-            },
-        };
-      } catch (_) {}
-    }
-
-    // 快捷键映射
-    final shortcutsJson = await _db.getShortcutsRaw();
-    if (shortcutsJson != null && shortcutsJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(shortcutsJson) as Map<String, dynamic>;
-        _shortcuts = parsed.map((k, v) => MapEntry(k, v.toString()));
-      } catch (_) {}
-    }
-
-    // 禁用的 BBCode 标签
-    final disabledJson = await _db.getDisabledBbcodeRaw();
-    if (disabledJson != null && disabledJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(disabledJson) as List<dynamic>;
-        // 只保留仍可配置的项：老版本可能存过已被移出清单的标签
-        // （如 strikethrough —— 删除线带语义，已不再允许禁用），
-        // 否则它会留在集合里继续生效，而用户在 UI 上已无处取消。
-        _disabledBbcodeTags = parsed
-            .map((e) => e.toString())
-            .where(bbcodeStyleTagIds.contains)
-            .toSet();
-      } catch (_) {}
-    }
-
-    // 快捷链接（每个站点独立存储）
-    for (final site in _sites) {
-      final host = site.host;
-      final linksJson = await _db.getShortcutLinksRaw(host);
-      if (linksJson != null && linksJson.isNotEmpty) {
-        try {
-          _shortcutLinks[host] = ManagedItem.decodeList(linksJson);
-        } catch (_) {}
-      }
-    }
-    for (final site in _sites) {
-      final host = site.host;
-      if (!_shortcutLinks.containsKey(host)) {
-        _shortcutLinks[host] = DefaultConfig.instance.shortcutLinksFor(host);
-      }
-    }
-
-    // 工具栏配置
-    _toolbarItems = await _loadSyncedToolbar();
-
-    // 工具栏快捷键
-    final tbShortcutsJson = await _db.getToolbarShortcutsRaw();
-    if (tbShortcutsJson != null && tbShortcutsJson.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(tbShortcutsJson) as Map<String, dynamic>;
-        _toolbarShortcuts = parsed.map((k, v) => MapEntry(k, v.toString()));
-        // 剪掉无效 id 的快捷键；用户自定义模板项的 id 也保留
-        _toolbarShortcuts.removeWhere(
-          (key, _) =>
-              !isValidToolbarItemId(key) &&
-              !_toolbarItems.any((e) => e.id == key),
-        );
-      } catch (_) {}
-    }
-
-    // 帖子页是否使用内嵌迷你编辑器（默认开启）
-    _threadMiniEditor = (await _db.getSettingBool('threadMiniEditor')) ?? true;
-
-    // 帖子迷你编辑器常用语（允许为空列表，故只判 JSON 字符串非空）
-    final quickRepliesJson = await _db.getSetting('quickReplies');
-    if (quickRepliesJson != null && quickRepliesJson.isNotEmpty) {
-      try {
-        _quickReplies = ManagedItem.decodeList(quickRepliesJson);
-      } catch (_) {}
-    }
-
-    // 主题模式
-    final themeModeStr = await _db.getSetting('themeMode');
-    if (themeModeStr != null) {
-      _themeMode = ThemeMode.values.firstWhere(
-        (m) => m.name == themeModeStr,
-        orElse: () => ThemeMode.system,
-      );
-    }
-
-    // 主题种子色
-    final seedColorInt = await _db.getSettingInt('seedColor');
-    if (seedColorInt != null) {
-      _seedColor = Color(seedColorInt);
-    }
-
-    // 纯黑主题
-    _isPureBlackTheme = (await _db.getSettingBool('pureBlackTheme')) ?? false;
-
-    // 头像设置
-    _showAvatars = (await _db.getSettingBool('showAvatars')) ?? true;
-
-    // 头像尺寸策略（默认 middle，未知值回退 middle）
-    _avatarSizeMode = AvatarSizeMode.fromValue(
-      await _db.getSetting('avatarSizeMode'),
+    // 4. 把应用设置同步给非 UI 服务
+    ThreadCacheService.instance.configure(
+      ttlDays: _threadCacheDays,
+      maxBytesPerThread: _threadCacheMaxKB * 1024,
+      maxVersions: _threadCacheMaxVersions,
     );
 
-    // 宽屏时帖子图片最大宽度（默认 600）
-    _maxImageWidth = (await _db.getSettingInt('maxImageWidth')) ?? 600;
-
-    // 分享图正文最大高度（生成页勾选「截断」时生效）
-    _shareImageMaxHeight =
-        (await _db.getSettingInt('shareImageMaxHeight')) ?? 8000;
-
-    // 「生成图片」只输出正文（默认关）
-    _shareImageContentOnly =
-        (await _db.getSettingBool('shareImageContentOnly')) ?? false;
-
-    // 编辑器启动自检
-    _editorStartupCheck =
-        (await _db.getSettingBool('editorStartupCheck')) ?? true;
-
-    // 工具栏项被隐藏时其快捷键是否仍然生效（默认开启）
-    _toolbarShortcutWhenHidden =
-        (await _db.getSettingBool('toolbarShortcutWhenHidden')) ?? true;
-
-    // 启动时自动检查更新
-    _autoCheckUpdate = (await _db.getSettingBool('autoCheckUpdate')) ?? true;
-    _skippedUpdateVersion =
-        (await _db.getSetting('skippedUpdateVersion')) ?? '';
-
     _notify();
   }
 
-  // ==================== 通用设置写入 ====================
+  /// 应用设置文档 → Provider 字段
+  void _applyAppSettings(AppSettings a) {
+    _fontSize = a.reading.fontSize;
+    _codeBlockMaxLines = a.reading.codeBlockMaxLines;
+    _ratingMaxRows = a.reading.ratingMaxRows;
+    _autoDetectUrls = a.reading.autoDetectUrls;
+    _disabledBbcodeTags = a.reading.disabledBbcodeTags
+        .where(bbcodeStyleTagIds.contains)
+        .toSet();
 
-  /// 开关"帖子页使用内嵌迷你编辑器"（关闭退回原全屏编辑器）
+    _themeMode = a.appearance.themeModeValue;
+    _seedColor = a.appearance.seedColorValue;
+    _isPureBlackTheme = a.appearance.pureBlackTheme;
+    _showAvatars = a.appearance.showAvatars;
+    _avatarSizeMode = a.appearance.avatarSizeModeValue;
+    _maxImageWidth = a.appearance.maxImageWidth;
+
+    _defaultTabIndex = a.startup.defaultTabIndex;
+    _doubleBackExit = a.startup.doubleBackExit;
+    _guideTabs = a.startup.guideTabs;
+    _homeSections = a.startup.homeSections;
+    _noticeTabs = a.startup.noticeTabs;
+    _autoFrequentTabs = a.startup.autoFrequentTabs;
+    _tabUsage = a.startup.tabUsage;
+
+    _threadMiniEditor = a.editor.threadMiniEditor;
+    _editorStartupCheck = a.editor.editorStartupCheck;
+    _toolbarShortcutWhenHidden = a.editor.toolbarShortcutWhenHidden;
+    _quickReplies = a.editor.quickReplies;
+    _toolbarItems = syncToolbarWithDefaults(
+      a.editor.toolbarItems,
+      defaultToolbarItems(),
+    );
+    _shortcuts = a.editor.shortcuts;
+    _toolbarShortcuts = a.editor.toolbarShortcuts;
+    _minSnapshotWordCount = a.editor.minSnapshotWordCount;
+    _autoSaveInterval = a.editor.autoSaveInterval;
+    _maxAutoSnapshots = a.editor.maxAutoSnapshots;
+
+    _avatarCacheDays = a.storage.avatarCacheDays;
+    _emojiCacheDays = a.storage.emojiCacheDays;
+    _imageCacheDays = a.storage.imageCacheDays;
+    _medalCacheDays = a.storage.medalCacheDays;
+    _threadCacheDays = a.storage.threadCacheDays.clamp(1, 365);
+    _threadCacheEnabled = a.storage.threadCacheEnabled;
+    _threadCacheMaxVersions = a.storage.threadCacheMaxVersions.clamp(
+      ThreadCacheService.minMaxVersions,
+      ThreadCacheService.maxMaxVersions,
+    );
+    _threadCacheMaxKB = a.storage.threadCacheMaxKB.clamp(
+      ThreadCacheService.minMaxKB,
+      ThreadCacheService.maxMaxKB,
+    );
+
+    _noticeBadgeMode = NoticeBadgeMode
+        .values[a.notice.badgeMode.clamp(0, NoticeBadgeMode.values.length - 1)];
+    _noticeCheckEnabled = a.notice.checkEnabled;
+    _noticeBadgeGroups = a.notice.badgeGroups;
+
+    _shareImageMaxHeight = a.share.maxHeight;
+    _shareImageContentOnly = a.share.contentOnly;
+
+    _historyMaxCount = a.history.maxCount;
+    _historyFormatThread = a.history.formatThread;
+    _historyFormatUser = a.history.formatUser;
+    _historyTitleFormatThread = a.history.titleFormatThread;
+    _historyTitleFormatUser = a.history.titleFormatUser;
+    _historyTitleFormatMythread = a.history.titleFormatMythread;
+    _historyTitleFormatReply = a.history.titleFormatReply;
+
+    _autoCheckUpdate = a.advanced.autoCheckUpdate;
+    _skippedUpdateVersion = a.advanced.skippedUpdateVersion;
+    _developerMode = a.advanced.developerMode;
+  }
+
+  AppSettings _buildAppSettings() => AppSettings(
+    currentSiteHost: _sites.isEmpty
+        ? ''
+        : _sites[_currentSiteIndex.clamp(0, _sites.length - 1)].host,
+    appearance: AppearanceSettings(
+      themeMode: _themeMode.name,
+      seedColor: _seedColor.toARGB32(),
+      pureBlackTheme: _isPureBlackTheme,
+      showAvatars: _showAvatars,
+      avatarSizeMode: _avatarSizeMode.value,
+      maxImageWidth: _maxImageWidth,
+    ),
+    startup: StartupSettings(
+      defaultTabIndex: _defaultTabIndex,
+      doubleBackExit: _doubleBackExit,
+      guideTabs: _guideTabs,
+      homeSections: _homeSections,
+      noticeTabs: _noticeTabs,
+      autoFrequentTabs: _autoFrequentTabs,
+      tabUsage: _tabUsage,
+    ),
+    reading: ReadingSettings(
+      fontSize: _fontSize,
+      codeBlockMaxLines: _codeBlockMaxLines,
+      ratingMaxRows: _ratingMaxRows,
+      autoDetectUrls: _autoDetectUrls,
+      disabledBbcodeTags: _disabledBbcodeTags,
+    ),
+    editor: EditorSettings(
+      threadMiniEditor: _threadMiniEditor,
+      editorStartupCheck: _editorStartupCheck,
+      toolbarShortcutWhenHidden: _toolbarShortcutWhenHidden,
+      quickReplies: _quickReplies,
+      toolbarItems: _toolbarItems,
+      shortcuts: _shortcuts,
+      toolbarShortcuts: _toolbarShortcuts,
+      minSnapshotWordCount: _minSnapshotWordCount,
+      autoSaveInterval: _autoSaveInterval,
+      maxAutoSnapshots: _maxAutoSnapshots,
+    ),
+    storage: StorageSettings(
+      avatarCacheDays: _avatarCacheDays,
+      emojiCacheDays: _emojiCacheDays,
+      imageCacheDays: _imageCacheDays,
+      medalCacheDays: _medalCacheDays,
+      threadCacheDays: _threadCacheDays,
+      threadCacheEnabled: _threadCacheEnabled,
+      threadCacheMaxVersions: _threadCacheMaxVersions,
+      threadCacheMaxKB: _threadCacheMaxKB,
+    ),
+    notice: NoticeSettings(
+      badgeMode: _noticeBadgeMode.index,
+      checkEnabled: _noticeCheckEnabled,
+      badgeGroups: _noticeBadgeGroups,
+    ),
+    share: ShareSettings(
+      maxHeight: _shareImageMaxHeight,
+      contentOnly: _shareImageContentOnly,
+    ),
+    history: HistorySettings(
+      maxCount: _historyMaxCount,
+      formatThread: _historyFormatThread,
+      formatUser: _historyFormatUser,
+      titleFormatThread: _historyTitleFormatThread,
+      titleFormatUser: _historyTitleFormatUser,
+      titleFormatMythread: _historyTitleFormatMythread,
+      titleFormatReply: _historyTitleFormatReply,
+    ),
+    advanced: AdvancedSettings(
+      autoCheckUpdate: _autoCheckUpdate,
+      skippedUpdateVersion: _skippedUpdateVersion,
+      developerMode: _developerMode,
+    ),
+  );
+
+  Future<void> _persistApp() => _settings.setApp(_buildAppSettings());
+
+  // ==================== 站点设置写入 ====================
+
+  SiteSettings get _currentSite => _settings.site(SiteStore.instance.host);
+
+  Future<void> _updateCurrentSite(
+    SiteSettings Function(SiteSettings current) update,
+  ) async {
+    await _settings.updateSite(SiteStore.instance.host, update);
+    _notify();
+  }
+
+  Future<void> setSimulateBrowserHeaders(bool enabled) => _updateCurrentSite(
+    (s) => s.copyWith(
+      network: s.network.copyWith(simulateBrowserHeaders: enabled),
+    ),
+  );
+
+  Future<void> setInterstitialAutoVerify(bool enabled) => _updateCurrentSite(
+    (s) => s.copyWith(
+      network: s.network.copyWith(interstitialAutoVerify: enabled),
+    ),
+  );
+
+  Future<void> setAcwForceWebview(bool enabled) => _updateCurrentSite(
+    (s) => s.copyWith(network: s.network.copyWith(acwForceWebview: enabled)),
+  );
+
+  Future<void> setAppPageEnabled(String id, bool enabled) =>
+      _updateCurrentSite((s) {
+        final ids = Set<String>.from(s.pages.disabledPageIds);
+        if (enabled) {
+          ids.remove(id);
+        } else {
+          ids.add(id);
+        }
+        return s.copyWith(pages: s.pages.copyWith(disabledPageIds: ids));
+      });
+
+  Future<void> setBrowserOnlyMode(bool enabled) => _updateCurrentSite(
+    (s) => s.copyWith(pages: s.pages.copyWith(browserOnly: enabled)),
+  );
+
+  Future<void> setSpaceSource(String value) => _updateCurrentSite(
+    (s) => s.copyWith(content: s.content.copyWith(spaceSource: value)),
+  );
+
+  Future<void> setPostMaxLength(int value) => _updateCurrentSite(
+    (s) => s.copyWith(
+      content: s.content.copyWith(postMaxLength: value.clamp(1, 1000000)),
+    ),
+  );
+
+  // ==================== 应用设置写入 ====================
+
+  /// 开关"帖子页使用内嵌迷你编辑器"
   Future<void> setThreadMiniEditorEnabled(bool enabled) async {
     _threadMiniEditor = enabled;
-    await _db.setSettingBool('threadMiniEditor', enabled);
+    await _persistApp();
     _notify();
   }
 
-  /// 开关浏览器仿真头（Referer / Accept），立即作用于后续请求
-  Future<void> setSimulateBrowserHeaders(bool enabled) async {
-    _simulateBrowserHeaders = enabled;
-    applyBrowserHeaders(enabled);
-    await _db.setSettingBool('simulateBrowserHeaders', enabled);
-    _notify();
-  }
-
-  /// 开关"返回键双击退出"（关闭后默认页按一次返回即退出，仅 Android）
+  /// 开关"返回键双击退出"
   Future<void> setDoubleBackExit(bool enabled) async {
     _doubleBackExit = enabled;
-    await _db.setSettingBool('doubleBackExit', enabled);
-    _notify();
-  }
-
-  /// 开关"非论坛页自动弹浏览器验证"（人机验证 / 防火墙）
-  Future<void> setInterstitialAutoVerify(bool enabled) async {
-    _interstitialAutoVerify = enabled;
-    await _db.setSettingBool('interstitialAutoVerify', enabled);
-    _notify();
-  }
-
-  /// 开关"跳过本地自解，改用内置浏览器完成人机验证"
-  Future<void> setAcwForceWebview(bool enabled) async {
-    _acwForceWebview = enabled;
-    await _db.setSettingBool('acwForceWebview', enabled);
+    await _persistApp();
     _notify();
   }
 
   /// 消息未读标记样式（隐藏 / 红点 / 数字）
   Future<void> setNoticeBadgeMode(NoticeBadgeMode mode) async {
     _noticeBadgeMode = mode;
-    await _db.setSettingInt('noticeBadgeMode', mode.index);
+    await _persistApp();
     _notify();
   }
 
-  /// 是否检查新提醒（关掉后完全不请求）
   Future<void> setNoticeCheckEnabled(bool enabled) async {
     _noticeCheckEnabled = enabled;
-    await _db.setSettingBool('noticeCheckEnabled', enabled);
+    await _persistApp();
     _notify();
   }
 
-  /// 计入底栏未读的分组
   Future<void> setNoticeBadgeGroups(Set<String> groups) async {
     _noticeBadgeGroups = Set.from(groups);
-    await _db.setSetting(
-      'noticeBadgeGroups',
-      jsonEncode(_noticeBadgeGroups.toList()),
-    );
+    await _persistApp();
     _notify();
   }
 
-  /// 开关"开发者选项已解锁"（关于页图标连点解锁 / 页面内关闭）
   Future<void> setDeveloperMode(bool enabled) async {
     _developerMode = enabled;
-    await _db.setSettingBool('developerMode', enabled);
+    await _persistApp();
     _notify();
   }
 
-  /// 开关"启动时自动检查更新"（仅正式版生效）
   Future<void> setAutoCheckUpdate(bool enabled) async {
     _autoCheckUpdate = enabled;
-    await _db.setSettingBool('autoCheckUpdate', enabled);
+    await _persistApp();
     _notify();
   }
 
-  /// 设置跳过的版本 tag（'' = 取消跳过）
   Future<void> setSkippedUpdateVersion(String tag) async {
     _skippedUpdateVersion = tag;
-    await _db.setSetting('skippedUpdateVersion', tag);
-    _notify();
-  }
-
-  /// 开启 / 关闭某页的 App 接管（关闭后该页无论从哪进入都走内置浏览器）
-  Future<void> setAppPageEnabled(String id, bool enabled) async {
-    if (enabled) {
-      _browserFallbackPages.remove(id);
-    } else {
-      _browserFallbackPages.add(id);
-    }
-    applyDisabledAppPages(_browserFallbackPages);
-    await _db.setSetting(
-      'browserFallbackPages',
-      jsonEncode(_browserFallbackPages.toList()),
-    );
-    _notify();
-  }
-
-  /// 开关"整体退化为内置浏览器"（逃生阀）。
-  ///
-  /// 开启后所有路由（除内置浏览器与设置）都改走 WebView；设置必须保持可达，
-  /// 否则用户无法自行关闭（浏览器页内另有设置入口）。
-  Future<void> setBrowserOnlyMode(bool enabled) async {
-    _browserOnlyMode = enabled;
-    applyBrowserOnlyMode(enabled);
-    await _db.setSettingBool('browserOnlyMode', enabled);
-    _notify();
-  }
-
-  /// 设置个人空间页数据源：'' 跟随浏览模式 / 'mobile' / 'desktop'
-  Future<void> setSpaceSource(String value) async {
-    _spaceSource = value;
-    space_api.applySpaceSourceOverride(value);
-    await _db.setSetting('spaceSource', value);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setStaggerInterval(int ms) async {
     _staggerInterval = ms.clamp(20, 300);
-    await _db.setSettingInt('staggerInterval', _staggerInterval);
-    _notify();
-  }
-
-  /// 站点正文字数上限（编辑器 / 留言板共用）
-  Future<void> setPostMaxLength(int value) async {
-    _postMaxLength = value.clamp(1, 1000000);
-    await _db.setSettingInt('postMaxLength', _postMaxLength);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setAvatarCacheDays(int days) async {
     _avatarCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('avatarCacheDays', _avatarCacheDays);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setEmojiCacheDays(int days) async {
     _emojiCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('emojiCacheDays', _emojiCacheDays);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setImageCacheDays(int days) async {
     _imageCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('imageCacheDays', _imageCacheDays);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setMedalCacheDays(int days) async {
     _medalCacheDays = days.clamp(-1, 365);
-    await _db.setSettingInt('medalCacheDays', _medalCacheDays);
+    await _persistApp();
     _notify();
   }
 
-  /// 帖子自动缓存过期天数：下限 1 天，不提供「永不过期」
+  /// 帖子自动缓存过期天数：下限 1 天
   Future<void> setThreadCacheDays(int days) async {
     _threadCacheDays = days.clamp(1, 365);
-    await _db.setSettingInt('threadCacheDays', _threadCacheDays);
+    await _persistApp();
     ThreadCacheService.instance.configure(ttlDays: _threadCacheDays);
     _notify();
   }
 
-  /// 帖子自动缓存总开关。关闭只影响**后续写入**，已有缓存照常可读/可管理。
+  /// 帖子自动缓存总开关
   Future<void> setThreadCacheEnabled(bool enabled) async {
     _threadCacheEnabled = enabled;
-    await _db.setSettingBool('threadCacheEnabled', enabled);
+    await _persistApp();
+    _notify();
+  }
+
+  /// 每帖保留的正文版本数（1~10）
+  Future<void> setThreadCacheMaxVersions(int v) async {
+    _threadCacheMaxVersions = v.clamp(
+      ThreadCacheService.minMaxVersions,
+      ThreadCacheService.maxMaxVersions,
+    );
+    await _persistApp();
+    ThreadCacheService.instance.configure(maxVersions: _threadCacheMaxVersions);
+    _notify();
+  }
+
+  /// 单帖最大缓存大小（KB）
+  Future<void> setThreadCacheMaxKB(int kb) async {
+    _threadCacheMaxKB = kb.clamp(
+      ThreadCacheService.minMaxKB,
+      ThreadCacheService.maxMaxKB,
+    );
+    await _persistApp();
+    ThreadCacheService.instance.configure(
+      maxBytesPerThread: _threadCacheMaxKB * 1024,
+    );
     _notify();
   }
 
   Future<void> setMinSnapshotWordCount(int v) async {
     _minSnapshotWordCount = v.clamp(1, 100);
-    await _db.setSettingInt('minSnapshotWordCount', _minSnapshotWordCount);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setAutoSaveInterval(int seconds) async {
     _autoSaveInterval = seconds.clamp(5, 300);
-    await _db.setSettingInt('autoSaveInterval', _autoSaveInterval);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setMaxAutoSnapshots(int v) async {
     _maxAutoSnapshots = v.clamp(1, 50);
-    await _db.setSettingInt('maxAutoSnapshots', _maxAutoSnapshots);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setDefaultTabIndex(int index) async {
     _defaultTabIndex = index.clamp(0, 3);
-    await _db.setSettingInt('defaultTabIndex', _defaultTabIndex);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setHistoryFormatThread(String format) async {
     _historyFormatThread = format;
-    await _db.setSetting('historyFormat_thread', format);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setHistoryFormatUser(String format) async {
     _historyFormatUser = format;
-    await _db.setSetting('historyFormat_user', format);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setHistoryTitleFormatThread(String format) async {
     _historyTitleFormatThread = format;
-    await _db.setSetting('historyTitleFormat_thread', format);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setHistoryTitleFormatUser(String format) async {
     _historyTitleFormatUser = format;
-    await _db.setSetting('historyTitleFormat_user', format);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setHistoryTitleFormatMythread(String format) async {
     _historyTitleFormatMythread = format;
-    await _db.setSetting('historyTitleFormat_mythread', format);
+    await _persistApp();
     _notify();
   }
 
   Future<void> setHistoryTitleFormatReply(String format) async {
     _historyTitleFormatReply = format;
-    await _db.setSetting('historyTitleFormat_reply', format);
+    await _persistApp();
     _notify();
   }
 }

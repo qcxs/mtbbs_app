@@ -175,7 +175,86 @@ class Html2BBCode {
       final clean = codeText.replaceAll(RegExp(r'复制代码\s*$'), '').trim();
       return '\n[code]$clean[/code]\n';
     }
+
+    // 52pojie 的 SyntaxHighlighter 插件把 [code] 渲染成
+    // <div class="syntaxhighlighter python">：左列 td.gutter 是行号，
+    // 右列 td.code 里每行一个 div.line（内部是若干 <code> 片段，
+    // 缩进用 &nbsp; 表示）。必须逐行取 .text —— 走通用解析会把每个
+    // <code> 的文本 trim 掉并首尾相接，整块代码挤成一行、缩进全丢。
+    if (el.classes.contains('syntaxhighlighter')) {
+      final code = _extractSyntaxHighlighter(el);
+      if (code != null) return '\n[code]$code[/code]\n';
+      return '';
+    }
+
+    // 代码块头部工具行：「[Python] 纯文本查看 复制代码」。
+    // 52pojie 服务端返回的结构是
+    // `<div><div>[Python] <em class=viewsource>…</em> <em class=copycode>…</em></div>
+    //  <pre class="brush: python">代码</pre></div>`，代码在**同一个** div 里；
+    // 只有浏览器执行 SyntaxHighlighter 插件 JS 后，才会变成紧随其后的
+    // div.syntaxhighlighter 表格。因此必须确认容器里没有 pre/code/高亮块，
+    // 否则会把整块代码一起丢掉。
+    if (el.querySelector('div.syntaxhighlighter') == null &&
+        el.querySelector('pre, code') == null &&
+        el.querySelector('em.copycode, em.viewsource') != null) {
+      return '';
+    }
+
+    // Discuz 分类信息（threadtype，如 52pojie「招聘」版）：帖子正文不在
+    // td.t_f，而是 div.typeoption > table.cgtl（caption 为分类名，每行
+    // th 标签 + td 值）。转成「分类名 + 两列表格」，由帖子解析层前置到正文。
+    if (cls == 'typeoption') {
+      final table = el.querySelector('table');
+      if (table == null) return _parseChildren(el);
+      final caption = sanitizeText(
+        table.querySelector('caption')?.text ?? '',
+      ).trim();
+      final rows = StringBuffer();
+      for (final tr in table.querySelectorAll('tr')) {
+        final td = tr.querySelector('td');
+        if (td == null) continue;
+        final value = _parseChildren(
+          td,
+        ).replaceAll(RegExp(r'[ \t]*\n[ \t]*'), '\n').trim();
+        // 空值项（性别/年龄/有效期等留空字段）不占一行
+        if (value.isEmpty) continue;
+        final label = sanitizeText(tr.querySelector('th')?.text ?? '').trim();
+        rows.write('[tr][td]$label[/td][td]$value[/td][/tr]');
+      }
+      if (rows.isEmpty) return '';
+      final head = caption.isEmpty ? '' : '[b]$caption[/b]\n';
+      return '\n$head[table]$rows[/table]\n';
+    }
     return null;
+  }
+
+  /// 从 52pojie SyntaxHighlighter 容器中逐行提取代码（保留缩进与空行）。
+  ///
+  /// 只取右列 `td.code` 的行（左列 gutter 是行号）；每行
+  /// `div.line` 的 `text` 已按文档顺序拼接好行内 `<code>` 片段，
+  /// `&nbsp;` 需还原为空格。返回 null 表示没找到行结构，交回通用解析。
+  String? _extractSyntaxHighlighter(dom.Element el) {
+    final lineEls = el.querySelectorAll('td.code div.line');
+    final lines = lineEls.isNotEmpty
+        ? lineEls
+        : el.querySelectorAll('div.container div.line');
+    if (lines.isEmpty) return null;
+    final text = lines
+        .map(
+          (line) => line.text
+              .replaceAll('\u00A0', ' ')
+              .replaceAll(RegExp(r'[ \t]+$'), ''),
+        )
+        .toList();
+    // 去掉首尾空行（插件偶尔多渲染空行）
+    while (text.isNotEmpty && text.first.trim().isEmpty) {
+      text.removeAt(0);
+    }
+    while (text.isNotEmpty && text.last.trim().isEmpty) {
+      text.removeLast();
+    }
+    if (text.isEmpty) return null;
+    return text.join('\n');
   }
 
   // ==================== 复杂匹配 ====================
@@ -345,6 +424,20 @@ class Html2BBCode {
       if (handled != null) return handled;
       // 回退：处理子节点（script → media/audio, span → bilibili 等）
       return _parseChildren(el);
+    }
+
+    // 代码块原始形态：52pojie SyntaxHighlighter 插件的
+    // `<pre class="brush: python; gutter: true">`。浏览器里由插件 JS 转成
+    // div.syntaxhighlighter 表格，App 拿到的是**未执行 JS** 的原始 HTML。
+    // 必须原样取 text 并包进 [code]：走通用解析会被 _format 压掉缩进，
+    // 也拿不到「整块代码」的语义。
+    if (tag == 'pre') {
+      final text = el.text
+          .replaceAll('\u00A0', ' ')
+          .replaceAll(RegExp(r'^[\r\n]+'), '')
+          .replaceAll(RegExp(r'[\r\n]+$'), '');
+      if (text.trim().isEmpty) return '';
+      return '\n[code]$text[/code]\n';
     }
 
     // 文本样式

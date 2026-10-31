@@ -19,7 +19,21 @@ final _snapshotStore = stringMapStoreFactory.store('editor_snapshots');
 final _previewStore = stringMapStoreFactory.store('preview_cache');
 
 /// 设置项 — String key → {value: String}，替代 SharedPreferences
+///
+/// 旧扁平设置仍保留此 Store；新分层设置使用下面三个 Store。
 final _settingsStore = stringMapStoreFactory.store('app_settings');
+
+/// 应用设置文档 — 固定 key "app" → AppSettings JSON
+final _appSettingsDocStore = stringMapStoreFactory.store('settings_app');
+
+/// 站点设置 — String key (host) → SiteSettings JSON
+final _siteSettingsStore = stringMapStoreFactory.store('settings_site');
+
+/// 账号设置 — String key (host|uid) → AccountSettings JSON
+final _accountSettingsStore = stringMapStoreFactory.store('settings_account');
+
+/// 站点派生状态 — String key (host|kind) → JSON（表情、作者资料等）
+final _siteStateStore = stringMapStoreFactory.store('site_state');
 
 /// 账号列表 — String key (host) → JSON: List<Account>
 final _accountsStore = stringMapStoreFactory.store('app_accounts');
@@ -29,24 +43,6 @@ final _imageHistoryStore = stringMapStoreFactory.store('image_history');
 
 /// 站点列表 — 固定 key "sites" → JSON: List<Site>
 final _sitesStore = stringMapStoreFactory.store('app_sites');
-
-/// 快捷链接 — String key (host) → JSON: List<ManagedItem>
-final _shortcutLinksStore = stringMapStoreFactory.store('shortcut_links');
-
-/// 工具栏项目 — 固定 key "items" → JSON: List<ManagedItem>
-final _toolbarItemsStore = stringMapStoreFactory.store('toolbar_items');
-
-/// 快捷键映射 — 固定 key "shortcuts" → JSON: Map<String, String>
-final _shortcutsStore = stringMapStoreFactory.store('app_shortcuts');
-
-/// 工具栏快捷键 — 固定 key "tb_shortcuts" → JSON: Map<String, String>
-final _toolbarShortcutsStore = stringMapStoreFactory.store('toolbar_shortcuts');
-
-/// 禁用的 BBCode 标签 — 固定 key "disabled" → JSON: List<String>
-final _disabledBbcodeStore = stringMapStoreFactory.store('disabled_bbcode');
-
-/// 积分公式 — String key (host) → {value: String}
-final _creditFormulaStore = stringMapStoreFactory.store('credit_formula');
 
 /// 上次登录账号 — String key (host) → {value: String}
 final _lastAccountStore = stringMapStoreFactory.store('last_account');

@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:provider/provider.dart';
 import 'package:mtbbs/api/forum/guide/export.dart' as guide_api;
 import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/models/settings/settings_defaults.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';

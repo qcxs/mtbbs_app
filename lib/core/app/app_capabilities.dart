@@ -27,7 +27,6 @@ enum AppCapability {
 
 /// 模块级能力注册表。
 ///
-/// 与 `app_page_gate.dart`、`api_service._simulateBrowserHeaders` 同一套做法：
 /// 启动早期就要生效，调用点不一定有 context，因此不放进 Provider。
 ///
 /// 判定分两层：

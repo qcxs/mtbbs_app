@@ -17,14 +17,12 @@ class AppOrchestrator {
   /// 1. 保存旧站点的活跃账号
   /// 2. 持久化新站点索引
   /// 3. SiteStore.switchTo → notifyListeners + SiteChangedEvent
-  /// 4. 加载 per-site 配置
-  /// 5. 恢复新站点的账号上下文（全局 Dio 换成新站点的罐）
-  /// 6. 重建跨站会话（旧站点改为作用域会话，新站点交回全局 Dio）
+  /// 4. 恢复新站点的账号上下文（全局 Dio 换成新站点的罐）
+  /// 5. 重建跨站会话（旧站点改为作用域会话，新站点交回全局 Dio）
   Future<void> switchSite(int index) async {
     auth.saveCurrentSiteState();
     await settings.switchSite(index);
     SiteStore.instance.switchTo(index);
-    await settings.reloadSiteConfig();
     await auth.onSiteChanged();
     // 必须放在全局 Dio 已经离开旧站点之后：当前站点不建作用域会话（见
     // `SessionRegistry.refreshHost`），切站后要重建，否则新当前站点还留着旧的

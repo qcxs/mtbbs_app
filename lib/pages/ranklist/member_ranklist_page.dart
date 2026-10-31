@@ -23,8 +23,9 @@ class MemberRanklistPage extends StatefulWidget {
   State<MemberRanklistPage> createState() => _MemberRanklistPageState();
 }
 
-/// 子榜：`id` 与站点 `view` 参数一一对应；`label` 为展示名
-const _kViews = <({String id, String label})>[
+/// 子榜兜底：站点未返回 `views` 导航时使用
+/// （PC 标准模板的 7 项；52pojie 等站点开放的子榜更少，以返回的为准）
+const _kDefaultViews = <({String id, String label})>[
   (id: 'beauty', label: '美女'),
   (id: 'handsome', label: '帅哥'),
   (id: 'credit', label: '积分'),
@@ -36,6 +37,9 @@ const _kViews = <({String id, String label})>[
 
 class _MemberRanklistPageState extends State<MemberRanklistPage> {
   late int _tabIndex;
+
+  /// 当前站点实际提供的子榜（首屏响应里的 `views` 导航）
+  List<({String id, String label})> _views = _kDefaultViews;
   final _items = <String, List<Map<String, dynamic>>>{};
   final _loading = <String, bool>{};
   final _errors = <String, String?>{};
@@ -48,7 +52,7 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
   @override
   void initState() {
     super.initState();
-    final idx = _kViews.indexWhere((v) => v.id == widget.initialView);
+    final idx = _kDefaultViews.indexWhere((v) => v.id == widget.initialView);
     _tabIndex = idx < 0 ? 0 : idx;
   }
 
@@ -58,10 +62,10 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
     _session = SiteScope.of(context);
     if (_sessionBound) return;
     _sessionBound = true;
-    _fetch(_kViews[_tabIndex].id);
+    _fetch(_views[_tabIndex].id);
   }
 
-  String get _currentView => _kViews[_tabIndex].id;
+  String get _currentView => _views[_tabIndex].id;
 
   Future<void> _fetch(String view, {bool force = false}) async {
     if ((_items.containsKey(view) || _loading[view] == true) && !force) return;
@@ -76,12 +80,21 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
       );
       if (!mounted) return;
       if (result['success'] == true) {
+        final siteViews = _viewsFrom(result['views']);
         setState(() {
+          if (siteViews != null) {
+            _views = siteViews;
+            final idx = siteViews.indexWhere((v) => v.id == view);
+            _tabIndex = idx < 0 ? 0 : idx;
+          }
           _items[view] = (result['items'] as List<dynamic>)
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
           _loading[view] = false;
         });
+        // 站点不支持当前子榜（如 52pojie 没有「邀请」）时，自动切到站点列表首项
+        final current = _views[_tabIndex].id;
+        if (current != view) _fetch(current);
       } else {
         setState(() {
           _errors[view] = result['message']?.toString() ?? '获取排行失败';
@@ -97,10 +110,24 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
     }
   }
 
+  /// 解析响应里的 `views`（站点子榜导航）；缺失/非法返回 null（沿用兜底）
+  List<({String id, String label})>? _viewsFrom(Object? raw) {
+    if (raw is! List || raw.isEmpty) return null;
+    final out = <({String id, String label})>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final id = '${e['id'] ?? ''}';
+      if (id.isEmpty) continue;
+      final label = '${e['label'] ?? ''}';
+      out.add((id: id, label: label.isEmpty ? id : label));
+    }
+    return out.isEmpty ? null : out;
+  }
+
   void _onTabChanged(int index) {
     if (index == _tabIndex) return;
     setState(() => _tabIndex = index);
-    _fetch(_kViews[index].id);
+    _fetch(_views[index].id);
   }
 
   @override
@@ -134,7 +161,7 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: _kViews.length,
+        itemCount: _views.length,
         separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemBuilder: (_, i) {
           final isActive = i == _tabIndex;
@@ -148,7 +175,7 @@ class _MemberRanklistPageState extends State<MemberRanklistPage> {
               ),
               alignment: Alignment.center,
               child: Text(
-                _kViews[i].label,
+                _views[i].label,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
