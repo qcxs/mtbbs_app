@@ -38,10 +38,28 @@ abstract final class BuildConfig {
   static bool get isBeta =>
       const bool.fromEnvironment('BETA') || versionName.contains('-beta');
 
-  /// 开源仓库地址（应用内各处引用，唯一事实源）
-  static const String repoUrl = 'https://github.com/qcxs/mtbbs_app';
+  /// 更新源仓库（`owner/repo`），由 `scripts/version.ps1 -Repo` 注入。
+  ///
+  /// **为空表示构建时未注入更新配置**（直接 `flutter build` / 未传 `-Repo`
+  /// 的本地包）：不检查更新，关于页也不显示更新入口。
+  static const String updateRepo = String.fromEnvironment(
+    'mtbbs.repo',
+    defaultValue: '',
+  );
 
-  /// GitHub Releases API（应用内更新检查）
-  static const String releasesApiUrl =
-      'https://api.github.com/repos/qcxs/mtbbs_app/releases';
+  /// 更新渠道（`release` / `beta` / `debug`），由 `-Channel` 注入；
+  /// 留空时按构建形态推断，见 `UpdateConfig.defaultChannel`。
+  static const String updateChannel = String.fromEnvironment(
+    'mtbbs.channel',
+    defaultValue: '',
+  );
+
+  /// 上游仓库地址（仅用于展示；fork 注入 `mtbbs.repo` 后 [repoUrl] 指向自己）。
+  static const String upstreamRepoUrl = 'https://github.com/qcxs/mtbbs_app';
+
+  /// 应用内展示的仓库地址：优先构建注入的更新源，未注入时回落上游。
+  static String get repoUrl {
+    final repo = updateRepo.trim();
+    return repo.isEmpty ? upstreamRepoUrl : 'https://github.com/$repo';
+  }
 }

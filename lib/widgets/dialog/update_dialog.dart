@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:mtbbs/config/build_config.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
+import 'package:mtbbs/platform/optional/external_url.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/services/update_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 手动 / 自动检查更新并给出反馈。
 ///
-/// - 自动检查（[isAuto]）= 仅正式版执行；该版本已被「跳过此版本」时静默；
-/// - 手动检查 = 任何构建（含 debug / beta）都执行，且**总会弹窗**显示版本与
-///   更新说明（便于排查"检测是否正确"）；无更新或非正式版时只给「关闭」；
+/// - 未注入更新源的构建（本地包）：不检查，关于页也不显示入口；
+/// - 自动检查 = 仅渠道策略允许 + 开关开启 + 距上次检查超过 1 小时；
+/// - 手动检查按渠道策略执行，且**总会弹窗**显示版本与更新说明（便于排查）；
 /// - 检查失败：一律不做任何事（「最新版本」保持上次成功的结果）。
 ///
 /// 「不再提醒」已由设置项「自动检查更新」开关替代，弹窗不再提供该按钮。
@@ -19,10 +20,15 @@ Future<void> checkForUpdate(
   required SettingsProvider settings,
 }) async {
   final service = UpdateService.instance;
-  // 自动检查仅正式版执行；手动检查在任何构建下都执行（便于 beta / debug 排查）
-  if (isAuto && !service.isSupported) return;
+  if (!service.isConfigured) return;
+  if (isAuto && !service.autoCheckEnabled) return;
+  if (!isAuto && !service.manualCheckEnabled) return;
 
   final result = await service.check();
+  // 记录本次检查时间（成功/失败都算），供启动自动检查的 1 小时限流使用
+  await settings.setLastUpdateCheckAt(
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+  );
   if (!context.mounted) return;
 
   switch (result) {
@@ -34,7 +40,8 @@ Future<void> checkForUpdate(
         title: '发现新版本',
         info: info,
         settings: settings,
-        canUpdate: service.isSupported,
+        canDownload: service.canDownload,
+        offerReleasePage: true,
       );
     case UpdateUpToDate():
       if (isAuto) return;
@@ -45,7 +52,8 @@ Future<void> checkForUpdate(
         title: '已是最新版本',
         info: info,
         settings: settings,
-        canUpdate: false,
+        canDownload: false,
+        offerReleasePage: false,
       );
     case UpdateCheckFailed():
       // 检测失败不做任何事（「最新版本」保持上次成功的结果）
@@ -53,11 +61,16 @@ Future<void> checkForUpdate(
   }
 }
 
-/// 启动后调度一次自动检查（仅正式版 + 开关开启）。
+/// 启动后调度一次自动检查。
 ///
-/// 延迟几秒执行：不阻塞首帧，也不与启动期的站点请求抢带宽。供 main.dart 调用。
+/// 条件：已注入更新源 + 渠道允许自动检查 + 设置开关开启 + 距上次检查超过
+/// 1 小时（发布没有那么频繁，避免每次启动都打 GitHub API）。延迟几秒执行，
+/// 不阻塞首帧，也不与启动期的站点请求抢带宽。供 main.dart 调用。
 void scheduleAutoUpdateCheck(SettingsProvider settings) {
-  if (!UpdateService.instance.isSupported || !settings.autoCheckUpdate) return;
+  final service = UpdateService.instance;
+  if (!service.isConfigured || !service.autoCheckEnabled) return;
+  if (!settings.autoCheckUpdate) return;
+  if (!UpdateService.autoCheckDue(settings.lastUpdateCheckAt)) return;
   Future.delayed(const Duration(seconds: 3), () {
     final ctx = rootNavigatorKey.currentContext;
     if (ctx == null || !ctx.mounted) return;
@@ -67,18 +80,23 @@ void scheduleAutoUpdateCheck(SettingsProvider settings) {
 
 /// 统一的版本信息弹窗。
 ///
-/// [canUpdate] 为 true（正式版 + 确有新版本）时展示「跳过此版本 / 关闭 / 下载」；
-/// 否则只给「关闭」，仅作信息展示（debug / beta、或已是最新时走这条路）。
+/// [canDownload] 为 true（正式渠道 + 确有新版本）时展示「跳过此版本 / 关闭 / 下载」；
+/// 否则只给信息展示。找不到匹配产物时，[offerReleasePage] 为 true 会给出
+/// 「打开发布页」——鸿蒙等尚无对应安装包形态时的兜底。
 Future<void> _showReleaseDialog(
   BuildContext context, {
   required String title,
   required ReleaseInfo info,
   required SettingsProvider settings,
-  required bool canUpdate,
+  required bool canDownload,
+  required bool offerReleasePage,
 }) {
   final cs = Theme.of(context).colorScheme;
-  final downloadUrl = canUpdate
+  final downloadUrl = canDownload
       ? UpdateService.instance.downloadUrlFor(info)
+      : null;
+  final releasePageUrl = offerReleasePage && downloadUrl == null
+      ? info.htmlUrl
       : null;
   final isSkipped = settings.skippedUpdateVersion == info.tagName;
 
@@ -111,7 +129,7 @@ Future<void> _showReleaseDialog(
         ),
       ),
       actions: [
-        if (canUpdate)
+        if (canDownload)
           TextButton(
             onPressed: () {
               settings.setSkippedUpdateVersion(isSkipped ? '' : info.tagName);
@@ -126,9 +144,14 @@ Future<void> _showReleaseDialog(
           onPressed: () => Navigator.of(ctx).pop(),
           child: Text('关闭', style: TextStyle(color: cs.outline)),
         ),
+        if (releasePageUrl != null && releasePageUrl.isNotEmpty)
+          TextButton(
+            onPressed: () => _openUrl(ctx, releasePageUrl),
+            child: const Text('打开发布页'),
+          ),
         if (downloadUrl != null)
           FilledButton(
-            onPressed: () => _openUrl(downloadUrl),
+            onPressed: () => _openUrl(ctx, downloadUrl),
             child: const Text('下载'),
           ),
       ],
@@ -165,8 +188,10 @@ Widget _infoRow(ColorScheme cs, String label, String value) {
   );
 }
 
-Future<void> _openUrl(String url) async {
-  final uri = Uri.tryParse(url);
-  if (uri == null) return;
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
+/// 打开发布页 / 下载地址；平台无法打开外部链接时复制链接兜底。
+Future<void> _openUrl(BuildContext context, String url) async {
+  final outcome = await ExternalUrl.open(url);
+  if (outcome == ExternalUrlOutcome.opened) return;
+  await ClipboardHelper.write(url);
+  if (context.mounted) showToast('无法打开浏览器，链接已复制');
 }

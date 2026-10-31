@@ -67,8 +67,8 @@ class AboutPage extends StatefulWidget {
       ? 'https://www.52pojie.cn'
       : 'https://bbs.binmt.cc';
 
-  /// 开源仓库
-  static const String repoUrl = BuildConfig.repoUrl;
+  /// 开源仓库（构建注入的更新源优先，未注入回落上游）
+  static String get repoUrl => BuildConfig.repoUrl;
 
   /// 应用介绍帖
   static const String introUrl = 'https://bbs.binmt.cc/thread-169295-1-1.html';

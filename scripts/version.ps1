@@ -10,8 +10,10 @@
 #   - beta 形态（-Beta）：版本固定 1.0.0-beta / 1，不追加 hash，配合
 #     `--dart-define=BETA=true` 由 gradle 切成独立应用（见 docs/15）
 #   - 生成 mtbbs_release.json，供 `flutter build --dart-define-from-file` 注入
+#   - 可用 -Repo / -Channel 注入更新源与更新渠道（不传 -Repo = 本地包不检查更新）
 #   - 导出 MTBBS_VERSION_NAME / MTBBS_VERSION_CODE / MTBBS_VERSION / MTBBS_BETA
-#     环境变量，CI 下同时写入 GITHUB_ENV 供后续步骤使用（Inno Setup 安装包版本号也读它）
+#     （注入更新源时另导出 MTBBS_REPO / MTBBS_CHANNEL）环境变量，
+#     CI 下同时写入 GITHUB_ENV 供后续步骤使用（Inno Setup 安装包版本号也读它）
 #
 # 用法：
 #   scripts/version.ps1                               # 桌面平台，版本名读 pubspec.yaml
@@ -19,10 +21,14 @@
 #   scripts/version.ps1 android -VersionName 1.2.0    # 显式指定版本名（容忍 v 前缀）
 #   scripts/version.ps1 -VersionName v1.2.0           # 桌面显式指定（同样追加 hash）
 #   scripts/version.ps1 android -Beta                 # beta 形态（固定 1.0.0-beta / 1）
+#   scripts/version.ps1 android -VersionName 1.2.0 -Repo qcxs/mtbbs_app -Channel release
+#                                                     # 注入更新源（不传 -Repo = 本地包不检查更新）
 param(
     [string]$Platform = '',
     [string]$VersionName = '',
-    [switch]$Beta
+    [switch]$Beta,
+    [string]$Repo = '',
+    [string]$Channel = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -90,12 +96,33 @@ try {
     $buildTime = [int]([DateTimeOffset]::Now.ToUnixTimeSeconds())
     $isBeta = if ($Beta) { 'true' } else { 'false' }
 
+    # 更新源（可选）：不传 -Repo 的本地包不检查更新（见 lib/config/update_config.dart）
+    $repoValue = $Repo.Trim()
+    if ($repoValue -ne '' -and $repoValue -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
+        throw "Repo 格式不合法（应为 owner/repo）：$Repo"
+    }
+    $channelValue = ''
+    if (-not [string]::IsNullOrWhiteSpace($Channel)) {
+        $channelValue = $Channel.Trim().ToLowerInvariant()
+        if ($channelValue -notin @('release', 'beta', 'debug')) {
+            throw "Channel 只能是 release / beta / debug：$Channel"
+        }
+    }
+    elseif ($repoValue -ne '') {
+        # 注入更新源但未指定渠道：beta 形态 → beta，其余 → release
+        $channelValue = if ($Beta) { 'beta' } else { 'release' }
+    }
+
     # 生成 dart-define 文件（无 BOM，兼容 Windows PowerShell 5.1）
     $data = @{
         'mtbbs.name' = $verName
         'mtbbs.code' = $verCode
         'mtbbs.hash' = $commitHash
         'mtbbs.time' = $buildTime
+    }
+    if ($repoValue -ne '') {
+        $data['mtbbs.repo'] = $repoValue
+        $data['mtbbs.channel'] = $channelValue
     }
     $json = $data | ConvertTo-Json -Compress
     [System.IO.File]::WriteAllText(
@@ -109,6 +136,8 @@ try {
     $env:MTBBS_VERSION_CODE = "$verCode"
     $env:MTBBS_VERSION = "$verName+$verCode"
     $env:MTBBS_BETA = $isBeta
+    $env:MTBBS_REPO = $repoValue
+    $env:MTBBS_CHANNEL = $channelValue
 
     if ($env:GITHUB_ENV) {
         @(
@@ -117,11 +146,21 @@ try {
             "MTBBS_VERSION=$verName+$verCode",
             "MTBBS_BETA=$isBeta"
         ) | Add-Content -Path $env:GITHUB_ENV
+        if ($repoValue -ne '') {
+            @(
+                "MTBBS_REPO=$repoValue",
+                "MTBBS_CHANNEL=$channelValue"
+            ) | Add-Content -Path $env:GITHUB_ENV
+        }
     }
 
     Write-Host "MTBBS_VERSION_NAME = $verName"
     Write-Host "MTBBS_VERSION_CODE = $verCode"
     Write-Host "MTBBS_BETA = $isBeta"
+    if ($repoValue -ne '') {
+        Write-Host "MTBBS_REPO = $repoValue"
+        Write-Host "MTBBS_CHANNEL = $channelValue"
+    }
     Write-Host "mtbbs_release.json 已生成：$json"
 }
 catch {

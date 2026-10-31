@@ -124,6 +124,7 @@ extension SettingsPersistence on SettingsProvider {
 
     _autoCheckUpdate = a.advanced.autoCheckUpdate;
     _skippedUpdateVersion = a.advanced.skippedUpdateVersion;
+    _lastUpdateCheckAt = a.advanced.lastUpdateCheckAt;
     _developerMode = a.advanced.developerMode;
   }
 
@@ -198,6 +199,7 @@ extension SettingsPersistence on SettingsProvider {
     advanced: AdvancedSettings(
       autoCheckUpdate: _autoCheckUpdate,
       skippedUpdateVersion: _skippedUpdateVersion,
+      lastUpdateCheckAt: _lastUpdateCheckAt,
       developerMode: _developerMode,
     ),
   );
@@ -307,6 +309,12 @@ extension SettingsPersistence on SettingsProvider {
     _skippedUpdateVersion = tag;
     await _persistApp();
     _notify();
+  }
+
+  Future<void> setLastUpdateCheckAt(int unixSeconds) async {
+    if (_lastUpdateCheckAt == unixSeconds) return;
+    _lastUpdateCheckAt = unixSeconds;
+    await _persistApp();
   }
 
   Future<void> setStaggerInterval(int ms) async {

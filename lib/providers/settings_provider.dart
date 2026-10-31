@@ -220,11 +220,14 @@ class SettingsProvider extends ChangeNotifier {
   /// 工具栏项被隐藏时，其快捷键是否仍然生效（默认开启）
   bool _toolbarShortcutWhenHidden = true;
 
-  /// 启动时自动检查更新（仅正式版生效，见 UpdateService.isSupported）
+  /// 启动时自动检查更新（需构建注入更新源，且受 1 小时限流，见 UpdateService）
   bool _autoCheckUpdate = true;
 
   /// 用户跳过的新版本 tag（自动检查不再提示；'' = 未跳过）
   String _skippedUpdateVersion = '';
+
+  /// 上次检查更新的时间（Unix 秒，0 = 从未检查）；自动检查 1 小时内不重复
+  int _lastUpdateCheckAt = 0;
 
   // ==================== 留在类体内的成员 ====================
   //

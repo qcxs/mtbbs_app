@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
+import 'package:mtbbs/config/build_config.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -164,7 +165,7 @@ class ProfilePage extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
             child: Text(
-              'https://github.com/qcxs/mtbbs_app',
+              BuildConfig.repoUrl,
               style: TextStyle(
                 fontSize: 11,
                 color: cs.onSurfaceVariant.withValues(alpha: 0.5),

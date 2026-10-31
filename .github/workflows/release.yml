@@ -60,9 +60,9 @@ jobs:
           INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:INPUT_TAG)) {
-            scripts/version.ps1 android -Beta
+            scripts/version.ps1 android -Beta -Repo ${{ github.repository }} -Channel beta
           } else {
-            scripts/version.ps1 android -VersionName $env:INPUT_TAG
+            scripts/version.ps1 android -VersionName $env:INPUT_TAG -Repo ${{ github.repository }} -Channel release
           }
 
       - name: 写入签名（可选，配置无效自动跳过 → MT 内置签名）
@@ -181,9 +181,9 @@ jobs:
           INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:INPUT_TAG)) {
-            scripts/version.ps1 -Beta
+            scripts/version.ps1 -Beta -Repo ${{ github.repository }} -Channel beta
           } else {
-            scripts/version.ps1 -VersionName $env:INPUT_TAG
+            scripts/version.ps1 -VersionName $env:INPUT_TAG -Repo ${{ github.repository }} -Channel release
           }
 
       - name: 构建 Windows Release

@@ -139,6 +139,9 @@ extension SettingsAccessors on SettingsProvider {
   /// 用户已跳过的新版本 tag（'' = 未跳过）
   String get skippedUpdateVersion => _skippedUpdateVersion;
 
+  /// 上次检查更新的时间（Unix 秒，0 = 从未检查）
+  int get lastUpdateCheckAt => _lastUpdateCheckAt;
+
   String get creditFormula => _currentSite.creditFormula;
 
   List<ManagedItem> get shortcutLinks =>

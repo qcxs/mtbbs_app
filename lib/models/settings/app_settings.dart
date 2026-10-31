@@ -556,23 +556,29 @@ class HistorySettings {
 class AdvancedSettings {
   final bool autoCheckUpdate;
   final String skippedUpdateVersion;
+
+  /// 上次检查更新的时间（Unix 秒，0 = 从未检查）；用于 1 小时启动限流
+  final int lastUpdateCheckAt;
   final bool developerMode;
 
   const AdvancedSettings({
     required this.autoCheckUpdate,
     required this.skippedUpdateVersion,
+    required this.lastUpdateCheckAt,
     required this.developerMode,
   });
 
   factory AdvancedSettings.defaults() => const AdvancedSettings(
     autoCheckUpdate: true,
     skippedUpdateVersion: '',
+    lastUpdateCheckAt: 0,
     developerMode: false,
   );
 
   Map<String, dynamic> toMap() => {
     'autoCheckUpdate': autoCheckUpdate,
     'skippedUpdateVersion': skippedUpdateVersion,
+    'lastUpdateCheckAt': lastUpdateCheckAt,
     'developerMode': developerMode,
   };
 
@@ -582,6 +588,8 @@ class AdvancedSettings {
       autoCheckUpdate: map['autoCheckUpdate'] as bool? ?? d.autoCheckUpdate,
       skippedUpdateVersion:
           map['skippedUpdateVersion']?.toString() ?? d.skippedUpdateVersion,
+      lastUpdateCheckAt:
+          (map['lastUpdateCheckAt'] as num?)?.toInt() ?? d.lastUpdateCheckAt,
       developerMode: map['developerMode'] as bool? ?? d.developerMode,
     );
   }
