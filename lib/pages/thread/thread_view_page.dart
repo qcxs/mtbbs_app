@@ -10,7 +10,6 @@ import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/core/app/site_session.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/app/session_registry.dart';
-import 'package:mtbbs/core/app/verification_gate.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/thread/thread_post_card.dart';
@@ -423,9 +422,6 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
                     onRetry: _isCacheMode
                         ? _loadCacheInitial
                         : () => _loadInitial(),
-                    // 人机验证 / 防火墙拦截时自动恢复可能失败（自解不了或写错罐），
-                    // 给用户一个直接过验证的入口
-                    onVerify: _isCacheMode ? null : _verifyFromErrorPage,
                     extraActions: [
                       if (!_isCacheMode &&
                           _errorCacheCandidates.isNotEmpty)

@@ -28,7 +28,6 @@ extension SettingsSites on SettingsProvider {
       if (idx >= 0) SiteStore.instance.switchTo(idx);
     }
     await _persistSites();
-    _notify();
   }
 
   Future<void> setSiteUA(String userAgent) async {
@@ -38,7 +37,6 @@ extension SettingsSites on SettingsProvider {
     _sites[idx] = old.copyWith(userAgent: userAgent);
     SiteStore.instance.switchTo(idx);
     await _persistSites();
-    _notify();
   }
 
   /// 设置当前站点的头像 URL 模板，空字符串恢复默认 API 方案
@@ -52,7 +50,6 @@ extension SettingsSites on SettingsProvider {
     );
     SiteStore.instance.switchTo(idx);
     await _persistSites();
-    _notify();
   }
 
   Future<void> replaceSites(List<Site> newSites) async {
@@ -108,7 +105,6 @@ extension SettingsSites on SettingsProvider {
       count++;
     }
     await _persistSites();
-    _notify();
     return count;
   }
 
@@ -132,7 +128,6 @@ extension SettingsSites on SettingsProvider {
     final newOrder = List<String>.from(old.defaultForumOrder)..remove(fid);
     _sites[idx] = old.copyWith(forums: newForums, defaultForumOrder: newOrder);
     await _persistSites();
-    _notify();
   }
 
   Future<void> moveForum(int oldIndex, int newIndex) async {
@@ -145,7 +140,6 @@ extension SettingsSites on SettingsProvider {
     order.insert(newIndex, moved);
     _sites[idx] = _sites[idx].copyWith(defaultForumOrder: order);
     await _persistSites();
-    _notify();
   }
 
   Future<void> renameForum(String fid, String newName) async {
@@ -182,6 +176,8 @@ extension SettingsSites on SettingsProvider {
     final prevSig = _sitesSignature(SiteStore.instance.sites);
     SiteStore.instance.replaceSites(_sites);
     SiteStore.instance.switchTo(_currentSiteIndex.clamp(0, _sites.length - 1));
+    // 内存状态已更新：先通知 UI，再落盘。持久化慢 / 异常不应让界面停在旧数据。
+    _notify();
     await _db.setSitesRaw(jsonEncode(_sites.map((s) => s.toJson()).toList()));
 
     // 站点设置文档：新站点补默认值，删除的站点级联清理
@@ -200,7 +196,6 @@ extension SettingsSites on SettingsProvider {
       await SessionRegistry.instance.reloadAll();
     }
     await _persistApp();
-    _notify();
   }
 
   String _sitesSignature(List<Site> sites) =>

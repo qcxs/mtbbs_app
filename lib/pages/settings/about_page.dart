@@ -31,6 +31,7 @@ import 'package:mtbbs/services/update_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
+import 'package:mtbbs/widgets/dialog/text_input_dialog.dart';
 
 /// 关于页 — 应用标识、作者、相关链接、版本信息与特别鸣谢。
 ///
@@ -361,7 +362,7 @@ class _AboutPageState extends State<AboutPage> {
   }
 
   Future<void> _importSettings() async {
-    final text = await _readImportText();
+    final text = await _readImportText(label: '设置');
     if (text == null || !mounted) return;
     final confirmed = await showConfirmDialog(
       context,
@@ -393,7 +394,7 @@ class _AboutPageState extends State<AboutPage> {
   }
 
   Future<void> _importCookies() async {
-    final text = await _readImportText();
+    final text = await _readImportText(label: 'Cookie');
     if (text == null || !mounted) return;
     final confirmed = await showConfirmDialog(
       context,
@@ -420,16 +421,22 @@ class _AboutPageState extends State<AboutPage> {
     }
   }
 
-  Future<String?> _readImportText() async {
+  Future<String?> _readImportText({required String label}) async {
     final mode = await _pickTransferMode(exporting: false, title: '导入方式');
     if (mode == null || !mounted) return null;
     if (mode == 'clipboard') {
       final text = await ClipboardHelper.read();
-      if (text == null || text.trim().isEmpty) {
-        if (mounted) showToast('剪切板为空');
-        return null;
-      }
-      return text;
+      if (text != null && text.trim().isNotEmpty) return text;
+      if (!mounted) return null;
+      // 降级：读取失败或剪切板为空时，让用户手动粘贴，而不是只弹一条提示后
+      // 要求退出流程重新复制（读取失败本身在 ClipboardHelper 内已留痕）。
+      return showTextInputDialog(
+        context,
+        title: '从剪切板导入$label',
+        message: '未能读取剪切板内容（为空或不可用），可在下方手动粘贴。',
+        hintText: '在此粘贴$label JSON…',
+        monospace: true,
+      );
     }
     final result = await FilePick.pickFiles(
       type: FileType.custom,
@@ -439,10 +446,15 @@ class _AboutPageState extends State<AboutPage> {
     final files = result?.files;
     if (files == null || files.isEmpty) return null;
     final file = files.first;
-    final bytes = file.bytes;
-    if (bytes != null) return utf8.decode(bytes);
-    final path = file.path;
-    if (path != null) return File(path).readAsString();
+    try {
+      final bytes = file.bytes;
+      if (bytes != null) return utf8.decode(bytes);
+      final path = file.path;
+      if (path != null) return await File(path).readAsString();
+    } catch (e) {
+      if (mounted) showToast('读取文件失败：$e');
+      return null;
+    }
     if (mounted) showToast('无法读取文件');
     return null;
   }
@@ -451,8 +463,12 @@ class _AboutPageState extends State<AboutPage> {
     final mode = await _pickTransferMode(exporting: true, title: '导出方式');
     if (mode == null || !mounted) return;
     if (mode == 'clipboard') {
-      await ClipboardHelper.write(text);
-      if (mounted) showToast('已复制到剪切板');
+      try {
+        await ClipboardHelper.write(text);
+        if (mounted) showToast('已复制到剪切板');
+      } catch (e) {
+        if (mounted) showToast('复制到剪切板失败：$e');
+      }
       return;
     }
     final fileName = '${prefix}_${_timestamp()}.json';

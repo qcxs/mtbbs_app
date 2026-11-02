@@ -69,7 +69,12 @@ extension on _EditorPageState {
 
     // 回退到文本粘贴
     final text = await ClipboardHelper.read();
-    if (text != null && mounted) {
+    if (text == null || text.isEmpty) {
+      // 读取失败与"剪切板确实为空"都无法区分：明确提示，避免看起来像没反应
+      if (mounted) showToast('剪切板为空或无法读取，请手动粘贴');
+      return;
+    }
+    if (mounted) {
       final sel = _session.contentCtl.selection;
       final pos = sel.isValid ? sel.start : _session.contentCtl.text.length;
       _session.contentCtl.value = TextEditingValue(

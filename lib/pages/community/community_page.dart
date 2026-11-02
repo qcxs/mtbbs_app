@@ -38,6 +38,11 @@ class CommunityPage extends StatefulWidget {
 
 class _CommunityPageState extends State<CommunityPage> {
   static final Map<String, ThreadListController> _ctrlMap = {};
+
+  /// [_ctrlMap] 归属的站点。静态表跨页面实例存活，切站后必须整表作废，
+  /// 否则同 fid 会命中旧站点的列表/页码（docs/07 #106，导读页同款处理）。
+  static String _ctrlHost = '';
+
   final Map<String, String> _orderbyMap = {};
   final Map<String, String> _filterMap = {};
   String _activeKey = '';
@@ -47,7 +52,19 @@ class _CommunityPageState extends State<CommunityPage> {
       .map((fid) => TabInfo(SiteStore.instance.forums[fid]!, fid))
       .toList();
 
+  /// 站点变化时先作废静态控制器与按 fid 的筛选状态
+  void _ensureHost() {
+    final host = SiteStore.instance.host;
+    if (host == _ctrlHost) return;
+    _ctrlMap.clear();
+    _orderbyMap.clear();
+    _filterMap.clear();
+    _activeKey = '';
+    _ctrlHost = host;
+  }
+
   void _ensureCtls() {
+    _ensureHost();
     for (final t in _tabs) {
       _ctrlMap.putIfAbsent(
         t.key,
@@ -212,6 +229,8 @@ class _CommunityPageState extends State<CommunityPage> {
   Widget build(BuildContext context) {
     // 监听 SiteStore 变化（如论坛列表加载完成后重建标签页）
     context.watch<SiteStore>();
+    // 切站后先作废静态控制器，避免后续 _buildSingleForum 命中旧站点缓存
+    _ensureHost();
     final cs = Theme.of(context).colorScheme;
     // 带 fid 时使用单版块模式
     if (widget.fid.isNotEmpty) {

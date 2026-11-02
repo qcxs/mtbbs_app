@@ -153,6 +153,40 @@ Future<void> clearCookiesForHost(String baseUrl) async {
   );
 }
 
+/// 删除某站点下所有「浏览方式」Cookie（Discuz 的 `{前缀}_mobile`）。
+///
+/// Discuz 的模板优先级是 `?mobile=` 参数 / `*_mobile` Cookie **高于** UA
+/// （见 docs/07 #72）。内置浏览器切「桌面模式」时只改 UA，若罐里已经有
+/// `*_mobile=no|yes`，页面仍按旧模板渲染 —— 表现为"切了桌面模式还是移动版"。
+Future<void> clearBrowseModeCookiesForHost(String baseUrl) async {
+  final host = Uri.tryParse(baseUrl)?.host ?? '';
+  if (host.isEmpty) return;
+
+  final manager = webview.CookieManager.instance();
+  try {
+    final cookies = await manager.getCookies(url: webview.WebUri(baseUrl));
+    for (final cookie in cookies.where((c) => c.name.endsWith('_mobile'))) {
+      for (final domain in _domainCandidates(cookie.domain, host)) {
+        try {
+          await manager.deleteCookie(
+            url: webview.WebUri(baseUrl),
+            name: cookie.name,
+            path: cookie.path ?? '/',
+            domain: domain,
+          );
+        } catch (e) {
+          AppLogger.d(
+            'PAGE',
+            'delete browse-mode cookie "${cookie.name}" failed: $e',
+          );
+        }
+      }
+    }
+  } catch (e) {
+    AppLogger.w('PAGE', 'clear browse-mode cookies for $host failed: $e');
+  }
+}
+
 /// 删除某条 Cookie 时应当尝试的 domain 候选值（按序执行）。
 ///
 /// 平台 API 的坑（`flutter_inappwebview_android` 的 `MyCookieManager.java`）：

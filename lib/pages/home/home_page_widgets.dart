@@ -345,9 +345,11 @@ class _ForumList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final forums = SiteStore.instance.defaultForumOrder
-        .where((fid) => SiteStore.instance.forums.containsKey(fid))
-        .map((fid) => MapEntry(fid, SiteStore.instance.forums[fid]!))
+    // 自己订阅 SiteStore：不依赖父级是否顺手重建，挪到别处也不会丢刷新
+    final store = context.watch<SiteStore>();
+    final forums = store.defaultForumOrder
+        .where((fid) => store.forums.containsKey(fid))
+        .map((fid) => MapEntry(fid, store.forums[fid]!))
         .toList();
     if (forums.isEmpty) {
       return Padding(

@@ -112,6 +112,15 @@ dependencies:
   # 锁到具体版本：协议与安全默认值随版本变化，升级前先读 docs/09
   mcp_dart: 2.4.2
 
+# Windows 退出崩溃修复（上游 issue #2733 / PR #2838）。
+# flutter_inappwebview_windows 0.6.0 把 WinRT/COM 资源存成静态智能指针，
+# 在 DLL_PROCESS_DETACH 阶段才析构，触发 fail-fast（0xC0000409，系统弹出
+# 「快速异常检测失败」）。third_party 副本在插件析构时提前释放这些资源。
+# 上游发布修复版后，删除本节与本目录即可（升级前先读 docs/09）。
+dependency_overrides:
+  flutter_inappwebview_windows:
+    path: third_party/flutter_inappwebview_windows
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

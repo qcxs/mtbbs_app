@@ -83,6 +83,9 @@ class SiteStore extends ChangeNotifier {
   }
 
   /// 更新当前站点的板块列表
+  ///
+  /// 与 SettingsProvider 的「版块管理」写入口等价，但只改内存并通知。
+  /// 需要持久化时仍走 `SettingsProvider.replaceForums`。
   void replaceForums(Map<String, String> newForums) {
     final old = _sites[_currentIndex];
     final newOrder = old.defaultForumOrder

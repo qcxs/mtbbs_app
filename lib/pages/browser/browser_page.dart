@@ -12,9 +12,9 @@ import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/app_page_gate.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/app/cookie_sync.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
-import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
@@ -64,6 +64,16 @@ class _BrowserPageState extends State<BrowserPage> {
   bool _cookiesReady = false;
   bool _urlInterceptEnabled = true;
 
+  /// 最近一次把 Cookie 注入 WebView 的**已添加站点**宿主（未添加的站点为 null）。
+  ///
+  /// 离开该宿主时要把 WebView 里新增的 Cookie 回流到它自己的罐；进入另一个宿主
+  /// 前要换成对方的账号 Cookie。见 `browser_page_actions.dart`。
+  String? _syncedHost;
+
+  /// 主框架加载失败信息（null = 正常）。只做覆盖层展示，不销毁 WebView
+  /// （销毁会丢掉前进/后退历史）。
+  String? _loadError;
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +90,13 @@ class _BrowserPageState extends State<BrowserPage> {
     if (!_cookiesSynced) {
       _cookiesSynced = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _syncCookies().then((_) {
+        // 按**当前要浏览的站点**注入 Cookie（不再是"永远注入全局当前站点"）：
+        // 浏览 52 时注入 52 的默认账号，浏览 App 当前站点时注入当前活跃账号。
+        final host = _host;
+        _syncedHost = SessionRegistry.instance.siteForHost(host) == null
+            ? null
+            : host;
+        _syncCookiesToWebView(_syncedHost).then((_) {
           if (mounted) setState(() => _cookiesReady = true);
         });
       });
@@ -89,9 +105,9 @@ class _BrowserPageState extends State<BrowserPage> {
 
   @override
   void dispose() {
-    // 离开浏览器时把 WebView 里新增的 Cookie 回流给 App。
+    // 离开浏览器时把 WebView 里新增的 Cookie 回流给对应站点的罐。
     // dispose 是同步的，这里不能 await；失败只记日志，不影响关闭。
-    unawaited(_syncCookiesBack());
+    unawaited(_syncCookiesBackForHost(_syncedHost));
     super.dispose();
   }
 

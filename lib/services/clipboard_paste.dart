@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:mtbbs/core/app/app_paths.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 
 /// 剪贴板读取结果
 ///
@@ -108,7 +109,9 @@ class ClipboardPasteService {
         image: image,
         ignored: copied.ignored,
       );
-    } catch (_) {
+    } catch (e) {
+      // 失败留痕：调用方只能看到"没有内容"，日志是唯一的排查线索
+      AppLogger.w('PAGE', '读取剪贴板失败：$e');
       return const ClipboardPasteData();
     }
   }
@@ -161,8 +164,9 @@ class ClipboardPasteService {
           // 时间戳刷新失败不丢文件：上传失败会走正常的失败提示
         }
         files.add(dest);
-      } catch (_) {
+      } catch (e) {
         // 单个文件复制失败不影响其余文件
+        AppLogger.w('PAGE', '复制剪贴板文件失败（$srcPath）：$e');
       }
     }
     return (files: files, ignored: ignored);

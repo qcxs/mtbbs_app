@@ -65,7 +65,10 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final baseUrl = context.select<SiteStore, String>((s) => s.baseUrl);
+    // 版块 / 站点名住在 SiteStore：这里必须直接订阅。只靠 SettingsProvider 的
+    // 间接通知会让"版块解析成功但首页不动"（持久化链延迟/异常时尤其明显）。
+    final store = context.watch<SiteStore>();
+    final baseUrl = store.baseUrl;
     final cards = [
       for (final s in settings.visibleHomeSections)
         _buildSection(context, settings, s),

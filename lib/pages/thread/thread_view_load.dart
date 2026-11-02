@@ -6,20 +6,6 @@ part of 'thread_view_page.dart';
 extension on _ThreadViewPageState {
   // ==================== 加载逻辑 ====================
 
-  /// 错误页「网页验证」：直接打开验证浏览器，通过后重新加载。
-  ///
-  /// 与自动恢复（Dio 拦截器）走同一套回流 / 探测逻辑，只是入口是用户手动点；
-  /// 自动恢复失败时（挑战需要交互、或自解写错罐）才用得上。
-  Future<void> _verifyFromErrorPage() async {
-    final ok = await VerificationGate.instance.verifyManually(url: _threadUrl);
-    if (!mounted) return;
-    if (ok) {
-      await _loadInitial();
-    } else {
-      showToast('网页验证未通过，请重试');
-    }
-  }
-
   /// 通过 redirect（允许重定向）获取 pid 对应的真实 page
   Future<int> _resolveRedirectPage() async {
     final pid = widget.pid;
@@ -50,6 +36,7 @@ extension on _ThreadViewPageState {
     _setState(() {
       _loading = true;
       _error = null;
+      _errorCacheCandidates = const [];
     });
     try {
       int targetPage = widget.initialPage;
@@ -98,18 +85,18 @@ extension on _ThreadViewPageState {
       if (_currentPage > 1) await _loadCommentPage(_currentPage);
       if (pidMode) _scrollToPid();
     } catch (e) {
-      if (mounted) {
-        final msg = e.toString();
-        final cleanMsg = msg.startsWith('Exception: ')
-            ? msg.substring(11)
-            : msg;
-        AppLogger.w('PAGE', 'ThreadViewPage error: $cleanMsg');
-        _setState(() {
-          _error = cleanMsg.isEmpty ? '加载失败' : cleanMsg;
-          _loading = false;
-        });
-        unawaited(_loadErrorCacheCandidates());
-      }
+      final msg = e.toString();
+      final cleanMsg = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+      AppLogger.w('PAGE', 'ThreadViewPage error: $cleanMsg');
+      // 先查缓存再一次性 setState：错误页出现时「查看缓存」按钮同步就位，
+      // 不会先渲染一帧无按钮的错误页再补上。
+      final candidates = await _errorCacheCandidatesForThread();
+      if (!mounted) return;
+      _setState(() {
+        _error = cleanMsg.isEmpty ? '加载失败' : cleanMsg;
+        _loading = false;
+        _errorCacheCandidates = candidates;
+      });
     }
   }
 

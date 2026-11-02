@@ -248,17 +248,23 @@ extension on _ThreadViewPageState {
     });
   }
 
-  /// 加载失败时查询该帖的可选缓存，供错误页显示「查看缓存」
-  Future<void> _loadErrorCacheCandidates() async {
+  /// 加载失败时查询该帖的可选缓存（自动 + 离线），供错误页显示「查看缓存」。
+  ///
+  /// 返回空列表表示确实没有可查看的缓存（或缓存库不可用）；查询异常也只
+  /// 降级为无缓存，不能影响错误页展示。
+  Future<List<ThreadSnapshotMeta>> _errorCacheCandidatesForThread() async {
     final service = ThreadCacheService.instance;
-    if (service.isDisabled) return;
-    final list = await service.snapshotsForThread(
-      host: _session.host,
-      tid: widget.tid,
-      viewer: _session.uid,
-    );
-    if (!mounted) return;
-    _setState(() => _errorCacheCandidates = list);
+    if (service.isDisabled) return const [];
+    try {
+      return await service.snapshotsForThread(
+        host: _session.host,
+        tid: widget.tid,
+        viewer: _session.uid,
+      );
+    } catch (e) {
+      AppLogger.w('THREAD_CACHE', '查询错误页缓存失败: $e');
+      return const [];
+    }
   }
 
   /// 评论页回写到自动缓存（无缓存键时跳过）

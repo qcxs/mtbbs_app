@@ -34,6 +34,7 @@ import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/core/app/desktop_window.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/max_screen_size.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -269,16 +270,7 @@ Future<void> _runSettingsGuard(SettingsProvider settings) async {
 
   final guards =
       <({bool Function() needsRefresh, Future<void> Function() refresh})>[
-        // 站点 CDN 排在表情之前：表情图片 URL 依赖识别结果
-        (
-          needsRefresh: () =>
-              SiteCdnStore.instance.needsDetect(SiteStore.instance.host),
-          refresh: () => detectSiteCdn(host: SiteStore.instance.host),
-        ),
-        (
-          needsRefresh: () => !EmojiService().isLoaded,
-          refresh: () => EmojiService().load(),
-        ),
+        // 版块排最前：首页首屏直接可见，且不依赖 CDN / 表情
         (
           needsRefresh: () => SiteStore.instance.forums.isEmpty,
           refresh: () async {
@@ -295,6 +287,16 @@ Future<void> _runSettingsGuard(SettingsProvider settings) async {
             }
           },
         ),
+        // 站点 CDN 排在表情之前：表情图片 URL 依赖识别结果
+        (
+          needsRefresh: () =>
+              SiteCdnStore.instance.needsDetect(SiteStore.instance.host),
+          refresh: () => detectSiteCdn(host: SiteStore.instance.host),
+        ),
+        (
+          needsRefresh: () => !EmojiService().isLoaded,
+          refresh: () => EmojiService().load(),
+        ),
         (
           needsRefresh: () =>
               settings.creditFormula == SettingsProvider.defaultFormula,
@@ -307,9 +309,14 @@ Future<void> _runSettingsGuard(SettingsProvider settings) async {
         ),
       ];
 
+  // 各守卫互相独立：任一失败只记录，不阻断后续（例如 CDN 探测失败不应
+  // 连带跳过版块初始化）。
   for (final guard in guards) {
-    if (guard.needsRefresh()) {
+    if (!guard.needsRefresh()) continue;
+    try {
       await guard.refresh();
+    } catch (e) {
+      AppLogger.w('GUARD', '启动守卫失败: $e');
     }
   }
 }

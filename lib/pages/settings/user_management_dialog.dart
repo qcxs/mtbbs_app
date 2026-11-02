@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/auth/pages/web_login_page.dart';
@@ -252,38 +251,52 @@ class UserManagementDialog extends StatelessWidget {
     );
   }
 
-  void _export(BuildContext context, AuthProvider auth) {
+  Future<void> _export(BuildContext context, AuthProvider auth) async {
     Navigator.of(context).pop();
     final jsonStr = auth.exportAccounts();
     if (jsonStr == '[]') {
       showToast('没有可导出的账号');
       return;
     }
-    Clipboard.setData(ClipboardData(text: jsonStr));
-    showToast('已导出到剪切板');
+    try {
+      await ClipboardHelper.write(jsonStr);
+      showToast('已导出到剪切板');
+    } catch (e) {
+      showToast('复制到剪切板失败：$e');
+    }
   }
 
-  void _import(BuildContext context, AuthProvider auth) {
-    Navigator.of(context).pop(); // 关闭用户管理弹窗
-    ClipboardHelper.read().then((text) {
-      if (text == null || text.trim().isEmpty) {
-        showToast('剪切板为空');
-        return;
-      }
-      _showImportPreview(context, auth, text.trim());
-    });
+  Future<void> _import(BuildContext context, AuthProvider auth) async {
+    // 先取 Navigator 再 pop：弹窗自身 context 在 pop 后处于退场动画中，
+    // 用它继续 showDialog 属于"在已销毁的子树下找祖先"，改用 Navigator 的 context。
+    final navigator = Navigator.of(context, rootNavigator: true);
+    navigator.pop(); // 关闭用户管理弹窗
+    final text = await ClipboardHelper.read();
+    final trimmed = text?.trim() ?? '';
+    // 降级：读取失败或剪切板为空时仍打开导入弹窗，让用户手动粘贴，
+    // 而不是只提示「剪切板为空」后把流程结束掉。
+    _showImportPreview(
+      navigator.context,
+      auth,
+      trimmed,
+      clipboardEmpty: trimmed.isEmpty,
+    );
   }
 
   /// 导入预览弹窗 — 可编辑、校验 JSON、二次确认
   void _showImportPreview(
     BuildContext context,
     AuthProvider auth,
-    String initialText,
-  ) {
+    String initialText, {
+    bool clipboardEmpty = false,
+  }) {
     showDialog(
       context: context,
-      builder: (_) =>
-          _ImportAccountsDialog(initialText: initialText, auth: auth),
+      builder: (_) => _ImportAccountsDialog(
+        initialText: initialText,
+        auth: auth,
+        notice: clipboardEmpty ? '未能从剪切板读取内容（为空或不可用），请手动粘贴账号 JSON。' : null,
+      ),
     );
   }
 
@@ -308,10 +321,17 @@ class UserManagementDialog extends StatelessWidget {
 /// notifyListeners 重建整棵树），在 pop 前后提前 dispose 会抛
 /// 「A TextEditingController was used after being disposed」。
 class _ImportAccountsDialog extends StatefulWidget {
-  const _ImportAccountsDialog({required this.initialText, required this.auth});
+  const _ImportAccountsDialog({
+    required this.initialText,
+    required this.auth,
+    this.notice,
+  });
 
   final String initialText;
   final AuthProvider auth;
+
+  /// 顶部提示（如剪切板读取失败的降级说明）
+  final String? notice;
 
   @override
   State<_ImportAccountsDialog> createState() => _ImportAccountsDialogState();
@@ -372,6 +392,13 @@ class _ImportAccountsDialogState extends State<_ImportAccountsDialog> {
             '请确认或编辑账号 JSON 数据：',
             style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
+          if (widget.notice != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              widget.notice!,
+              style: TextStyle(fontSize: 12, color: cs.error),
+            ),
+          ],
           const SizedBox(height: 8),
           TextField(
             controller: _ctl,

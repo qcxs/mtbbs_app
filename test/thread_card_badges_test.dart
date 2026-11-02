@@ -95,4 +95,28 @@ void main() {
     final titleY = tester.getTopLeft(find.text('被删除的帖子')).dy;
     expect(badgeY, lessThan(titleY));
   });
+
+  testWidgets('帖子卡片：查看回复按钮铺满卡片宽度', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    const item = ThreadItem(
+      uid: 0,
+      nickname: '',
+      time: '刚刚',
+      title: '帖子标题',
+      threadId: 3,
+    );
+    await tester.pumpWidget(
+      harness(ThreadCard(item: item, onViewReplies: () {})),
+    );
+    await tester.pump();
+
+    expect(find.text('查看回复'), findsOneWidget);
+    final button = find.byWidgetPredicate((w) => w is FilledButton);
+    expect(button, findsOneWidget);
+    // 卡片左右内边距各 12：360 - 24
+    expect(tester.getSize(button).width, moreOrLessEquals(336, epsilon: 1));
+  });
 }
