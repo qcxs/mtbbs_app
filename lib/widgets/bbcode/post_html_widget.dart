@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:go_router/go_router.dart';
 import 'package:html/dom.dart' as dom;
@@ -134,6 +135,7 @@ class PostHtmlWidget extends StatelessWidget {
     );
     final html = converter.convert(bbcode);
     final codeBlocks = converter.codeBlocks;
+    final mathBlocks = converter.mathBlocks;
     // 本段 BBCode（= 一帖/一楼）的全部正文图片，供画廊左右滑动
     final imageUrls = converter.imageUrls;
 
@@ -152,6 +154,8 @@ class PostHtmlWidget extends StatelessWidget {
           maxImageWidth,
           codeBlockMaxLines,
           ...codeBlocks,
+          // 公式原文同样旁路注入（HTML 里只有占位元素），必须进指纹
+          for (final m in mathBlocks) '${m.display}:${m.tex}',
         ]),
       ),
       // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
@@ -182,6 +186,36 @@ class PostHtmlWidget extends StatelessWidget {
             // 代码块跟随正文字号，上限同步设置项上限（曾封顶 16，字号调大后代码块不跟）
             fontSize: textSize.clamp(11, 32).toDouble(),
             maxLines: codeBlockMaxLines,
+          );
+        }
+        // [appdata] math 占位 → LaTeX 公式组件
+        final mathIndex = element.attributes['data-math-index'];
+        if (mathIndex != null) {
+          final i = int.tryParse(mathIndex) ?? -1;
+          if (i < 0 || i >= mathBlocks.length) return const SizedBox.shrink();
+          final math = mathBlocks[i];
+          final mathStyle = TextStyle(fontSize: textSize, color: cs.onSurface);
+          final widget = Math.tex(
+            _normalizeMathTex(math.tex),
+            mathStyle: math.display ? MathStyle.display : MathStyle.text,
+            textStyle: mathStyle,
+            // 不支持的宏/语法：退回原始 TeX，保证内容不丢
+            onErrorFallback: (_) => Text(
+              math.tex,
+              style: mathStyle.copyWith(fontFamily: 'monospace'),
+            ),
+          );
+          if (!math.display) {
+            return InlineCustomWidget(
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              child: widget,
+            );
+          }
+          // 长公式不撑破屏幕，块级公式允许横向滚动
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: widget,
           );
         }
         // img → 表情内联 / 帖子图片块级

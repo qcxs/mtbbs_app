@@ -81,4 +81,32 @@ void main() {
       );
     });
   });
+
+  group('encodeQueryComponentForSite', () {
+    test('utf-8 站点保持标准 UTF-8 百分号编码', () {
+      expect(
+        encodeQueryComponentForSite('公式', charset: 'utf-8'),
+        '%E5%85%AC%E5%BC%8F',
+      );
+    });
+
+    test('gbk 站点按 GBK 字节编码（52pojie 搜索）', () {
+      expect(encodeQueryComponentForSite('公式', charset: 'gbk'), '%B9%AB%CA%BD');
+    });
+
+    test('ASCII 不转义，空格编码为 %20', () {
+      expect(
+        encodeQueryComponentForSite('abc 123', charset: 'gbk'),
+        'abc%20123',
+      );
+    });
+
+    test('空 / 未知 charset 回退 UTF-8', () {
+      expect(encodeQueryComponentForSite('公式'), '%E5%85%AC%E5%BC%8F');
+      expect(
+        encodeQueryComponentForSite('公式', charset: 'unknown'),
+        '%E5%85%AC%E5%BC%8F',
+      );
+    });
+  });
 }

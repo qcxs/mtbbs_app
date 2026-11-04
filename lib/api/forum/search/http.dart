@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/core/app/browse_mode.dart';
+import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 站内搜索 HTTP 请求（`search.php?mod=forum`）— 基于 Dio
 ///
@@ -19,11 +21,13 @@ import 'package:mtbbs/core/app/browse_mode.dart';
 /// [searchId] 为空表示发起新搜索（带 srchtxt / srchfilter）；非空表示翻页/复用已有结果。
 /// [srchFilter] 为搜索结果过滤范围（如 `digest` = 全站精华）；无关键词时仅按它过滤，
 /// Discuz 的 `submitcheck('searchsubmit', 1)` 允许"只过滤、无关键词"的搜索。
+/// [charset] 为站点字符集（GBK 站点必须按 GBK 编码 `srchtxt`；空 = 当前站点）。
 String searchPath({
   required String keyword,
   int page = 1,
   String? searchId,
   String srchFilter = '',
+  String? charset,
 }) {
   final sid = searchId?.trim() ?? '';
   final buf = StringBuffer('/search.php?mod=forum&searchsubmit=yes');
@@ -35,7 +39,10 @@ String searchPath({
     // 首次搜索：纯 GET 即可。submitcheck('searchsubmit', 1) 的 allowget 分支
     // 不校验 formhash（见 Discuz 源码 helper_form::submitcheck），无需 POST。
     if (keyword.isNotEmpty) {
-      buf.write('&srchtxt=${Uri.encodeQueryComponent(keyword)}');
+      final cs = charset ?? SiteStore.instance.charset;
+      buf.write(
+        '&srchtxt=${encodeQueryComponentForSite(keyword, charset: cs)}',
+      );
     }
     if (srchFilter.isNotEmpty) {
       buf.write('&srchfilter=$srchFilter');
@@ -50,12 +57,14 @@ String searchPath({
 /// [page]       页码，从 1 开始
 /// [searchId]   搜索结果会话 id；为空表示发起新搜索，非空表示翻页
 /// [srchFilter] 搜索结果过滤范围（如 `digest` = 全站精华）
+/// [charset]    站点字符集（空 = 当前站点；GBK 站点必须显式传或依赖当前站点）
 Future<Response<String>> searchThreads(
   Dio dio, {
   required String keyword,
   int page = 1,
   String? searchId,
   String srchFilter = '',
+  String? charset,
 }) {
   return dio.get<String>(
     searchPath(
@@ -63,6 +72,7 @@ Future<Response<String>> searchThreads(
       page: page,
       searchId: searchId,
       srchFilter: srchFilter,
+      charset: charset,
     ),
     options: Options(headers: {'User-Agent': resolveRequestUserAgent()}),
   );

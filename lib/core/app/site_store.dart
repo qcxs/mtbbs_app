@@ -50,6 +50,9 @@ class SiteStore extends ChangeNotifier {
   /// 当前站点是否使用移动端 UA
   bool get isMobileUA => current.isMobileUA;
 
+  /// 当前站点请求参数编码（GBK 站点为 `gbk`）
+  String get charset => current.effectiveCharset;
+
   /// 当前站点板块列表 (fid → 名称)
   Map<String, String> get forums => current.forums;
 

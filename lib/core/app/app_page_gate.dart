@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/settings/settings_repository.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 可被内置浏览器「接管回退」的 App 页面注册表 + 开关状态。
 ///
@@ -202,9 +203,15 @@ String? siteUrlFor(String appPath) {
       final kw = q['kw'] ?? '';
       final filter = q['filter'] ?? '';
       if (kw.isEmpty && filter.isEmpty) return '$base/search.php?mod=forum';
+      final charset = (siteHost == null || siteHost.isEmpty)
+          ? SiteStore.instance.charset
+          : (SessionRegistry.instance.siteForHost(siteHost)?.effectiveCharset ??
+                SiteStore.instance.charset);
       final buf = StringBuffer('$base/search.php?mod=forum');
       if (kw.isNotEmpty) {
-        buf.write('&srchtxt=${Uri.encodeQueryComponent(kw)}');
+        buf.write(
+          '&srchtxt=${encodeQueryComponentForSite(kw, charset: charset)}',
+        );
       }
       if (filter.isNotEmpty) buf.write('&srchfilter=$filter');
       buf.write('&searchsubmit=yes');

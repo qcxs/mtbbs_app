@@ -73,6 +73,13 @@ class _SearchPageState extends State<SearchPage> {
   /// 用户搜索建议的显示文字（不区分 UID / 用户名——数字也可能是用户名）
   String _userSearchLabel(String text) => '查看用户 "$text"';
 
+  /// 纯数字输入可能是帖子 ID（tid）。
+  ///
+  /// 上限 10 位（Discuz 的 tid 是无符号 32 位整数），避免把手机号之类
+  /// 的长数字也提示成帖子；数字同样可能是用户名，所以用户建议仍并列显示。
+  bool _isTidCandidate(String text) =>
+      UsernameValidator.isNumeric(text) && text.length <= 10;
+
   // ==================== 动作 ====================
 
   Future<void> _openInApp(String input) async {
@@ -100,6 +107,13 @@ class _SearchPageState extends State<SearchPage> {
     context.push(
       '/browser?url=${Uri.encodeComponent(fullUrl)}&intercept=false',
     );
+  }
+
+  /// 按帖子 ID 直接打开帖子（纯数字输入的快捷入口）
+  Future<void> _openThread(String tid) async {
+    await _addHistory(tid);
+    if (!mounted) return;
+    context.push('/thread/$tid');
   }
 
   Future<void> _performBingSearch(String query) async {
@@ -320,6 +334,17 @@ class _SearchPageState extends State<SearchPage> {
             label: '在浏览器中打开',
             subtitle: text,
             onTap: () => _openInBrowser(text),
+          ),
+          const Divider(height: 16),
+        ],
+        // 纯数字：优先当帖子 ID，数字也可能是用户名，故与用户建议并列
+        if (_isTidCandidate(text) && !_isUrl) ...[
+          _suggestionCard(
+            icon: Icons.article_outlined,
+            iconColor: cs.primary,
+            label: '打开帖子 tid=$text',
+            subtitle: '按帖子 ID 直接打开',
+            onTap: () => _openThread(text),
           ),
           const Divider(height: 16),
         ],

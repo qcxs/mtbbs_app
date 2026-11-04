@@ -2,6 +2,9 @@ import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 
+part 'url_router_php.dart';
+part 'url_router_static.dart';
+
 /// URL 路由解析结果
 class UrlRouteResult {
   /// App 内路由路径，null 表示不支持
@@ -99,457 +102,40 @@ class UrlRouter {
 
     final path = parsed.path;
     final query = parsed.queryParameters;
+    final site = (host: otherSiteHost, name: otherSiteName);
 
     // ==================== 帖子详情 ====================
-
     if (path.endsWith('/forum.php') || path.endsWith('forum.php')) {
-      final mod = query['mod'];
-
-      // 在线用户（PC 专属页）：forum.php?showoldetails=yes
-      if (query['showoldetails'] != null) {
-        return UrlRouteResult(
-          label: '在线用户',
-          appPath: '/online',
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-
-      // 小黑屋（PC 专属页）：forum.php?mod=misc&action=showdarkroom
-      if (mod == 'misc' && query['action'] == 'showdarkroom') {
-        return UrlRouteResult(
-          label: '小黑屋',
-          appPath: '/darkroom',
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-
-      // 导读：forum.php?mod=guide&view={newthread|hot|new|digest|sofa|my}[&index=N]
-      // App 内对应「导读」页；具体 view 由页内 Tab 承载，路由层不带参数，
-      // index（页码）同理由页内列表自管。
-      if (mod == 'guide') {
-        return UrlRouteResult(
-          label: '导读',
-          appPath: '/guide',
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-
-      if (mod == 'viewthread') {
-        final tid = query['tid'];
-        if (tid != null && tid.isNotEmpty) {
-          final page = _resolvePage(query['page']);
-          return UrlRouteResult(
-            label: '帖子详情',
-            appPath: _threadPath(tid, page),
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        return UrlRouteResult(
-          label: '帖子详情（缺少 tid）',
-          appPath: null,
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-
-      if (mod == 'redirect') {
-        final goto = query['goto'];
-        if (goto == 'findpost') {
-          final pid = query['pid'];
-          final ptid = query['ptid'];
-          if (pid != null &&
-              pid.isNotEmpty &&
-              ptid != null &&
-              ptid.isNotEmpty) {
-            return UrlRouteResult(
-              label: '帖子详情（定位回复）',
-              appPath: '/thread/$ptid?pid=$pid',
-              siteHost: otherSiteHost,
-              siteName: otherSiteName,
-            );
-          }
-        }
-        return UrlRouteResult(
-          label: '帖子详情（缺少参数）',
-          appPath: null,
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-
-      if (mod == 'forumdisplay') {
-        final fid = query['fid'];
-        if (fid != null && fid.isNotEmpty) {
-          final page = _resolvePage(query['page']);
-          final pageSuffix = page > 1 ? '&page=$page' : '';
-          return UrlRouteResult(
-            label: '板块',
-            appPath: '/forum?fid=$fid$pageSuffix',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        return UrlRouteResult(
-          label: '板块（缺少 fid）',
-          appPath: null,
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-
-      if (mod == 'post') {
-        final postResult = _parsePostUrl(query);
-        return UrlRouteResult(
-          label: postResult.label,
-          appPath: postResult.appPath,
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
+      final result = _matchForumPhp(query, site);
+      if (result != null) return result;
     }
 
     // ==================== 圈子（群组） ====================
-
     if (path.endsWith('/group.php') || path.endsWith('group.php')) {
-      final gid = query['gid'];
-      if (gid != null && gid.isNotEmpty) {
-        return UrlRouteResult(
-          label: '圈子分类',
-          appPath: '/groups/category?gid=$gid',
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-      return UrlRouteResult(
-        label: '圈子',
-        appPath: '/groups',
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
+      return _matchGroupPhp(query, site);
     }
 
     // ==================== 用户主页 ====================
-
     if (path.endsWith('/home.php') || path.endsWith('home.php')) {
-      final mod = query['mod'];
-
-      // 关注/粉丝：home.php?mod=follow&do={following|follower}[&uid=X][&page=N]
-      // uid 为空 = 当前用户自己的列表 → /follow?type=...；指定 uid → /follow?type=...&uid=X
-      if (mod == 'follow') {
-        final String do_ = query['do'] ?? '';
-        if (do_ == 'following' || do_ == 'follower') {
-          final uid = query['uid'];
-          final hasUid = uid != null && uid.isNotEmpty;
-          final page = _resolvePage(query['page']);
-          final params = <String, String>{
-            'type': do_,
-            if (hasUid) 'uid': uid,
-            if (page > 1) 'page': '$page',
-          };
-          final qs = params.isEmpty
-              ? ''
-              : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-          return UrlRouteResult(
-            label: hasUid
-                ? (do_ == 'following' ? 'TA的关注' : 'TA的粉丝')
-                : (do_ == 'following' ? '我的关注' : '我的粉丝'),
-            appPath: '/follow$qs',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        // do=view 等（广播 feed）暂未适配，走内置浏览器
-        return UrlRouteResult(
-          label: '广播',
-          appPath: null,
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-      if (mod == 'space') {
-        final uid = query['uid'];
-        // 好友列表：home.php?mod=space[&uid=X]&do=friend[&view=me][&page=N]
-        // uid 为空（含空 uid= 的“我的好友”写法）→ /friends；指定 uid → /friends?uid=X
-        if (query['do'] == 'friend') {
-          final hasUid = uid != null && uid.isNotEmpty;
-          final page = _resolvePage(query['page']);
-          final params = <String, String>{
-            if (hasUid) 'uid': uid,
-            if (page > 1) 'page': '$page',
-          };
-          final qs = params.isEmpty
-              ? ''
-              : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-          return UrlRouteResult(
-            label: hasUid ? '好友列表' : '我的好友',
-            appPath: '/friends$qs',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        // 留言板：home.php?mod=space[&uid=X]&do=wall[&page=N]
-        // 注意必须排在下面 `uid 非空 → 用户主页` 之前：do=wall 也带 uid
-        if (query['do'] == 'wall') {
-          final hasUid = uid != null && uid.isNotEmpty;
-          final page = _resolvePage(query['page']);
-          final qs = page > 1 ? '?page=$page' : '';
-          return UrlRouteResult(
-            label: hasUid ? '留言板' : '我的留言板',
-            appPath: '/user/${hasUid ? uid : 'self'}/wall$qs',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        // 我的帖子/回复：home.php?mod=space[&uid=X]&do=thread[&view=me][&type=reply]
-        // 注意排在下面 `uid 非空 → 用户主页` 之前：do=thread 也带 uid
-        if (query['do'] == 'thread') {
-          final hasUid = uid != null && uid.isNotEmpty;
-          final isReply = query['type'] == 'reply';
-          final params = <String, String>{
-            if (isReply) 'type': 'reply',
-            if (hasUid) 'uid': uid,
-          };
-          final qs = params.isEmpty
-              ? ''
-              : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-          return UrlRouteResult(
-            label: hasUid ? 'Ta的帖子' : (isReply ? '最近回复' : '我的帖子'),
-            appPath: '/my-threads$qs',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        // 我的收藏：home.php?mod=space&do=favorite[&view=me][&type=all|thread|forum]
-        if (query['do'] == 'favorite') {
-          return UrlRouteResult(
-            label: '我的收藏',
-            appPath: '/favorite',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        if (uid != null && uid.isNotEmpty) {
-          return UrlRouteResult(
-            label: '用户主页',
-            appPath: '/user/$uid',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        // 私人消息：home.php?mod=space&do=pm[&subop=view&touid=X]
-        // 会话详情 → 聊天页；消息列表（无 subop）→ 消息 Tab
-        if (query['do'] == 'pm') {
-          final touid = query['touid'];
-          if (query['subop'] == 'view' && touid != null && touid.isNotEmpty) {
-            return UrlRouteResult(
-              label: '私信会话',
-              appPath: '/pm/chat?touid=$touid',
-              siteHost: otherSiteHost,
-              siteName: otherSiteName,
-            );
-          }
-          return UrlRouteResult(
-            label: '我的消息',
-            appPath: '/message',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        // home.php?mod=space&do=profile — 当前用户个人资料页（无 uid）
-        if (query['do'] == 'profile') {
-          return UrlRouteResult(
-            label: '我的主页',
-            appPath: '/user/self',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        return UrlRouteResult(
-          label: '用户主页（缺少 uid）',
-          appPath: null,
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-      // 发私信页：home.php?mod=spacecp&ac=pm&op=showmsg&touid=X → 聊天页
-      if (mod == 'spacecp' && query['ac'] == 'pm' && query['op'] == 'showmsg') {
-        final touid = query['touid'];
-        if (touid != null && touid.isNotEmpty) {
-          return UrlRouteResult(
-            label: '发私信',
-            appPath: '/pm/chat?touid=$touid',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-      }
-      // 积分记录：home.php?mod=spacecp&ac=credit&op=log[&exttype=N][&optype=CODE]
-      // exttype：1=好评 / 2=金币 / 3=信誉（0/缺省=不限）；optype 为操作类型代码
-      if (mod == 'spacecp' && query['ac'] == 'credit' && query['op'] == 'log') {
-        final exttype = query['exttype'] ?? '';
-        final optype = query['optype'] ?? '';
-        final params = <String, String>{
-          if (exttype.isNotEmpty && exttype != '0') 'exttype': exttype,
-          if (optype.isNotEmpty) 'optype': optype,
-        };
-        final qs = params.isEmpty
-            ? ''
-            : '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-        return UrlRouteResult(
-          label: '积分记录',
-          appPath: '/credit-log$qs',
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
+      final result = _matchHomePhp(query, site);
+      if (result != null) return result;
     }
 
     // ==================== 排行榜 ====================
-
-    // 用户排行：misc.php?mod=ranklist[&type=member][&view=beauty|handsome|credit|
-    //   friendnum|invite|post|onlinetime]
-    // 无 type（排行榜 hub）与 type=member 都落到 App「用户排行」页；
-    // type=thread / type=forum 暂无 App 页面，走内置浏览器。
     if (path.endsWith('/misc.php') || path.endsWith('misc.php')) {
-      if (query['mod'] == 'ranklist') {
-        final type = query['type'] ?? '';
-        if (type.isEmpty || type == 'member') {
-          final view = query['view'] ?? '';
-          final qs = view.isEmpty ? '' : '?view=$view';
-          return UrlRouteResult(
-            label: '用户排行',
-            appPath: '/ranklist$qs',
-            siteHost: otherSiteHost,
-            siteName: otherSiteName,
-          );
-        }
-        return UrlRouteResult(
-          label: '排行榜',
-          appPath: null,
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
+      final result = _matchMiscPhp(query, site);
+      if (result != null) return result;
     }
 
     // ==================== 伪静态格式 ====================
-
-    // thread-{tid}-{page}-{ordertype}.html
-    // 示例：thread-169246.html → tid=169246（无 page）
-    //       thread-169246-5-1.html → tid=169246, page=5
-    //       支持外部 ?page=N 覆盖，如 thread-169246-1-1.html?page=2
-    final threadFull = RegExp(r'thread-(\d+)-(\d+)').firstMatch(url);
-    if (threadFull != null) {
-      final tid = threadFull.group(1)!;
-      final pathPage = int.tryParse(threadFull.group(2)!) ?? 1;
-      // 外部查询参数 page 优先级高于路径中的 page
-      final page = _resolvePage(query['page'], fallback: pathPage);
-      return UrlRouteResult(
-        label: '帖子详情',
-        appPath: _threadPath(tid, page),
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
-    }
-    // thread-{tid}.html（无 page/ordertype 的简写格式）
-    final threadSimple = RegExp(r'thread-(\d+)').firstMatch(url);
-    if (threadSimple != null) {
-      final tid = threadSimple.group(1)!;
-      final page = _resolvePage(query['page']);
-      return UrlRouteResult(
-        label: '帖子详情',
-        appPath: _threadPath(tid, page),
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
-    }
-
-    // space-uid-456.html
-    final spaceMatch = RegExp(r'space-uid-(\d+)').firstMatch(url);
-    if (spaceMatch != null) {
-      final uid = spaceMatch.group(1)!;
-      return UrlRouteResult(
-        label: '用户主页',
-        appPath: '/user/$uid',
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
-    }
-
-    // ==================== 板块（伪静态） ====================
-
-    // forum-{fid}-{page}.html
-    // 示例：forum-42-1.html → fid=42, page=1
-    final forumFull = RegExp(r'forum-(\d+)-(\d+)').firstMatch(url);
-    if (forumFull != null) {
-      final fid = forumFull.group(1)!;
-      final page = int.tryParse(forumFull.group(2)!) ?? 1;
-      final pageSuffix = page > 1 ? '&page=$page' : '';
-      return UrlRouteResult(
-        label: '板块',
-        appPath: '/forum?fid=$fid$pageSuffix',
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
-    }
-    // forum-{fid}.html（无 page 的简写格式）
-    final forumSimple = RegExp(r'forum-(\d+)').firstMatch(url);
-    if (forumSimple != null) {
-      final fid = forumSimple.group(1)!;
-      return UrlRouteResult(
-        label: '板块',
-        appPath: '/forum?fid=$fid',
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
-    }
-
-    // group-{gid}-{page}.html（圈子内容，只读讨论区）
-    final groupMatch = RegExp(r'group-(\d+)').firstMatch(url);
-    if (groupMatch != null) {
-      final gid = groupMatch.group(1)!;
-      return UrlRouteResult(
-        label: '圈子',
-        appPath: '/groups/content?gid=$gid',
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
-    }
+    final staticResult = _matchPseudoStatic(url, query, site);
+    if (staticResult != null) return staticResult;
 
     // ==================== 站内搜索 ====================
-
-    // search.php?mod=forum&srchtxt=关键词[&srchfilter=digest]
-    if (path.endsWith('search.php')) {
-      final kw = query['srchtxt'] ?? query['kw'] ?? query['keyword'] ?? '';
-      if (kw.isNotEmpty) {
-        final filter = query['srchfilter'] ?? '';
-        final params = <String, String>{
-          'kw': kw,
-          if (filter.isNotEmpty) 'filter': filter,
-        };
-        final qs =
-            '?${params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}';
-        return UrlRouteResult(
-          label: '搜索「$kw」',
-          appPath: '/search/result$qs',
-          siteHost: otherSiteHost,
-          siteName: otherSiteName,
-        );
-      }
-      return UrlRouteResult(
-        label: '搜索（缺少关键词）',
-        appPath: null,
-        siteHost: otherSiteHost,
-        siteName: otherSiteName,
-      );
-    }
+    final searchResult = _matchSearchPhp(path, query, site);
+    if (searchResult != null) return searchResult;
 
     // ==================== 不支持的页面 ====================
-
     return UrlRouteResult(
       label: '不支持的页面',
       appPath: null,
@@ -632,70 +218,11 @@ class UrlRouter {
     return false;
   }
 
-  /// 构建帖子路由路径，page > 1 时附加 ?page=N
-  static String _threadPath(String tid, int page) {
-    if (page > 1) return '/thread/$tid?page=$page';
-    return '/thread/$tid';
-  }
-
-  /// 解析 page 参数。先尝试外部查询参数，失败时使用[fallback]（默认 1）。
-  static int _resolvePage(String? externalPage, {int fallback = 1}) {
-    if (externalPage != null) {
-      final p = int.tryParse(externalPage);
-      if (p != null && p > 1) return p;
-    }
-    return fallback;
-  }
-
   /// 从 URL 中提取主机名
   static String? _extractHost(String url) {
     final fullUrl = url.contains('://') ? url : 'https://$url';
     final uri = Uri.tryParse(fullUrl);
     return uri?.host;
-  }
-
-  /// 解析 forum.php?mod=post 类型的 URL
-  static ({String label, String? appPath}) _parsePostUrl(
-    Map<String, String> query,
-  ) {
-    final action = query['action'];
-    final tid = query['tid'];
-    final pid = query['pid'];
-    final fid = query['fid'];
-
-    switch (action) {
-      case 'newthread':
-        if (fid != null && fid.isNotEmpty) {
-          return (label: '发新帖', appPath: '/editor?type=post&fid=$fid');
-        }
-        return (label: '发新帖（缺少 fid）', appPath: null);
-
-      case 'reply':
-        if (tid == null || tid.isEmpty) {
-          return (label: '回复帖子（缺少 tid）', appPath: null);
-        }
-        if (pid != null && pid.isNotEmpty) {
-          // 引用回复
-          return (
-            label: '回复评论',
-            appPath: '/editor?type=reply&tid=$tid&pid=$pid',
-          );
-        }
-        // 普通评论
-        return (label: '评论帖子', appPath: '/editor?type=comment&tid=$tid');
-
-      case 'edit':
-        if (tid != null && tid.isNotEmpty && pid != null && pid.isNotEmpty) {
-          return (
-            label: '编辑帖子',
-            appPath: '/editor?type=editPost&tid=$tid&pid=$pid',
-          );
-        }
-        return (label: '编辑帖子（缺少参数）', appPath: null);
-
-      default:
-        return (label: '不支持的页面', appPath: null);
-    }
   }
 
   /// 标准化 URL：提取 path 和 query，去掉 baseUrl 前缀

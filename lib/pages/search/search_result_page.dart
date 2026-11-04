@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mtbbs/api/forum/search/export.dart' as search_api;
 import 'package:mtbbs/controllers/thread_list_controller.dart';
 import 'package:mtbbs/core/app/site_session.dart';
@@ -53,6 +54,9 @@ class _SearchResultPageState extends State<SearchResultPage> {
   /// Discuz 搜索结果会话 id：首次请求后拿到，后续翻页复用
   String? _searchId;
 
+  /// 站点 302 到 Bing 时的最终结果 URL（自动改用内置浏览器打开）
+  String? _externalSearchUrl;
+
   /// 是否处于"搜索过于频繁"限流态
   bool _rateLimited = false;
 
@@ -81,9 +85,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
           page: page,
           searchId: _searchId,
           srchFilter: widget.searchFilter,
+          charset: _session.charset,
         );
         // 首次搜索后缓存 searchid，供后续翻页使用
         _searchId ??= r['searchId'] as String?;
+        _externalSearchUrl = r['externalSearchUrl'] as String?;
         return r;
       },
     );
@@ -110,6 +116,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
       case LoadState.loaded:
         // 搜索成功 → 退出限流态（限流只可能发生在"发起新搜索"这一步）
         if (_rateLimited) setState(() => _rateLimited = false);
+        _openExternalSearch();
       case LoadState.error:
         final secs = _parseRetrySeconds(_listCtrl.errorMessage ?? '');
         if (secs != null) {
@@ -126,6 +133,23 @@ class _SearchResultPageState extends State<SearchResultPage> {
       case LoadState.loading:
         break;
     }
+  }
+
+  /// 站点把搜索 302 给 Bing（52pojie）：直接改用内置浏览器打开最终结果页，
+  /// 避免停在永远解析不出列表的 Discuz 空结果页。
+  ///
+  /// 用 post-frame + `replace`：不在 build/notify 过程中导航；返回时回到搜索入口页，
+  /// 而不是留下一张 noMatch 的空结果页。
+  void _openExternalSearch() {
+    final url = _externalSearchUrl;
+    if (url == null || url.isEmpty) return;
+    _externalSearchUrl = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.replace(
+        '/browser?url=${Uri.encodeComponent(url)}&intercept=false',
+      );
+    });
   }
 
   /// 从服务端文案解析需等待秒数；非限流文案返回 null。
@@ -227,6 +251,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
               page: _listCtrl.page,
               srchFilter: widget.searchFilter,
               baseUrl: _session.baseUrl,
+              charset: _session.charset,
             ),
             // 用 refresh 而非 loadInitial：保留 searchid，刷新复用同一次搜索会话，
             // 不会在服务端新建搜索（避免触发搜索频率限制）

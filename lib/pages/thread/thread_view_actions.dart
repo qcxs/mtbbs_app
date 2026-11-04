@@ -125,52 +125,11 @@ extension on _ThreadViewPageState {
     );
   }
 
-  void _showBbcodeDialog(PostItem post) {
-    final cs = Theme.of(context).colorScheme;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 400),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                'BBCode - ${post.username}',
-                style: const TextStyle(fontSize: 15),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 20),
-              onPressed: () => Navigator.of(ctx).pop(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-        // BBCode 可能很长（整楼原文 / 含代码块）：必须可滚动，
-        // 否则超出 AlertDialog 的 maxHeight 后被裁剪、无法查看
-        content: SingleChildScrollView(
-          child: SelectableText(
-            post.bbcode,
-            style: TextStyle(fontSize: 12, color: cs.onSurface, height: 1.5),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('关闭'),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              _copyToClipboard(post.bbcode);
-              Navigator.of(ctx).pop();
-            },
-            icon: const Icon(Icons.copy, size: 16),
-            label: const Text('复制'),
-          ),
-        ],
-      ),
+  void _showPostSource(PostItem post) {
+    PostSourceSheet.show(
+      context,
+      username: post.username,
+      bbcode: post.bbcode,
     );
   }
 
@@ -220,14 +179,6 @@ extension on _ThreadViewPageState {
       if (!mounted) return;
       showToast('获取详情失败: $e');
     }
-  }
-
-  Future<void> _copyToClipboard(String text) async {
-    final ok = await ClipboardHelper.write(text);
-    showToast(
-      ok ? '已复制到剪贴板' : '复制到剪切板失败',
-      duration: const Duration(seconds: 1),
-    );
   }
 
   void _showPagePicker() {

@@ -31,6 +31,12 @@ class Site {
   /// 见 [resolveAvatarUrl]
   final String? avatarTemplate;
 
+  /// 站点请求参数编码，默认 `utf-8`。
+  ///
+  /// Discuz 按站点字符集解码 GET 参数：GBK 站点（如 52pojie）如果收到 UTF-8
+  /// 字节的中文关键词，会读成乱码、搜索必然无结果。见 `docs/18`。
+  final String charset;
+
   const Site({
     required this.name,
     required this.baseUrl,
@@ -39,6 +45,7 @@ class Site {
     required this.defaultForumOrder,
     this.userAgent = '',
     this.avatarTemplate,
+    this.charset = 'utf-8',
   });
 
   String get host => Uri.parse(baseUrl).host;
@@ -48,6 +55,12 @@ class Site {
 
   /// 是否使用移动端 UA（含 "Mobile" 关键字）
   bool get isMobileUA => effectiveUserAgent.contains('Mobile');
+
+  /// 站点实际使用的请求编码（空 / 未配置 → `utf-8`）
+  String get effectiveCharset {
+    final c = charset.trim().toLowerCase();
+    return c.isEmpty ? 'utf-8' : c;
+  }
 
   /// 复制并覆盖字段；不传（null）= 保持不变。显式清空 [avatarTemplate] 用
   /// [clearAvatarTemplate]。
@@ -63,6 +76,7 @@ class Site {
     String? userAgent,
     String? avatarTemplate,
     bool clearAvatarTemplate = false,
+    String? charset,
   }) => Site(
     name: name ?? this.name,
     baseUrl: baseUrl ?? this.baseUrl,
@@ -73,6 +87,7 @@ class Site {
     avatarTemplate: clearAvatarTemplate
         ? null
         : (avatarTemplate ?? this.avatarTemplate),
+    charset: charset ?? this.charset,
   );
 
   Map<String, dynamic> toJson() => {
@@ -84,7 +99,16 @@ class Site {
     if (userAgent.isNotEmpty) 'userAgent': userAgent,
     if (avatarTemplate != null && avatarTemplate!.isNotEmpty)
       'avatarTemplate': avatarTemplate,
+    if (effectiveCharset != 'utf-8') 'charset': effectiveCharset,
   };
+
+  /// 旧版持久化数据没有 `charset` 字段：按 host 兜底，避免升级后 52pojie
+  /// 仍然用 UTF-8 发搜索词。
+  static String _legacyCharsetFor(String baseUrl) {
+    final host = Uri.tryParse(baseUrl)?.host.toLowerCase() ?? '';
+    if (host == '52pojie.cn' || host.endsWith('.52pojie.cn')) return 'gbk';
+    return 'utf-8';
+  }
 
   factory Site.fromJson(Map<String, dynamic> json) => Site(
     name: json['name']?.toString() ?? '',
@@ -98,6 +122,9 @@ class Site {
     ),
     userAgent: json['userAgent']?.toString() ?? '',
     avatarTemplate: json['avatarTemplate']?.toString(),
+    charset:
+        json['charset']?.toString() ??
+        _legacyCharsetFor(json['baseUrl']?.toString() ?? ''),
   );
 
   static const String uaAndroid =

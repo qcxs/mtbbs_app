@@ -84,6 +84,7 @@ extension SettingsSites on SettingsProvider {
         userAgent: def.userAgent,
         avatarTemplate: def.avatarTemplate,
         clearAvatarTemplate: def.avatarTemplate == null,
+        charset: def.charset,
       );
       count++;
     }
@@ -100,6 +101,7 @@ extension SettingsSites on SettingsProvider {
           defaultForumOrder: [],
           userAgent: d.userAgent,
           avatarTemplate: d.avatarTemplate,
+          charset: d.charset,
         ),
       );
       count++;

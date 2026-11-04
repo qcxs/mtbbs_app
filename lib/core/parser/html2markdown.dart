@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/parser/md2bbcode.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
@@ -15,13 +17,64 @@ import 'package:mtbbs/models/md_convert_templates.dart';
 ///
 /// 只在 `div.parsedown-markdown` 容器内使用（由 [Html2BBCode] 判定），
 /// 其它站点的 HTML 不走这里，因此不会影响既有解析结果。
-String htmlToMarkdown(dom.Element root) => _Html2Markdown().convert(root);
+String htmlToMarkdown(dom.Element root) {
+  final math = _MathCollector();
+  final markdown = _Html2Markdown(math).convert(root);
+  return math.restoreMarkdown(markdown);
+}
 
 /// Parsedown 容器 → 展示用 BBCode（[Html2BBCode] 直接拼接）
 String parsedownHtmlToBbcode(dom.Element root) {
-  final markdown = htmlToMarkdown(root);
+  final math = _MathCollector();
+  final markdown = _Html2Markdown(math).convert(root);
   if (markdown.trim().isEmpty) return '';
-  return markdownToBbcode(markdown, templates: _displayTemplates);
+  final bbcode = markdownToBbcode(markdown, templates: _displayTemplates);
+  return math.restoreBbcode(bbcode);
+}
+
+/// 数学公式（`.math-render`）收集器
+///
+/// 解析期间先用占用符（`\x00MATH0\x00`）代替公式，转换结束后再还原。
+/// **不能**在还原出的 Markdown 文本里直接写 `[appdata]{…}`：JSON 中的 LaTeX
+/// 反斜杠（`\\frac`）会在 Markdown 的反斜杠转义阶段被吃掉，JSON 随之损坏。
+class _MathCollector {
+  final List<_MathItem> items = [];
+
+  String add(String tex, {required bool display}) {
+    items.add(_MathItem(tex, display));
+    return '\x00MATH${items.length - 1}\x00';
+  }
+
+  /// Markdown 场景：还原成 `$…$` / `$$…$$`
+  String restoreMarkdown(String text) => text.replaceAllMapped(
+    RegExp(r'\x00MATH(\d+)\x00'),
+    (m) {
+      final item = items[int.parse(m.group(1)!)];
+      final fence = item.display ? r'$$' : r'$';
+      return '$fence${item.tex}$fence';
+    },
+  );
+
+  /// BBCode 场景：还原成 App 私有展示载荷 `[appdata]`
+  String restoreBbcode(String text) => text.replaceAllMapped(
+    RegExp(r'\x00MATH(\d+)\x00'),
+    (m) {
+      final item = items[int.parse(m.group(1)!)];
+      final json = jsonEncode({
+        'type': 'math',
+        'tex': item.tex,
+        'display': item.display,
+      });
+      return '[appdata]$json[/appdata]';
+    },
+  );
+}
+
+class _MathItem {
+  final String tex;
+  final bool display;
+
+  const _MathItem(this.tex, this.display);
 }
 
 /// 展示用模板：只在「帖子阅读」场景使用。
@@ -55,7 +108,25 @@ const _displayTemplates = MdConvertTemplates(
 ///
 /// 只覆盖 Parsedown 会产出的标签；未知标签保留其文本内容。
 class _Html2Markdown {
+  _Html2Markdown(this._math);
+
+  final _MathCollector _math;
+
   String convert(dom.Element root) => _blocksOf(root).trim();
+
+  /// `.math-render`：52pojie Markdown 插件的公式容器。
+  /// 内容是 `$$…$$`（块级）或 `$…$`（行内）包裹的原始 LaTeX。
+  static ({String tex, bool display})? _parseMath(dom.Element el) {
+    final raw = el.text.replaceAll('\u00a0', ' ').trim();
+    if (raw.length >= 4 && raw.startsWith(r'$$') && raw.endsWith(r'$$')) {
+      return (tex: raw.substring(2, raw.length - 2).trim(), display: true);
+    }
+    if (raw.length >= 2 && raw.startsWith(r'$') && raw.endsWith(r'$')) {
+      return (tex: raw.substring(1, raw.length - 1).trim(), display: false);
+    }
+    // 没有 `$` 分隔符（如 `\(…\)`）时按普通文本处理，交由既有逻辑转义
+    return null;
+  }
 
   // ==================== 块级 ====================
 
@@ -110,6 +181,12 @@ class _Html2Markdown {
 
   String _block(dom.Node node) {
     if (node is! dom.Element) return '';
+    // 块级公式：<div class="math-render">$$…$$</div>
+    if (node.classes.contains('math-render')) {
+      final math = _parseMath(node);
+      if (math == null) return '';
+      return '${_math.add(math.tex, display: math.display)}\n\n';
+    }
     final tag = node.localName ?? '';
     switch (tag) {
       case 'h1':
@@ -211,9 +288,14 @@ class _Html2Markdown {
     List<dom.Element> cellsOf(dom.Element row) => row.children
         .where((c) => c.localName == 'th' || c.localName == 'td')
         .toList();
-    String cellText(dom.Element cell) => _escapeText(
-      _inlinesOf(cell).replaceAll(RegExp(r'\s*\n\s*'), ' ').trim(),
-    ).replaceAll('|', r'\|');
+    // 单元格内容已经是 Markdown 片段（`**粗体**`、`[文本](链接)` 等），
+    // 不能再整体 _escapeText——那会把生成的语法转义成字面量（曾导致单元格里的
+    // 加粗显示成 `**xxx**`、链接变成 `[url]([url=…]…[/url])`）。
+    // 文本节点的转义已由 _inline 内部完成，这里只需处理 GFM 的列分隔符。
+    String cellText(dom.Element cell) => _inlinesOf(cell)
+        .replaceAll(RegExp(r'\s*\n\s*'), ' ')
+        .trim()
+        .replaceAll('|', r'\|');
 
     final header = cellsOf(rows.first);
     final buf = StringBuffer();
@@ -234,6 +316,12 @@ class _Html2Markdown {
       return _escapeText(node.text ?? '');
     }
     if (node is! dom.Element) return '';
+    // 行内公式：<span class="math-render">$…$</span>
+    if (node.classes.contains('math-render')) {
+      final math = _parseMath(node);
+      if (math == null) return _inlinesOf(node);
+      return _math.add(math.tex, display: math.display);
+    }
     final tag = node.localName ?? '';
     switch (tag) {
       case 'br':

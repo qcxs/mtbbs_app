@@ -138,7 +138,7 @@ extension on _ThreadViewPageState {
       onPopupAction: (action, post) {
         switch (action) {
           case PostCardAction.showBbcode:
-            _showBbcodeDialog(post);
+            _showPostSource(post);
           case PostCardAction.editPost:
             _editPost(post);
           case PostCardAction.viewTime:
@@ -187,7 +187,7 @@ extension on _ThreadViewPageState {
       onPopupAction: (action) {
         switch (action) {
           case PostCardAction.showBbcode:
-            _showBbcodeDialog(post);
+            _showPostSource(post);
           case PostCardAction.editPost:
             _editPost(post);
           case PostCardAction.viewTime:

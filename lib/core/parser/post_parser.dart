@@ -155,9 +155,12 @@ Map<String, dynamic> parsePostFromTable(
       }
     }
 
-    // 求助帖奖励（悬赏金）：.rusld → [appdata]
-    // DOM 结构：div.pcbs > div.rwd > div.rusld.z > cite{amount}unit
-    final helpReward = plc.querySelector('.rusld cite');
+    // 求助帖奖励（悬赏金）：.rusld / .rsld → [appdata]
+    // 模板差异：MT 用 div.rusld.z，52pojie 用 div.rwd.cl > div.rsld.z；
+    // 两者结构都是 cite{amount}unit，单位如「金币」「吾爱币」。
+    final helpReward =
+        plc.querySelector('.rusld cite') ??
+        plc.querySelector('.rwd .rsld cite');
     if (helpReward != null) {
       final amount = sanitizeText(helpReward.text).trim();
       if (amount.isNotEmpty) {

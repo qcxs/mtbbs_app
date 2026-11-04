@@ -79,6 +79,10 @@ class BBCode2Html {
   /// 交给代码高亮组件（[BbcodeCodeBlock]）渲染。
   final List<String> codeBlocks = [];
 
+  /// [convert] 后填充的数学公式（索引对应 HTML 中的 `data-math-index`）。
+  /// 渲染层按索引取出 LaTeX 原文，交给公式渲染组件（`Math.tex`）。
+  final List<({String tex, bool display})> mathBlocks = [];
+
   /// [convert] 后填充的正文图片 URL（按 HTML 文档顺序，索引对应
   /// `data-img-index`，不含表情）。一段 BBCode 即一帖/一楼，
   /// 渲染层据此把该帖/该楼的图片组成一个可左右滑动的画廊。

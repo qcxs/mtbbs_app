@@ -1,3 +1,4 @@
+import 'package:charset/charset.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 
 /// URL 统一工具
@@ -29,6 +30,39 @@ String normalizeUrl(String url, {String? base}) {
   // 相对路径 → 基于 baseUrl（缺省为站点 baseUrl）解析
   final baseUrl = base ?? SiteStore.instance.baseUrl;
   return Uri.parse(baseUrl).resolve(url).toString();
+}
+
+/// 按站点字符集对查询参数值做百分号编码。
+///
+/// [Uri.encodeQueryComponent] 固定按 UTF-8 编码；而 Discuz 会按站点字符集
+/// 解码 GET 参数。GBK 站点（如 52pojie）收到 UTF-8 字节的中文关键词时，
+/// 会把「公式」读成「鍏紡」，搜索必然无结果（见 `docs/18`）。
+///
+/// [charset] 为 `gbk` / `gb2312` 时按 GBK 编码（GBK 兼容 GB2312）；其余
+/// （空 / `utf-8` / 未知值）保持 UTF-8。空格统一编码为 `%20`。
+String encodeQueryComponentForSite(String value, {String? charset}) {
+  final cs = (charset ?? '').trim().toLowerCase();
+  if (cs != 'gbk' && cs != 'gb2312') {
+    return Uri.encodeQueryComponent(value);
+  }
+  final buf = StringBuffer();
+  for (final b in gbk.encode(value)) {
+    // ASCII 可见字符保留原样，其余（含中文 / 空格 / 保留字符）转 %XX
+    final unreserved =
+        (b >= 0x30 && b <= 0x39) || // 0-9
+        (b >= 0x41 && b <= 0x5A) || // A-Z
+        (b >= 0x61 && b <= 0x7A) || // a-z
+        b == 0x2D ||
+        b == 0x2E ||
+        b == 0x5F ||
+        b == 0x7E; // - . _ ~
+    if (unreserved) {
+      buf.writeCharCode(b);
+    } else {
+      buf.write('%${b.toRadixString(16).toUpperCase().padLeft(2, '0')}');
+    }
+  }
+  return buf.toString();
 }
 
 /// 图片"占位图"特征（文件名片段）：URL 含其中任一即视为没有真实图片。

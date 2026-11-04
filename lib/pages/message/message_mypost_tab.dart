@@ -13,6 +13,7 @@ import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
+import 'package:mtbbs/widgets/thread/post_source_sheet.dart';
 import 'package:provider/provider.dart';
 
 /// 「我的帖子」分组配置（唯一数据源：lib/config/notice_config.dart）
@@ -237,51 +238,17 @@ class _MypostTabState extends State<MypostTab>
                     ),
                     onSelected: (v) {
                       if (v == 'showBbcode') {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            constraints: const BoxConstraints(
-                              maxWidth: 500,
-                              maxHeight: 400,
-                            ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'BBCode - $username',
-                                    style: const TextStyle(fontSize: 15),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 20),
-                                  onPressed: () => Navigator.of(ctx).pop(),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              ],
-                            ),
-                            content: SingleChildScrollView(
-                              child: SelectableText(
-                                preview.bbcode,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: cs.onSurface,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ),
-                          ),
+                        PostSourceSheet.show(
+                          context,
+                          username: username,
+                          bbcode: preview.bbcode,
                         );
                       }
                     },
                     itemBuilder: (_) => [
                       const PopupMenuItem(
                         value: 'showBbcode',
-                        child: Text(
-                          '查看 BBCode',
-                          style: TextStyle(fontSize: 13),
-                        ),
+                        child: Text('查看', style: TextStyle(fontSize: 13)),
                       ),
                     ],
                   ),

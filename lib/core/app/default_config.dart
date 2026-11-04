@@ -67,6 +67,7 @@ class DefaultConfig {
         defaultForumOrder: [],
         avatarTemplate:
             'https://avatar.52pojie.cn/data/avatar/{dir}/{tail}_avatar_{size}.jpg',
+        charset: 'gbk',
       ),
     ];
   }

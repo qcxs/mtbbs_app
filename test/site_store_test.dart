@@ -56,4 +56,29 @@ void main() {
     expect(store.host, 'b.example.com');
     expect(notified, greaterThan(0));
   });
+
+  test('旧版站点 JSON 缺少 charset 时按 host 兜底', () {
+    final legacy = Site.fromJson({
+      'name': '吾爱破解',
+      'baseUrl': 'https://www.52pojie.cn',
+      'loginPagePath': '/member.php?mod=logging&action=login',
+    });
+    expect(legacy.charset, 'gbk');
+
+    final custom = Site.fromJson({
+      'name': 'Custom',
+      'baseUrl': 'https://example.com',
+      'loginPagePath': '/login',
+    });
+    expect(custom.charset, 'utf-8');
+
+    // 显式配置优先于 host 兜底
+    final explicit = Site.fromJson({
+      'name': '吾爱破解',
+      'baseUrl': 'https://www.52pojie.cn',
+      'loginPagePath': '/member.php?mod=logging&action=login',
+      'charset': 'utf-8',
+    });
+    expect(explicit.charset, 'utf-8');
+  });
 }

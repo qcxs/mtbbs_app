@@ -1,5 +1,13 @@
 part of 'post_html_widget.dart';
 
+/// flutter_math_fork 缺失的少量 KaTeX 别名 → 兼容写法
+///
+/// 只影响渲染，不改缓存里的 TeX 原文（`\lt`/`\gt` 在 52pojie 的
+/// Parsedown 公式里很常见，如 `a \lt b`）。
+String _normalizeMathTex(String tex) => tex
+    .replaceAllMapped(RegExp(r'\\lt\b'), (_) => '<')
+    .replaceAllMapped(RegExp(r'\\gt\b'), (_) => '>');
+
 /// Color → CSS 颜色串（`#rrggbbaa`，flutter_widget_from_html 按 CSS 规范解析）
 String _cssColor(Color c) {
   final argb = c.toARGB32();

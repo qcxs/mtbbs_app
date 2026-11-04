@@ -43,6 +43,16 @@ extension on BBCode2Html {
               ? '<div style="padding:4px 0;color:#999">$status</div>'
               : '';
           return '<div class="bbcode-poll"><div>📊 $pollType · $voterCount 人参与</div>$optionsHtml$statusHtml</div>';
+        case 'math':
+          // 52pojie Markdown 帖的 LaTeX 公式：HTML 里只放占位元素，
+          // 原文交给渲染层按 data-math-index 取用（与 [code] 同一模式）
+          final tex = data['tex'] as String? ?? '';
+          if (tex.isEmpty) return '';
+          final display = data['display'] == true;
+          final index = mathBlocks.length;
+          mathBlocks.add((tex: tex, display: display));
+          final tag = display ? 'div' : 'span';
+          return '<$tag class="bbcode-math" data-math-index="$index"></$tag>';
         default:
           return '';
       }

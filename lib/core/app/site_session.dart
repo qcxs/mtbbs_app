@@ -35,6 +35,9 @@ abstract class SiteSession {
   /// 站点 baseUrl（不带末尾 `/`）
   String get baseUrl;
 
+  /// 站点请求参数编码（GBK 站点为 `gbk`）
+  String get charset;
+
   /// 生效账号名，null = 游客
   String? get accountName;
 
@@ -68,6 +71,9 @@ class GlobalSiteSession implements SiteSession {
   String get baseUrl => SiteStore.instance.baseUrl;
 
   @override
+  String get charset => SiteStore.instance.charset;
+
+  @override
   String? get accountName => isLoggedIn ? username : null;
 
   @override
@@ -98,6 +104,9 @@ class FixedSiteSession implements SiteSession {
   final String baseUrl;
 
   @override
+  final String charset;
+
+  @override
   final String? accountName;
 
   @override
@@ -112,6 +121,7 @@ class FixedSiteSession implements SiteSession {
   FixedSiteSession({
     required this.host,
     required this.baseUrl,
+    required this.charset,
     required this.accountName,
     required this.uid,
     required this.username,

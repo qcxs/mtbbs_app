@@ -167,7 +167,13 @@ class Html2BBCode {
       // 从 <ol><li> 逐行提取，保留换行
       final ol = el.querySelector('ol');
       if (ol != null) {
-        final lines = ol.querySelectorAll('li').map((li) => li.text).join('\n');
+        // Discuz 的 <li> 常省略闭合标签：`<li>代码<br />` 后面的源码换行
+        // 会被 DOM 归入当前 <li>。若原样 join('\n')，每个代码行之间会多出
+        // 一个空行；这里只裁掉每行首尾的换行，保留行内缩进与空代码行。
+        final lines = ol
+            .querySelectorAll('li')
+            .map((li) => li.text.replaceAll(RegExp(r'^[\r\n]+|[\r\n]+$'), ''))
+            .join('\n');
         return '\n[code]$lines[/code]\n';
       }
       // 无 ol/li 时回退到 el.text

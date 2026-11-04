@@ -227,7 +227,6 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                     columns: columns,
                     entries: entries,
                     hasReason: hasReason,
-                    wrapReason: true,
                   ),
                 ),
               ],
@@ -453,7 +452,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
             itemBuilder: (_) => [
               const PopupMenuItem(
                 value: PostCardAction.showBbcode,
-                child: Text('查看 BBCode', style: TextStyle(fontSize: 13)),
+                child: Text('查看', style: TextStyle(fontSize: 13)),
               ),
               if (widget.post.postTime.length < 15)
                 PopupMenuItem(
@@ -505,19 +504,17 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
   }
 }
 
-/// 评分表格：帖内传截断后的 [entries]，弹层传全量并允许理由换行。
+/// 评分表格：帖内传截断后的 [entries]，弹层传全量。
 class _RatingTable extends StatelessWidget {
   const _RatingTable({
     required this.columns,
     required this.entries,
     required this.hasReason,
-    this.wrapReason = false,
   });
 
   final List<dynamic> columns;
   final List<dynamic> entries;
   final bool hasReason;
-  final bool wrapReason;
 
   @override
   Widget build(BuildContext context) {
@@ -588,7 +585,8 @@ class _RatingTable extends StatelessWidget {
                 if (hasReason)
                   _cell(
                     ConstrainedBox(
-                      // 弹层里给理由列一个上限宽度，长理由才会换行
+                      // 理由列限宽后自动换行：不截断、不加省略号
+                      // （默认只展示前 10 行，行高增长可接受）
                       constraints: const BoxConstraints(maxWidth: 200),
                       child: Text(
                         reason,
@@ -596,8 +594,6 @@ class _RatingTable extends StatelessWidget {
                           fontSize: 11,
                           color: cs.onSurfaceVariant,
                         ),
-                        maxLines: wrapReason ? 3 : 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),

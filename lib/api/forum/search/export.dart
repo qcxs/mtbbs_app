@@ -14,6 +14,7 @@ Future<Map<String, dynamic>> searchThreads(
   int page = 1,
   String? searchId,
   String srchFilter = '',
+  String? charset,
 }) async {
   final resp = await http.searchThreads(
     dio,
@@ -21,10 +22,20 @@ Future<Map<String, dynamic>> searchThreads(
     page: page,
     searchId: searchId,
     srchFilter: srchFilter,
+    charset: charset,
   );
   final data = parseWithLog(resp, parse.parseResponse);
-  // searchid 只在重定向后的最终 URL 上（空结果页 body 里没有分页链接）
-  final sid = resp.realUri.queryParameters['searchid'];
+  // 站点把搜索外包给 Bing（52pojie 的 search.php 会 302 到 bing.com/search），
+  // 最终页面不是 Discuz DOM，解析必然 noMatch。把最终 URL 交给页面，
+  // 由它自动改用内置浏览器打开。
+  final finalHost = resp.realUri.host.toLowerCase();
+  if (finalHost == 'bing.com' || finalHost.endsWith('.bing.com')) {
+    data['externalSearchUrl'] = resp.realUri.toString();
+  }
+  // searchid 只在重定向后的最终 URL 上（空结果页 body 里没有分页链接）。
+  // 不能用 realUri.queryParameters：它会按 UTF-8 解码整个 query，GBK 站点
+  // 的 highlight=%B9%AB%CA%BD 会抛 FormatException（见 _queryValue）。
+  final sid = _queryValue(resp.realUri, 'searchid');
   if (sid != null && sid.isNotEmpty) {
     data['searchId'] = sid;
   } else {
@@ -43,7 +54,31 @@ String searchPageUrl({
   int page = 1,
   String srchFilter = '',
   String? baseUrl,
+  String? charset,
 }) {
   final base = baseUrl ?? SiteStore.instance.baseUrl;
-  return '$base${http.searchPath(keyword: keyword, page: page, searchId: searchId, srchFilter: srchFilter)}';
+  final cs = charset ?? SiteStore.instance.charset;
+  return '$base${http.searchPath(keyword: keyword, page: page, searchId: searchId, srchFilter: srchFilter, charset: cs)}';
+}
+
+/// 只取指定查询参数，不碰其它键。
+///
+/// `Uri.queryParameters` 会把**所有**参数值按 UTF-8 解码；GBK 站点（如 52pojie）
+/// 的 URL 常带 `highlight=%B9%AB%CA%BD`，会抛
+/// `FormatException: Unexpected extension byte`。
+String? _queryValue(Uri uri, String key) {
+  final query = uri.query;
+  if (query.isEmpty) return null;
+  for (final part in query.split('&')) {
+    final eq = part.indexOf('=');
+    final k = eq < 0 ? part : part.substring(0, eq);
+    if (k != key) continue;
+    final raw = eq < 0 ? '' : part.substring(eq + 1);
+    try {
+      return Uri.decodeQueryComponent(raw);
+    } catch (_) {
+      return raw;
+    }
+  }
+  return null;
 }

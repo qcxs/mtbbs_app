@@ -73,6 +73,9 @@ dependencies:
   # Markdown 解析（编辑器「导入 Markdown」→ BBCode，见 lib/core/parser/md2bbcode.dart）
   markdown: ^7.3.1
 
+  # 数学公式渲染（52pojie Markdown 帖的 LaTeX → Widget，KaTeX 的 Dart 移植）
+  flutter_math_fork: ^0.7.4
+
   # 瀑布流布局
   flutter_staggered_grid_view: ^0.7.0
 

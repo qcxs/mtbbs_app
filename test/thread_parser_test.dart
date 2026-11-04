@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:html/parser.dart' as html_parser;
+import 'package:mtbbs/core/parser/post_parser.dart';
 import 'package:mtbbs/core/parser/thread_parser.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 
@@ -640,6 +642,56 @@ void main() {
       expect(info.matched, false);
       expect(info.parser, 'NoParser');
       expect(info.items, isEmpty);
+    });
+  });
+
+  group('单帖解析 - 悬赏（bounty）', () {
+    test('52pojie div.rwd > div.rsld：cite 金额 + 后缀单位', () {
+      final doc = html_parser.parse(
+        '<table id="pid_54593821" class="plhin">'
+        '<tr>'
+        '<td class="pls"><p class="pi"><em><a>锋芒初露</a></em></p>'
+        '<div class="pi"><span class="authi">'
+        '<a href="home.php?mod=space&uid=524201">m99044032</a></span></div></td>'
+        '<td class="plc">'
+        '<div class="pcbs"><div class="rwd cl">'
+        '<div class="rsld z"><cite>25</cite>吾爱币</div>'
+        '<div class="rwdn"><table><tr>'
+        '<td class="t_f" id="postmessage_54593821">正文内容</td>'
+        '</tr></table></div>'
+        '</div></div>'
+        '</td>'
+        '</tr>'
+        '</table>',
+      );
+      final post = parsePostFromTable(
+        doc.querySelector('table.plhin')!,
+        isOp: true,
+        floor: 1,
+      );
+      final bbcode = post['bbcode'] as String;
+      expect(bbcode, startsWith('[appdata]{"type":"bounty"'));
+      expect(bbcode, contains('"amount":"25"'));
+      expect(bbcode, contains('"unit":"吾爱币"'));
+    });
+
+    test('MT div.rusld：原有选择器不受影响', () {
+      final doc = html_parser.parse(
+        '<table id="pid_1" class="plhin"><tr>'
+        '<td class="pls"></td>'
+        '<td class="plc">'
+        '<div class="pcbs"><div class="rwd">'
+        '<div class="rusld z"><cite>30</cite>金币</div>'
+        '<div class="rwdn"><table><tr>'
+        '<td class="t_f" id="postmessage_1">正文</td>'
+        '</tr></table></div>'
+        '</div></div>'
+        '</td></tr></table>',
+      );
+      final post = parsePostFromTable(doc.querySelector('table.plhin')!);
+      expect(post['bbcode'], contains('"type":"bounty"'));
+      expect(post['bbcode'], contains('"amount":"30"'));
+      expect(post['bbcode'], contains('"unit":"金币"'));
     });
   });
 }

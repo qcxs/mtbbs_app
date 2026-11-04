@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -627,6 +628,58 @@ void main() {
       );
       await _settle(tester);
       expect(find.text('查看全部代码'), findsNothing);
+    });
+  });
+
+  group('⑭ Markdown 公式', () {
+    testWidgets('块级 math appdata 渲染为公式组件，不显示原始 TeX', (tester) async {
+      const bbcode =
+          r'[appdata]{"type":"math","tex":"\\frac{a}{b}","display":true}[/appdata]';
+      await tester.pumpWidget(_post(bbcode));
+      await _settle(tester);
+
+      expect(find.byType(Math), findsOneWidget);
+      // 解析成功时不应走 onErrorFallback 显示原文
+      expect(find.textContaining(r'\frac', findRichText: true), findsNothing);
+    });
+
+    testWidgets('行内 math appdata 与文字同行渲染', (tester) async {
+      final bbcode =
+          r'点 [appdata]{"type":"math","tex":"x_{0}","display":false}[/appdata] 处';
+      await tester.pumpWidget(_post(bbcode));
+      await _settle(tester);
+
+      expect(find.byType(Math), findsOneWidget);
+      final mathRect = tester.getRect(find.byType(Math));
+      final textRect = _rectOfText('点');
+      expect(textRect, isNotNull);
+      // 行内公式与前后文字垂直方向存在重叠（同一行）
+      expect(
+        mathRect.top < textRect!.bottom && mathRect.bottom > textRect.top,
+        isTrue,
+      );
+    });
+
+    testWidgets(r'\lt 别名归一化后可正常解析', (tester) async {
+      final bbcode =
+          r'[appdata]{"type":"math","tex":"a \\lt b","display":false}[/appdata]';
+      await tester.pumpWidget(_post(bbcode));
+      await _settle(tester);
+
+      expect(find.byType(Math), findsOneWidget);
+      expect(find.textContaining(r'\lt', findRichText: true), findsNothing);
+    });
+
+    testWidgets('不支持的宏走 onErrorFallback，原文不丢', (tester) async {
+      final bbcode =
+          r'[appdata]{"type":"math","tex":"\\badmacro{a}","display":true}[/appdata]';
+      await tester.pumpWidget(_post(bbcode));
+      await _settle(tester);
+
+      expect(
+        find.textContaining(r'\badmacro', findRichText: true),
+        findsOneWidget,
+      );
     });
   });
 }

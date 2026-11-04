@@ -175,6 +175,30 @@ void main() {
     });
   });
 
+  group('Html2BBCode - blockcode 代码块', () {
+    test('省略 </li> 且 <br /> 后带源码换行时不多出空行', () {
+      // Discuz 实际结构：<li> 不闭合，<br /> 后的换行会被归入当前 li
+      const html =
+          '<div class="blockcode"><div id="code_X"><ol>'
+          '<li>#!/bin/sh<br />\n'
+          '<li>echo hello<br />\n'
+          '<li><br />\n'
+          '<li>true<br />\n'
+          '</ol></div><em>复制代码</em></div>';
+      final result = Html2BBCode().convert(html);
+      expect(result, contains('[code]#!/bin/sh\necho hello\n\ntrue[/code]'));
+    });
+
+    test('正常闭合的 </li> 保持逐行输出', () {
+      const html =
+          '<div class="blockcode"><div id="code_X"><ol>'
+          '<li>a</li><li>b</li>'
+          '</ol></div></div>';
+      final result = Html2BBCode().convert(html);
+      expect(result, contains('[code]a\nb[/code]'));
+    });
+  });
+
   group('Html2BBCode - 内联样式属性提取', () {
     test('背景色不误提取 color（background-color 含 color 后缀）', () {
       final result = Html2BBCode().convert(

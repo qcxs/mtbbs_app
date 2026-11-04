@@ -127,6 +127,29 @@ void main() {
     });
   });
 
+  group('Html2Markdown - 数学公式', () {
+    test(r'块级 / 行内公式还原为 $ 分隔的 TeX', () {
+      final out = md(
+        r'<div class="parsedown-markdown">'
+        r'<div class="math-render">$$\frac{a}{b}$$</div>'
+        r'<p>点 <span class="math-render">$x_{0}$</span></p>'
+        r'</div>',
+      );
+      expect(out, contains(r'$$\frac{a}{b}$$'));
+      expect(out, contains(r'$x_{0}$'));
+    });
+
+    test(r'无 $ 分隔符时按普通文本处理', () {
+      final out = md(
+        '<div class="parsedown-markdown">'
+        '<span class="math-render">plain</span>'
+        '</div>',
+      );
+      expect(out, contains('plain'));
+      expect(out, isNot(contains(r'$plain$')));
+    });
+  });
+
   group('Html2BBCode - 52pojie Markdown 插件端到端', () {
     String conv(String html) => Html2BBCode().convert(html);
 
@@ -166,6 +189,37 @@ void main() {
       expect(out, isNot(contains('[th]')));
     });
 
+    test('表格单元格内的加粗 / 链接转成 BBCode，不残留 Markdown 语法', () {
+      // 52pojie thread-2091509 / 2088125 的真实结构
+      final out = conv(
+        '<div class="parsedown-markdown"><table><thead>'
+        '<tr><th>账号</th><th>地址</th></tr></thead><tbody><tr>'
+        '<td><strong>buluo533</strong></td>'
+        '<td><a href="https://www.52pojie.cn/thread-1996104-1-1.html">'
+        'https://www.52pojie.cn/thread-1996104-1-1.html</a></td>'
+        '</tr></tbody></table></div>',
+      );
+      expect(out, contains('[td][b]buluo533[/b][/td]'));
+      expect(
+        out,
+        contains(
+          '[td][url=https://www.52pojie.cn/thread-1996104-1-1.html]'
+          'https://www.52pojie.cn/thread-1996104-1-1.html[/url][/td]',
+        ),
+      );
+      expect(out, isNot(contains('**')));
+      expect(out, isNot(contains('](')));
+    });
+
+    test('表格单元格里的字面星号保持原样（不被当成 Markdown 语法）', () {
+      final out = conv(
+        '<div class="parsedown-markdown"><table><tbody><tr>'
+        '<td>MIFA**系列NFC</td>'
+        '</tr></tbody></table></div>',
+      );
+      expect(out, contains('MIFA**系列NFC'));
+    });
+
     test('分割线不会触发 Front Matter（不产生 [free]）', () {
       final out = conv(
         '<div class="parsedown-markdown">'
@@ -188,6 +242,26 @@ void main() {
       expect(out, contains('[code]line1\n\nline2[/code]'));
       expect(out, isNot(contains('复制代码')));
     });
+
+    test('数学公式转 appdata，LaTeX 反斜杠不被 Markdown 往返破坏', () {
+      final out = conv(
+        r'<div class="parsedown-markdown">'
+        r'<div class="math-render">'
+        r'$$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$'
+        r'</div>'
+        r'<p>点 <span class="math-render">$x_{0}$</span></p>'
+        r'</div>',
+      );
+      expect(out, contains('"type":"math"'));
+      // jsonEncode 会把 LaTeX 反斜杠再转义一层，BBCode 里是 `\\frac`
+      expect(out, contains(r'\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}'));
+      expect(out, contains('"display":true'));
+      expect(out, contains('"display":false'));
+      // 分隔符已剥掉，不会以 `$$` / `\$` 形式残留
+      expect(out, isNot(contains(r'$$')));
+      expect(out, isNot(contains(r'\$')));
+    });
+
 
     test('容器级行内 code 渲染后不换行（端到端）', () {
       final out = conv(
