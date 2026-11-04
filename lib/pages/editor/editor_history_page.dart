@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';

@@ -338,8 +338,6 @@ class _ShortcutTile extends StatelessWidget {
 class _ForumList extends StatelessWidget {
   const _ForumList();
 
-  /// 目标芯片宽度：据此反推列数，列宽再均分整行 → 右侧不留白
-  static const double _minTileWidth = 128;
   static const double _spacing = 8;
 
   @override
@@ -360,50 +358,20 @@ class _ForumList extends StatelessWidget {
         ),
       );
     }
-    // 列数由容器宽度反推、列宽均分整行：内容宽度的 Wrap 会在窄屏右侧留出一大块空白
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = math.max(
-          2,
-          (constraints.maxWidth / (_minTileWidth + _spacing)).floor(),
-        );
-        final tileWidth =
-            (constraints.maxWidth - _spacing * (columns - 1)) / columns;
-        final rows = <Widget>[];
-        for (var i = 0; i < forums.length; i += columns) {
-          final chunk = forums.sublist(
-            i,
-            math.min(i + columns, forums.length),
-          );
-          rows.add(
-            Row(
-              children: [
-                for (var j = 0; j < chunk.length; j++) ...[
-                  if (j > 0) const SizedBox(width: _spacing),
-                  SizedBox(
-                    width: tileWidth,
-                    child: _ForumChip(entry: chunk[j]),
-                  ),
-                ],
-              ],
-            ),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) const SizedBox(height: _spacing),
-              rows[i],
-            ],
-          ],
-        );
-      },
+    // 芯片宽度只由名称长度决定（同一名称在任何行都同宽），放不下即换行；
+    // 行尾留白是标签流的自然形态。刻意不做拉伸：按行分摊剩余空间会让
+    // 同字数的芯片在不同行宽窄不一。
+    return Wrap(
+      spacing: _spacing,
+      runSpacing: _spacing,
+      children: [
+        for (final entry in forums) _ForumChip(entry: entry),
+      ],
     );
   }
 }
 
-/// 单个版块芯片（等宽填充整行）
+/// 单个版块芯片（宽度随名称自适应，超长时单行省略）
 class _ForumChip extends StatelessWidget {
   const _ForumChip({required this.entry});
 
@@ -422,7 +390,7 @@ class _ForumChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.forum, size: 18, color: cs.onSurfaceVariant),
             const SizedBox(width: 6),

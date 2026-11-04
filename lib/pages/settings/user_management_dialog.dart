@@ -258,12 +258,8 @@ class UserManagementDialog extends StatelessWidget {
       showToast('没有可导出的账号');
       return;
     }
-    try {
-      await ClipboardHelper.write(jsonStr);
-      showToast('已导出到剪切板');
-    } catch (e) {
-      showToast('复制到剪切板失败：$e');
-    }
+    final ok = await ClipboardHelper.write(jsonStr);
+    showToast(ok ? '已导出到剪切板' : '复制到剪切板失败');
   }
 
   Future<void> _import(BuildContext context, AuthProvider auth) async {

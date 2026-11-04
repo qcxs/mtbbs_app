@@ -11,7 +11,7 @@ plugins {
 
 // beta 开关：`flutter build apk --release --dart-define=BETA=true` 时构建为 beta 形态。
 // Flutter 会把 --dart-define 逐个 base64 编码后以逗号分隔透传给 gradle（-Pdart-defines），这里解码还原。
-// beta 为独立 applicationId（.beta 后缀）+ 「MT论坛 beta」应用名 + 固定 1.0.0-beta/1 + debug 签名，
+// beta 为独立 applicationId（.beta 后缀）+ 「MT论坛 beta」应用名 + 固定 1.0.0-beta/1 + MT 内置 testkey 签名，
 // 与正式版互不影响，版本号固定 1 反而便于随意覆盖安装（无升降级限制），仅临时测试用。
 val dartDefines: Map<String, String> = run {
     (project.findProperty("dart-defines") as? String).orEmpty()
@@ -30,9 +30,12 @@ val dartDefines: Map<String, String> = run {
 }
 val isBeta = dartDefines["BETA"] == "true"
 
-// 签名配置：key.properties 四项齐全且 key.jks 能成功加载才启用正式签名，
-// 否则（无 key.properties / 文件缺失 / 密码错误）回退 **MT 内置签名**（见 mtTestkey），
-// 构建不报错。
+// 签名策略（统一口径）：
+//   1. release 且 key.properties 四项齐全、keystore 能成功加载 → 正式签名
+//      （CI 由 Secrets 写入 key.properties；本地手动放置同样生效）；
+//   2. 其余所有情况（debug / profile / beta / release 未配签名）→ **MT 内置 testkey**
+//      （见 mtTestkey，AOSP 公开证书、零机密性）。
+// 目的：同一 applicationId 的包在任何机器、任何渠道都用同一张证书，可互相覆盖安装。
 val keyProperties = Properties().apply {
     val f = rootProject.file("key.properties")
     if (f.exists()) {
@@ -61,7 +64,7 @@ val keystoreOk: Boolean = try {
         false
     }
 } catch (e: Exception) {
-    println("签名配置无效（${e.message}），回退 debug 签名")
+    println("签名配置无效（${e.message}），回退 MT 内置 testkey")
     false
 }
 
@@ -80,7 +83,7 @@ android {
         // 与 MT 管理器给未签名 APK 补签所用证书相同）。密钥口令就是公开的 android，
         // **零机密性、故意入库**，与 Flutter/Android 的 debug keystore 不同点在于
         // 它是所有使用者共享的同一张固定证书，因此本地与 CI、不同次构建的包可互相
-        // 覆盖安装。仅用于"用户未指定签名"的兜底，正式分发仍应配置 key.properties。
+        // 覆盖安装。debug / profile / beta 与「release 未配正式签名」全部用它。
         create("mtTestkey") {
             storeFile = file("testkey.keystore")
             storePassword = "android"
@@ -117,14 +120,21 @@ android {
             applicationIdSuffix = ".debug"
             // debug 版应用名带后缀，避免与正式版在桌面/最近任务里认不出
             manifestPlaceholders.put("appName", "MT论坛 debug")
+            // 不用各机器自动生成的 ~/.android/debug.keystore，统一 MT 内置 testkey
+            signingConfig = signingConfigs.getByName("mtTestkey")
+        }
+        // Flutter Gradle 插件在 apply 时已创建 profile 并 initWith(debug)，
+        // 那是早于本块的快照，不会跟随上面的 debug 改动，所以这里显式覆盖。
+        getByName("profile") {
+            signingConfig = signingConfigs.getByName("mtTestkey")
         }
         release {
             if (isBeta) {
                 // beta 形态：独立 applicationId + 独立应用名，与正式版共存，versionCode 互不影响，
-                // 彻底绕开"Android 不允许降级安装"；固定 debug 签名（独立应用，签名不敏感，仅临时测试）
+                // 彻底绕开"Android 不允许降级安装"；签名固定 MT 内置 testkey
                 applicationIdSuffix = ".beta"
                 manifestPlaceholders.put("appName", "MT论坛 beta")
-                signingConfig = signingConfigs.getByName("debug")
+                signingConfig = signingConfigs.getByName("mtTestkey")
             } else {
                 // 有正式签名用正式签名；否则用 MT 内置签名（AOSP 公开 testkey），
                 // 保证不同来源的包签名一致、可覆盖安装（本地自测/CI 未配 Secrets 均不报错）

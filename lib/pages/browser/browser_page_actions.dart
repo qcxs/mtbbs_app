@@ -302,10 +302,13 @@ extension _BrowserPageActions on _BrowserPageState {
 
   // ==================== 更多菜单操作 ====================
 
-  void _copyUrl() {
-    ClipboardHelper.write(_currentUrl);
+  Future<void> _copyUrl() async {
+    final ok = await ClipboardHelper.write(_currentUrl);
     if (mounted) {
-      showToast('链接已复制', duration: const Duration(seconds: 1));
+      showToast(
+        ok ? '链接已复制' : '复制到剪切板失败',
+        duration: const Duration(seconds: 1),
+      );
     }
   }
 

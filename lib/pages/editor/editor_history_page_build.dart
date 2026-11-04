@@ -378,9 +378,12 @@ extension on _EditorHistoryPageState {
         actions: [
           if (snapshot.content.isNotEmpty)
             TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: snapshot.content));
-                showToast('已复制', duration: const Duration(seconds: 1));
+              onPressed: () async {
+                final ok = await ClipboardHelper.write(snapshot.content);
+                showToast(
+                  ok ? '已复制' : '复制到剪切板失败',
+                  duration: const Duration(seconds: 1),
+                );
               },
               icon: const Icon(Icons.copy, size: 16),
               label: const Text('复制'),

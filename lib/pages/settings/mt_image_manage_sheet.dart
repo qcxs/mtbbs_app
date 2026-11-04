@@ -170,8 +170,8 @@ class _MtImageInfoDialog extends StatelessWidget {
   final MtUploadResult item;
 
   Future<void> _copy(String text) async {
-    await ClipboardHelper.write(text);
-    showToast('已复制');
+    final ok = await ClipboardHelper.write(text);
+    showToast(ok ? '已复制' : '复制到剪切板失败');
   }
 
   @override

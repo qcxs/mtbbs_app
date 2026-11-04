@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 通用页面顶部操作组件
@@ -48,9 +48,12 @@ class PageActions extends StatelessWidget {
     context.push('/browser?url=${Uri.encodeComponent(url)}&intercept=false');
   }
 
-  void _copyLink(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: url));
-    showToast(copyLabel ?? '链接已复制', duration: const Duration(seconds: 1));
+  Future<void> _copyLink(BuildContext context) async {
+    final ok = await ClipboardHelper.write(url);
+    showToast(
+      ok ? (copyLabel ?? '链接已复制') : '复制到剪切板失败',
+      duration: const Duration(seconds: 1),
+    );
   }
 
   void _openSearch(BuildContext context) {

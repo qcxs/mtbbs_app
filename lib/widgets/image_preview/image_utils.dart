@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
 /// 长图检测阈值（宽高比大于此值视为长图）
@@ -67,10 +67,13 @@ void showImageInfoDialog(
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: url));
+            onPressed: () async {
+              final ok = await ClipboardHelper.write(url);
               Navigator.of(ctx).pop();
-              showToast('已复制链接', duration: const Duration(seconds: 1));
+              showToast(
+                ok ? '已复制链接' : '复制到剪切板失败',
+                duration: const Duration(seconds: 1),
+              );
             },
             child: const Text('复制链接'),
           ),

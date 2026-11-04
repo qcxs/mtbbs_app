@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -70,10 +68,10 @@ class _UserSharePreviewState extends State<UserSharePreview> {
       );
       if (!mounted) return;
       switch (outcome) {
-        case SaveImageOutcome.saved:
-          showToast(
-            Platform.isAndroid || Platform.isIOS ? '已保存到相册' : '图片已保存',
-          );
+        case SaveImageOutcome.savedToGallery:
+          showToast('已保存到相册');
+        case SaveImageOutcome.savedToFile:
+          showToast('图片已保存');
         case SaveImageOutcome.permissionDenied:
           showToast('未获得相册权限，无法保存');
         case SaveImageOutcome.failed:

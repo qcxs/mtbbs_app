@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -200,8 +200,8 @@ class _TokenDetailSheet extends StatelessWidget {
                   leading: const Icon(Icons.copy),
                   title: const Text('复制令牌'),
                   onTap: () async {
-                    await Clipboard.setData(ClipboardData(text: token.value));
-                    showToast('令牌已复制');
+                    final ok = await ClipboardHelper.write(token.value);
+                    showToast(ok ? '令牌已复制' : '复制到剪切板失败');
                   },
                 ),
                 ListTile(

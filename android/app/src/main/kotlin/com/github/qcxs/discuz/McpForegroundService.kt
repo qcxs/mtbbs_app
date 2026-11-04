@@ -3,6 +3,7 @@ package com.github.qcxs.discuz
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 
 /**
  * MCP 运行状态前台服务。
@@ -23,6 +24,17 @@ class McpForegroundService : Service() {
             McpStatusNotification.buildNotification(this, endpoint),
         )
         return START_NOT_STICKY
+    }
+
+    /**
+     * Android 15+ 对 dataSync 类型前台服务有 6 小时/24 小时配额。
+     * 配额用尽时系统回调这里；必须主动停止服务，否则会被判定为 ANR/异常。
+     * 停止后状态通知消失，但 MCP HTTP 服务仍在 Flutter 进程内运行（进程未死）。
+     */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Log.w("MTBBS_MCP", "前台服务超时（type=$fgsType），停止状态通知")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
     }
 
     companion object {

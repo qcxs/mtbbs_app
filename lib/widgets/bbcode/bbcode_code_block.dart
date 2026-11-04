@@ -6,6 +6,7 @@ import 'package:flutter_highlight/themes/github.dart';
 import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/languages/all.dart';
 import 'package:mtbbs/config/brand_colors.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
@@ -274,9 +275,12 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
             IconButton(
               icon: const Icon(Icons.copy_rounded, size: 18),
               tooltip: '复制',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: widget.code));
-                showToast('已复制', duration: const Duration(seconds: 1));
+              onPressed: () async {
+                final ok = await ClipboardHelper.write(widget.code);
+                showToast(
+                  ok ? '已复制' : '复制到剪切板失败',
+                  duration: const Duration(seconds: 1),
+                );
               },
             ),
           ],
@@ -480,9 +484,12 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
           IconButton(
             icon: const Icon(Icons.copy_rounded, size: 20),
             tooltip: '复制代码',
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: widget.code));
-              showToast('已复制', duration: const Duration(seconds: 1));
+            onPressed: () async {
+              final ok = await ClipboardHelper.write(widget.code);
+              showToast(
+                ok ? '已复制' : '复制到剪切板失败',
+                duration: const Duration(seconds: 1),
+              );
             },
           ),
         ],
@@ -591,9 +598,12 @@ class _BbcodeCodeBlockState extends State<BbcodeCodeBlock> {
           const SizedBox(width: 6),
           // 复制按钮
           GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: widget.code));
-              showToast('已复制', duration: const Duration(seconds: 1));
+            onTap: () async {
+              final ok = await ClipboardHelper.write(widget.code);
+              showToast(
+                ok ? '已复制' : '复制到剪切板失败',
+                duration: const Duration(seconds: 1),
+              );
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

@@ -222,9 +222,12 @@ extension on _ThreadViewPageState {
     }
   }
 
-  void _copyToClipboard(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    showToast('已复制到剪贴板', duration: const Duration(seconds: 1));
+  Future<void> _copyToClipboard(String text) async {
+    final ok = await ClipboardHelper.write(text);
+    showToast(
+      ok ? '已复制到剪贴板' : '复制到剪切板失败',
+      duration: const Duration(seconds: 1),
+    );
   }
 
   void _showPagePicker() {

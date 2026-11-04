@@ -8,9 +8,19 @@ import 'package:mtbbs/core/utils/logger.dart';
 class ClipboardHelper {
   ClipboardHelper._();
 
-  /// 将文本写入系统剪切板
-  static Future<void> write(String text) {
-    return Clipboard.setData(ClipboardData(text: text));
+  /// 将文本写入系统剪切板。
+  ///
+  /// 返回 `true` 表示写入成功；平台权限受限 / 剪贴板被占用等失败只记日志并
+  /// 返回 `false`，**不抛异常**。调用方必须据此提示，不能无条件显示“已复制”
+  /// （见 docs/07 #107）。
+  static Future<bool> write(String text) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      return true;
+    } catch (e) {
+      AppLogger.w('PAGE', '写入剪切板失败：$e');
+      return false;
+    }
   }
 
   /// 从系统剪切板读取文本

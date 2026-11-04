@@ -192,6 +192,8 @@ Widget _infoRow(ColorScheme cs, String label, String value) {
 Future<void> _openUrl(BuildContext context, String url) async {
   final outcome = await ExternalUrl.open(url);
   if (outcome == ExternalUrlOutcome.opened) return;
-  await ClipboardHelper.write(url);
-  if (context.mounted) showToast('无法打开浏览器，链接已复制');
+  final ok = await ClipboardHelper.write(url);
+  if (context.mounted) {
+    showToast(ok ? '无法打开浏览器，链接已复制' : '无法打开浏览器，请手动复制链接');
+  }
 }

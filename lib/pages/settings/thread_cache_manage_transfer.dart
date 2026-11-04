@@ -46,31 +46,42 @@ extension on _ThreadCacheManagePageState {
   }
 
   Future<void> _handleImport() async {
+    // 不用 withData：大文件会在选择阶段就整份读入内存，100 MB 上限还没检查
+    // 就已经 OOM。Android 上 file_picker 会把文件复制到缓存并给出 path，
+    // 这里先 stat 再读，读完清理副本。
     final picked = await FilePick.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['json'],
-      withData: true,
+      withData: false,
     );
     if (picked == null || picked.files.isEmpty) {
       if (mounted) showToast('已取消');
       return;
     }
     final file = picked.files.first;
-    if (file.size > 100 * 1024 * 1024) {
-      showToast('文件过大（超过 100 MB）');
-      return;
-    }
+    final path = file.path;
     String? json;
     try {
-      if (file.bytes != null) {
+      if (path != null) {
+        final length = await File(path).length();
+        if (length > 100 * 1024 * 1024) {
+          if (mounted) showToast('文件过大（超过 100 MB）');
+          return;
+        }
+        json = await File(path).readAsString();
+      } else if (file.bytes != null) {
+        if (file.bytes!.length > 100 * 1024 * 1024) {
+          if (mounted) showToast('文件过大（超过 100 MB）');
+          return;
+        }
         json = utf8.decode(file.bytes!, allowMalformed: true);
-      } else if (file.path != null) {
-        json = await File(file.path!).readAsString();
       }
     } catch (e) {
       AppLogger.w('THREAD_CACHE', 'read import file failed: $e');
       if (mounted) showToast('读取文件失败');
       return;
+    } finally {
+      await FilePick.cleanupTemp(path);
     }
     if (json == null) {
       if (mounted) showToast('读取文件失败');
@@ -237,14 +248,31 @@ extension on _ThreadCacheManagePageState {
   }
 
   Future<void> _handleExportRaw() async {
-    final dir = await FileSave.pickDirectory(dialogTitle: '选择备份目录');
-    if (dir == null) {
-      if (mounted) showToast('已取消或当前平台不支持选择目录');
-      return;
-    }
-    final saved = await _transfer.copyRawTo(dir);
+    final source = await AppPaths.threadDatabasePath;
+    final fileName =
+        'threads_${ThreadCacheTransfer.timestampForFileName()}.sembast';
+    final outcome = await FileSave.copyFile(
+      source,
+      fileName: fileName,
+      dialogTitle: '导出原始文件',
+    );
     if (!mounted) return;
-    showToast(saved == null ? '原始文件不存在或复制失败' : '已备份到 $saved');
+    switch (outcome) {
+      case FileSaveOutcome.saved:
+        showToast('已导出原始文件');
+        break;
+      case FileSaveOutcome.canceled:
+        break;
+      case FileSaveOutcome.unavailable:
+      case FileSaveOutcome.failed:
+        // 平台没有“另存为”：写入应用私有导出目录，至少保证备份落地
+        final path = await _transfer.copyRawTo(await AppPaths.exportsDir);
+        if (!mounted) return;
+        showToast(
+          path == null ? '原始文件不存在或复制失败' : '已保存到 $path',
+          duration: const Duration(seconds: 4),
+        );
+    }
   }
 
   Future<void> _handleBestEffortExport() async {

@@ -5,6 +5,7 @@ import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/common/app_sheet.dart';
@@ -384,11 +385,15 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
         ),
         if (!widget.post.isOp && widget.post.floor > 0)
           GestureDetector(
-            onTap: () {
+            onTap: () async {
               final url =
                   '${SiteStore.instance.baseUrl}/forum.php?mod=redirect&goto=findpost&ptid=${widget.tid}&pid=${widget.post.pid}';
-              Clipboard.setData(ClipboardData(text: url));
-              showToast('复制楼层成功：tid：${widget.tid}，pid：${widget.post.pid}');
+              final ok = await ClipboardHelper.write(url);
+              showToast(
+                ok
+                    ? '复制楼层成功：tid：${widget.tid}，pid：${widget.post.pid}'
+                    : '复制到剪切板失败',
+              );
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),

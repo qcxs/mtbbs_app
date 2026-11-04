@@ -268,9 +268,12 @@ class _AboutPageState extends State<AboutPage> {
                 icon: const Icon(Icons.copy, size: 18),
                 tooltip: '复制地址',
                 onPressed: () async {
-                  await ClipboardHelper.write(AboutPage.repoUrl);
+                  final ok = await ClipboardHelper.write(AboutPage.repoUrl);
                   if (context.mounted) {
-                    showToast('仓库地址已复制', duration: const Duration(seconds: 1));
+                    showToast(
+                      ok ? '仓库地址已复制' : '复制到剪切板失败',
+                      duration: const Duration(seconds: 1),
+                    );
                   }
                 },
               ),
@@ -446,14 +449,17 @@ class _AboutPageState extends State<AboutPage> {
     final files = result?.files;
     if (files == null || files.isEmpty) return null;
     final file = files.first;
+    final path = file.path;
     try {
       final bytes = file.bytes;
       if (bytes != null) return utf8.decode(bytes);
-      final path = file.path;
       if (path != null) return await File(path).readAsString();
     } catch (e) {
       if (mounted) showToast('读取文件失败：$e');
       return null;
+    } finally {
+      // 清理 file_picker 复制到缓存的导入副本（Android/iOS）
+      await FilePick.cleanupTemp(path);
     }
     if (mounted) showToast('无法读取文件');
     return null;
@@ -463,11 +469,9 @@ class _AboutPageState extends State<AboutPage> {
     final mode = await _pickTransferMode(exporting: true, title: '导出方式');
     if (mode == null || !mounted) return;
     if (mode == 'clipboard') {
-      try {
-        await ClipboardHelper.write(text);
-        if (mounted) showToast('已复制到剪切板');
-      } catch (e) {
-        if (mounted) showToast('复制到剪切板失败：$e');
+      final ok = await ClipboardHelper.write(text);
+      if (mounted) {
+        showToast(ok ? '已复制到剪切板' : '复制到剪切板失败');
       }
       return;
     }

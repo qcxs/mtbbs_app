@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:provider/provider.dart';
 import 'package:mtbbs/config/site_config.dart';
 import 'package:mtbbs/core/app/site_store.dart';
@@ -6,6 +8,15 @@ import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/core/app/app_orchestrator.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+
+/// Android 的 `network_security_config.xml` 只放行回环地址的明文流量。
+/// `http://` 站点在 Android 上会**所有请求都被系统拦截**（Windows 正常），
+/// 提前拒绝并提示，避免保存后"看起来正常、实际全失败"。
+bool _rejectCleartextSiteOnAndroid(String url) {
+  if (!Platform.isAndroid || !url.startsWith('http://')) return false;
+  showToast('Android 不允许明文 HTTP 站点，请改用 https://');
+  return true;
+}
 
 /// 站点管理 — 切换、添加、删除站点
 class SiteManagement {
@@ -270,6 +281,7 @@ class _EditSiteDialogState extends State<_EditSiteDialog> {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://$url';
     }
+    if (_rejectCleartextSiteOnAndroid(url)) return;
     await widget.settings.updateSite(
       widget.index,
       widget.site.copyWith(
@@ -379,6 +391,7 @@ class _AddSiteDialogState extends State<_AddSiteDialog> {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://$url';
     }
+    if (_rejectCleartextSiteOnAndroid(url)) return;
     await widget.settings.addSite(
       Site(
         name: name,

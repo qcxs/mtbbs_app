@@ -24,6 +24,7 @@ import 'package:mtbbs/api/forum/viewthread/action/export.dart' as action_api;
 import 'package:mtbbs/api/forum/viewthread/viewpid/export.dart' as viewpid_api;
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/models/thread_detail.dart';
 import 'package:mtbbs/models/browse_record.dart';

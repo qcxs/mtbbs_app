@@ -92,12 +92,15 @@ class _VerifyBrowserPageState extends State<VerifyBrowserPage> {
 
   /// 准备验证页的 cookie：**先清空，再只注入登录串**。
   ///
-  /// 清空用 `deleteAllCookies()`：按域逐条删在 Android 上删不干净，实测旧的
-  /// `acw_sc__v2` 会跨会话存活（docs/07 #71 的坑）。验证页是一次性全屏模态，
-  /// 清空 WebView 级 cookie 的代价只是内置浏览器下次打开要重新同步。
+  /// 清空**当前站点**的 WebView Cookie。
+  ///
+  /// 不用 `deleteAllCookies()`：那是平台级单例，会把其它站点的 WebView 登录态
+  /// 一起清掉（多站点下验证 A 站 → B 站掉线）。`clearCookiesForHost` 内部按
+  /// 多种 domain 写法逐条删，正是为解决 Android 上域 Cookie 删不干净的问题
+  /// （docs/07 #71）。
   Future<void> _injectCookies() async {
     try {
-      await CookieManager.instance().deleteAllCookies();
+      await clearCookiesForHost(SiteStore.instance.baseUrl);
     } catch (e) {
       AppLogger.w('PAGE', '清空验证浏览器 cookie 失败: $e');
     }

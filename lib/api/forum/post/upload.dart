@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
+import 'package:path/path.dart' as p;
 
 /// 上传图片到论坛
 ///
@@ -18,7 +19,9 @@ Future<Map<String, dynamic>> uploadImage(
   final formData = FormData.fromMap({
     'Filedata': await MultipartFile.fromFile(
       file.path,
-      filename: file.path.split('/').last,
+      // 用 path 包的 basename：Windows 路径是 `\`，split('/') 会把整条路径
+      // 当成文件名发给服务端
+      filename: p.basename(file.path),
     ),
     'uid': uid,
     'hash': uploadHash,
@@ -195,7 +198,9 @@ Future<Map<String, dynamic>> uploadAttachment(
   final formData = FormData.fromMap({
     'Filedata': await MultipartFile.fromFile(
       file.path,
-      filename: file.path.split('/').last,
+      // 用 path 包的 basename：Windows 路径是 `\`，split('/') 会把整条路径
+      // 当成文件名发给服务端
+      filename: p.basename(file.path),
     ),
     'uid': uid,
     'hash': uploadHash,

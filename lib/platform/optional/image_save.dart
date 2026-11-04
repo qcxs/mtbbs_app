@@ -8,7 +8,17 @@ import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 
 /// 保存生成的分享图的结果。
-enum SaveImageOutcome { saved, canceled, permissionDenied, failed, unavailable }
+///
+/// 刻意区分「相册」与「另存为」：Android/iOS 相册失败会回退到文件保存，
+/// 两者成功的提示文案不同（避免明明存到了文件却提示“已保存到相册”）。
+enum SaveImageOutcome {
+  savedToGallery,
+  savedToFile,
+  canceled,
+  permissionDenied,
+  failed,
+  unavailable,
+}
 
 /// 分享图保存适配器。
 ///
@@ -16,6 +26,9 @@ enum SaveImageOutcome { saved, canceled, permissionDenied, failed, unavailable }
 /// - Android / iOS 优先存相册（gal，自带权限处理）；
 /// - 其他平台（Windows / 鸿蒙）走“另存为”对话框；
 /// - 相册不可用或失败时自动回退到“另存为”。
+///
+/// 平台差异：Android/iOS 的 `file_picker.saveFile` 要求必须传 bytes，且由插件
+/// 直接写入；桌面端只需返回路径后自行写入（macOS 传 bytes 会抛错）。
 ///
 /// 插件缺失时返回 [SaveImageOutcome.unavailable] 并关闭
 /// [AppCapability.saveImage]，由入口隐藏/提示，而不是抛异常。
@@ -32,7 +45,7 @@ abstract final class ImageSave {
 
     if (Platform.isAndroid || Platform.isIOS) {
       final gallery = await _saveToGallery(bytes, fileName);
-      if (gallery == SaveImageOutcome.saved ||
+      if (gallery == SaveImageOutcome.savedToGallery ||
           gallery == SaveImageOutcome.canceled) {
         return gallery;
       }
@@ -56,8 +69,9 @@ abstract final class ImageSave {
           return SaveImageOutcome.permissionDenied;
         }
       }
+      // Gal 的 name 不带扩展名（插件按 bytes 推断）
       await Gal.putImageBytes(bytes, name: fileName);
-      return SaveImageOutcome.saved;
+      return SaveImageOutcome.savedToGallery;
     } on GalException catch (e) {
       AppLogger.w('PAGE', '保存到相册失败：${e.type}');
       return e.type == GalExceptionType.accessDenied
@@ -79,15 +93,20 @@ abstract final class ImageSave {
     Uint8List bytes,
     String fileName,
   ) async {
+    final writtenByPlugin = Platform.isAndroid || Platform.isIOS;
     try {
       final path = await FilePicker.platform.saveFile(
         dialogTitle: '保存图片',
         fileName: '$fileName.png',
         type: FileType.image,
+        // Android/iOS 必须传 bytes，由插件直接写入；桌面端不传（macOS 会抛错）
+        bytes: writtenByPlugin ? bytes : null,
       );
       if (path == null) return SaveImageOutcome.canceled;
-      await File(path).writeAsBytes(bytes);
-      return SaveImageOutcome.saved;
+      if (!writtenByPlugin) {
+        await File(path).writeAsBytes(bytes);
+      }
+      return SaveImageOutcome.savedToFile;
     } on MissingPluginException {
       AppLogger.w('PAGE', 'file_picker.saveFile 无当前平台实现');
       return SaveImageOutcome.unavailable;

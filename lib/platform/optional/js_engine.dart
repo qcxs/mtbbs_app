@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_qjs_next/flutter_qjs.dart';
 import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/utils/logger.dart';
@@ -44,9 +45,15 @@ abstract final class JsEngine {
         isError: result.isError,
         stringResult: result.stringResult,
       );
+    } on MissingPluginException catch (e) {
+      // 平台没有原生实现：`MissingPluginException implements Exception`，
+      // 不会被下面的 `on Error` 捕获，必须单独处理并关闭能力，否则每次请求
+      // 都会重试并刷日志（鸿蒙等平台）。
+      AppLogger.w('DIO', '本地 JS 引擎不可用，改用纯 Dart 兜底: $e');
+      AppCapabilities.disable(AppCapability.localJsSolver);
+      return null;
     } on Error catch (e) {
-      // 鸿蒙等平台没有原生实现时，插件会抛 MissingPluginException（Error 子类）
-      // 或 UnimplementedError；两者都在这里收敛。
+      // 插件在部分平台直接抛 UnimplementedError（Error 子类）
       AppLogger.w('DIO', '本地 JS 引擎不可用，改用纯 Dart 兜底: $e');
       AppCapabilities.disable(AppCapability.localJsSolver);
       return null;

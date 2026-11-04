@@ -65,7 +65,9 @@ jobs:
             scripts/version.ps1 android -VersionName $env:INPUT_TAG -Repo ${{ github.repository }} -Channel release
           }
 
-      - name: 写入签名（可选，配置无效自动跳过 → MT 内置签名）
+      - name: 写入签名（仅正式 Release；配置无效自动跳过 → MT 内置签名）
+        # beta 测试包（tag 留空）固定使用 MT 内置 testkey，写 key.properties 不会被采用
+        if: ${{ github.event.inputs.tag != '' }}
         shell: pwsh
         env:
           SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}

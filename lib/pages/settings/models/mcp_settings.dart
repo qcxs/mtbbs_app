@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
 import 'package:mtbbs/mcp/tools/mcp_tool_registry.dart';
@@ -289,8 +289,8 @@ String _formatTime(DateTime t) =>
     '${t.minute.toString().padLeft(2, '0')}';
 
 Future<void> _copy(String text, String toast) async {
-  await Clipboard.setData(ClipboardData(text: text));
-  showToast(toast);
+  final ok = await ClipboardHelper.write(text);
+  showToast(ok ? toast : '复制到剪切板失败');
 }
 
 /// 开启「允许非本机连接」前的风险确认（返回 true = 继续开启）。

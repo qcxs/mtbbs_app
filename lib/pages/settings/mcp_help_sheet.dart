@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -82,8 +82,8 @@ class _McpHelpSheet extends StatelessWidget {
                 icon: const Icon(Icons.copy, size: 18),
                 label: Text(hasToken ? '复制配置（含令牌）' : '复制配置'),
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: copySnippet));
-                  showToast('配置已复制');
+                  final ok = await ClipboardHelper.write(copySnippet);
+                  showToast(ok ? '配置已复制' : '复制到剪切板失败');
                 },
               ),
             ),

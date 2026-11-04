@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -131,10 +131,10 @@ void showRawBbcodeDialog(BuildContext context, String bbcode) {
       ),
       actions: [
         TextButton(
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: bbcode));
-            showToast('已复制');
-            Navigator.of(ctx).pop();
+          onPressed: () async {
+            final ok = await ClipboardHelper.write(bbcode);
+            showToast(ok ? '已复制' : '复制到剪切板失败');
+            if (ctx.mounted) Navigator.of(ctx).pop();
           },
           child: const Text('复制'),
         ),

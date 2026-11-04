@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/platform/optional/file_pick.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -107,7 +108,9 @@ class _MdImportSheetState extends State<_MdImportSheet> {
       result = await FilePick.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['md', 'markdown', 'txt'],
-        withData: true,
+        // 用 path 读取：withData 会让插件把整份文件读进内存（Android 还会另复制
+        // 一份缓存副本），大文件没有必要
+        withData: false,
         allowCompression: false,
       );
     } catch (e) {
@@ -117,17 +120,20 @@ class _MdImportSheetState extends State<_MdImportSheet> {
     if (result == null || result.files.isEmpty) return;
 
     final file = result.files.first;
+    final path = file.path;
     String? content;
     try {
       final bytes = file.bytes;
       if (bytes != null) {
         content = utf8.decode(bytes, allowMalformed: true);
-      } else if (file.path != null) {
-        content = await File(file.path!).readAsString();
+      } else if (path != null) {
+        content = await File(path).readAsString();
       }
     } catch (e) {
       if (mounted) showToast('读取文件失败: $e');
       return;
+    } finally {
+      await FilePick.cleanupTemp(path);
     }
     if (content == null || !mounted) return;
 
@@ -138,8 +144,13 @@ class _MdImportSheetState extends State<_MdImportSheet> {
 
   Future<void> _copy() async {
     if (_bbcode.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: _bbcode));
-    if (mounted) showToast('已复制 BBCode', duration: const Duration(seconds: 1));
+    final ok = await ClipboardHelper.write(_bbcode);
+    if (mounted) {
+      showToast(
+        ok ? '已复制 BBCode' : '复制到剪切板失败',
+        duration: const Duration(seconds: 1),
+      );
+    }
   }
 
   Future<void> _apply(MdImportMode mode) async {

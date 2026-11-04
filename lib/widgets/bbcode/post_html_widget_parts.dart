@@ -309,9 +309,12 @@ void _handleLinkTap(BuildContext context, String url) {
         message: 'QQ号:\n${qqMatch.group(1)}',
         actionLabel: '复制',
         copyValue: qqMatch.group(1)!,
-        onAction: () {
-          Clipboard.setData(ClipboardData(text: qqMatch.group(1)!));
-          showToast('已复制', duration: const Duration(seconds: 1));
+        onAction: () async {
+          final ok = await ClipboardHelper.write(qqMatch.group(1)!);
+          showToast(
+            ok ? '已复制' : '复制到剪切板失败',
+            duration: const Duration(seconds: 1),
+          );
         },
       );
       return;
@@ -382,9 +385,12 @@ Future<void> _showActionDialog(
     case 'action':
       onAction();
     case 'copy':
-      await Clipboard.setData(ClipboardData(text: copyValue));
+      final ok = await ClipboardHelper.write(copyValue);
       if (context.mounted) {
-        showToast('已复制', duration: const Duration(seconds: 1));
+        showToast(
+          ok ? '已复制' : '复制到剪切板失败',
+          duration: const Duration(seconds: 1),
+        );
       }
   }
 }

@@ -37,9 +37,16 @@ extension on _WebLoginPageState {
   ) async {
     if (_loginDone || url == null) return;
 
-    final cookies = await CookieManager.instance().getCookies(
-      url: WebUri(SiteStore.instance.baseUrl),
-    );
+    final List<Cookie> cookies;
+    try {
+      cookies = await CookieManager.instance().getCookies(
+        url: WebUri(SiteStore.instance.baseUrl),
+      );
+    } catch (e) {
+      // 插件异常只影响本次检测；下一次 onLoadStop 会重试
+      AppLogger.w('AUTH', '读取登录 Cookie 失败: $e');
+      return;
+    }
 
     // Discuz 登录成功后会写入 {tablepre}_auth cookie
     if (!cookies.any((c) => c.name.endsWith('_auth'))) return;
