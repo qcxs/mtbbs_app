@@ -6,29 +6,21 @@ part of 'thread_view_page.dart';
 extension on _ThreadViewPageState {
   // ==================== 加载逻辑 ====================
 
-  /// 通过 redirect（允许重定向）获取 pid 对应的真实 page
+  /// 通过跳转定位接口获取 pid 对应的真实 page
   Future<int> _resolveRedirectPage() async {
     final pid = widget.pid;
     if (pid == null || pid.isEmpty) return 1;
-    try {
-      final dio = _dio;
-      final response = await dio.get(
-        '/forum.php?mod=redirect&goto=findpost&pid=$pid&ptid=${widget.tid}',
-        options: Options(validateStatus: (status) => true),
-      );
-      for (final r in response.redirects.reversed) {
-        final pageStr = r.location.queryParameters['page'];
-        if (pageStr != null && pageStr.isNotEmpty) {
-          final p = int.tryParse(pageStr) ?? 1;
-          AppLogger.i('PAGE', 'redirect pid=$pid → page=$p');
-          return p;
-        }
-      }
-      return 1;
-    } catch (e) {
-      AppLogger.w('PAGE', 'resolve redirect page error: $e');
-      return 1;
+    final result = await redirect_api.resolveRedirectPage(
+      _dio,
+      tid: widget.tid,
+      pid: pid,
+    );
+    if (result['success'] == true) {
+      final page = result['page'] as int? ?? 1;
+      AppLogger.i('PAGE', 'redirect pid=$pid → page=$page');
+      return page;
     }
+    return 1;
   }
 
   /// 初始加载
@@ -125,12 +117,14 @@ extension on _ThreadViewPageState {
       }
       final data = ThreadViewData.fromMap(raw, widget.tid);
       if (!mounted) return false;
+      final oldTotalPages = _totalPages;
       final actualPage = data.currentPage;
       _commentPages[actualPage] = List<PostItem>.from(data.posts);
       if (switchPage) _currentPage = actualPage;
       AppLogger.i(
         'PAGE',
-        'loaded comment page $actualPage (${data.posts.length} posts)',
+        'loaded comment page $actualPage (${data.posts.length} posts), '
+            'totalPages=$oldTotalPages → ${data.totalPages}',
       );
       // 自动缓存只回写已加载页，不额外抓取
       unawaited(
@@ -138,6 +132,12 @@ extension on _ThreadViewPageState {
       );
       if (mounted)
         _setState(() {
+          // 翻页时同步总页数：回复数变化会让服务端的分页结果变动，
+          // 不能只在进入帖子时读取一次（否则上下页按钮会基于过期页数）
+          if (data.totalPages > 0) {
+            _totalPages = data.totalPages;
+            if (_currentPage > _totalPages) _currentPage = _totalPages;
+          }
           _pageLoading = false;
         });
       return true;

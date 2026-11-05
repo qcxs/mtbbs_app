@@ -28,6 +28,12 @@ List<SettingsModel> dataSettings() => [
     onTap: (ctx, s) => showMtImageManageSheet(ctx),
   ),
   NormalSetting(
+    title: '编解码工具',
+    subtitle: 'Base64 / URL / 十六进制 / MD5 / SHA',
+    icon: Icons.code,
+    onTap: (ctx, s) => ctx.push('/tools/codec'),
+  ),
+  NormalSetting(
     title: '通用错峰间隔',
     icon: Icons.motion_photos_on,
     subtitleBuilder: (s) => '${s.staggerInterval}ms，批量请求逐个放行',

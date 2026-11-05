@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart' show DioException;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:mtbbs/config/build_config.dart';
+import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
+import 'package:mtbbs/mcp/mcp_scope.dart';
 import 'package:mtbbs/mcp/mcp_types.dart';
 
 /// 出站数据结构组装 —— 工具层所有响应的唯一出口。
@@ -35,25 +38,63 @@ class McpPayloads {
   // ==================== App / 站点 ====================
 
   static Map<String, dynamic> appInfo(McpAccountInfoProvider accountInfo) {
-    final site = SiteStore.instance.current;
+    final scope = McpScope.current;
+    final site = scope == null
+        ? SiteStore.instance.current
+        : SessionRegistry.instance.siteForHost(scope.host) ??
+              SiteStore.instance.current;
+    final host = scope?.host ?? SiteStore.instance.host;
+    final builtAt = BuildConfig.buildTime > 0
+        ? DateTime.fromMillisecondsSinceEpoch(
+            BuildConfig.buildTime * 1000,
+            isUtc: true,
+          ).toIso8601String()
+        : null;
+    final repo = BuildConfig.repoUrl;
     return {
       'app': 'MTBBS',
+      'description': 'Discuz 论坛的 Flutter 客户端（只读 MCP 数据接口）',
       'versionName': BuildConfig.versionName,
       'versionCode': BuildConfig.versionCode,
       'commitHash': BuildConfig.commitHash,
+      'build': {
+        'isBeta': BuildConfig.isBeta,
+        'channel': BuildConfig.updateChannel.isEmpty
+            ? null
+            : BuildConfig.updateChannel,
+        'builtAt': builtAt,
+      },
+      'platform': defaultTargetPlatform.name,
+      'links': {
+        'repo': repo,
+        'releases': '$repo/releases',
+        'issues': '$repo/issues',
+      },
       'site': {
         'name': site.name,
-        'host': SiteStore.instance.host,
-        'baseUrl': SiteStore.instance.baseUrl,
-        'isMobileUA': SiteStore.instance.isMobileUA,
+        'host': host,
+        'baseUrl': site.baseUrl,
+        'isMobileUA': scope?.isMobileUA ?? SiteStore.instance.isMobileUA,
+        'browseMode': (scope?.isMobileUA ?? SiteStore.instance.isMobileUA)
+            ? 'mobile'
+            : 'desktop',
       },
-      'account': accountInfo().toJson(),
+      'account': (scope?.account ?? accountInfo()).toJson(),
+      if (scope != null)
+        'scope': {
+          'crossSite': scope.crossSite,
+          'accountName': scope.username,
+          'note': scope.crossSite
+              ? '本次调用以其它站点读取，未改动 App 当前站点'
+              : '本次调用以其它账号视角读取，未改动 App 当前登录态',
+        },
     };
   }
 
   static List<Map<String, dynamic>> sites() {
     final store = SiteStore.instance;
     final currentIndex = store.currentIndex;
+    final inUseHost = McpScope.current?.host ?? store.host;
     return [
       for (var i = 0; i < store.sites.length; i++)
         {
@@ -61,18 +102,26 @@ class McpPayloads {
           'host': store.sites[i].host,
           'baseUrl': store.sites[i].baseUrl,
           'isCurrent': i == currentIndex,
+          if (store.sites[i].host == inUseHost) 'isInUse': true,
         },
     ];
   }
 
   static Map<String, dynamic> forums() {
     final store = SiteStore.instance;
-    final forums = store.forums;
+    final scope = McpScope.current;
+    // 跨站点时读目标站点缓存的版块表，而不是 App 当前站点的
+    final site = scope == null
+        ? null
+        : SessionRegistry.instance.siteForHost(scope.host);
+    final forums = site?.forums ?? store.forums;
+    final order = site?.defaultForumOrder ?? store.defaultForumOrder;
+    final host = scope?.host ?? store.host;
     final ordered = <Map<String, dynamic>>[];
     final seen = <String>{};
 
     // 先按用户自定义顺序，再补上未在顺序表里的版块
-    for (final fid in store.defaultForumOrder) {
+    for (final fid in order) {
       final name = forums[fid];
       if (name == null) continue;
       ordered.add({'fid': fid, 'name': name});
@@ -82,7 +131,7 @@ class McpPayloads {
       if (seen.contains(entry.key)) continue;
       ordered.add({'fid': entry.key, 'name': entry.value});
     }
-    return {'host': store.host, 'count': ordered.length, 'forums': ordered};
+    return {'host': host, 'count': ordered.length, 'forums': ordered};
   }
 
   // ==================== 帖子 ====================
@@ -323,6 +372,7 @@ class McpPayloads {
     bool fullBbcode = false,
     int bbcodeOffset = 0,
     int maxChars = maxBbcodeChars,
+    Map<String, dynamic> extra = const {},
   }) {
     final rawPosts = result['posts'];
     final all = rawPosts is List ? rawPosts : const <dynamic>[];
@@ -363,6 +413,7 @@ class McpPayloads {
     }
 
     return _dropNulls({
+      ...extra,
       'tid': result['tid'] ?? tid,
       'success': result['success'] ?? false,
       if (result['message'] != null) 'message': result['message'],

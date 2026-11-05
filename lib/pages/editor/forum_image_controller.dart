@@ -267,6 +267,19 @@ class ForumImageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 清空全部图片状态（提交成功后调用）。
+  ///
+  /// 页面内复用的控制器（帖子页迷你编辑器）必须清掉，否则上一次回复上传的图片
+  /// 会以"待绑定附件"（`pendingAids`）或角标数量带到下一次回复，造成串状态。
+  void reset() {
+    _list.clear();
+    _ignored.clear();
+    aidToSrc.clear();
+    _loading = false;
+    contentCtl.pendingAids.clear();
+    notifyListeners();
+  }
+
   /// 把活跃 AID 同步到 [BBCodeController.pendingAids]：
   /// "上传但未插入正文"的图片据此在提交时经 `attachnew` 绑定（见 docs/07 #42）。
   void syncPendingAids() {

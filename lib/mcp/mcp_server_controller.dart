@@ -13,6 +13,7 @@ import 'package:mtbbs/mcp/mcp_status_notice.dart';
 import 'package:mtbbs/mcp/mcp_token.dart';
 import 'package:mtbbs/mcp/mcp_types.dart';
 import 'package:mtbbs/mcp/tools/mcp_tool_registry.dart';
+import 'package:mtbbs/mcp/tools/mcp_tools_navigation.dart';
 
 /// MCP 服务运行状态
 enum McpServerStatus { stopped, starting, running, error }
@@ -56,12 +57,24 @@ class McpServerController extends ChangeNotifier {
   static const String _kDisabledGroups = 'mcpDisabledGroups';
   static const String _kAllowRemote = 'mcpAllowRemote';
 
+  /// 允许 AI 跨站点访问（默认关闭，需用户手动开启）
+  static const String _kAllowCrossSite = 'mcpAllowCrossSite';
+
+  /// 允许 AI 切换用户视角（默认关闭，需用户手动开启）
+  static const String _kAllowAccountSwitch = 'mcpAllowAccountSwitch';
+
   /// 旧版单令牌键（首次运行迁移为"默认令牌"，保住已配置的客户端）
   static const String _kLegacyToken = 'mcpToken';
 
   bool _loaded = false;
   bool _enabled = false;
   bool _allowRemote = false;
+
+  /// 跨站点是公开信息，默认开启（用户可在设置中关闭）
+  bool _allowCrossSite = true;
+
+  /// 用户身份是敏感信息，默认关闭（需用户手动开启）
+  bool _allowAccountSwitch = false;
   int _port = defaultPort;
   final List<McpToken> _tokens = [];
 
@@ -82,6 +95,7 @@ class McpServerController extends ChangeNotifier {
   StreamableMcpServer? _server;
 
   McpAccountInfoProvider _accountInfo = () => const McpAccountInfo.guest();
+  McpPageOpener? _openPage;
 
   // ==================== 只读状态 ====================
 
@@ -92,6 +106,12 @@ class McpServerController extends ChangeNotifier {
 
   /// 是否允许非本机（局域网）连接。默认 false = 只监听回环 127.0.0.1。
   bool get allowRemote => _allowRemote;
+
+  /// 是否允许 AI 传入 `site` 读取其它已配置站点。默认 true（公开信息）。
+  bool get allowCrossSite => _allowCrossSite;
+
+  /// 是否允许 AI 传入 `account` 以该站点其它已登录账号读取。默认 false。
+  bool get allowAccountSwitch => _allowAccountSwitch;
 
   /// 用户创建的访问令牌（可多个，像 API Key 一样管理）
   List<McpToken> get tokens => List.unmodifiable(_tokens);
@@ -133,6 +153,11 @@ class McpServerController extends ChangeNotifier {
     _accountInfo = provider;
   }
 
+  /// 绑定 App 页面导航（由 `main.dart` 在路由创建后注入；MCP 层不直接依赖 UI）
+  void bindNavigator(McpPageOpener opener) {
+    _openPage = opener;
+  }
+
   /// 读取持久化配置；仅在启用时才启动服务。
   Future<void> bootstrap() async {
     await load();
@@ -153,6 +178,9 @@ class McpServerController extends ChangeNotifier {
       maxPort,
     );
     _allowRemote = (await _db.getSettingBool(_kAllowRemote)) ?? false;
+    _allowCrossSite = (await _db.getSettingBool(_kAllowCrossSite)) ?? true;
+    _allowAccountSwitch =
+        (await _db.getSettingBool(_kAllowAccountSwitch)) ?? false;
 
     await _loadTokens();
 
@@ -210,6 +238,9 @@ class McpServerController extends ChangeNotifier {
         serverFactory: (sessionId) => McpToolRegistry.createServer(
           isGroupEnabled: isGroupEnabled,
           accountInfo: () => _accountInfo(),
+          openPage: _openPage,
+          allowCrossSite: _allowCrossSite,
+          allowAccountSwitch: _allowAccountSwitch,
         ),
         host: bindHost,
         port: _port,
@@ -338,6 +369,25 @@ class McpServerController extends ChangeNotifier {
       await stop();
       await start();
     }
+  }
+
+  /// 允许 AI 跨站点访问。
+  ///
+  /// 不涉及监听地址，无需重启服务：`serverFactory` 每请求重建，
+  /// 下次 `tools/call` 就会带上新的权限与 schema。
+  Future<void> setAllowCrossSite(bool value) async {
+    if (_allowCrossSite == value) return;
+    _allowCrossSite = value;
+    await _db.setSettingBool(_kAllowCrossSite, value);
+    notifyListeners();
+  }
+
+  /// 允许 AI 以其它已登录账号的视角读取（只读，不写数据）。
+  Future<void> setAllowAccountSwitch(bool value) async {
+    if (_allowAccountSwitch == value) return;
+    _allowAccountSwitch = value;
+    await _db.setSettingBool(_kAllowAccountSwitch, value);
+    notifyListeners();
   }
 
   // ==================== 访问令牌管理 ====================

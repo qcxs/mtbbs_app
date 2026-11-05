@@ -9,6 +9,7 @@ import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/dialog/quick_reply_dialog.dart';
+import 'package:mtbbs/widgets/common/identity_avatar_button.dart';
 import 'package:mtbbs/widgets/editor/editor_selection_toolbar.dart';
 
 /// 迷你编辑器 — 帖子页 / 私信页内嵌使用的紧凑编辑表面。
@@ -324,6 +325,11 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
             visualDensity: VisualDensity.compact,
             onPressed: widget.submitting ? null : widget.onExpandToFull,
           ),
+        // 当前身份头像：放左下角，避免挤占上方工具栏；提交前可确认所用账号
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Center(child: IdentityAvatarButton(radius: 12)),
+        ),
         const Spacer(),
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: widget.contentCtl,

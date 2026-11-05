@@ -52,6 +52,43 @@ class ThreadViewData {
   }
 }
 
+/// 单条「点评」（楼中楼）
+///
+/// 来自帖子内 `div#comment_<pid>.cm > div.pstl`；作者、内容、时间
+/// 分别对应 `.psta` / `.psti` / `span.xg1`。
+class PostComment {
+  /// 点评自身的 pid（用于「详情」定位），不是所属楼层的 pid
+  final String pid;
+  final String uid;
+  final String username;
+  final String message;
+  final String time;
+
+  const PostComment({
+    this.pid = '',
+    this.uid = '',
+    this.username = '',
+    this.message = '',
+    this.time = '',
+  });
+
+  factory PostComment.fromMap(Map<String, dynamic> m) => PostComment(
+    pid: m['pid']?.toString() ?? '',
+    uid: m['uid']?.toString() ?? '',
+    username: m['username']?.toString() ?? '',
+    message: m['message']?.toString() ?? '',
+    time: m['time']?.toString() ?? '',
+  );
+
+  Map<String, dynamic> toMap() => {
+    'pid': pid,
+    'uid': uid,
+    'username': username,
+    'message': message,
+    'time': time,
+  };
+}
+
 /// 单帖数据模型（楼主和评论共用）
 ///
 /// 基于 PC 模板 table#pidXX.plhin 结构解析。
@@ -83,6 +120,9 @@ class PostItem {
   /// 评分记录，结构 {header, detailUrl, totalScore, entries: [{username, uid, score, reason}]}
   final Map<String, dynamic>? rating;
 
+  /// 本楼的「点评」列表（楼中楼，按页面顺序）
+  final List<PostComment> comments;
+
   /// 该楼层的解析是否失败（解析异常时降级为占位，避免拖垮整页）
   final bool degraded;
 
@@ -110,6 +150,7 @@ class PostItem {
     this.kickUrl = '',
     this.isLiked = false,
     this.rating,
+    this.comments = const [],
     this.degraded = false,
     this.stamp = '',
     this.isStickReply = false,
@@ -147,6 +188,13 @@ class PostItem {
     rating: p['rating'] != null
         ? Map<String, dynamic>.from(p['rating'] as Map)
         : null,
+    comments:
+        (p['comments'] as List?)
+            ?.map(
+              (e) => PostComment.fromMap(Map<String, dynamic>.from(e as Map)),
+            )
+            .toList(growable: false) ??
+        const [],
     degraded: p['degraded'] == true,
     stamp: p['stamp']?.toString() ?? '',
     isStickReply: p['isStickReply'] == true,
@@ -170,6 +218,7 @@ class PostItem {
     'kickUrl': kickUrl,
     'isLiked': isLiked,
     'rating': rating,
+    'comments': comments.map((c) => c.toMap()).toList(growable: false),
     'degraded': degraded,
     'stamp': stamp,
     'isStickReply': isStickReply,

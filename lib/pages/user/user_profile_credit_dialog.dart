@@ -16,7 +16,6 @@ extension on _UserProfilePageState {
 
     final p = _profile!;
     final computed = _computeCreditData(p);
-    if (computed == null) return;
 
     final segments = computed.$1;
     final totalCalc = computed.$2;
@@ -24,130 +23,149 @@ extension on _UserProfilePageState {
     final formulaStr = computed.$4;
     final diff = computed.$5;
 
+    // 积分为 0（或负数）时不再静默无响应：仍然弹窗，只是不画饼图。
+    final points = p['points'] as Map<String, dynamic>? ?? {};
+    final credits = _n(points['credits']);
+    final hasChart = totalCalc > 0 && segments.isNotEmpty;
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.pie_chart_outline,
-                      size: 18,
-                      color: _cs.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      '积分分析',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 18),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '公式: $formulaStr',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: _cs.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (diff < 10) ...[
-                  const SizedBox(height: 10),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
                     children: [
-                      Text(
-                        '估算精华帖: ',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: _cs.onSurfaceVariant,
-                        ),
+                      Icon(
+                        Icons.pie_chart_outline,
+                        size: 18,
+                        color: _cs.onSurfaceVariant,
                       ),
-                      Text(
-                        '$elitePosts 篇',
-                        style: const TextStyle(
-                          fontSize: 18,
+                      const SizedBox(width: 6),
+                      const Text(
+                        '积分分析',
+                        style: TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '(可能不准确)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _cs.onSurfaceVariant,
-                        ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => Navigator.of(ctx).pop(),
                       ),
                     ],
                   ),
-                ],
-                const SizedBox(height: 16),
-                // 饼图 + 图例
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    PieChart(segments: segments, size: 130, strokeWidth: 30),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: segments.map((s) {
-                          final pct = (s.value / totalCalc * 100);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: s.color,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    s.label,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: _cs.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  '${pct.toStringAsFixed(1)}%',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '公式: $formulaStr',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: _cs.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (hasChart && diff < 10) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text(
+                          '估算精华帖: ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _cs.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          '$elitePosts 篇',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '(可能不准确)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  if (!hasChart)
+                    Text(
+                      credits <= 0
+                          ? '当前积分为 ${credits.toStringAsFixed(0)}，暂无可分析的积分来源'
+                          : '暂无可分析的积分来源',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _cs.onSurfaceVariant,
+                      ),
+                    )
+                  else
+                    // 饼图 + 图例
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        PieChart(segments: segments, size: 130, strokeWidth: 30),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: segments.map((s) {
+                              final pct = (s.value / totalCalc * 100);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 3),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: s.color,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        s.label,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: _cs.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${pct.toStringAsFixed(1)}%',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -156,7 +174,7 @@ extension on _UserProfilePageState {
   }
 
   /// 计算积分分析数据，返回 (segments, totalCalc, elitePosts, formulaStr, diff)
-  (List<PieChartSegment>, double, int, String, double)? _computeCreditData(
+  (List<PieChartSegment>, double, int, String, double) _computeCreditData(
     Map<String, dynamic> p,
   ) {
     final points = p['points'] as Map<String, dynamic>? ?? {};
@@ -173,10 +191,13 @@ extension on _UserProfilePageState {
     final friends = _n(stats['friends']);
     final onlineTime = _extractHours(activity['onlineTime'] as String?);
 
-    if (credits <= 0) return null;
-
     final settings = context.read<SettingsProvider>();
     final formulaStr = settings.creditFormula;
+
+    // 积分为 0 或负数时不画饼图（各来源无法归因），但仍返回公式供弹窗展示
+    if (credits <= 0) {
+      return (<PieChartSegment>[], 0.0, 0, formulaStr, 0.0);
+    }
 
     final termGold = goldCoins * 0.2;
     final termThreads = threads * 3;

@@ -17,6 +17,8 @@ void main() {
       htmlToMarkdown(htmlParser.parse(html).body!.querySelector('div')!);
 
   group('Html2Markdown - 结构还原', () {
+    setUpAll(() => SiteStore.instance.init());
+
     test('标题 / 段落 / 行内样式', () {
       final out = md(
         '<div class="parsedown-markdown">'
@@ -98,6 +100,23 @@ void main() {
       expect(out, isNot(contains('1.png')));
     });
 
+    test('普通附件（zip 等）转 Markdown 链接，不输出文件类型图标', () {
+      // 52pojie thread-2117334：Markdown 帖的附件是
+      // <ignore_js_op><img src="filetype/zip.gif"> + <a mod=attachment> + <em>
+      // 原实现只取首个 <img>，正文只剩一张 zip.gif 图标。
+      final out = md(
+        '<div class="parsedown-markdown"><p><ignore_js_op>'
+        '<img src="https://static.example.com/static/image/filetype/zip.gif" class="vm">'
+        '<span id="attach_2863935">'
+        '<a href="forum.php?mod=attachment&amp;aid=Mjg2MzkzNXw%3D%3D">工具_v3.4.zip</a>'
+        '<em class="xg1">(1.67 MB, 下载次数: 4329)</em>'
+        '</span></ignore_js_op></p></div>',
+      );
+      expect(out, contains('工具_v3.4.zip'));
+      expect(out, contains('mod=attachment'));
+      expect(out, isNot(contains('zip.gif')));
+    });
+
     test('正文里的 Markdown 特殊字符被转义，不会被二次解析', () {
       final out = md(
         '<div class="parsedown-markdown"><p>a *b* [c] _d_ &lt;e&gt;</p></div>',
@@ -152,6 +171,28 @@ void main() {
 
   group('Html2BBCode - 52pojie Markdown 插件端到端', () {
     String conv(String html) => Html2BBCode().convert(html);
+
+    setUpAll(() => SiteStore.instance.init());
+
+    test('普通附件转 [appdata] 附件卡片，不输出文件类型图标', () {
+      // 52pojie thread-2117334 主楼真实结构
+      final out = conv(
+        '<div class="parsedown-markdown"><h3>下载地址</h3><p><ignore_js_op>'
+        '<img src="https://static.example.com/static/image/filetype/zip.gif" class="vm">'
+        '<span id="attach_2863935">'
+        '<a href="forum.php?mod=attachment&amp;aid=Mjg2MzkzNXw%3D%3D">工具_v3.4.zip</a>'
+        '<em class="xg1">(1.67 MB, 下载次数: 4329)</em>'
+        '</span></ignore_js_op></p></div>',
+      );
+      expect(out, contains('"type":"attach"'));
+      expect(out, contains('"name":"工具_v3.4.zip"'));
+      expect(out, contains('"size":"1.67 MB"'));
+      expect(out, contains('"downloads":"4329"'));
+      expect(out, contains('mod=attachment'));
+      expect(out, isNot(contains('zip.gif')));
+      // 元数据已进入 appdata，不应以正文形式重复出现
+      expect(out, isNot(contains('下载次数')));
+    });
 
     test('标题按阅读层级放大', () {
       final out = conv(

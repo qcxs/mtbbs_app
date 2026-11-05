@@ -405,19 +405,30 @@ Future<void> _showActionDialog(
 
 /// 链接确认弹窗 — App打开（路由匹配）/ 外部浏览器 / 取消
 Future<void> _showUrlEditDialog(BuildContext context, String url) async {
+  // 作者可能直接发相对地址（forum.php?...）。解析层按原文保留，
+  // 这里按**当前页面所属站点**补全，再用绝对地址走 App 路由/浏览器。
+  // 不能用全局 SiteStore：跨站页面可能正以临时身份访问他站。
+  final resolvedUrl = resolveContentUrl(
+    url,
+    base: SiteScope.read(context).baseUrl,
+  );
+  final uri = Uri.tryParse(resolvedUrl);
+  // 只处理可打开的网页/邮件地址；App 内路径不经过链接弹窗
+  if (uri == null || !uri.hasScheme) return;
+  if (uri.scheme != 'http' && uri.scheme != 'https' && uri.scheme != 'mailto') {
+    return;
+  }
+
   final action = await showDialog<String>(
     context: context,
-    builder: (_) => _UrlActionDialog(url: url),
+    builder: (_) => _UrlActionDialog(url: resolvedUrl),
   );
   if (action == null || context.mounted == false) return;
-
-  final uri = Uri.tryParse(url);
-  if (uri == null || !uri.hasScheme) return;
 
   switch (action) {
     case '__app__':
       // 与首页链接点击、系统入站链接共用同一决策（App 内优先，兜底内置浏览器）
-      final target = UrlRouter.resolveTarget(url);
+      final target = UrlRouter.resolveTarget(resolvedUrl);
       if (target != null) context.push(target);
     case '__external__':
       await launchUrl(uri, mode: LaunchMode.externalApplication);

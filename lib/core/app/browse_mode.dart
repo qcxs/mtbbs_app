@@ -18,8 +18,40 @@ import 'package:mtbbs/core/app/site_store.dart';
 /// Zone 覆盖键（值：`'mobile'` | `'desktop'`）
 const Symbol kBrowseModeZoneKey = #mtbbsBrowseModeOverride;
 
+/// 请求级「站点上下文」覆盖键（值：[RequestSiteOverride]）。
+///
+/// MCP 单次调用可临时以另一个已配置站点（乃至另一个账号）的身份读取，
+/// 这里承载不随 Dio 变化的站点元信息，让 `resolveRequestUserAgent` /
+/// `resolveRequestCharset` 等调用点在跨站时仍拿到**目标站点**的值。
+const Symbol kRequestSiteZoneKey = #mtbbsRequestSiteOverride;
+
 /// 进程级覆盖（探针用；null = 未覆盖）
 String? _stickyOverride;
+
+/// 请求级站点上下文（MCP 跨站点调用用；仅本次调用有效）
+class RequestSiteOverride {
+  const RequestSiteOverride({
+    required this.host,
+    required this.baseUrl,
+    required this.charset,
+    required this.userAgent,
+    required this.isMobileUA,
+  });
+
+  final String host;
+  final String baseUrl;
+  final String charset;
+  final String userAgent;
+  final bool isMobileUA;
+}
+
+/// 当前生效的请求级站点上下文（无覆盖返回 null）
+RequestSiteOverride? currentRequestSite() =>
+    Zone.current[kRequestSiteZoneKey] as RequestSiteOverride?;
+
+/// 本次请求应使用的参数编码：站点上下文覆盖优先，否则跟随全局站点。
+String resolveRequestCharset() =>
+    currentRequestSite()?.charset ?? SiteStore.instance.charset;
 
 /// 归一浏览模式：`mobile`/`m` → `mobile`；`desktop`/`pc`/`d` → `desktop`；
 /// 其它（含空串 / `default` / `auto`）→ null，表示不覆盖、跟随站点浏览模式。
@@ -48,7 +80,7 @@ String? currentBrowseModeOverride() =>
 /// 是否处于"覆盖"状态（供 [ApiService] 决定是否改写请求 UA）
 bool browseModeOverrideActive() => currentBrowseModeOverride() != null;
 
-/// 本次请求应使用的 UA：覆盖优先，否则跟随站点「浏览模式」。
+/// 本次请求应使用的 UA：浏览模式覆盖 > 站点上下文 > 全局站点「浏览模式」。
 ///
 /// 供 API 层（`api/**/http.dart`）与 [ApiService] 的覆盖拦截器共用。
 String resolveRequestUserAgent() {
@@ -58,7 +90,7 @@ String resolveRequestUserAgent() {
     case 'desktop':
       return Site.uaPc;
     default:
-      return SiteStore.instance.userAgent;
+      return currentRequestSite()?.userAgent ?? SiteStore.instance.userAgent;
   }
 }
 
@@ -69,4 +101,20 @@ Future<T> runWithBrowseMode<T>(String? mode, Future<T> Function() body) {
   final normalized = normalizeBrowseMode(mode);
   if (normalized == null) return body();
   return runZoned(body, zoneValues: {kBrowseModeZoneKey: normalized});
+}
+
+/// 同时套用「浏览模式」与「站点上下文」的 Zone 覆盖（MCP 单次调用用）。
+///
+/// 两者都为 null 时直接执行；任一存在时只设置存在的键，CPU 开销可忽略。
+Future<T> runWithRequestContext<T>({
+  String? browseMode,
+  RequestSiteOverride? site,
+  required Future<T> Function() body,
+}) {
+  final mode = normalizeBrowseMode(browseMode);
+  final zoneValues = <Symbol, Object>{};
+  if (mode != null) zoneValues[kBrowseModeZoneKey] = mode;
+  if (site != null) zoneValues[kRequestSiteZoneKey] = site;
+  if (zoneValues.isEmpty) return body();
+  return runZoned(body, zoneValues: zoneValues);
 }

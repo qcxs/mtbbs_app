@@ -65,7 +65,7 @@ extension on _ThreadViewPageState {
       _replyTargetName = post.username;
       _replyTargetPid = post.pid;
     });
-    await _ensureEditorPageData(force: true);
+    if (!await _ensureEditorPageData(force: true)) return;
     // 预取被回复评论，供"点击目标芯片 → 弹窗预览"
     final quoted = await _editorSession.fetchQuotedPost();
     if (mounted && quoted != null) {
@@ -125,21 +125,27 @@ extension on _ThreadViewPageState {
     });
   }
 
-  /// 抓取当前目标所需的页面数据（formhash / 引用信息），失败给出提示
-  Future<void> _ensureEditorPageData({bool force = false}) async {
-    if (!force && _editorSession.pageData.formhash.isNotEmpty) return;
+  /// 抓取当前目标所需的页面数据（formhash / 引用信息）。
+  ///
+  /// 失败时**立即收起迷你编辑器**：页面数据取不到（如帖子已超出编辑/回复时间、
+  /// 版块关闭、无权限）时，编辑器发不出去，却会一直占着底部挡住正文，
+  /// 用户还得再手动点一次「收起」。正文草稿保留在控制器里，下次展开仍在。
+  Future<bool> _ensureEditorPageData({bool force = false}) async {
+    if (!force && _editorSession.pageData.formhash.isNotEmpty) return true;
     await EmojiService().load();
     final result = await _editorSession.fetchPage();
-    if (!mounted) return;
+    if (!mounted) return false;
     _editorSession.pageData = result;
     _setState(() {});
     if (!result.success) {
       showToast(result.error ?? '页面数据加载失败');
-      return;
+      _collapseEditor();
+      return false;
     }
     // 同步图片列表与映射（供预览替换 [attachimg] 与工具栏角标）
     _images.setFromPageImages(result.images);
     _images.refresh();
+    return true;
   }
 
   /// 提交迷你编辑器内容（评论 / 回复某评论）
@@ -164,9 +170,16 @@ extension on _ThreadViewPageState {
       _setState(() => _editorSubmitting = false);
       if (!result.success) {
         showToast(result.message.isNotEmpty ? result.message : '提交失败');
+        // 服务端拒绝（超出编辑/回复时间、无权限、版块已关闭等）时收起编辑器：
+        // 错误提示不会被展开的编辑框挡住，也让用户立刻回到正常读帖态。
+        // 草稿仍保留在 contentCtl，重新展开可继续处理可修复的错误。
+        _collapseEditor();
         return;
       }
       _editorSession.contentCtl.clear();
+      // 连同图片/待绑定附件一起清空：控制器在本页复用，不清会把上一次回复的
+      // `attachnew` 附件带到下一次回复（见 ForumImageController.reset）
+      _images.reset();
       showToast(result.message.isNotEmpty ? result.message : '提交成功');
       // 成功后自动收起（同时重置回复目标，恢复浏览态）
       _collapseEditor();
@@ -178,6 +191,8 @@ extension on _ThreadViewPageState {
       if (!mounted) return;
       _setState(() => _editorSubmitting = false);
       showToast('网络错误: $e');
+      // 与业务失败一致：收起编辑器，避免一直占着底部；草稿保留
+      _collapseEditor();
     }
   }
 
@@ -226,7 +241,11 @@ extension on _ThreadViewPageState {
         : '';
     final ok = await _openEditor('/editor?type=$type&tid=${widget.tid}$pidQ');
     if (!mounted) return;
-    if (ok) _editorSession.contentCtl.clear();
+    if (ok) {
+      _editorSession.contentCtl.clear();
+      // 完整版已发布成功：清掉迷你编辑器侧的图片/待绑定附件，避免带到下一次回复
+      _images.reset();
+    }
     _collapseEditor();
   }
 

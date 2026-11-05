@@ -1,6 +1,7 @@
 import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 
 part 'url_router_php.dart';
 part 'url_router_static.dart';
@@ -121,6 +122,13 @@ class UrlRouter {
       if (result != null) return result;
     }
 
+    // ==================== 用户空间短链 ====================
+    // `https://bbs.binmt.cc/?100`：查询串为纯数字，视为 uid → 个人空间
+    if (path.isEmpty || path == '/') {
+      final result = _matchBareUidSpace(query, site);
+      if (result != null) return result;
+    }
+
     // ==================== 排行榜 ====================
     if (path.endsWith('/misc.php') || path.endsWith('misc.php')) {
       final result = _matchMiscPhp(query, site);
@@ -232,7 +240,10 @@ class UrlRouter {
     try {
       final fullUrl = url.contains('://') ? url : 'https://$url';
       final uri = Uri.parse(fullUrl);
-      return (path: uri.path, queryParameters: uri.queryParameters);
+      // 不能直接用 uri.queryParameters：它会按 UTF-8 解码整串参数，
+      // GBK 站点的 highlight=%B5%E3%C6%C0 会抛 FormatException，
+      // 导致带搜索高亮参数的帖子链接被判为"不支持的页面"。
+      return (path: uri.path, queryParameters: parseQueryLenient(uri.query));
     } catch (_) {
       return null;
     }

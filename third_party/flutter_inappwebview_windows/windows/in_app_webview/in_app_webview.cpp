@@ -1788,10 +1788,37 @@ namespace flutter_inappwebview_plugin
       return;
     }
 
-    // delta * 6 gives me a multiple of WHEEL_DELTA (120)
-    constexpr auto kScrollMultiplier = 6;
+    // Flutter Windows 的 scrollDelta / panDelta 单位是逻辑像素：
+    // 一个滚轮刻度 = lines_per_scroll * 100 / 3 像素（Flutter 引擎
+    // FlutterWindow::UpdateScrollOffsetMultiplier），而 WebView2 一个刻度 = 120。
+    // 因此 像素 -> 滚轮单位 = 120 / (lines * 100 / 3) = 3.6 / lines，
+    // 鼠标滚轮和触摸板平移都能 1:1 滚动。
+    // 旧代码固定乘 6（按 20px/刻度估算）；实际默认是 100px/刻度，
+    // 一下会滚 5 格，表现为"稍微一滚就翻一页"。
+    static const double units_per_pixel = [] {
+      UINT lines_per_scroll = 3;
+      SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &lines_per_scroll, 0);
+      if (lines_per_scroll == 0 || lines_per_scroll == WHEEL_PAGESCROLL) {
+        lines_per_scroll = 3;
+      }
+      return 120.0 * 3.0 / (static_cast<double>(lines_per_scroll) * 100.0);
+    }();
 
-    auto offset = static_cast<short>(delta * kScrollMultiplier);
+    // 累积不足一个滚轮单位的增量，避免触摸板慢速滑动被反复截断为 0
+    double& remainder = horizontal ? scrollRemainderX_ : scrollRemainderY_;
+    remainder += delta * units_per_pixel;
+    int whole = static_cast<int>(remainder);
+    remainder -= whole;
+    if (whole > 32767) {
+      whole = 32767;
+    }
+    else if (whole < -32767) {
+      whole = -32767;
+    }
+    auto offset = static_cast<short>(whole);
+    if (offset == 0) {
+      return;
+    }
 
     if (horizontal) {
       webViewCompositionController->SendMouseInput(

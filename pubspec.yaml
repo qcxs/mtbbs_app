@@ -103,6 +103,9 @@ dependencies:
   # 全平台同一 QuickJS（无 Apple JSC 分叉），须显式调小栈上限，并给不可信脚本设超时/内存上限。
   flutter_qjs_next: ^1.5.2
 
+  # 哈希（编解码工具页的 MD5/SHA-1/SHA-256，见 lib/core/utils/codec_utils.dart）
+  crypto: ^3.0.7
+
   # HTML 渲染（BBCode → HTML → Widget）
   # 代码语法高亮
   highlight: ^0.7.0
@@ -153,6 +156,7 @@ flutter:
     - assets/config/shortcuts.json
     - assets/config/cache.json
     - assets/config/quick_replies.json
+    - assets/config/site_defaults.json
     - assets/config/thanks.json
     # 关于页展示的应用图标，由 mipmap-xxxhdpi/ic_launcher.png 复制而来
     - assets/icon/app_icon.png

@@ -1,5 +1,8 @@
 part of 'pm_chat_page.dart';
 
+/// 相邻消息超过该间隔才显示时间分隔（与微信聊天一致）
+const _kPmTimeSep = Duration(minutes: 5);
+
 /// 发送、本地占位与页面主体构建。
 extension on _PmChatPageState {
   Future<void> _send() async {
@@ -198,13 +201,7 @@ extension on _PmChatPageState {
                 children: [
                   // 视觉顶部：加载更早消息 / "没有更早的消息了"
                   _buildOlderHeader(),
-                  for (final item in all)
-                    PmMessageBubble(
-                      item: item,
-                      onFailedTap: item['_status'] == 'failed'
-                          ? () => _showFailedActions(item)
-                          : null,
-                    ),
+                  ..._buildMessageRows(all),
                 ],
               ),
             ),
@@ -212,6 +209,83 @@ extension on _PmChatPageState {
         );
       },
     );
+  }
+
+  /// 构造消息行，并在时间跨度较大的相邻消息之间插入居中时间条。
+  ///
+  /// 首条消息总是显示时间；之后仅当与上一条的时间差 ≥ [_kPmTimeSep]
+  /// （或上一条时间不可解析）时再显示，避免密集对话被时间条打断。
+  List<Widget> _buildMessageRows(List<Map<String, dynamic>> all) {
+    final now = DateTime.now();
+    final rows = <Widget>[];
+    DateTime? prev;
+    for (final item in all) {
+      final t = _parsePmTime(item['time'] as String? ?? '');
+      final needSep =
+          t != null &&
+          (prev == null ||
+              t.difference(prev).inSeconds.abs() >= _kPmTimeSep.inSeconds);
+      if (needSep) rows.add(_buildTimeSeparator(_formatPmTime(t, now)));
+      rows.add(
+        PmMessageBubble(
+          item: item,
+          onFailedTap: item['_status'] == 'failed'
+              ? () => _showFailedActions(item)
+              : null,
+        ),
+      );
+      if (t != null) prev = t;
+    }
+    return rows;
+  }
+
+  Widget _buildTimeSeparator(String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 解析 Discuz 消息时间（`span[title]`，如 `2026-10-2 16:38`）
+  DateTime? _parsePmTime(String raw) {
+    final m = RegExp(
+      r'(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})',
+    ).firstMatch(raw);
+    if (m == null) return null;
+    return DateTime(
+      int.parse(m.group(1)!),
+      int.parse(m.group(2)!),
+      int.parse(m.group(3)!),
+      int.parse(m.group(4)!),
+      int.parse(m.group(5)!),
+    );
+  }
+
+  /// 时间条文案：当天只显示时分；昨天 / 一周内 / 同年 / 跨年逐级补全日期
+  String _formatPmTime(DateTime t, DateTime now) {
+    final hm =
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final day = DateTime(t.year, t.month, t.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return hm;
+    if (diff == 1) return '昨天 $hm';
+    if (diff > 1 && diff < 7) return '${_weekdayLabel(t.weekday)} $hm';
+    if (t.year == now.year) return '${t.month}月${t.day}日 $hm';
+    return '${t.year}年${t.month}月${t.day}日 $hm';
+  }
+
+  String _weekdayLabel(int weekday) {
+    const labels = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+    return labels[weekday - 1];
   }
 
   Widget _buildOlderHeader() {

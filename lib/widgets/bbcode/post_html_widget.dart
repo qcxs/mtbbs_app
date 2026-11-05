@@ -9,11 +9,12 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
-import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_code_block.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -128,7 +129,8 @@ class PostHtmlWidget extends StatelessWidget {
       emojiMap: EmojiService().map,
       smilieIdMap: EmojiService().smilieIdMap,
       disabledTags: effectiveDisabled,
-      baseUrl: SiteStore.instance.baseUrl,
+      // 必须用页面所属会话，而非全局当前站点：同页可能以临时身份访问他站
+      baseUrl: SiteScope.of(context).baseUrl,
       autoDetectUrls: autoDetectUrls,
       // [code] 还原为占位元素，由 customWidgetBuilder 原地替换为高亮组件
       emitCodePlaceholder: true,

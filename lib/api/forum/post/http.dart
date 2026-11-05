@@ -1,6 +1,66 @@
 import 'package:dio/dio.dart';
+import 'package:mtbbs/core/parser/page_fetcher.dart';
 
 /// 发帖/回复 HTTP 请求 — 使用 Dio 实例的 baseUrl
+
+/// 获取编辑器页面 HTML（发帖/评论/回复/编辑共用）
+Future<Response<String>> getEditorPage(
+  Dio dio, {
+  required String type,
+  String fid = '',
+  String tid = '',
+  String pid = '',
+  String? repquote,
+}) {
+  final url = PageFetcher.buildUrl(
+    type: type,
+    fid: fid,
+    tid: tid,
+    pid: pid,
+    repquote: repquote,
+  );
+  return dio.get<String>(url);
+}
+
+/// 提交编辑（帖子/回复）。
+///
+/// 编辑成功后 Discuz 会 301/302 到 viewthread，因此不能跟随重定向——
+/// 需要保留状态码与 Location 交给解析层判断。
+Future<Response<String>> submitEdit(
+  Dio dio, {
+  required String fid,
+  required String tid,
+  required String pid,
+  required String formhash,
+  required String posttime,
+  required String subject,
+  required String message,
+  String page = '1',
+  Map<String, String> attachNew = const {},
+}) {
+  return dio.post<String>(
+    '/forum.php?mod=post&action=edit&fid=$fid&tid=$tid&pid=$pid'
+    '&editsubmit=yes&inajax=1&formhash=$formhash',
+    options: Options(
+      followRedirects: false,
+      sendTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
+      headers: {'Content-Type': Headers.formUrlEncodedContentType},
+    ),
+    data: {
+      'formhash': formhash,
+      'posttime': posttime,
+      'subject': subject,
+      'message': message,
+      'fid': fid,
+      'tid': tid,
+      'pid': pid,
+      'page': page,
+      'editsubmit': 'yes',
+      ...attachNew,
+    },
+  );
+}
 
 /// 获取发帖/回复页面的 HTML（用于提取 formhash/posttime 等会话字段）
 Future<Response<String>> getNewThreadPage(Dio dio, {required String fid}) {

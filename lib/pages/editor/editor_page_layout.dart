@@ -86,6 +86,11 @@ extension on _EditorPageState {
               title: Text(_pageTitle),
               surfaceTintColor: cs.surface,
               actions: [
+                // 当前身份头像：点击查看站点 + 账号，避免切站/切号后发错身份
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Center(child: IdentityAvatarButton(radius: 14)),
+                ),
                 if (!isWide)
                   IconButton(
                     icon: Icon(_showPreview ? Icons.edit : Icons.visibility),
@@ -138,6 +143,12 @@ extension on _EditorPageState {
                             '附件': '${_attachmentList.length} 个',
                         };
                         showPageInfoDialog(context, fields);
+                      case 'browser':
+                        if (!context.mounted) return;
+                        context.push(
+                          '/browser?url=${Uri.encodeComponent(_editorWebUrl)}'
+                          '&intercept=false',
+                        );
                       case 'refresh':
                         if (!_loadingPage) {
                           await _doFetchPage(preserveContent: false);
@@ -186,6 +197,15 @@ extension on _EditorPageState {
                       child: ListTile(
                         leading: Icon(Icons.info_outline, size: 20),
                         title: Text('页面信息'),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'browser',
+                      child: ListTile(
+                        leading: Icon(Icons.open_in_browser, size: 20),
+                        title: Text('在浏览器中打开'),
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                       ),

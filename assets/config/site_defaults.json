@@ -1,0 +1,11 @@
+{
+  "_comment": "站点级默认设置：仅在没有已保存的站点设置（或旧文档缺少对应段）时生效。顶层键是站点 host。",
+  "sites": {
+    "www.52pojie.cn": {
+      "pageGate": {
+        "disabledPageIds": ["editor", "wall", "pm"],
+        "browserOnly": false
+      }
+    }
+  }
+}

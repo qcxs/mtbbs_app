@@ -15,6 +15,7 @@ class McpToolDefinition {
     this.requiredArgs = const [],
     this.network = true,
     this.mobileSupported = false,
+    this.readOnlyHint = true,
   });
 
   final String name;
@@ -41,6 +42,12 @@ class McpToolDefinition {
   /// 为 false 时，显式传 `browse_mode=mobile` 会被**明确拒绝**并提示，
   /// 避免 AI 误以为该接口 PC / 移动两套等价（`browse_mode=desktop` 始终允许）。
   final bool mobileSupported;
+
+  /// 是否向客户端声明为只读工具（默认 true）。
+  ///
+  /// 编解码等纯计算工具保持 true；`open_app_page` 会改变 App 当前页面，
+  /// 必须声明 false，避免客户端把它当成纯读取。
+  final bool readOnlyHint;
 
   /// 返回业务数据（Map），出站前统一过 `McpSanitizer`
   final Future<Map<String, dynamic>> Function(Map<String, dynamic> args) run;

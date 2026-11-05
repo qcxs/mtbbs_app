@@ -191,6 +191,9 @@ namespace flutter_inappwebview_plugin
     float scaleFactor_ = 1.0;
     POINT lastCursorPos_ = { 0, 0 };
     VirtualKeyState virtualKeys_;
+    // 小于一个滚轮单位的滚动增量累积到下一次，避免触摸板慢速滑动被截断为 0
+    double scrollRemainderX_ = 0.0;
+    double scrollRemainderY_ = 0.0;
 
     std::map<UINT64, std::shared_ptr<NavigationAction>> navigationActions_ = {};
     std::shared_ptr<NavigationAction> lastNavigationAction_;

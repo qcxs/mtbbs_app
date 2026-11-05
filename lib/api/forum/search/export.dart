@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/api/helpers.dart';
+import 'package:mtbbs/core/app/browse_mode.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/api/forum/search/http.dart' as http;
 import 'package:mtbbs/api/forum/search/parse.dart' as parse;
@@ -57,7 +58,7 @@ String searchPageUrl({
   String? charset,
 }) {
   final base = baseUrl ?? SiteStore.instance.baseUrl;
-  final cs = charset ?? SiteStore.instance.charset;
+  final cs = charset ?? resolveRequestCharset();
   return '$base${http.searchPath(keyword: keyword, page: page, searchId: searchId, srchFilter: srchFilter, charset: cs)}';
 }
 

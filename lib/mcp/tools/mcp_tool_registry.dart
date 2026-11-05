@@ -9,6 +9,7 @@ import 'package:mtbbs/core/app/stagger_queue.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/mcp/mcp_audit.dart';
 import 'package:mtbbs/mcp/mcp_sanitizer.dart';
+import 'package:mtbbs/mcp/mcp_scope.dart';
 import 'package:mtbbs/mcp/mcp_types.dart';
 import 'package:mtbbs/mcp/tools/mcp_payloads.dart';
 import 'package:mtbbs/mcp/tools/mcp_resources.dart';
@@ -16,8 +17,10 @@ import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
 import 'package:mtbbs/mcp/tools/mcp_tools_app.dart';
 import 'package:mtbbs/mcp/tools/mcp_tools_editor.dart';
 import 'package:mtbbs/mcp/tools/mcp_tools_forum.dart';
+import 'package:mtbbs/mcp/tools/mcp_tools_navigation.dart';
 import 'package:mtbbs/mcp/tools/mcp_tools_saved.dart';
 import 'package:mtbbs/mcp/tools/mcp_tools_user.dart';
+import 'package:mtbbs/mcp/tools/mcp_tools_utils.dart';
 
 /// MCP 工具注册表 —— 全部为**只读**工具，绝不提供写操作。
 ///
@@ -40,6 +43,9 @@ class McpToolRegistry {
   static McpServer createServer({
     required bool Function(McpToolGroup group) isGroupEnabled,
     required McpAccountInfoProvider accountInfo,
+    McpPageOpener? openPage,
+    bool allowCrossSite = true,
+    bool allowAccountSwitch = false,
   }) {
     final server = McpServer(
       Implementation(name: 'mtbbs', version: BuildConfig.versionName),
@@ -48,15 +54,22 @@ class McpToolRegistry {
         // 连接时就把"先看 help + 只读边界"注入 AI 上下文，
         // 避免 AI 上来就乱猜工具用法。
         instructions:
-            'MTBBS：Discuz 论坛的**只读**数据接口。'
+            'MTBBS：Discuz 论坛的**只读数据接口**，另提供本地编解码与 App 页面导航。'
             '第一次使用请先调用 help 工具，它会给出能力清单、'
             '几类典型任务（总结最近帖子 / 总结某账号 / 读编辑器草稿）的工具组合方式，'
-            '以及参数约定。所有工具均只读；会发请求的工具会自动错峰排队，'
-            '连续大量调用时变慢属正常保护。',
+            '以及参数约定。没有任何发帖/回复/修改/收藏类操作；'
+            '跨站点访问与切换账号视角需用户在设置里手动开启（默认关闭），'
+            '未开启时不要传 site / account。'
+            '会发请求的工具会自动错峰排队，连续大量调用时变慢属正常保护。',
       ),
     );
 
-    for (final def in buildTools(accountInfo)) {
+    for (final def in buildTools(
+      accountInfo,
+      openPage: openPage,
+      allowCrossSite: allowCrossSite,
+      allowAccountSwitch: allowAccountSwitch,
+    )) {
       server.registerTool(
         def.name,
         description: def.description,
@@ -74,12 +87,31 @@ class McpToolRegistry {
                   '其余为 PC-only，传 mobile 会被明确拒绝。',
               enumValues: const ['mobile', 'desktop'],
             ),
+            // 跨站点 / 换账号视角：仅在用户于设置里开启对应权限后才出现在
+            // 入参 schema 里（关闭时不暴露，避免 AI 误以为随时可用）。
+            if (allowCrossSite)
+              'site': JsonSchema.string(
+                description:
+                    '可选：以另一个**已配置站点**读取（填域名或站点名，如 52pojie）。'
+                    '省略 = 当前站点。仅对公开只读数据生效，返回里 source 字段仍标明数据来源。',
+              ),
+            if (allowAccountSwitch)
+              'account': JsonSchema.string(
+                description:
+                    '可选：以该站点的另一个**已登录账号**读取（填账号名）。'
+                    '省略 = 当前账号或该站点默认账号。只读视角，不会写入任何数据。',
+              ),
           },
           required: def.requiredArgs,
         ),
-        annotations: const ToolAnnotations(readOnlyHint: true),
-        callback: (args, extra) =>
-            _invoke(def, args, enabled: isGroupEnabled(def.group)),
+        annotations: ToolAnnotations(readOnlyHint: def.readOnlyHint),
+        callback: (args, extra) => _invoke(
+          def,
+          args,
+          enabled: isGroupEnabled(def.group),
+          allowCrossSite: allowCrossSite,
+          allowAccountSwitch: allowAccountSwitch,
+        ),
       );
     }
 
@@ -94,13 +126,22 @@ class McpToolRegistry {
 
   /// 全部工具定义（按能力分组聚合），供注册与统计使用
   static List<McpToolDefinition> buildTools(
-    McpAccountInfoProvider accountInfo,
-  ) => [
-    ...appTools(accountInfo),
-    ...forumTools(),
+    McpAccountInfoProvider accountInfo, {
+    McpPageOpener? openPage,
+    bool allowCrossSite = true,
+    bool allowAccountSwitch = false,
+  }) => [
+    ...appTools(
+      accountInfo,
+      allowCrossSite: allowCrossSite,
+      allowAccountSwitch: allowAccountSwitch,
+    ),
+    ...forumTools(accountInfo),
     ...userTools(),
     ...savedTools(),
     ...editorTools(),
+    ...utilTools(),
+    ...navigationTools(openPage),
   ];
 
   /// 分组 → 工具数（设置页展示"已开启/全部"用，与账号信息无关）
@@ -118,6 +159,8 @@ class McpToolRegistry {
     McpToolDefinition def,
     Map<String, dynamic> args, {
     required bool enabled,
+    required bool allowCrossSite,
+    required bool allowAccountSwitch,
   }) async {
     final sw = Stopwatch()..start();
 
@@ -132,6 +175,21 @@ class McpToolRegistry {
         '请让用户在「设置 → MCP 服务 → 能力开关」中开启后重试。',
         auditError: '能力已关闭',
       );
+    }
+
+    // 跨站点 / 换账号视角：用户在设置里手动开启对应权限后才会进入解析；
+    // 关闭时明确拒绝并告诉用户去哪开，而不是静默忽略参数。
+    McpScope? scope;
+    if (args.containsKey('site') || args.containsKey('account')) {
+      try {
+        scope = await McpScope.resolve(
+          args: args,
+          allowCrossSite: allowCrossSite,
+          allowAccountSwitch: allowAccountSwitch,
+        );
+      } catch (e) {
+        return _fail(def.name, sw, '$e', auditError: '跨站点/身份参数被拒绝');
+      }
     }
 
     // 浏览模式白名单：默认 PC-only 的接口不接受 mobile —— 明确拒绝，
@@ -156,9 +214,10 @@ class McpToolRegistry {
     if (def.network) await enqueueStagger().ready;
 
     try {
-      final raw = await runWithBrowseMode(
-        browseMode,
-        () => def.run(args).timeout(callTimeout),
+      final raw = await runWithRequestContext(
+        browseMode: browseMode,
+        site: scope?.requestSite,
+        body: () => def.run(args).timeout(callTimeout),
       );
       final safe = McpSanitizer.sanitize(raw);
       return _ok(def.name, safe, sw);

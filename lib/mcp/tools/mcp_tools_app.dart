@@ -4,12 +4,21 @@ import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
 
 /// App 信息组工具（`McpToolGroup.appInfo`）
 ///
-/// 只回版本、站点与登录状态，**不含任何凭据**（token / cookie / formhash）。
-List<McpToolDefinition> appTools(McpAccountInfoProvider accountInfo) => [
+/// 只回版本、构建元数据、仓库链接、站点与登录状态，**不含任何凭据**
+/// （token / cookie / formhash）。
+/// [allowCrossSite] / [allowAccountSwitch] 仅用于让 `help` 如实告知当前权限。
+List<McpToolDefinition> appTools(
+  McpAccountInfoProvider accountInfo, {
+  bool allowCrossSite = true,
+  bool allowAccountSwitch = false,
+}) => [
   McpToolDefinition(
     name: 'get_app_info',
     group: McpToolGroup.appInfo,
-    description: '获取 App 版本、当前论坛站点与登录状态（不含任何凭据）。用于判断能否读取需登录的内容。',
+    description:
+        '获取 App 版本与构建信息（版本名/构建号/提交/构建时间/渠道/Beta）、'
+        '仓库与发布链接、当前论坛站点与登录状态（不含任何凭据）。'
+        '用于判断版本、排查构建差异、告知用户去哪看更新，以及确认能否读取需登录的内容。',
     properties: const {},
     network: false, // 纯本地
     run: (args) async => McpPayloads.appInfo(accountInfo),
@@ -30,7 +39,10 @@ List<McpToolDefinition> appTools(McpAccountInfoProvider accountInfo) => [
         '几类典型任务该按什么顺序组合工具、参数约定与注意事项。',
     properties: const {},
     network: false, // 纯文本，不发请求
-    run: (args) async => _help(),
+    run: (args) async => _help(
+      allowCrossSite: allowCrossSite,
+      allowAccountSwitch: allowAccountSwitch,
+    ),
   ),
 ];
 
@@ -38,12 +50,17 @@ List<McpToolDefinition> appTools(McpAccountInfoProvider accountInfo) => [
 ///
 /// 刻意做成结构化的 Map 而不是一大段文本：AI 更容易按 `scenarios` 直接选路，
 /// 也便于后续增删场景而不影响其它字段。
-Map<String, dynamic> _help() => {
+Map<String, dynamic> _help({
+  required bool allowCrossSite,
+  required bool allowAccountSwitch,
+}) => {
   'what':
-      '本服务是 Discuz 论坛客户端 MTBBS 暴露的**只读**数据接口，'
-      '让 AI 读取论坛内容（帖子、用户、版块、排行、本地草稿等）。',
+      '本服务是 Discuz 论坛客户端 MTBBS 暴露的**只读数据接口**，'
+      '让 AI 读取论坛内容（帖子、用户、版块、排行、本地草稿等）；'
+      '另提供两个本地工具：codec_text 编解码、open_app_page 打开 App 内容页。',
   'principles': [
-    '全部只读：没有任何发帖/回复/修改/收藏类操作。',
+    '没有任何发帖/回复/修改/收藏类操作；open_app_page 只切换 App 当前页面，不写入数据。',
+    '编解码与导航是本地能力，不发 HTTP，不受错峰队列影响。',
     '数据走用户当前登录态，可见范围与 App 内完全一致'
         '（比如回复可见的帖子，是否能看到内容取决于该账号是否已回复）。',
     '会发请求的工具自动过全局错峰队列：连续大量调用会逐个放行，变慢属正常的防封保护。',
@@ -99,6 +116,54 @@ Map<String, dynamic> _help() => {
           '需登录返回 loginRequired=true。',
     },
     {
+      'task': '读帖子但时效性要求不高（尽量少发请求）',
+      'steps': [
+        'get_thread_detail(tid, source=auto) 默认即缓存优先：有未过期的本地缓存就不发 HTTP',
+        '返回里 source=cache 时看 cache.stale / cache.cachedPages / cacheNote 判断是否够用',
+        '需要最新回复时再用 get_thread_detail(tid, source=network) 强制联网',
+      ],
+      'note':
+          'source=cache 只读缓存、未命中返回 cacheMiss=true 且不发请求；'
+          '缓存通常只含访问过的页码，深页缺失时会回退联网（auto）或明确返回缺失页。',
+    },
+    {
+      'task': '还原帖子里的编码内容（链接 / Base64 / 十六进制）',
+      'steps': [
+        'codec_text(op=base64, direction=decode, text=...) 解码 Base64',
+        'codec_text(op=url, direction=decode, text=...) 还原 URL 编码',
+        'codec_text(op=hex, direction=decode, text=...) 还原十六进制；'
+            'op=md5/sha1/sha256 可直接算摘要',
+      ],
+    },
+    {
+      'task': '在 App 里打开某个页面',
+      'steps': [
+        'open_app_page(target=thread, id=tid, page=N) 打开帖子',
+        'open_app_page(target=user, id=uid) / target=forum, id=fid 打开用户或版块',
+        'open_app_page(target=search, keyword=...) 打开搜索结果页',
+      ],
+      'note':
+          '仅在用户明确要求打开/跳转时调用；只开放内容页白名单'
+          '（帖子/用户/版块/搜索/导读/首页），设置、编辑器、内置浏览器与私信页不可用。',
+    },
+    if (allowCrossSite || allowAccountSwitch)
+      {
+        'task': '跨站点 / 换账号视角读取（需用户已在设置中开启权限）',
+        'steps': [
+          if (allowCrossSite)
+            'list_sites 先看已配置站点（isInUse 标出本次会用的站点）',
+          if (allowCrossSite)
+            '任意读取工具追加 site=域名或站点名，如 list_guide_threads(site=52pojie)',
+          if (allowAccountSwitch)
+            '追加 account=账号名，以该站点其它已登录账号的视角读取（只读）',
+          if (allowCrossSite)
+            'open_app_page(target=thread, id=tid, site=其它站点) 可跨站打开帖子 / 用户 / 搜索页',
+        ],
+        'note':
+            'site 与 account 只对本次调用生效，不会改变 App 当前站点或登录态；'
+            '未填时沿用当前站点与当前账号。缓存读帖也按目标站点 + 账号隔离。',
+      },
+    {
       'task': '浏览圈子与留言板',
       'steps': [
         'list_groups 取推荐圈子、圈子分类与积分排行',
@@ -115,7 +180,32 @@ Map<String, dynamic> _help() => {
     'get_thread_detail 默认只回前 10 层、正文精简；用 max_posts 调层数、'
         'full_bbcode=true 取逐字原文。单层正文超长会分片：该层带 bbcodeNextOffset，'
         '用它作为 bbcode_offset 再次调用即可续读同一层（full_bbcode 要保持一致）。',
+    'get_thread_detail 的 source 控制数据来源：auto（默认，缓存优先）/ '
+        'network（强制最新）/ cache（只读缓存）。返回的 source 字段标明实际来源。',
+    'codec_text 只做本地计算；输入上限 20 万字符，超长请先截取。',
+    'open_app_page 的 id 必须是数字；App 需在前台，后台调用不会把界面带到前台。',
+    if (allowCrossSite)
+      'site 可填域名或站点名（先用 list_sites 确认）；只对已配置站点生效，'
+          '返回里的 host / source 会标明实际站点。',
+    if (allowAccountSwitch)
+      'account 必须是该站点已登录的账号名；它只换读取视角，不会修改 App 当前登录态。',
   ],
+  'permissions': {
+    'crossSite': allowCrossSite,
+    'accountSwitch': allowAccountSwitch,
+    'note': switch ((allowCrossSite, allowAccountSwitch)) {
+      (true, true) => '跨站点与切换账号视角均已开启；未填 site / account 时沿用当前站点与当前账号。',
+      (true, false) =>
+        '跨站点已开启（公开信息默认开启）；切换账号视角未开启，'
+            '不要传 account，如任务确实需要请提示用户到「设置 → MCP 服务 → 跨站点与身份」开启。',
+      (false, true) =>
+        '切换账号视角已开启；跨站点访问未开启，不要传 site，'
+            '如任务确实需要请提示用户到「设置 → MCP 服务 → 跨站点与身份」开启。',
+      (false, false) =>
+        '跨站点与切换账号视角均未开启；如任务确实需要，请提示用户到'
+            '「设置 → MCP 服务 → 跨站点与身份」手动开启，不要反复重试。',
+    },
+  },
   'groups': [
     for (final g in McpToolGroup.values)
       {

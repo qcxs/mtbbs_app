@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtbbs/core/app/app_paths.dart';
 import 'package:mtbbs/core/app/browse_mode.dart';
@@ -7,6 +8,7 @@ import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/services/api_service.dart';
 import 'api_bootstrap.dart';
 import 'api_scenarios.dart';
+import 'scenarios/mcp_coverage.dart';
 
 /// API 只读探针入口（AI 以命令 + 参数调用）
 ///
@@ -17,7 +19,10 @@ import 'api_scenarios.dart';
 /// ```
 ///
 /// 参数：
-///   cmd       场景命令（默认 session.list），见 [scenarios]
+///   argsFile  参数 JSON 文件路径（推荐；无白名单限制、免特殊字符转义）
+///   maxList   结果列表保留项数（默认 3，上限 50）
+///   maxStr    结果字符串截断长度（默认 160，上限 100000）
+///   cmd       场景命令（默认 session.list），见 [scenarios]；cmd=coverage 查看覆盖矩阵
 ///   account   登录账号名（可空=游客），需先运行 App 登录生成 Cookie
 ///   site      站点（索引数字或站点名，空=默认第一个站点）
 ///   ua        临时换用浏览模式：mobile / desktop(或 pc)；空=跟随站点设置
@@ -30,22 +35,110 @@ import 'api_scenarios.dart';
 /// {json}
 /// === API_PROBE_END ===
 /// ```
-/// ok=true 表示管线无异常；result 内 success 表示业务层结果；
-/// 缺登录态时 blocked=true + reminder 提示先运行 App。
+/// ok=true 表示管线无异常；status 细分为 ok/invalid_args/blocked/business/failed；
+/// result 内 success 表示业务层结果；缺登录态时 blocked=true + reminder 提示先运行 App。
 void main() {
   test('api-probe', () async {
-    final cmd = const String.fromEnvironment(
-      'cmd',
-      defaultValue: 'session.list',
+    const argsFile = String.fromEnvironment('argsFile');
+    Map<String, String> fileArgs = {};
+    if (argsFile.isNotEmpty) {
+      try {
+        fileArgs = await _loadArgsFile(argsFile);
+      } catch (e) {
+        final output = {
+          'ok': false,
+          'status': 'failed',
+          'cmd': '<argsFile>',
+          'error': 'argsFile 读取失败: $e',
+        };
+        print('=== API_PROBE_BEGIN ===');
+        print(jsonEncode(output));
+        print('=== API_PROBE_END ===');
+        throw StateError('probe failed: ${output['error']}');
+      }
+    }
+
+    // 注意：String.fromEnvironment 只在编译期常量表达式下生效，
+    // 必须逐键显式 const 读取（循环变量运行时求值会取到默认值）。
+    // 这些键只是「常用参数」快捷方式；完整参数请用 argsFile（无白名单限制）。
+    const envArgs = <String, String>{
+      'view': String.fromEnvironment('view'),
+      'page': String.fromEnvironment('page'),
+      'fid': String.fromEnvironment('fid'),
+      'gid': String.fromEnvironment('gid'),
+      'orderby': String.fromEnvironment('orderby'),
+      'filter': String.fromEnvironment('filter'),
+      'kw': String.fromEnvironment('kw'),
+      'searchid': String.fromEnvironment('searchid'),
+      'tid': String.fromEnvironment('tid'),
+      'pid': String.fromEnvironment('pid'),
+      'favid': String.fromEnvironment('favid'),
+      'cid': String.fromEnvironment('cid'),
+      'subject': String.fromEnvironment('subject'),
+      'authorid': String.fromEnvironment('authorid'),
+      'uid': String.fromEnvironment('uid'),
+      'username': String.fromEnvironment('username'),
+      'touid': String.fromEnvironment('touid'),
+      'type': String.fromEnvironment('type'),
+      'message': String.fromEnvironment('message'),
+      'reppid': String.fromEnvironment('reppid'),
+      'note': String.fromEnvironment('note'),
+      'exttype': String.fromEnvironment('exttype'),
+      'income': String.fromEnvironment('income'),
+      'optype': String.fromEnvironment('optype'),
+      'starttime': String.fromEnvironment('starttime'),
+      'endtime': String.fromEnvironment('endtime'),
+      'scores': String.fromEnvironment('scores'),
+      'notify': String.fromEnvironment('notify'),
+      'reason': String.fromEnvironment('reason'),
+      // debug.http 专用：path=请求路径；q=额外 query 参数（JSON 字符串）
+      'path': String.fromEnvironment('path'),
+      'n': String.fromEnvironment('n'),
+      'q': String.fromEnvironment('q'),
+      // cache.* 专用
+      'kind': String.fromEnvironment('kind'),
+      'limit': String.fromEnvironment('limit'),
+    };
+
+    // 文件参数作底，显式 --dart-define 优先（空值不算显式传入）
+    final args = <String, String>{
+      ...fileArgs,
+      for (final e in envArgs.entries)
+        if (e.value.isNotEmpty) e.key: e.value,
+    };
+
+    String pick(String key, String envValue) =>
+        envValue.isNotEmpty ? envValue : (fileArgs[key] ?? '');
+
+    final rawCmd = pick('cmd', const String.fromEnvironment('cmd'));
+    final cmd = rawCmd.isEmpty ? 'session.list' : rawCmd;
+    final account = pick(
+      'account',
+      const String.fromEnvironment('account'),
     );
-    final account = const String.fromEnvironment('account', defaultValue: '');
-    final site = const String.fromEnvironment('site', defaultValue: '');
-    final baseUrl = const String.fromEnvironment('baseUrl', defaultValue: '');
-    final siteName = const String.fromEnvironment('siteName', defaultValue: '');
-    final cookie = const String.fromEnvironment('cookie', defaultValue: '');
-    final header = const String.fromEnvironment('header', defaultValue: '');
-    final ua = const String.fromEnvironment('ua', defaultValue: '');
-    final log = const String.fromEnvironment('log', defaultValue: 'info');
+    final site = pick('site', const String.fromEnvironment('site'));
+    final baseUrl = pick('baseUrl', const String.fromEnvironment('baseUrl'));
+    final siteName = pick(
+      'siteName',
+      const String.fromEnvironment('siteName'),
+    );
+    final cookie = pick('cookie', const String.fromEnvironment('cookie'));
+    final header = pick('header', const String.fromEnvironment('header'));
+    final ua = pick('ua', const String.fromEnvironment('ua'));
+    final rawLog = pick('log', const String.fromEnvironment('log'));
+    final log = rawLog.isEmpty ? 'info' : rawLog;
+    final maxList = _clampInt(
+      pick('maxList', const String.fromEnvironment('maxList')),
+      fallback: 3,
+      min: 1,
+      max: 50,
+    );
+    final maxStr = _clampInt(
+      pick('maxStr', const String.fromEnvironment('maxStr')),
+      fallback: 160,
+      min: 1,
+      max: 100000,
+    );
 
     // 日志级别控制
     if (log == 'off') {
@@ -53,44 +146,6 @@ void main() {
     } else if (log == 'debug') {
       AppLogger.level = LogLevel.debug;
     }
-
-    // 注意：String.fromEnvironment 只在编译期常量表达式下生效，
-    // 必须逐键显式 const 读取（循环变量运行时求值会取到默认值）。
-    final args = <String, String>{
-      'view': const String.fromEnvironment('view'),
-      'page': const String.fromEnvironment('page'),
-      'fid': const String.fromEnvironment('fid'),
-      'gid': const String.fromEnvironment('gid'),
-      'orderby': const String.fromEnvironment('orderby'),
-      'filter': const String.fromEnvironment('filter'),
-      'kw': const String.fromEnvironment('kw'),
-      'searchid': const String.fromEnvironment('searchid'),
-      'tid': const String.fromEnvironment('tid'),
-      'pid': const String.fromEnvironment('pid'),
-      'favid': const String.fromEnvironment('favid'),
-      'cid': const String.fromEnvironment('cid'),
-      'subject': const String.fromEnvironment('subject'),
-      'authorid': const String.fromEnvironment('authorid'),
-      'uid': const String.fromEnvironment('uid'),
-      'username': const String.fromEnvironment('username'),
-      'touid': const String.fromEnvironment('touid'),
-      'type': const String.fromEnvironment('type'),
-      'message': const String.fromEnvironment('message'),
-      'reppid': const String.fromEnvironment('reppid'),
-      'note': const String.fromEnvironment('note'),
-      'exttype': const String.fromEnvironment('exttype'),
-      'income': const String.fromEnvironment('income'),
-      'optype': const String.fromEnvironment('optype'),
-      'starttime': const String.fromEnvironment('starttime'),
-      'endtime': const String.fromEnvironment('endtime'),
-      'scores': const String.fromEnvironment('scores'),
-      'notify': const String.fromEnvironment('notify'),
-      'reason': const String.fromEnvironment('reason'),
-      // debug.http 专用：path=请求路径；q=额外 query 参数（JSON 字符串）
-      'path': const String.fromEnvironment('path'),
-      'n': const String.fromEnvironment('n'),
-      'q': const String.fromEnvironment('q'),
-    };
 
     final output = await runProbe(
       cmd: cmd,
@@ -102,13 +157,20 @@ void main() {
       cookie: cookie,
       header: header,
       ua: ua,
+      maxList: maxList,
+      maxStr: maxStr,
     );
 
     print('=== API_PROBE_BEGIN ===');
     print(jsonEncode(output));
     print('=== API_PROBE_END ===');
     if (output['ok'] != true) {
-      throw StateError('probe failed: ${output['error']}');
+      final result = output['result'];
+      final reason =
+          output['error'] ??
+          (result is Map ? result['message'] : null) ??
+          output['status'];
+      throw StateError('probe failed: $reason');
     }
   });
 }
@@ -123,16 +185,29 @@ Future<Map<String, dynamic>> runProbe({
   String cookie = '',
   String header = '',
   String ua = '',
+  int maxList = 3,
+  int maxStr = 160,
 }) async {
   // 自描述：无上下文的 AI 跑 help 即可掌握全部用法，无需读源码
   if (cmd == 'help' || cmd == '--help' || cmd == 'h') {
     return _buildHelp();
   }
 
+  // 探针 ↔ MCP 工具覆盖矩阵（不发请求、不需要登录）
+  if (cmd == 'coverage') {
+    return {
+      'ok': true,
+      'status': 'ok',
+      'cmd': 'coverage',
+      'result': buildMcpCoverage(scenarios.keys),
+    };
+  }
+
   final scenario = scenarios[cmd];
   if (scenario == null) {
     return {
-      'ok': true,
+      'ok': false,
+      'status': 'invalid_args',
       'cmd': cmd,
       'result': {
         'success': false,
@@ -144,7 +219,8 @@ Future<Map<String, dynamic>> runProbe({
   // 浏览模式白名单：显式 ua=mobile 时，PC-only 场景明确拒绝（避免误判两套等价）
   if (normalizeBrowseMode(ua) == 'mobile' && !scenario.mobileSupported) {
     return {
-      'ok': true,
+      'ok': false,
+      'status': 'invalid_args',
       'cmd': cmd,
       'browseMode': 'mobile',
       'result': {
@@ -171,7 +247,12 @@ Future<Map<String, dynamic>> runProbe({
       ua: ua,
     );
   } catch (e) {
-    return {'ok': false, 'cmd': cmd, 'error': '初始化失败: $e'};
+    return {
+      'ok': false,
+      'status': 'failed',
+      'cmd': cmd,
+      'error': '初始化失败: $e',
+    };
   }
 
   final sw = Stopwatch()..start();
@@ -184,6 +265,7 @@ Future<Map<String, dynamic>> runProbe({
         final dir = await AppPaths.cookiesDirForHost(host);
         return {
           'ok': true,
+          'status': 'blocked',
           'cmd': cmd,
           'blocked': true,
           'reminder':
@@ -198,6 +280,7 @@ Future<Map<String, dynamic>> runProbe({
             .join(', ');
         return {
           'ok': true,
+          'status': 'blocked',
           'cmd': cmd,
           'blocked': true,
           'reminder':
@@ -215,7 +298,8 @@ Future<Map<String, dynamic>> runProbe({
         .toList();
     if (missing.isNotEmpty) {
       return {
-        'ok': true,
+        'ok': false,
+        'status': 'invalid_args',
         'cmd': cmd,
         'result': {
           'success': false,
@@ -228,6 +312,7 @@ Future<Map<String, dynamic>> runProbe({
     final result = await scenario.run(args);
     return {
       'ok': true,
+      'status': 'ok',
       'cmd': cmd,
       'params': {
         for (final k in scenario.params.keys)
@@ -237,8 +322,14 @@ Future<Map<String, dynamic>> runProbe({
       'account': ApiService().activeAccount ?? '(游客)',
       // 本次运行的浏览模式：site = 跟随站点设置；mobile/desktop = ua 覆盖生效
       'browseMode': normalizeBrowseMode(ua) ?? 'site',
-      'result': compactJson(result, maxStr: scenario.raw ? 100000 : 160),
+      'result': compactJson(
+        result,
+        maxList: maxList,
+        maxStr: scenario.raw ? 100000 : maxStr,
+      ),
       'usage': scenario.desc,
+      if (maxList != 3 || maxStr != 160)
+        'compact': {'maxList': maxList, 'maxStr': maxStr},
       if (probeAcwSolved > 0) 'acwSolved': probeAcwSolved,
       if (probeInterstitialHit) 'reminder': _interstitialReminder,
     };
@@ -248,6 +339,7 @@ Future<Map<String, dynamic>> runProbe({
     if (e is FormatException) {
       return {
         'ok': true,
+        'status': 'business',
         'cmd': cmd,
         'result': {
           'success': false,
@@ -260,6 +352,7 @@ Future<Map<String, dynamic>> runProbe({
     }
     return {
       'ok': false,
+      'status': 'failed',
       'cmd': cmd,
       'error': '$e',
       'runtimeMs': sw.elapsedMilliseconds,
@@ -283,13 +376,21 @@ const String _interstitialReminder =
 Map<String, dynamic> _buildHelp() {
   return {
     'ok': true,
+    'status': 'ok',
     'cmd': 'help',
     'what': 'API 只读探针：真实请求 + 解析管线，复用 App 的 Cookie 登录态',
     'invoke': [
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=<命令> --dart-define=key=value',
+      r'推荐：flutter test tool/api_probe_test.dart --dart-define=argsFile=<args.json>',
       r'跨平台通用，无 shell 依赖；帮助见 docs/10-API探针使用规范.md',
     ],
     'globalParams': {
+      'argsFile':
+          '参数 JSON 文件路径（推荐）。文件内写 {"cmd":"thread.detail","tid":"170313",'
+          '"page":"2","maxList":10}；没有参数白名单限制，也不受 & | ; 空格等字符影响。'
+          '显式 --dart-define 优先级更高。',
+      'maxList': '结果列表保留项数（默认 3，上限 50）。需要看全列表时调大',
+      'maxStr': '字符串截断长度（默认 160，上限 100000；raw=true 场景不截断）',
       'cmd': '场景命令（默认 session.list），见下方 scenarios',
       'account': '登录账号名（空=游客）；先跑 session.list 查看可用账号',
       'site': '站点（索引或名称，空=第一个站点），如 site=1',
@@ -314,6 +415,12 @@ Map<String, dynamic> _buildHelp() {
         e.key: {
           'desc': e.value.desc,
           'params': e.value.params,
+          'required': [
+            for (final p in e.value.params.entries)
+              if (p.value.startsWith('*')) p.key,
+          ],
+          // 可直接复制的最小命令（cmd=xxx key=<key>）
+          'minimal': _minimalCommand(e.key, e.value.params),
           'needsLogin': e.value.needsLogin,
           // 白名单：仅这些场景接受 ua=mobile；其余为 PC-only
           if (e.value.mobileSupported) 'mobileSupported': true,
@@ -328,6 +435,10 @@ Map<String, dynamic> _buildHelp() {
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=session.status --dart-define=site=1 --dart-define=account=qcxs  # 跨站点账号',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=log=info   # 人机验证会自解，日志可见「已自算 acw_sc__v2」',
       r'flutter test tool/api_probe_test.dart --dart-define=cmd=forum.list --dart-define=fid=2 --dart-define=ua=desktop  # 换桌面 UA 复测（默认跟随浏览模式）',
+      r'flutter test tool/api_probe_test.dart --dart-define=argsFile=tool/args.example.json  # 参数文件（推荐）',
+      r'flutter test tool/api_probe_test.dart --dart-define=cmd=coverage               # 探针 ↔ MCP 工具覆盖矩阵',
+      r'flutter test tool/api_probe_test.dart --dart-define=cmd=cache.list             # 本机帖子缓存（不联网）',
+      r'flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=maxList=20                     # 多看几条列表',
     ],
     'tips': [
       '首次使用：先运行一次 App（flutter run -d windows）并登录，生成 Cookie；'
@@ -337,8 +448,12 @@ Map<String, dynamic> _buildHelp() {
           '并重放请求，无需人工介入；输出里的 acwSolved 表示本次自解次数',
       'debug.http 的额外 query 参数用 q=k1=v1,k2=v2 逗号分隔'
           '（URL 中的 & 会被 PowerShell→cmd 拆散，禁止直接传完整 URL）',
-      '参数值不要包含 & | ; " 空格 等特殊字符',
-      '大列表结果自动截断为前 3 项 + __more__，长字符串截断 160 字符',
+      '用 --dart-define 时参数值不要包含 & | ; " 空格 等特殊字符；'
+          '确有特殊字符或参数很多时，改用 --dart-define=argsFile=<json>',
+      '大列表默认只保留前 3 项 + __more__，长字符串截断 160 字符；'
+          '用 maxList / maxStr 调整，输出里的 compact 会回显实际取值',
+      'cmd=coverage 会列出「有场景没工具 / 有工具没场景」的缺口，'
+          '新增 MCP 工具或探针场景后跑一次可发现文档与实现脱节',
       '换 UA 复测：加 --dart-define=ua=desktop（或 mobile）临时换「浏览模式」，'
           '本次运行所有请求都按该 UA 发；某套模板解析异常时用它对照',
     ],
@@ -386,4 +501,49 @@ Object? compactJson(Object? v, {int maxList = 3, int maxStr = 160}) {
     return '${v.substring(0, maxStr)}…(+${v.length - maxStr}字符截断)';
   }
   return v;
+}
+
+// ==================== 参数文件 / 帮助辅助 ====================
+
+/// 读取 `--dart-define=argsFile=<path>` 指向的 JSON。
+///
+/// 这是绕开「compile-time 白名单」的官方方式：任意键都会原样透传给场景，
+/// 值可为字符串/数字/布尔，对象与数组按 JSON 字符串传入（如 debug.http 的 q）。
+Future<Map<String, String>> _loadArgsFile(String path) async {
+  final file = File(path);
+  if (!await file.exists()) {
+    throw ArgumentError('argsFile 不存在: $path');
+  }
+  final raw = jsonDecode(await file.readAsString());
+  if (raw is! Map) {
+    throw const FormatException('argsFile 顶层必须是 JSON 对象');
+  }
+  return {
+    for (final e in raw.entries)
+      e.key.toString(): switch (e.value) {
+        String s => s,
+        null => '',
+        final v => jsonEncode(v),
+      },
+  };
+}
+
+int _clampInt(
+  String raw, {
+  required int fallback,
+  required int min,
+  required int max,
+}) {
+  final v = int.tryParse(raw.trim());
+  if (v == null) return fallback;
+  return v.clamp(min, max);
+}
+
+/// 由必填参数（文档约定以 `*` 开头）拼出可直接复制的 `cmd=... key=<key>` 命令
+String _minimalCommand(String cmd, Map<String, String> params) {
+  final required = [
+    for (final e in params.entries)
+      if (e.value.startsWith('*')) '${e.key}=<${e.key}>',
+  ];
+  return ['cmd=$cmd', ...required].join(' ');
 }

@@ -28,6 +28,17 @@ int _resolvePage(String? externalPage, {int fallback = 1}) {
   return fallback;
 }
 
+/// 用户空间短链：`https://host/?100`（查询串为纯数字，无参数名）→ 用户主页。
+///
+/// 部分 Discuz 站（如 bbs.binmt.cc）用 `?uid` 的短形式直接进个人空间。
+UrlRouteResult? _matchBareUidSpace(Map<String, String> query, _SiteRef site) {
+  if (query.length != 1) return null;
+  final entry = query.entries.first;
+  if (entry.value.isNotEmpty) return null;
+  if (!RegExp(r'^\d+$').hasMatch(entry.key)) return null;
+  return _r(site, '用户主页', '/user/${entry.key}');
+}
+
 /// 解析 forum.php 链接（帖子 / 板块 / 发帖 / 在线用户 / 小黑屋 / 导读）。
 UrlRouteResult? _matchForumPhp(Map<String, String> query, _SiteRef site) {
   final mod = query['mod'];

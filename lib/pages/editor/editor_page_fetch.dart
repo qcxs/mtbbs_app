@@ -3,6 +3,8 @@ part of 'editor_page.dart';
 /// 页面/引用数据抓取 — 从绑定的 Discuz 页面提取会话数据，以及引用帖加载。
 extension on _EditorPageState {
   Future<void> _doFetchPage({bool preserveContent = false}) async {
+    // 代次：身份重建 / 再次刷新时，让旧身份的在途请求作废
+    final epoch = ++_pageFetchEpoch;
     _setState(() {
       _loadingPage = true;
       _pageError = null;
@@ -10,7 +12,7 @@ extension on _EditorPageState {
     final result = await _session.submitHelper.fetchPage(
       preserveContent: preserveContent,
     );
-    if (!mounted) return;
+    if (!mounted || epoch != _pageFetchEpoch) return;
 
     AppLogger.i(
       'EDITOR',
@@ -94,12 +96,13 @@ extension on _EditorPageState {
   }
 
   Future<void> _doFetchQuotedPost() async {
+    final epoch = _pageFetchEpoch;
     _setState(() {
       _loadingQuoted = true;
       _quotedError = null;
     });
     final post = await _session.submitHelper.fetchQuotedPost();
-    if (!mounted) return;
+    if (!mounted || epoch != _pageFetchEpoch) return;
     if (post != null) {
       _setState(() {
         _session.quotedPost = post;

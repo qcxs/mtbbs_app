@@ -114,6 +114,28 @@ List<SettingsModel> mcpSettings() {
       ),
 
     HeaderSetting(
+      title: '跨站点与身份',
+      subtitle: '站点是公开信息，跨站点默认开启；用户身份是重点，切换视角默认关闭，需手动开启',
+    ),
+    SwitchSetting(
+      title: '允许跨站点访问',
+      subtitle: '默认开启：AI 可用「site=域名或站点名」读取其它已配置站点的公开数据；关闭后传 site 会被明确拒绝',
+      icon: Icons.public,
+      value: (s) => c.allowCrossSite,
+      onChanged: (ctx, s, v) => c.setAllowCrossSite(v),
+    ),
+    SwitchSetting(
+      title: '允许切换用户视角',
+      subtitle: '默认关闭：开启后 AI 可用「account=账号名」以该站点其它已登录账号的 Cookie 只读访问，能读到该账号可见的内容',
+      icon: Icons.manage_accounts,
+      value: (s) => c.allowAccountSwitch,
+      onChanged: (ctx, s, v) async {
+        if (v && !await _confirmAllowAccountSwitch(ctx)) return;
+        await c.setAllowAccountSwitch(v);
+      },
+    ),
+
+    HeaderSetting(
       title: '访问令牌',
       subtitle: '像 API Key 一样手动管理：可创建多个、加备注、随时刷新或删除',
     ),
@@ -209,6 +231,8 @@ IconData _groupIcon(McpToolGroup group) => switch (group) {
   McpToolGroup.appInfo => Icons.info_outline,
   McpToolGroup.publicData => Icons.forum,
   McpToolGroup.editorRead => Icons.edit_note,
+  McpToolGroup.utility => Icons.sync_alt,
+  McpToolGroup.navigation => Icons.open_in_new,
   McpToolGroup.accountData => Icons.bookmark_border,
   McpToolGroup.localData => Icons.history,
 };
@@ -304,6 +328,25 @@ Future<bool> _confirmAllowRemote(BuildContext context) async {
         '开启后 MCP 会监听所有网卡（0.0.0.0），同一局域网内的设备都可尝试连接。\n\n'
         '• 没有访问令牌时，所有连接都会被拒绝；\n'
         '• 请只在可信网络（如家庭 Wi-Fi）下开启，公共网络请保持关闭。',
+    confirmText: '仍要开启',
+    danger: true,
+  );
+  return ok == true;
+}
+
+/// 开启「允许切换用户视角」前的风险确认（返回 true = 继续开启）。
+///
+/// 该权限会让 AI 读到其它已登录账号才能看到的私密内容（如仅好友可见的帖子、
+/// 该账号的收藏/提醒），因此默认关闭且每次开启都要确认。
+Future<bool> _confirmAllowAccountSwitch(BuildContext context) async {
+  final ok = await showConfirmDialog(
+    context,
+    title: '允许 AI 以其它账号的视角读取？',
+    message:
+        '开启后，AI 可在工具参数里填 account=<账号名>，用该账号的登录态读取内容。\n\n'
+        '• 只读：不会发帖、回复、收藏或修改任何数据；\n'
+        '• 该账号能看到的私密内容（好友可见内容、收藏、提醒等）也会被 AI 读到；\n'
+        '• 不填写 account 时仍使用当前账号；公共网络或共享设备请保持关闭。',
     confirmText: '仍要开启',
     danger: true,
   );

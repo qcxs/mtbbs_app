@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:mtbbs/core/app/browse_mode.dart';
-import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 站内搜索 HTTP 请求（`search.php?mod=forum`）— 基于 Dio
@@ -39,7 +38,7 @@ String searchPath({
     // 首次搜索：纯 GET 即可。submitcheck('searchsubmit', 1) 的 allowget 分支
     // 不校验 formhash（见 Discuz 源码 helper_form::submitcheck），无需 POST。
     if (keyword.isNotEmpty) {
-      final cs = charset ?? SiteStore.instance.charset;
+      final cs = charset ?? resolveRequestCharset();
       buf.write(
         '&srchtxt=${encodeQueryComponentForSite(keyword, charset: cs)}',
       );

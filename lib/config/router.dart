@@ -26,6 +26,7 @@ import 'package:mtbbs/pages/settings/history_format_page.dart';
 import 'package:mtbbs/pages/settings/models/developer_settings.dart';
 import 'package:mtbbs/pages/settings/models/mcp_settings.dart';
 import 'package:mtbbs/pages/settings/settings_group_page.dart';
+import 'package:mtbbs/pages/tools/codec_page.dart';
 import 'package:mtbbs/pages/thread/thread_view_page.dart';
 import 'package:mtbbs/pages/editor/editor_page.dart';
 import 'package:mtbbs/pages/editor/editor_history_page.dart';
@@ -177,6 +178,11 @@ GoRouter buildRouter({
             path: '/settings/editor',
             pageBuilder: (_, __) =>
                 const NoTransitionPage(child: EditorSettingsPage()),
+          ),
+          // 编解码工具：帖子页菜单与设置「存储与工具」共用入口
+          GoRoute(
+            path: '/tools/codec',
+            pageBuilder: (_, __) => const NoTransitionPage(child: CodecPage()),
           ),
           // MCP 设置 —— 与设置页「MCP 服务」分组共用同一份声明
           // （`mcpSettings`），供 MCP 快捷弹窗右上角直达

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:mtbbs/core/app/emoji_loader.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/page_fetcher.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
@@ -23,6 +24,7 @@ import 'package:mtbbs/models/browse_record.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
 import 'package:mtbbs/widgets/common/history_picker.dart';
+import 'package:mtbbs/widgets/common/identity_avatar_button.dart';
 import 'package:mtbbs/widgets/dialog/image_picker_sheet.dart';
 import 'package:mtbbs/widgets/dialog/attachment_picker_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
@@ -191,6 +193,21 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
   Timer? _autoSaveTimer;
   bool _initialSnapshotSaved = false;
 
+  // ---- 身份监听：编辑器打开期间切站点/切账号 → 按新身份重建 ----
+  //
+  // 页面数据里的 formhash 属于打开编辑器时的那个身份，换身份后继续提交会把
+  // 旧账号的 formhash 发给新账号（或反之），服务端必然拒绝，还可能串状态。
+  AuthProvider? _authRef;
+  String _identityKey = '';
+  bool _identityBound = false;
+  bool _identityRebuilding = false;
+
+  /// 重建期间又发生了身份变化（极少见）：等本轮结束再重建一次
+  bool _identityRebuildQueued = false;
+
+  /// 页面数据请求代次：身份重建 / 刷新后，旧请求的返回值直接丢弃
+  int _pageFetchEpoch = 0;
+
   // ==================== 提示系统 ====================
   final Set<String> _dismissedHints = {};
   bool _hasEmojiWarning = false;
@@ -202,6 +219,30 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
       widget.type == EditorType.editPost || widget.type == EditorType.editReply;
 
   String get _pageTitle => _session.pageTitle;
+
+  /// 编辑器绑定的网页地址（「在浏览器中打开」用）
+  ///
+  /// 优先用抓取页面数据时的真实 URL（Discuz 的 action=post/comment/reply 页），
+  /// 未加载成功时退回帖子页 / 版块页，保证菜单项始终有落点。
+  String get _editorWebUrl {
+    final fetched = _session.pageData.fetchedUrl;
+    if (fetched.isNotEmpty) {
+      // fetchedUrl 可能是站内相对路径（PageFetcher.buildUrl 的返回值）
+      if (fetched.startsWith('http://') || fetched.startsWith('https://')) {
+        return fetched;
+      }
+      final base = SiteStore.instance.baseUrl;
+      return fetched.startsWith('/') ? '$base$fetched' : '$base/$fetched';
+    }
+    final base = SiteStore.instance.baseUrl;
+    if (_session.tid.isNotEmpty) {
+      return '$base/forum.php?mod=viewthread&tid=${_session.tid}';
+    }
+    if (_session.fid.isNotEmpty) {
+      return '$base/forum.php?mod=forumdisplay&fid=${_session.fid}';
+    }
+    return base;
+  }
 
   @override
   void initState() {
@@ -267,6 +308,91 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_identityBound) return;
+    _identityBound = true;
+    _authRef = context.read<AuthProvider>();
+    _identityKey = _currentIdentityKey();
+    _authRef!.addListener(_onIdentityChanged);
+  }
+
+  /// 站点 + 账号的身份指纹（formhash 的作用域）
+  String _currentIdentityKey() {
+    final auth = _authRef ?? context.read<AuthProvider>();
+    return '${SiteStore.instance.host}|${auth.uid}';
+  }
+
+  /// 编辑期间切换了站点或账号 —— 不退出，按新身份**重建**编辑器。
+  ///
+  /// 旧身份的内存状态（formhash / 图片 / 引用帖 / 正文）全部丢弃；有未提交内容时
+  /// 先写自动快照保底，可在「编辑历史」里找回。重建后重新抓取页面数据，编辑页
+  /// （editPost/editReply）会按新身份重新填充标题与正文。
+  void _onIdentityChanged() {
+    if (!mounted) return;
+    final key = _currentIdentityKey();
+    if (key == _identityKey) return;
+    _identityKey = key;
+    if (_identityRebuilding) {
+      _identityRebuildQueued = true;
+      return;
+    }
+    unawaited(_rebuildForNewIdentity());
+  }
+
+  Future<void> _rebuildForNewIdentity() async {
+    _identityRebuilding = true;
+    // 旧身份草稿先落快照（有改动才写），随后整体清空
+    try {
+      if (_hasUnsavedChanges) _saveAutoSnapshot();
+    } catch (_) {}
+    _autoSaveTimer?.cancel();
+    // 让仍在飞行的旧身份请求作废
+    _pageFetchEpoch++;
+    _session.titleCtl.clear();
+    _session.contentCtl.clear();
+    _session.contentCtl.pendingAids.clear();
+    _session.pageData = const PageFormData();
+    _session.quotedPost = null;
+    _images.reset();
+    _aidToAttachment = {};
+    _attachmentList = [];
+    _attachmentSheetDataNotifier.value = const _AttachmentSheetData([], false);
+    _previewData.value = const EditorPreviewData.empty();
+    _anchors = const [];
+    _lastSeenText = '';
+    _activeAnchor = null;
+    _editorMarks = const [];
+    _initialTitle = '';
+    _initialContent = '';
+    _initialPendingAids = {};
+    _lastSavedTitle = '';
+    _lastSavedContent = '';
+    _lastSavedPendingAids = {};
+    _hasUnsavedChanges = false;
+    _initialSnapshotSaved = false;
+    _hasEmojiWarning = false;
+    _pageError = null;
+    _quotedError = null;
+    _showImagePanel = false;
+    _setState(() {});
+    showToast('身份已切换，编辑器已按新身份重建');
+    try {
+      // 用新身份重新取 formhash / 图片 / 引用帖
+      await _doFetchPage(preserveContent: false);
+      if (mounted && _isReply && widget.tid.isNotEmpty && widget.pid.isNotEmpty) {
+        await _doFetchQuotedPost();
+      }
+    } finally {
+      _identityRebuilding = false;
+      if (_identityRebuildQueued && mounted) {
+        _identityRebuildQueued = false;
+        unawaited(_rebuildForNewIdentity());
+      }
+    }
+  }
+
   void _focusContent() => _contentFocusNode.requestFocus();
 
   /// setState 安全包装：part 文件中的扩展方法无法访问 @protected 的 setState，
@@ -280,6 +406,7 @@ class _EditorPageState extends State<EditorPage> with WindowListener {
 
   @override
   void dispose() {
+    _authRef?.removeListener(_onIdentityChanged);
     _session.titleCtl.removeListener(_onContentChanged);
     _session.contentCtl.removeListener(_onContentChanged);
     _session.contentCtl.removeListener(_onEditingChanged);

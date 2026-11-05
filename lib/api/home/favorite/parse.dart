@@ -102,6 +102,21 @@ Map<String, dynamic> parseAddResult(String body, int statusCode) {
   if (statusCode != 200) {
     return {'success': false, 'message': 'HTTP $statusCode'};
   }
+
+  // 优先只判定 Discuz 提示信息容器。整页扫描会命中页脚免责声明——
+  // 52pojie 页脚含「非法用途」，收藏实际成功却会被误判为失败。
+  final alert = _extractAlertText(body);
+  if (alert.isNotEmpty) {
+    if (alert.contains('已收藏')) {
+      return {'success': true, 'message': '已收藏过该帖子'};
+    }
+    final err = _extractError(alert);
+    if (err != null) return {'success': false, 'message': err};
+    final ok = alert.contains('收藏成功');
+    return {'success': ok, 'message': ok ? '收藏成功' : '未知响应'};
+  }
+
+  // 无提示容器（非标准模板 / 纯文本响应）时保持原有的全页判定
   if (body.contains('已收藏')) {
     return {'success': true, 'message': '已收藏过该帖子'};
   }
@@ -122,10 +137,37 @@ Map<String, dynamic> parseDeleteResult(String body, int statusCode) {
   if (statusCode != 200) {
     return {'success': false, 'message': 'HTTP $statusCode'};
   }
+
+  // 同 parseAddResult：只扫提示信息容器，避免页脚免责声明误判
+  final alert = _extractAlertText(body);
+  if (alert.isNotEmpty) {
+    final err = _extractError(alert);
+    if (err != null) return {'success': false, 'message': err};
+    final ok = alert.contains('取消收藏成功') || alert.contains('收藏已取消');
+    return {'success': ok, 'message': ok ? '取消收藏成功' : '未知响应'};
+  }
+
   final err = _extractError(body);
   if (err != null) return {'success': false, 'message': err};
   final ok = body.contains('取消收藏成功') || body.contains('收藏已取消');
   return {'success': ok, 'message': ok ? '取消收藏成功' : '未知响应'};
+}
+
+/// 提取 Discuz `showmessage` 提示页的消息文本。
+///
+/// 标准模板用 `.alert_error` / `.alert_right` / `.alert_info`，部分模板用
+/// `#messagetext`。只在这里判定业务结果，**不要整页扫正文**：站点页脚
+/// 可能常驻「非法」「失败」等词（如 52pojie 的免责声明），会把成功误判为失败。
+String _extractAlertText(String body) {
+  try {
+    final doc = htmlParser.parse(body);
+    final el = doc.querySelector(
+      '.alert_error, .alert_right, .alert_info, #messagetext, .alert',
+    );
+    return el?.text.trim() ?? '';
+  } catch (_) {
+    return '';
+  }
 }
 
 /// 从正文提取 Discuz 错误文案：自首个错误关键词起截 60 字符并去 HTML 标签。

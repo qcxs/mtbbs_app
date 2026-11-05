@@ -140,6 +140,7 @@ class CommentSection extends StatelessWidget {
     required VoidCallback? onNext,
     required VoidCallback? onPageTap,
     required VoidCallback? onRefresh,
+    VoidCallback? onTitleTap,
   }) {
     final cs = Theme.of(context).colorScheme;
     return Container(
@@ -149,12 +150,20 @@ class CommentSection extends StatelessWidget {
         children: [
           Icon(Icons.forum_outlined, size: 18, color: cs.onSurfaceVariant),
           const SizedBox(width: 6),
-          Text(
-            '评论区',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurface,
+          GestureDetector(
+            onTap: onTitleTap,
+            behavior: HitTestBehavior.opaque,
+            child: Text(
+              '评论区',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+                // 下划线表示可点击（点击后输入楼层并跳转）
+                decoration: onTitleTap == null
+                    ? null
+                    : TextDecoration.underline,
+              ),
             ),
           ),
           const Spacer(),

@@ -9,20 +9,25 @@
 ```
 调用层（跨平台，无 shell 依赖）
   flutter test tool/api_probe_test.dart --dart-define=cmd=<命令> --dart-define=key=value
+  flutter test tool/api_probe_test.dart --dart-define=argsFile=tool/args.example.json   ← 推荐
 
 规范层（自描述）
   cmd=help            → 动态生成全部命令/参数/示例/踩坑提示（永不过期）
+  cmd=coverage        → 探针场景 ↔ MCP 工具覆盖矩阵
   docs/10-API探针使用规范.md（本文件）→ 架构、上手引导、踩坑记录
 
 实现层（Dart，复杂逻辑全部在此，shell 只做转发）
   tool/api_bootstrap.dart  模拟 App 初始化序列（真实 HttpOverrides + Windows 证书 + 站点 + Cookie + 人机验证自解）
   tool/acw_challenge.dart  阿里云 ESA `acw_sc__v2` 挑战的自解算法（纯 Dart，无 JS 引擎）
-  tool/api_scenarios.dart  场景聚合器（合并 scenarios/ 下三个子模块，对外接口不变）
+  tool/api_scenarios.dart  场景聚合器（合并 scenarios/ 下四个子模块，对外接口不变）
   tool/scenarios/scenario_types.dart   ApiScenario 类型定义
   tool/scenarios/read_scenarios.dart   只读场景（含 Cookie 目录扫描）
   tool/scenarios/write_scenarios.dart  写操作场景（发帖/评论/回复/修改/评分/收藏）
   tool/scenarios/debug_scenarios.dart  调试场景（debug.http）
-  tool/api_probe_test.dart 入口：解析 --dart-define、执行场景、输出协议
+  tool/scenarios/cache_scenarios.dart  本地帖子缓存场景（不联网）
+  tool/scenarios/mcp_coverage.dart     探针 ↔ MCP 工具覆盖矩阵
+  tool/args.example.json   参数文件模板（argsFile 用）
+  tool/api_probe_test.dart 入口：参数解析、执行场景、输出协议
 ```
 
 - 旧的 `api_probe.ps1` 便捷层已移除（Windows-only，且 PowerShell 5.1 有编码/解析坑），跨平台一律直接调用 `flutter test`（见 help 的 `invoke` 字段）。
@@ -39,13 +44,23 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=session.list
 
 # 3) 执行具体命令（无需登录的示例）
 flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define=view=newthread --dart-define=log=off
+
+# 4) 推荐：参数写进 JSON 文件，彻底绕开 shell 转义与参数白名单
+flutter test tool/api_probe_test.dart --dart-define=argsFile=tool/args.example.json
+
+# 5) 覆盖矩阵 / 本地缓存（都不联网）
+flutter test tool/api_probe_test.dart --dart-define=cmd=coverage
+flutter test tool/api_probe_test.dart --dart-define=cmd=cache.list
 ```
 
 ## 3. 全局参数
 
 | 参数 | 说明 |
 |---|---|
-| `cmd` | 场景命令（默认 `session.list`），见第 4 节清单 |
+| `cmd` | 场景命令（默认 `session.list`），见第 4 节清单；`coverage` 输出覆盖矩阵 |
+| `argsFile` | **推荐**：参数 JSON 文件路径（如 `tool/args.example.json`）。文件内可写任意场景参数键，无白名单限制、不受 `& \| ; 空格` 影响；显式 `--dart-define` 优先于文件 |
+| `maxList` | 结果列表保留项数（默认 3，上限 50）；输出里的 `compact` 回显实际取值 |
+| `maxStr` | 字符串截断长度（默认 160，上限 100000；`raw` 场景不受限） |
 | `account` | 登录账号名（空 = 游客）。先跑 `session.list` 查看可用账号，再追加 `account=<账号名>` |
 | `site` | 站点（索引数字或名称，空 = 第一个站点），如 `site=1` 切到吾爱破解 |
 | `baseUrl` | 指定任意站点 URL（测试站等不在默认列表中的站点）；传入时站点列表替换为单站，Cookie 目录自动跟随 host |
@@ -104,14 +119,18 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 | `wall.edit` | 编辑自己的留言（写操作），`uid=*`、`cid=*`、`message=*` | 是 |
 | `wall.delete` | 删除留言（写操作，破坏性），`uid=*`、`cid=*` | 是 |
 | `debug.http` | 调试：GET 指定路径，输出状态码/响应头/原始正文（携带当前会话 Cookie） | 否 |
+| `cache.list` | 列出当前站点本机的帖子缓存索引（自动缓存 / 离线保存），`kind`、`limit`；**不联网** | 否 |
+| `cache.thread` | 读取某帖本地缓存快照摘要（`tid=*`、`page`、`kind`）；**不联网**，用于验证快照字段与页码完整性 | 否 |
+
+> `coverage` 不是场景，而是与 `help` 同级的元命令：输出「场景 → MCP 工具」映射、`mcpToolsWithoutScenario`、`scenariosWithoutMcpTool`、`mappingUnknownTools`。新增工具/场景后跑一次即可发现契约与实现的缺口。
 
 > 完整参数与说明以 `cmd=help` 实时输出为准（本表可能滞后）。
 
 ## 5. 调用规范与参数约定
 
-- **输出协议**：`=== API_PROBE_BEGIN ===` + JSON + `=== API_PROBE_END ===`。`ok=true` = 管线无异常；`result.success` = 业务层结果。缺登录态时 `blocked=true` + `reminder` 提示先运行 App 登录。
-- **大结果压缩**：列表保留前 3 项 + `__more__`，长字符串截断 160 字符（`debug.http` 等 `raw` 场景除外，由场景自己控制长度）。
-- **参数值禁止包含** `& | ; " 空格` 等特殊字符：`&` 在 PowerShell→cmd 传递时会被拆成命令分隔符；`"` 会被 shell 剥离（JSON 方案不可行）。
+- **输出协议**：`=== API_PROBE_BEGIN ===` + JSON + `=== API_PROBE_END ===`。`ok=true` = 管线无异常；`status` 细分：`ok`（正常）/ `invalid_args`（命令未知或缺必填参数，`ok=false`）/ `blocked`（缺登录态）/ `business`（业务层失败，`ok=true` + `result.success=false`）/ `failed`（异常或初始化失败）。缺登录态时 `blocked=true` + `reminder` 提示先运行 App 登录。
+- **大结果压缩**：列表默认保留前 3 项 + `__more__`，长字符串截断 160 字符；用 `maxList` / `maxStr` 调整，非默认值时输出带 `compact:{maxList,maxStr}`（`debug.http` 等 `raw` 场景不受 `maxStr` 限制）。
+- **参数传递优先级**：`--dart-define` 非空值 > `argsFile` 文件值 > 默认值。含特殊字符或键很多时**一律用 `argsFile`**，不要再拼 `--dart-define`。
 - **浏览模式（UA）**：默认跟随站点「浏览模式」（探针加载的是默认站点，通常即移动 UA）；加 `--dart-define=ua=desktop`（或 `mobile`）可临时换 UA 复测，**整次运行生效**、覆盖所有接口。**白名单**：仅 `guide.list` / `forum.list` / `search.list` / `my.threads` / `user.info` / `debug.http` 支持 `ua=mobile`；其余场景为 PC-only，传 `mobile` 会被明确拒绝（见各场景 `mobileSupported` 标记、docs/03）。
 - **`debug.http` 的 query 参数**：用 `q=k1=v1,k2=v2` 逗号分隔（逗号在各类 shell 中均安全），禁止直接传含 `&` 的完整 URL：
   ```
@@ -137,10 +156,11 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 
 | 坑 | 表现 | 规避 |
 |---|---|---|
-| `&` 被 cmd 拆分 | URL 直接传参被拆成多条命令 | 用 `path=` + `q=` 逗号分隔 |
-| 双引号被 shell 剥离 | JSON 参数引号丢失，解析静默失败 | 弃用 JSON，用逗号分隔 `k=v` |
+| `&` 被 cmd 拆分 | URL 直接传参被拆成多条命令 | 用 `path=` + `q=` 逗号分隔，或改用 `argsFile` |
+| 双引号被 shell 剥离 | JSON 参数引号丢失，解析静默失败 | 改用 `argsFile`（JSON 由 Dart 读取，不经过 shell） |
 | `String.fromEnvironment` 循环变量失效 | 运行时求值取默认值，参数丢失 | 必须逐键显式 `const` 读取 |
-| args 白名单固定 | 新参数键没读进 map，请求缺参数 | 新键需在 `args` map 里显式声明 |
+| args 白名单固定 | 新参数键没读进 map，请求缺参数 | 新键补进 `envArgs`，或直接用 `argsFile`（无白名单） |
+| 列表只留前 3 项 | 看不到完整列表就误判数据缺失 | 调 `maxList`（上限 50），或看 `__more__` 计数 |
 | PowerShell 5.1 中文注释编码 | 无 BOM UTF-8 按 ANSI 解码，脚本解析失败 | ps1 已移除；如需脚本保持纯 ASCII |
 | flutter_test 自动装 mock HttpOverrides | 所有请求返回 400 | bootstrap 里用真实 `HttpOverrides.global` 覆盖 |
 | Dio 对 Map 数据不自动加 Content-Type | PHP 收不到 `$_POST`，表单校验失败 | 显式 `Headers.formUrlEncodedContentType` |
@@ -153,9 +173,10 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=guide.list --dart-define
 
 新增一个只读 API 的测试：
 
-1. 在 [api_scenarios.dart](tool/api_scenarios.dart) 注册一条 `ApiScenario`：`desc`（说明用途，AI 可读）、`params`（参数说明，`*` 前缀 = 必填，自动校验）、`needsLogin`（需登录设 true，无 Cookie 自动拦截）、`run`（调用对应 `lib/api/**/export.dart` 函数）。
-2. 若参数键不在 [api_probe_test.dart](tool/api_probe_test.dart) 的 `args` 白名单，需显式补一行 `const String.fromEnvironment('键')`。
-3. 跑 `cmd=help` 确认新场景已自动出现在清单，再实际执行验证。
+1. 在对应子模块注册一条 `ApiScenario`：`desc`（说明用途，AI 可读）、`params`（参数说明，`*` 前缀 = 必填，自动校验）、`needsLogin`（需登录设 true，无 Cookie 自动拦截）、`run`（调用对应 `lib/api/**/export.dart` 函数）。
+2. 参数键推荐直接用 `argsFile` 传入（无白名单）；若要支持 `--dart-define` 快捷方式，再补一行 `const String.fromEnvironment('键')`。
+3. 在 `tool/scenarios/mcp_coverage.dart` 补上该场景对应的 MCP 工具（没有就留空）。
+4. 跑 `cmd=help` 确认新场景已自动出现（含 `required` / `minimal`），再跑 `cmd=coverage` 检查缺口，最后实际执行验证。
 
 开发新 API（http/parse/export 未完成时）的调试循环：
 
@@ -168,11 +189,14 @@ debug.http 拿原始响应（含登录态 Cookie） → 对照 Chrome MCP 渲染
 | 文件 | 作用 |
 |---|---|
 | `tool/api_probe_test.dart` | 探针入口：参数解析、执行、协议输出、help 自描述 |
-| `tool/api_scenarios.dart` | 场景聚合器（合并 `tool/scenarios/` 三个子模块） |
+| `tool/api_scenarios.dart` | 场景聚合器（合并 `tool/scenarios/` 四个子模块） |
 | `tool/scenarios/scenario_types.dart` | `ApiScenario` 类型定义 |
 | `tool/scenarios/read_scenarios.dart` | 只读场景 + Cookie 目录扫描 |
 | `tool/scenarios/write_scenarios.dart` | 写操作场景 |
 | `tool/scenarios/debug_scenarios.dart` | 调试场景（`debug.http`） |
+| `tool/scenarios/cache_scenarios.dart` | 本地帖子缓存场景（不联网） |
+| `tool/scenarios/mcp_coverage.dart` | 探针 ↔ MCP 工具覆盖矩阵 |
+| `tool/args.example.json` | `argsFile` 参数文件模板 |
 | `tool/api_bootstrap.dart` | 初始化序列（真实网络 + Windows 证书 + 站点 + Cookie 切换 + 临时 cookie/header 注入 + 拦截页探测与自解） |
 | `tool/acw_challenge.dart` | 人机验证（阿里云 ESA `acw_sc__v2`）自解算法：`extractAcwArg1` / `acwScV2` |
 | `lib/api/**/export.dart` | 被测 API 层（http 请求 + parse 解析） |

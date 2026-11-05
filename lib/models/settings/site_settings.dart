@@ -29,7 +29,7 @@ class SiteSettings {
   factory SiteSettings.defaults(String host) => SiteSettings(
     host: host,
     network: SiteNetworkSettings.defaults(),
-    pages: SitePageGateSettings.defaults(),
+    pages: SitePageGateSettings.defaultsFor(host),
     content: SiteContentSettings.defaults(),
     identity: SiteIdentitySettings.defaults(),
     shortcutLinks: DefaultConfig.instance.shortcutLinksFor(host),
@@ -78,7 +78,7 @@ class SiteSettings {
       schemaVersion: (map['schemaVersion'] as num?)?.toInt() ?? 1,
       host: host,
       network: SiteNetworkSettings.fromMap(sub('network')),
-      pages: SitePageGateSettings.fromMap(sub('pages')),
+      pages: SitePageGateSettings.fromMap(sub('pages'), defaults: d.pages),
       content: SiteContentSettings.fromMap(sub('content')),
       identity: SiteIdentitySettings.fromMap(sub('identity')),
       creditFormula: map['creditFormula']?.toString() ?? d.creditFormula,
@@ -161,6 +161,26 @@ class SitePageGateSettings {
   factory SitePageGateSettings.defaults() =>
       const SitePageGateSettings(disabledPageIds: {}, browserOnly: false);
 
+  /// 站点级默认值（`assets/config/site_defaults.json` 的 `sites[host].pageGate`）。
+  ///
+  /// 用于「阅读为主」的站点（如 52pojie）默认关闭 App 接管，避免进入尚未适配的页面；
+  /// 用户在设置里改过之后以保存值为准。
+  factory SitePageGateSettings.defaultsFor(String host) {
+    final raw = DefaultConfig.instance.siteDefaultsFor(host)['pageGate'];
+    if (raw is! Map) return SitePageGateSettings.defaults();
+    final map = raw.cast<String, dynamic>();
+    final ids = map['disabledPageIds'];
+    return SitePageGateSettings(
+      disabledPageIds: ids is List
+          ? ids
+                .map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toSet()
+          : const {},
+      browserOnly: map['browserOnly'] as bool? ?? false,
+    );
+  }
+
   SitePageGateSettings copyWith({
     Set<String>? disabledPageIds,
     bool? browserOnly,
@@ -174,8 +194,11 @@ class SitePageGateSettings {
     'browserOnly': browserOnly,
   };
 
-  factory SitePageGateSettings.fromMap(Map<String, dynamic> map) {
-    final d = SitePageGateSettings.defaults();
+  factory SitePageGateSettings.fromMap(
+    Map<String, dynamic> map, {
+    SitePageGateSettings? defaults,
+  }) {
+    final d = defaults ?? SitePageGateSettings.defaults();
     final ids = map['disabledPageIds'];
     return SitePageGateSettings(
       disabledPageIds: ids is List

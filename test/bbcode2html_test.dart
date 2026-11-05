@@ -87,6 +87,33 @@ void main() {
     });
   });
 
+  group('BBCode2Html - 正文相对链接', () {
+    test('[url=forum.php?...] 按注入的所属站点补全', () {
+      final converter = BBCode2Html(baseUrl: 'https://b.example.com');
+      final html = converter.convert(
+        '[url=forum.php?mod=viewthread&tid=1]链接[/url]',
+      );
+      expect(
+        html,
+        contains(
+          'href="https://b.example.com/forum.php?mod=viewthread&amp;tid=1"',
+        ),
+      );
+    });
+
+    test('绝对地址与 App 内路径不补站点前缀', () {
+      final converter = BBCode2Html(baseUrl: 'https://b.example.com');
+      expect(
+        converter.convert('[url=https://a.example.com/x]绝对[/url]'),
+        contains('href="https://a.example.com/x"'),
+      );
+      expect(
+        converter.convert('[url=/thread/1]App[/url]'),
+        contains('href="/thread/1"'),
+      );
+    });
+  });
+
   group('BBCode2Html - 背景色标签', () {
     test('[backcolor] 转成 background-color 样式', () {
       final html = BBCode2Html().convert('[backcolor=red]背景[/backcolor]');

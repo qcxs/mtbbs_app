@@ -82,6 +82,59 @@ void main() {
     });
   });
 
+  group('resolveContentUrl', () {
+    test('相对脚本地址按页面所属站点补全', () {
+      expect(
+        resolveContentUrl(
+          'forum.php?mod=viewthread&tid=1',
+          base: 'https://b.example.com',
+        ),
+        'https://b.example.com/forum.php?mod=viewthread&tid=1',
+      );
+    });
+
+    test('站点部署在子目录时保留子目录', () {
+      expect(
+        resolveContentUrl('forum.php?mod=forumdisplay&fid=2', base: 'https://b.com/bbs'),
+        'https://b.com/bbs/forum.php?mod=forumdisplay&fid=2',
+      );
+    });
+
+    test('站内绝对脚本路径同样补全', () {
+      expect(
+        resolveContentUrl('/forum.php?mod=viewthread&tid=2', base: 'https://b.example.com'),
+        'https://b.example.com/forum.php?mod=viewthread&tid=2',
+      );
+    });
+
+    test('绝对地址、App 深链与 App 内路径原样返回', () {
+      const absolute = 'https://a.example.com/forum.php?mod=viewthread&tid=3';
+      expect(resolveContentUrl(absolute, base: 'https://b.example.com'), absolute);
+      expect(
+        resolveContentUrl('mtbbs://thread/1', base: 'https://b.example.com'),
+        'mtbbs://thread/1',
+      );
+      expect(
+        resolveContentUrl('/thread/123', base: 'https://b.example.com'),
+        '/thread/123',
+      );
+    });
+
+    test('协议相对地址按页面站点协议补全', () {
+      expect(
+        resolveContentUrl('//cdn.example.com/a.png', base: 'https://b.example.com'),
+        'https://cdn.example.com/a.png',
+      );
+    });
+
+    test('base 为空时保持原文（无站点上下文不瞎拼）', () {
+      expect(
+        resolveContentUrl('forum.php?mod=viewthread&tid=4', base: ''),
+        'forum.php?mod=viewthread&tid=4',
+      );
+    });
+  });
+
   group('encodeQueryComponentForSite', () {
     test('utf-8 站点保持标准 UTF-8 百分号编码', () {
       expect(

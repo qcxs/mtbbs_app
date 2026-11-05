@@ -29,12 +29,55 @@ void main() {
       expect(result.isOtherSite, isFalse);
     });
 
+    test('GBK 百分号编码的附加参数不影响帖子识别', () {
+      // highlight=%B5%E3%C6%C0 是 GBK 的「点评」；按 UTF-8 解码整串会抛异常
+      expect(
+        UrlRouter.parse(
+          'https://www.52pojie.cn/forum.php?mod=viewthread&tid=2116760&highlight=%B5%E3%C6%C0',
+        ).appPath,
+        '/thread/2116760',
+      );
+    });
+
+    test('GBK 搜索关键词按 GBK 正确解码', () {
+      final result = UrlRouter.parse(
+        'https://www.52pojie.cn/search.php?mod=forum&srchtxt=%B9%AB%CA%BD',
+      );
+      expect(result.label, '搜索「公式」');
+      expect(result.appPath, '/search/result?kw=%E5%85%AC%E5%BC%8F');
+    });
+
     test('用户主页 home.php?mod=space&uid → /user/{uid}', () {
       expect(
         UrlRouter.parse(
           'https://bbs.binmt.cc/home.php?mod=space&uid=88062',
         ).appPath,
         '/user/88062',
+      );
+    });
+
+    test('用户空间短链 /?100 → /user/100', () {
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/?100').appPath,
+        '/user/100',
+      );
+      // 带锚点也要识别
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/?100#profile').appPath,
+        '/user/100',
+      );
+    });
+
+    test('短链只认唯一的纯数字查询串', () {
+      // 多个参数 / 非数字 / 带值都不当作 uid 短链
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/?100&page=2').appPath,
+        isNull,
+      );
+      expect(UrlRouter.parse('https://bbs.binmt.cc/?abc').appPath, isNull);
+      expect(
+        UrlRouter.parse('https://bbs.binmt.cc/?uid=100').appPath,
+        isNull,
       );
     });
 

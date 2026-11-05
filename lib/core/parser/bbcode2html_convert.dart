@@ -244,8 +244,14 @@ extension BBCode2HtmlConvert on BBCode2Html {
     html = html.replaceAllMapped(
       RegExp(r'\[url(?:=([^\]]*))?\]([\s\S]*?)\[\/url\]', caseSensitive: false),
       (m) {
-        final href = (m.group(1) ?? m.group(2) ?? '').trim();
+        final rawHref = (m.group(1) ?? m.group(2) ?? '').trim();
         final text = (m.group(2) ?? '').trim();
+        // 作者可能直接发相对地址（如 forum.php?mod=viewthread&tid=1）。
+        // 解析层保留原文，这里按注入的站点 base 补全，供点击时直接打开。
+        final base = _baseUrl;
+        final href = base == null || base.isEmpty
+            ? rawHref
+            : resolveContentUrl(rawHref, base: base);
         return '<a href="$href" target="_blank">$text</a>';
       },
     );

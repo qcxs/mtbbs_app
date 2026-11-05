@@ -20,10 +20,14 @@ void main() {
   StreamableMcpServer buildServer({
     bool Function(McpToolGroup)? isGroupEnabled,
     List<String> tokens = tokenList,
+    bool allowCrossSite = true,
+    bool allowAccountSwitch = false,
   }) => StreamableMcpServer(
     serverFactory: (_) => McpToolRegistry.createServer(
       isGroupEnabled: isGroupEnabled ?? (_) => true,
       accountInfo: () => const McpAccountInfo.guest(),
+      allowCrossSite: allowCrossSite,
+      allowAccountSwitch: allowAccountSwitch,
     ),
     host: '127.0.0.1',
     port: 0,
@@ -165,14 +169,27 @@ void main() {
       expect(names, contains('list_credit_log'));
       expect(names, contains('list_notifications'));
 
-      // 只读断言 ①：每个工具的注解都必须声明 readOnlyHint
-      for (final tool in tools.tools) {
-        expect(
-          tool.annotations?.readOnlyHint,
-          isTrue,
-          reason: '工具未声明只读: ${tool.name}',
-        );
-      }
+      // 新增能力：本地编解码（只读）与页面导航（会切换 UI，故 readOnlyHint=false）
+      expect(names, contains('codec_text'));
+      expect(names, contains('open_app_page'));
+
+      // 只读断言 ①：除页面导航外，每个工具的注解都必须声明 readOnlyHint
+      final nonReadOnly = {
+        for (final tool in tools.tools)
+          if (tool.annotations?.readOnlyHint != true) tool.name,
+      };
+      expect(
+        nonReadOnly,
+        {'open_app_page'},
+        reason: '只有页面导航允许声明为非只读（它会切换 App 当前页面）',
+      );
+      expect(
+        tools.tools
+            .firstWhere((t) => t.name == 'codec_text')
+            .annotations
+            ?.readOnlyHint,
+        isTrue,
+      );
 
       // 只读断言 ②：不得出现任何写操作工具名
       const forbidden = {
@@ -200,6 +217,43 @@ void main() {
       final text = (result.content.first as TextContent).text;
       expect(text, contains('测试版块'));
       expect(text, contains(SiteStore.instance.host));
+      await client.close();
+    });
+
+    test('调用 codec_text 本地解码 Base64（不发网络）', () async {
+      final client = buildClient();
+      await client.connect(transportFor(port, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'codec_text',
+          arguments: const {
+            'op': 'base64',
+            'direction': 'decode',
+            'text': 'aGVsbG8gTVRCQlM=',
+          },
+        ),
+      );
+
+      expect(result.isError, isFalse);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('hello MTBBS'));
+      expect(text, contains('"direction":"decode"'));
+      await client.close();
+    });
+
+    test('未注入导航时 open_app_page 返回可读错误', () async {
+      final client = buildClient();
+      await client.connect(transportFor(port, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'open_app_page',
+          arguments: const {'target': 'thread', 'id': '123'},
+        ),
+      );
+
+      expect(result.isError, isTrue);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('导航尚未就绪'));
       await client.close();
     });
 
@@ -243,6 +297,10 @@ void main() {
       expect(result.isError, isFalse);
       final text = (result.content.first as TextContent).text;
       expect(text, contains('"isLoggedIn":false'));
+      expect(text, contains('"versionName"'));
+      expect(text, contains('"commitHash"'));
+      expect(text, contains('"repo"'));
+      expect(text, contains('"builtAt"'));
       expect(text, isNot(contains('cookie')));
       expect(text, isNot(contains('formhash')));
       expect(text, isNot(contains('token')));
@@ -317,6 +375,107 @@ void main() {
       );
       expect(result.isError, isFalse);
       await client.close();
+    });
+  });
+
+  group('跨站点 / 切换账号视角权限（默认关闭）', () {
+    late StreamableMcpServer server;
+    late int port;
+
+    setUp(() async {
+      server = buildServer();
+      await server.start();
+      port = server.boundPort;
+    });
+
+    tearDown(() async {
+      await server.stop();
+    });
+
+    test('关闭跨站点权限时拒绝 site 参数并提示去设置开启', () async {
+      final noCross = buildServer(allowCrossSite: false);
+      await noCross.start();
+      final client = buildClient();
+      await client.connect(transportFor(noCross.boundPort, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'list_forums',
+          arguments: const {'site': 'other.example.com'},
+        ),
+      );
+
+      expect(result.isError, isTrue);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('跨站点访问未开启'));
+      expect(text, contains('跨站点与身份'));
+      await client.close();
+      await noCross.stop();
+    });
+
+    test('默认关闭 account 参数并提示去设置开启', () async {
+      final client = buildClient();
+      await client.connect(transportFor(port, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'list_forums',
+          arguments: const {'account': 'alice'},
+        ),
+      );
+
+      expect(result.isError, isTrue);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('切换用户视角未开启'));
+      await client.close();
+    });
+
+    test('help 如实报告权限状态（跨站点默认开、换视角默认关）', () async {
+      final client = buildClient();
+      await client.connect(transportFor(port, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(name: 'help', arguments: const {}),
+      );
+
+      expect(result.isError, isFalse);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('"crossSite":true'));
+      expect(text, contains('"accountSwitch":false'));
+      await client.close();
+    });
+
+    test('site 未匹配到站点时给出可读错误', () async {
+      final extra = buildServer();
+      await extra.start();
+      final client = buildClient();
+      await client.connect(transportFor(extra.boundPort, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'list_forums',
+          arguments: const {'site': 'no-such-site.example.com'},
+        ),
+      );
+
+      expect(result.isError, isTrue);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('未找到站点'));
+      await client.close();
+      await extra.stop();
+    });
+
+    test('开启切换视角后 help 报告两项均已开启', () async {
+      final extra = buildServer(allowAccountSwitch: true);
+      await extra.start();
+      final client = buildClient();
+      await client.connect(transportFor(extra.boundPort, bearer: tokenA));
+      final result = await client.callTool(
+        CallToolRequest(name: 'help', arguments: const {}),
+      );
+
+      expect(result.isError, isFalse);
+      final text = (result.content.first as TextContent).text;
+      expect(text, contains('"crossSite":true'));
+      expect(text, contains('"accountSwitch":true'));
+      await client.close();
+      await extra.stop();
     });
   });
 

@@ -199,6 +199,101 @@ extension on _ThreadViewPageState {
     );
   }
 
+  /// 点击「评论区」标题：输入楼层号并跳转
+  void _showFloorJumpDialog() {
+    if (_isCacheMode || _data == null) return;
+    // 只看作者视图按作者回复数分页，与全帖楼层号不是一套页码，无法可靠定位
+    if (widget.authorid != null && widget.authorid!.isNotEmpty) {
+      showToast('只看作者模式下不支持按楼层跳转');
+      return;
+    }
+    showPageJumpDialog(
+      context,
+      currentPage: _currentPage,
+      title: '跳转楼层',
+      autofocus: true,
+      showSummary: false,
+      hintText: '输入楼层号（1 为主帖）',
+      onGoToPage: _jumpToFloor,
+    );
+  }
+
+  /// 用 Discuz 的跳转定位接口解析楼层所在页。
+  ///
+  /// 不本地推算每页帖数：置顶回复、删帖都会让"每页帖数"失真。
+  Future<int?> _resolveFloorPage(int floor) async {
+    final result = await redirect_api.resolveRedirectPage(
+      _dio,
+      tid: widget.tid,
+      authorid: widget.authorid ?? '0',
+      postno: floor,
+    );
+    if (result['success'] == true) {
+      return result['page'] as int?;
+    }
+    // 落到帖子页但没有页码 = 楼层超出范围；其余按请求失败处理
+    return result['reason'] == 'floor_not_found' ? 0 : null;
+  }
+
+  /// 按楼层号定位：由站点重定向解析目标页，必要时加载，再滚动到该楼层
+  Future<void> _jumpToFloor(int floor) async {
+    if (_isCacheMode || floor < 1) return;
+    if (floor == 1) {
+      _setState(() => _mainPostLoaded = true);
+      _scrollToTop();
+      return;
+    }
+    if (_pageLoading) {
+      showToast('评论正在加载，请稍后再试');
+      return;
+    }
+    final targetPage = await _resolveFloorPage(floor);
+    if (!mounted) return;
+    if (targetPage == null) {
+      showToast('跳转失败，请稍后重试');
+      return;
+    }
+    if (targetPage == 0) {
+      showToast('楼层 $floor 不存在');
+      return;
+    }
+    if (targetPage > _totalPages) {
+      showToast('楼层 $floor 不存在');
+      return;
+    }
+    if (targetPage != _currentPage) {
+      _setState(() {
+        _currentPage = targetPage;
+      });
+      _recordThreadHistory();
+      if (!_commentPages.containsKey(targetPage)) {
+        final ok = await _loadCommentPage(targetPage);
+        if (!mounted) return;
+        if (!ok) {
+          showToast('加载第 $targetPage 页失败');
+          return;
+        }
+      } else if (!mounted) {
+        return;
+      }
+    }
+    _scrollToFloor(floor);
+  }
+
+  /// 在当前页查找指定楼层并滚动；找不到时提示（楼层可能已删除）
+  void _scrollToFloor(int floor) {
+    final posts = _commentPages[_currentPage];
+    if (posts != null) {
+      for (final post in posts) {
+        if (post.floor == floor) {
+          _scrollToPost(post.pid);
+          return;
+        }
+      }
+    }
+    showToast('未找到 $floor 楼（可能已被删除）');
+  }
+
   // ==================== 导航 ====================
 
   void _navigateComment() {

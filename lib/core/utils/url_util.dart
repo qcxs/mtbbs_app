@@ -32,6 +32,85 @@ String normalizeUrl(String url, {String? base}) {
   return Uri.parse(baseUrl).resolve(url).toString();
 }
 
+/// 补全正文里的「网页相对地址」（如 `forum.php?mod=viewthread&tid=1`）。
+///
+/// 解析层刻意保留作者原文不补域名；这里由**处理层**按页面所属站点补全。
+/// 以下情况原样返回，避免误伤：
+/// - 绝对地址（`http:` / `https:` / `mailto:` / `javascript:` 等任意 scheme）
+/// - App 深链（`mtbbs://`）与 App 内路径（`/thread/123` 等，不含 `.php`）
+/// - 空串
+///
+/// [base] 必须是**当前页面所属站点**的 baseUrl（跨站页面用临时会话的地址），
+/// 不能取全局 `SiteStore`，否则跨站帖子会被补成当前站点。
+String resolveContentUrl(String url, {required String base}) {
+  final text = url.trim();
+  if (text.isEmpty) return text;
+  if (text.startsWith('mtbbs://')) return text;
+  final parsed = Uri.tryParse(text);
+  if (parsed != null && parsed.hasScheme) return text;
+  // 以 / 开头的 Discuz 脚本路径按站点相对地址处理；其余 / 路径视为 App 内路径
+  // （`//cdn/...` 是协议相对地址，不能按 App 路径处理）
+  if (text.startsWith('/') && !text.startsWith('//')) {
+    final path = text.split('?').first.split('#').first;
+    if (!path.endsWith('.php')) return text;
+  }
+  final b = base.trim();
+  if (b.isEmpty) return text;
+  // 浏览器按文档 URL 解析相对地址；站点 base 补尾斜杠才能保留子目录
+  final baseUri = Uri.parse(b.endsWith('/') ? b : '$b/');
+  return baseUri.resolve(text).toString();
+}
+
+/// 宽松解析 URL 查询串。
+///
+/// [Uri.queryParameters] 会把**整串**参数值按 UTF-8 解码，GBK 站点（如 52pojie）
+/// 常见 `highlight=%B5%E3%C6%C0` 这类非 UTF-8 字节，会直接抛
+/// `FormatException: Unexpected extension byte`，导致整条链接被判为"不支持的页面"。
+///
+/// 这里逐个参数解码：UTF-8 失败时按 GBK 兜底，仍失败则保留原文，保证
+/// `mod` / `tid` 等 ASCII 参数永远可读。
+Map<String, String> parseQueryLenient(String query) {
+  final result = <String, String>{};
+  if (query.isEmpty) return result;
+  for (final part in query.split('&')) {
+    if (part.isEmpty) continue;
+    final eq = part.indexOf('=');
+    final key = decodeQueryComponentLenient(eq < 0 ? part : part.substring(0, eq));
+    final value = eq < 0 ? '' : decodeQueryComponentLenient(part.substring(eq + 1));
+    if (key.isNotEmpty) result[key] = value;
+  }
+  return result;
+}
+
+/// 解码单个查询参数；UTF-8 失败时按 GBK 兜底（GBK 站点如 52pojie）。
+String decodeQueryComponentLenient(String raw) {
+  try {
+    return Uri.decodeQueryComponent(raw);
+  } catch (_) {
+    final text = raw.replaceAll('+', ' ');
+    final bytes = <int>[];
+    for (var i = 0; i < text.length; i++) {
+      final c = text.codeUnitAt(i);
+      if (c == 0x25 && i + 2 < text.length) {
+        final value = int.tryParse(text.substring(i + 1, i + 3), radix: 16);
+        if (value != null) {
+          bytes.add(value);
+          i += 2;
+          continue;
+        }
+      }
+      // 非 ASCII 原字符（如已被上层解码的中文）无法安全混入 GBK 字节流
+      if (c > 0x7E) return raw;
+      bytes.add(c);
+    }
+    try {
+      return gbk.decode(bytes);
+    } catch (_) {
+      return raw;
+    }
+  }
+}
+
 /// 按站点字符集对查询参数值做百分号编码。
 ///
 /// [Uri.encodeQueryComponent] 固定按 UTF-8 编码；而 Discuz 会按站点字符集

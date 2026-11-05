@@ -26,10 +26,30 @@ String htmlToMarkdown(dom.Element root) {
 /// Parsedown 容器 → 展示用 BBCode（[Html2BBCode] 直接拼接）
 String parsedownHtmlToBbcode(dom.Element root) {
   final math = _MathCollector();
-  final markdown = _Html2Markdown(math).convert(root);
+  final attachments = _AttachmentCollector();
+  final markdown = _Html2Markdown(math, attachments: attachments).convert(root);
   if (markdown.trim().isEmpty) return '';
   final bbcode = markdownToBbcode(markdown, templates: _displayTemplates);
-  return math.restoreBbcode(bbcode);
+  return attachments.restore(math.restoreBbcode(bbcode));
+}
+
+/// 普通附件（`<ignore_js_op>` 内 `a[href*=mod=attachment]`）收集器
+///
+/// 与数学公式同理，JSON 不能直接写进 Markdown：文件名里的 `_`、`*`、`[]`
+/// 会被 Markdown 转义/解释，往返后 JSON 就坏了。解析期间先用控制字符占位，
+/// 转成 BBCode 后再替换为 `[appdata]`。
+class _AttachmentCollector {
+  final List<String> items = [];
+
+  String add(Map<String, dynamic> data) {
+    items.add(jsonEncode(data));
+    return '\x00ATTACH${items.length - 1}\x00';
+  }
+
+  String restore(String text) => text.replaceAllMapped(
+    RegExp(r'\x00ATTACH(\d+)\x00'),
+    (m) => '[appdata]${items[int.parse(m.group(1)!)]}[/appdata]',
+  );
 }
 
 /// 数学公式（`.math-render`）收集器
@@ -108,9 +128,14 @@ const _displayTemplates = MdConvertTemplates(
 ///
 /// 只覆盖 Parsedown 会产出的标签；未知标签保留其文本内容。
 class _Html2Markdown {
-  _Html2Markdown(this._math);
+  _Html2Markdown(this._math, {_AttachmentCollector? attachments})
+    : _attachments = attachments;
 
   final _MathCollector _math;
+
+  /// 非空时把普通附件转成 `[appdata]` 占位符（BBCode 阅读场景）；
+  /// 为空时（纯 Markdown 输出）转成普通链接。
+  final _AttachmentCollector? _attachments;
 
   String convert(dom.Element root) => _blocksOf(root).trim();
 
@@ -216,6 +241,8 @@ class _Html2Markdown {
         // 识别成 Front Matter 并转成 [free]
         return '***\n\n';
       case 'ignore_js_op':
+        final attach = _attachment(node);
+        if (attach != null) return '$attach\n\n';
         final img = node.querySelector('img');
         return img == null ? '' : '${_image(img)}\n\n';
       case 'div':
@@ -350,6 +377,8 @@ class _Html2Markdown {
       case 'img':
         return _image(node);
       case 'ignore_js_op':
+        final attach = _attachment(node);
+        if (attach != null) return attach;
         final img = node.querySelector('img');
         return img == null ? '' : _image(img);
       case 'div':
@@ -366,6 +395,53 @@ class _Html2Markdown {
     // 内容含反引号时用双反引号包裹
     final fence = text.contains('`') ? '``' : '`';
     return '$fence$text$fence';
+  }
+
+  /// `<ignore_js_op>` 内的普通附件（图片附件之外的 zip/rar 等）
+  ///
+  /// 结构：
+  /// ```html
+  /// <ignore_js_op>
+  ///   <img src=".../filetype/zip.gif">
+  ///   <span id="attach_N">
+  ///     <a href="forum.php?mod=attachment&aid=...">name.zip</a>
+  ///     <em class="xg1">(1.67 MB, 下载次数: 4329)</em>
+  ///   </span>
+  /// </ignore_js_op>
+  /// ```
+  /// 文件类型图标（zip.gif）没有展示价值，绝不能当普通图片输出——否则文件名、
+  /// 大小、下载入口全部丢失，正文只剩一张图标（52pojie Markdown 帖 2117334）。
+  ///
+  /// BBCode 阅读场景转成 [appdata] 占位符（由 [_AttachmentCollector] 还原），
+  /// 纯 Markdown 输出则转成普通链接。
+  String? _attachment(dom.Element op) {
+    final link = op.querySelector('a[href*="mod=attachment"]');
+    if (link == null) return null;
+    final href = (link.attributes['href'] ?? '').trim();
+    if (href.isEmpty) return null;
+
+    final name = link.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final emText = op.querySelector('em.xg1')?.text ?? '';
+    final size =
+        RegExp(r'\(([^,]+)').firstMatch(emText)?.group(1)?.trim() ?? '';
+    final downloads =
+        RegExp(r'下载次数[：:]\s*(\d+)').firstMatch(emText)?.group(1) ?? '';
+    final aid = RegExp(r'aid=([^&]+)').firstMatch(href)?.group(1) ?? '';
+    final url = normalizeUrl(href);
+
+    final collector = _attachments;
+    if (collector != null) {
+      return collector.add({
+        'type': 'attach',
+        if (aid.isNotEmpty) 'aid': aid,
+        'name': name.isEmpty ? '附件' : name,
+        if (size.isNotEmpty) 'size': size,
+        if (url.isNotEmpty) 'url': url,
+        if (downloads.isNotEmpty) 'downloads': downloads,
+      });
+    }
+    final text = name.isEmpty ? url : name;
+    return '[$text](${_destination(url)})';
   }
 
   String _image(dom.Element img) {

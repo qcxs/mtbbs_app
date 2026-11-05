@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mtbbs/core/parser/page_fetcher.dart';
@@ -39,33 +38,26 @@ class EditorSubmitHelper {
     required this.isReply,
   });
 
-  /// 构造编辑器页面 URL
-  String _buildUrl() {
-    final type = switch (editorType) {
-      EditorType.post => 'post',
-      EditorType.comment => 'comment',
-      EditorType.reply => 'reply',
-      EditorType.editPost => 'editPost',
-      EditorType.editReply => 'editReply',
-    };
-    return PageFetcher.buildUrl(
-      type: type,
-      fid: widgetFid,
-      tid: widgetTid,
-      pid: widgetPid,
-      repquote: isReply ? widgetPid : null,
-    );
-  }
+  /// 编辑器类型 → PageFetcher 的 URL 类型标识
+  String get _typeKey => switch (editorType) {
+    EditorType.post => 'post',
+    EditorType.comment => 'comment',
+    EditorType.reply => 'reply',
+    EditorType.editPost => 'editPost',
+    EditorType.editReply => 'editReply',
+  };
 
   /// 拉取绑定的 Discuz 页面数据
   Future<PageFormData> fetchPage({bool preserveContent = false}) async {
-    final url = _buildUrl();
-    if (url.isEmpty) return const PageFormData(success: false, error: 'URL 为空');
-
     try {
-      final resp = await ApiService().dio.get(url);
-      final html = resp.data is String ? (resp.data as String) : '';
-      final result = PageFetcher.parsePage(html, url: url);
+      final result = await post_api.fetchEditorPage(
+        ApiService().dio,
+        type: _typeKey,
+        fid: widgetFid,
+        tid: widgetTid,
+        pid: widgetPid,
+        repquote: isReply ? widgetPid : null,
+      );
       if (result.success) {
         AppLogger.i(
           'PAGE',
@@ -137,6 +129,9 @@ class EditorSubmitHelper {
     String content, {
     Map<String, String> attachNew = const {},
   }) async {
+    final fid = pageData.fid.isNotEmpty ? pageData.fid : widgetFid;
+    final tid = pageData.tid.isNotEmpty ? pageData.tid : widgetTid;
+    final pid = pageData.pid.isNotEmpty ? pageData.pid : widgetPid;
     AppLogger.i(
       'EDITOR',
       jsonEncode({
@@ -144,85 +139,33 @@ class EditorSubmitHelper {
         'titleLen': title.length,
         'contentLen': content.length,
         'attachNew': attachNew.length,
-        'fid': pageData.fid.isNotEmpty ? pageData.fid : widgetFid,
-        'tid': pageData.tid.isNotEmpty ? pageData.tid : widgetTid,
-        'pid': pageData.pid.isNotEmpty ? pageData.pid : widgetPid,
+        'fid': fid,
+        'tid': tid,
+        'pid': pid,
       }),
     );
     try {
-      final editResp = await ApiService().dio.post(
-        '/forum.php?mod=post&action=edit&fid=${pageData.fid.isNotEmpty ? pageData.fid : widgetFid}&tid=${pageData.tid.isNotEmpty ? pageData.tid : widgetTid}&pid=${pageData.pid.isNotEmpty ? pageData.pid : widgetPid}&editsubmit=yes&inajax=1&formhash=${pageData.formhash}',
-        data: {
-          'formhash': pageData.formhash,
-          'posttime': pageData.posttime,
-          'subject': title,
-          'message': content,
-          'fid': pageData.fid.isNotEmpty ? pageData.fid : widgetFid,
-          'tid': pageData.tid.isNotEmpty ? pageData.tid : widgetTid,
-          'pid': pageData.pid.isNotEmpty ? pageData.pid : widgetPid,
-          'page': '1',
-          'editsubmit': 'yes',
-          ...attachNew,
-        },
-        options: Options(
-          followRedirects: false,
-          sendTimeout: const Duration(seconds: 60),
-          receiveTimeout: const Duration(seconds: 60),
-          headers: {'Content-Type': Headers.formUrlEncodedContentType},
-        ),
+      final result = await post_api.submitEditPost(
+        ApiService().dio,
+        fid: fid,
+        tid: tid,
+        pid: pid,
+        formhash: pageData.formhash,
+        posttime: pageData.posttime,
+        subject: title,
+        message: content,
+        attachNew: attachNew,
       );
-
-      final code = editResp.statusCode;
-      final location = (editResp.headers.value('location') ?? '').trim();
-      final body = editResp.data is String ? (editResp.data as String) : '';
-
-      if (code == 301 || code == 302) {
-        final ok = location.contains('viewthread');
-        AppLogger.i(
-          'EDITOR',
-          jsonEncode({
-            'action': 'submitEdit_redirect',
-            'success': ok,
-            'code': code,
-            'location': location,
-          }),
-        );
-        if (ok) {
-          return const SubmitResult(success: true, message: '编辑成功');
-        }
-        return SubmitResult(success: false, message: '编辑后重定向异常: $location');
-      }
-
-      final errorMatch = RegExp(
-        r'(抱歉|错误|失败|小于|限制|禁止|不能|非法|无权|权限)',
-      ).firstMatch(body);
-      if (errorMatch != null) {
-        final start = body.indexOf(errorMatch.group(0)!);
-        final snippet = body.substring(start, start + 60);
-        final cleanMsg = snippet.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-        AppLogger.w(
-          'EDITOR',
-          jsonEncode({'action': 'submitEdit_error', 'error': cleanMsg}),
-        );
-        return SubmitResult(success: false, message: cleanMsg);
-      }
-
-      if (body.contains('审核') || body.contains('审核中')) {
-        AppLogger.i(
-          'EDITOR',
-          jsonEncode({'action': 'submitEdit_approval', 'needsApproval': true}),
-        );
-        return const SubmitResult(
-          success: true,
-          message: '编辑成功，等待审核',
-          needsApproval: true,
-        );
-      }
       AppLogger.i(
         'EDITOR',
-        jsonEncode({'action': 'submitEdit_done', 'success': true}),
+        jsonEncode({
+          'action': 'submitEdit_done',
+          'success': result.success,
+          'message': result.message,
+          'needsApproval': result.needsApproval,
+        }),
       );
-      return const SubmitResult(success: true, message: '编辑成功');
+      return result;
     } catch (e) {
       AppLogger.e(
         'EDITOR',

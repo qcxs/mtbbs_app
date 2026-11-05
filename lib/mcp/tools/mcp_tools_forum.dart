@@ -8,16 +8,19 @@ import 'package:mtbbs/api/forum/search/export.dart' as search;
 import 'package:mtbbs/api/forum/viewthread/detail/export.dart' as viewthread;
 import 'package:mtbbs/api/group/groupindex/export.dart' as groups;
 import 'package:mtbbs/api/home/space/export.dart' as space;
+import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/mcp/mcp_scope.dart';
 import 'package:mtbbs/mcp/mcp_types.dart';
 import 'package:mtbbs/mcp/tools/mcp_payloads.dart';
 import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
-import 'package:mtbbs/services/api_service.dart';
+import 'package:mtbbs/models/thread_snapshot.dart';
+import 'package:mtbbs/services/thread_cache_service.dart';
 
 /// 论坛公开数据组工具（`McpToolGroup.publicData`）
 ///
-/// 全部走现有 `lib/api/**/export.dart`，共用 `ApiService().dio`
+/// 全部走现有 `lib/api/**/export.dart`，共用 `McpScope.effectiveDio`
 /// （因此登录态下的可见范围与 App 内一致），本层不新增解析逻辑。
-List<McpToolDefinition> forumTools() => [
+List<McpToolDefinition> forumTools(McpAccountInfoProvider accountInfo) => [
   McpToolDefinition(
     name: 'list_forums',
     group: McpToolGroup.publicData,
@@ -44,7 +47,7 @@ List<McpToolDefinition> forumTools() => [
       final fid = McpArgs.requireStr(args, 'fid');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
       final result = await forumdisplay.getForumThreads(
-        ApiService().dio,
+        McpScope.effectiveDio,
         fid: fid,
         page: page,
       );
@@ -72,7 +75,7 @@ List<McpToolDefinition> forumTools() => [
       final view = McpArgs.str(args, 'view', fallback: 'newthread');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
       final result = await guide.getThreadList(
-        ApiService().dio,
+        McpScope.effectiveDio,
         view: view,
         page: page,
       );
@@ -109,10 +112,12 @@ List<McpToolDefinition> forumTools() => [
         );
       }
       final result = await search.searchThreads(
-        ApiService().dio,
+        McpScope.effectiveDio,
         keyword: keyword,
         page: page,
         searchId: searchId.isEmpty ? null : searchId,
+        // 跨站点时按目标站点编码查询参数（如 GBK 站点），未跨站传 null 走全局
+        charset: McpScope.current?.charset,
       );
       return McpPayloads.threadList(
         result,
@@ -135,13 +140,21 @@ List<McpToolDefinition> forumTools() => [
         '默认只返回前 ${McpPayloads.defaultMaxPosts} 层（更多请提高 max_posts 或翻页）。'
         '单层正文超过 max_bbcode_chars（默认 ${McpPayloads.maxBbcodeChars} 字，上限 '
         '${McpPayloads.maxBbcodeCharsLimit}）时分片返回，该层会带 bbcodeNextOffset，'
-        '用它作为 bbcode_offset 再次调用即可续读同一层（务必沿用相同的 full_bbcode）。',
+        '用它作为 bbcode_offset 再次调用即可续读同一层（务必沿用相同的 full_bbcode）。'
+        '数据源默认 source=auto：优先使用 App 的帖子缓存（不发 HTTP），'
+        '对时效性要求高时传 source=network 强制联网。',
     properties: {
       'tid': JsonSchema.string(description: '帖子 ID（tid）'),
       'page': JsonSchema.integer(
         minimum: 1,
         maximum: 200,
         description: '页码，默认 1',
+      ),
+      'source': JsonSchema.string(
+        description:
+            '数据来源：auto（默认，有效缓存优先、未命中再联网）/ network（强制联网）/ '
+            'cache（只读缓存，未命中时返回 cacheMiss=true 而不发请求）',
+        enumValues: const ['auto', 'network', 'cache'],
       ),
       'max_posts': JsonSchema.integer(
         minimum: 1,
@@ -192,8 +205,41 @@ List<McpToolDefinition> forumTools() => [
         min: 1,
         max: McpPayloads.maxBbcodeCharsLimit,
       );
+      final source = McpArgs.str(args, 'source', fallback: 'auto').toLowerCase();
+      if (!const {'auto', 'network', 'cache'}.contains(source)) {
+        throw ArgumentError(
+          '不支持的 source=$source，可用：auto / network / cache',
+        );
+      }
+      if (source != 'network') {
+        final viewer = McpScope.effectiveUid;
+        final hit = await _readCachedThread(
+          tid: tid,
+          viewer: viewer,
+          page: page,
+          requireUnexpired: source == 'auto',
+        );
+        if (hit != null) {
+          return McpPayloads.threadDetail(
+            _cachedResult(hit, page),
+            tid: tid,
+            maxPosts: maxPosts,
+            fullBbcode: fullBbcode,
+            bbcodeOffset: bbcodeOffset,
+            maxChars: maxChars,
+            extra: _cacheExtra(hit, page),
+          );
+        }
+        if (source == 'cache') {
+          return _cacheMiss(
+            tid: tid,
+            page: page,
+            metas: await _cachedMetas(tid: tid, viewer: viewer),
+          );
+        }
+      }
       final result = await viewthread.getThreadDetail(
-        ApiService().dio,
+        McpScope.effectiveDio,
         tid: tid,
         page: page,
       );
@@ -204,6 +250,7 @@ List<McpToolDefinition> forumTools() => [
         fullBbcode: fullBbcode,
         bbcodeOffset: bbcodeOffset,
         maxChars: maxChars,
+        extra: const {'source': 'network'},
       );
     },
   ),
@@ -225,7 +272,7 @@ List<McpToolDefinition> forumTools() => [
         throw ArgumentError('uid 与 username 至少传一个');
       }
       final result = await space.getUserProfile(
-        ApiService().dio,
+        McpScope.effectiveDio,
         uid: uid,
         username: username,
       );
@@ -260,7 +307,7 @@ List<McpToolDefinition> forumTools() => [
       final view = McpArgs.requireStr(args, 'view');
       final orderby = McpArgs.str(args, 'orderby', fallback: 'thisweek');
       return ranklist.getRanklist(
-        ApiService().dio,
+        McpScope.effectiveDio,
         type: type,
         view: view,
         orderby: orderby,
@@ -272,14 +319,14 @@ List<McpToolDefinition> forumTools() => [
     group: McpToolGroup.publicData,
     description: '获取当前在线会员与统计信息。',
     properties: const {},
-    run: (args) async => online.fetchOnlineUsers(ApiService().dio),
+    run: (args) async => online.fetchOnlineUsers(McpScope.effectiveDio),
   ),
   McpToolDefinition(
     name: 'get_rss_feed',
     group: McpToolGroup.publicData,
     description: '获取站点 RSS 最新条目（标题、链接、发布时间）。',
     properties: const {},
-    run: (args) async => rss.getRssFeed(ApiService().dio),
+    run: (args) async => rss.getRssFeed(McpScope.effectiveDio),
   ),
   McpToolDefinition(
     name: 'list_groups',
@@ -288,7 +335,7 @@ List<McpToolDefinition> forumTools() => [
         '列出站点的圈子（Discuz 群组）首页：推荐圈子、圈子分类（含各分类下的圈子预览）与积分排行。'
         '读某个圈子的帖子用 list_forum_threads（fid 传圈子的 gid）。',
     properties: const {},
-    run: (args) async => McpPayloads.groupIndex(await groups.fetchGroupIndex(ApiService().dio)),
+    run: (args) async => McpPayloads.groupIndex(await groups.fetchGroupIndex(McpScope.effectiveDio)),
   ),
   McpToolDefinition(
     name: 'list_group_forums',
@@ -307,7 +354,7 @@ List<McpToolDefinition> forumTools() => [
       final gid = McpArgs.requireStr(args, 'gid');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
       final result = await groups.fetchCategoryGroups(
-        ApiService().dio,
+        McpScope.effectiveDio,
         gid: gid,
         page: page,
       );
@@ -315,3 +362,128 @@ List<McpToolDefinition> forumTools() => [
     },
   ),
 ];
+
+// ==================== 帖子缓存（source=auto / cache） ====================
+
+class _CachedThreadHit {
+  const _CachedThreadHit({required this.snapshot, required this.meta});
+
+  final ThreadSnapshot snapshot;
+  final ThreadSnapshotMeta meta;
+}
+
+/// 某帖在当前站点、当前账号下可见的缓存索引（自动 + 离线），新的在前。
+///
+/// 缓存库损坏或读取异常时降级为空：不能让本地缓存问题阻断联网读取。
+Future<List<ThreadSnapshotMeta>> _cachedMetas({
+  required String tid,
+  required String viewer,
+}) async {
+  final service = ThreadCacheService.instance;
+  if (service.isDisabled) return const [];
+  try {
+    return await service.snapshotsForThread(
+      host: McpScope.effectiveHost,
+      tid: tid,
+      viewer: viewer,
+    );
+  } catch (e) {
+    AppLogger.w('MCP', '读取帖子缓存索引失败: $e');
+    return const [];
+  }
+}
+
+/// 从新到旧挑一份可用快照。
+///
+/// 第 1 页只要快照存在即可（至少含楼主帖）；更深页要求该页评论确实缓存过。
+Future<_CachedThreadHit?> _readCachedThread({
+  required String tid,
+  required String viewer,
+  required int page,
+  required bool requireUnexpired,
+}) async {
+  final metas = await _cachedMetas(tid: tid, viewer: viewer);
+  final now = DateTime.now();
+  for (final meta in metas) {
+    if (requireUnexpired && meta.isExpiredAt(now)) continue;
+    if (page > 1 && !meta.cachedPages.contains(page)) continue;
+    try {
+      final snapshot = await ThreadCacheService.instance.readSnapshot(
+        meta.key,
+      );
+      if (snapshot == null) continue;
+      return _CachedThreadHit(snapshot: snapshot, meta: meta);
+    } catch (e) {
+      AppLogger.w('MCP', '读取帖子缓存失败(${meta.key}): $e');
+    }
+  }
+  return null;
+}
+
+/// 把快照还原成与联网结果同形的输入，复用 `McpPayloads.threadDetail`
+Map<String, dynamic> _cachedResult(_CachedThreadHit hit, int page) {
+  final snapshot = hit.snapshot;
+  final posts = snapshot.commentPages[page];
+  return {
+    'tid': snapshot.tid,
+    'success': true,
+    'title': snapshot.title,
+    'currentPage': page,
+    'totalPages': snapshot.totalPages,
+    'mainPost': snapshot.mainPost.toMap(),
+    'posts': posts == null
+        ? <Map<String, dynamic>>[]
+        : [for (final p in posts) p.toMap()],
+  };
+}
+
+/// 缓存命中时附加的溯源信息：AI 可据此判断内容是否够新、分页是否完整
+Map<String, dynamic> _cacheExtra(_CachedThreadHit hit, int page) {
+  final meta = hit.meta;
+  final stale = meta.isExpiredAt(DateTime.now());
+  final pageCached = page == 1 || meta.cachedPages.contains(page);
+  return {
+    'source': 'cache',
+    'cache': {
+      'kind': meta.kind.name,
+      'stale': stale,
+      'cachedPages': meta.cachedPages,
+      'totalPages': meta.totalPages,
+      'approxBytes': meta.approxBytes,
+      if (meta.lastVisitedAt != null)
+        'lastVisitedAt': meta.lastVisitedAt!.toIso8601String(),
+      if (meta.savedAt != null) 'savedAt': meta.savedAt!.toIso8601String(),
+      if (meta.expiresAt != null)
+        'expiresAt': meta.expiresAt!.toIso8601String(),
+    },
+    'cacheNote':
+        '${[
+          '内容来自本地缓存，可能不含最新回复',
+          if (stale) '且已超过自动缓存有效期',
+          if (!pageCached) '该页评论尚未缓存，仅返回楼主帖',
+          '需要最新内容请传 source=network',
+        ].join('；')}。',
+  };
+}
+
+/// `source=cache` 未命中：不发请求，直接告诉 AI 哪些页有缓存
+Map<String, dynamic> _cacheMiss({
+  required String tid,
+  required int page,
+  required List<ThreadSnapshotMeta> metas,
+}) {
+  final pages = <int>{
+    for (final meta in metas) ...meta.cachedPages,
+  }.toList()..sort();
+  return {
+    'tid': tid,
+    'success': false,
+    'source': 'cache',
+    'cacheMiss': true,
+    'requestedPage': page,
+    'cacheAvailablePages': pages,
+    if (metas.isEmpty) 'cacheEmpty': true,
+    'message':
+        '该帖第 $page 页没有可用缓存；请改用 source=network 或 source=auto 重新读取。',
+  };
+}

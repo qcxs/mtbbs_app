@@ -12,6 +12,7 @@ import 'package:mtbbs/models/managed_item.dart';
 /// | `shortcuts.json` | 全局快捷键 | `global` |
 /// | `cache.json` | 图片缓存过期天数 / 帖子缓存配置 | `expireDays` / `thread` |
 /// | `quick_replies.json` | 帖子迷你编辑器常用语 | `items` |
+/// | `site_defaults.json` | 站点级默认设置（如页面接管默认关闭项） | `sites` |
 ///
 /// 各文件**独立容错**：加载失败或 JSON 错误只让对应域返回空/默认，不影响其它域。
 /// 只有站点配置带硬编码回退（否则 App 无法启动）。
@@ -24,6 +25,7 @@ class DefaultConfig {
   Map<String, dynamic>? _shortcuts;
   Map<String, dynamic>? _cache;
   Map<String, dynamic>? _quickReplies;
+  Map<String, dynamic>? _siteDefaults;
 
   /// 从 assets 加载全部默认配置（每个文件独立 try/catch）
   Future<void> load() async {
@@ -32,6 +34,7 @@ class DefaultConfig {
     _shortcuts = await _loadJson('assets/config/shortcuts.json');
     _cache = await _loadJson('assets/config/cache.json');
     _quickReplies = await _loadJson('assets/config/quick_replies.json');
+    _siteDefaults = await _loadJson('assets/config/site_defaults.json');
   }
 
   Future<Map<String, dynamic>?> _loadJson(String path) async {
@@ -70,6 +73,18 @@ class DefaultConfig {
         charset: 'gbk',
       ),
     ];
+  }
+
+  // ==================== 站点级默认设置（非关键，缺省返回空 Map） ====================
+
+  /// 指定站点的默认设置段（`site_defaults.json` 的 `sites[host]`）。
+  ///
+  /// 只在「没有已保存的站点设置」或旧文档缺少对应段时作为兜底，
+  /// 不覆盖用户已经保存过的选择。
+  Map<String, dynamic> siteDefaultsFor(String host) {
+    final sites = _siteDefaults?['sites'] as Map<String, dynamic>?;
+    final entry = sites?[host];
+    return entry is Map ? entry.cast<String, dynamic>() : const {};
   }
 
   // ==================== 快捷链接（非关键，JSON 失败返回空） ====================

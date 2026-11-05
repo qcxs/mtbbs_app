@@ -3,10 +3,10 @@ import 'package:mtbbs/api/home/follow/export.dart' as follow;
 import 'package:mtbbs/api/home/friend/export.dart' as friend;
 import 'package:mtbbs/api/home/mythread/export.dart' as mythread;
 import 'package:mtbbs/api/home/wall/export.dart' as wall;
+import 'package:mtbbs/mcp/mcp_scope.dart';
 import 'package:mtbbs/mcp/mcp_types.dart';
 import 'package:mtbbs/mcp/tools/mcp_payloads.dart';
 import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
-import 'package:mtbbs/services/api_service.dart';
 
 /// 用户维度工具（`McpToolGroup.publicData`）—— "看某个人"的三个面：
 /// 他发过什么（主题/回复）、他的好友、他的关注与粉丝。
@@ -45,7 +45,7 @@ List<McpToolDefinition> userTools() => [
       final type = McpArgs.str(args, 'type', fallback: 'thread');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
       final result = await mythread.getMyThreads(
-        ApiService().dio,
+        McpScope.effectiveDio,
         uid: uid.isEmpty ? null : uid,
         type: type,
         page: page,
@@ -72,7 +72,7 @@ List<McpToolDefinition> userTools() => [
       final uid = McpArgs.str(args, 'uid');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
       final result = await friend.getFriendList(
-        ApiService().dio,
+        McpScope.effectiveDio,
         uid: uid,
         page: page,
       );
@@ -105,7 +105,7 @@ List<McpToolDefinition> userTools() => [
       final type = McpArgs.str(args, 'type', fallback: 'following');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
       final result = await follow.getFollowList(
-        ApiService().dio,
+        McpScope.effectiveDio,
         type: type,
         uid: uid,
         page: page,
@@ -131,7 +131,7 @@ List<McpToolDefinition> userTools() => [
     run: (args) async {
       final uid = McpArgs.str(args, 'uid');
       final page = McpArgs.integer(args, 'page', fallback: 1, min: 1, max: 200);
-      final result = await wall.getWall(ApiService().dio, uid: uid, page: page);
+      final result = await wall.getWall(McpScope.effectiveDio, uid: uid, page: page);
       return McpPayloads.wallList(result, uid: uid);
     },
   ),

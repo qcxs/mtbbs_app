@@ -1,0 +1,7 @@
+{
+  "cmd": "thread.detail",
+  "tid": "<帖子 ID>",
+  "page": "1",
+  "maxList": 10,
+  "maxStr": 400
+}

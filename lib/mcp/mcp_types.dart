@@ -22,6 +22,18 @@ enum McpToolGroup {
     description: '读取编辑器里正在写的内容与历史快照',
     defaultEnabled: true,
   ),
+  utility(
+    id: 'utility',
+    label: '本地工具',
+    description: '编解码与哈希（Base64 / URL / Hex / MD5 / SHA），不访问网络',
+    defaultEnabled: true,
+  ),
+  navigation(
+    id: 'navigation',
+    label: 'App 导航',
+    description: '让 AI 在 App 内打开帖子 / 用户 / 版块 / 搜索页（仅内容页白名单）',
+    defaultEnabled: true,
+  ),
   accountData(
     id: 'account_data',
     label: '账号相关数据',

@@ -15,6 +15,7 @@ import 'package:mtbbs/providers/search_history_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
+import 'package:mtbbs/mcp/mcp_server_controller.dart';
 import 'package:mtbbs/core/app/app_link.dart';
 import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/app_shortcuts.dart';
@@ -215,6 +216,15 @@ void main() async {
     initialLocation:
         navItems[settings.defaultTabIndex.clamp(0, navItems.length - 1)].path,
   );
+
+  // MCP 页面导航：仅在路由创建后注入；未就绪时返回给 AI 可读原因
+  McpServerController.instance.bindNavigator((path) {
+    if (rootNavigatorKey.currentContext == null) {
+      return 'App 页面尚未就绪（可能仍在前台首帧渲染中），请稍后重试';
+    }
+    unawaited(router.push(path));
+    return null;
+  });
 
   // Windows 下监听窗口 resize/移动/最大化并记忆状态
   final app = _buildApp(

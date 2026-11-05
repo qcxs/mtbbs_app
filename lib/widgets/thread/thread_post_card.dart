@@ -150,6 +150,110 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     );
   }
 
+  /// 本楼「点评」（楼中楼）：作者 + 内容 + 时间
+  Widget _buildComments(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final comments = widget.post.comments;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.outlineVariant, width: 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+            child: Row(
+              children: [
+                Icon(Icons.chat_bubble_outline, size: 14, color: cs.primary),
+                const SizedBox(width: 4),
+                const Text(
+                  '点评',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${comments.length}',
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          for (final c in comments)
+            Container(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: cs.outlineVariant, width: 0.5),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  UserAvatar(
+                    uid: c.uid,
+                    nickname: c.username,
+                    radius: 12,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                c.username,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (c.time.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                c.time,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (c.message.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              c.message,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   /// 「查看全部 N 条评分」入口
   Widget _ratingViewAllButton(BuildContext context, int total) {
     final cs = Theme.of(context).colorScheme;
@@ -284,6 +388,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
               widget.post.bbcode,
               style: TextStyle(color: cs.onSurfaceVariant),
             ),
+          if (widget.post.comments.isNotEmpty) _buildComments(context),
           if (widget.post.rating != null) _buildRating(context),
           if (!widget.readOnly && !widget.post.isOp)
             Padding(

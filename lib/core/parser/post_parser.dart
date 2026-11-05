@@ -57,6 +57,7 @@ Map<String, dynamic> parsePostFromTable(
       source = '',
       bbcode = '';
   Map<String, dynamic>? rating;
+  List<Map<String, dynamic>> comments = const [];
 
   // 置顶回复：管理员将该楼层置顶时，楼层号前会渲染 settop 图标
   // （克米 PC / 移动模板：`td.plc ... a[id^=postnum] img[src*=settop]`，title=置顶回复）
@@ -136,8 +137,15 @@ Map<String, dynamic> parsePostFromTable(
     }
 
     // 回帖奖励：h3.psth → [appdata]
-    // DOM 结构：div.pct > div.cm > h3.psth，不在 td.t_f 内容区内
-    final rewardEl = plc.querySelector('h3.psth');
+    // DOM 结构：div.pct > div.cm > h3.psth，不在 td.t_f 内容区内。
+    // 注意「点评」也用 h3.psth（icon_ring + 点评），必须按文案挑，不能取第一个。
+    dom.Element? rewardEl;
+    for (final h3 in plc.querySelectorAll('h3.psth')) {
+      if (sanitizeText(h3.text).contains('回帖奖励')) {
+        rewardEl = h3;
+        break;
+      }
+    }
     if (rewardEl != null) {
       // <h3 class="psth">回帖奖励 <span class="xw1 xs2 xi1">+30</span> 金币</h3>
       final amountSpan = rewardEl.querySelector('span.xw1.xs2.xi1');
@@ -299,6 +307,9 @@ Map<String, dynamic> parsePostFromTable(
         'entries': entries,
       };
     }
+
+    // 点评（楼中楼）：div#comment_<pid>.cm > h3.psth「点评」+ div.pstl × N
+    comments = _parsePostComments(plc);
   }
 
   return {
@@ -315,8 +326,73 @@ Map<String, dynamic> parsePostFromTable(
     'bbcode': bbcode,
     'followUrl': followUrl,
     'rating': rating,
+    'comments': comments,
     'isStickReply': isStickReply,
   };
+}
+
+/// 解析楼层的「点评」列表。
+///
+/// 标准 Discuz / 52pojie 结构（克米模板沿用同一段核心输出）：
+/// ```
+/// div#comment_<所属楼层 pid>.cm
+///   h3.psth「点评」
+///   div.pstl                    ← 每条点评一个
+///     div.psta > a(头像) + a(用户名)
+///     div.psti > 正文 + a「详情」+ a「回复」+ span.xg1「发表于 …」
+/// ```
+/// 空的 `.cm`（未加载/无点评）与「回帖奖励」的 `.cm` 没有 `.pstl`，直接跳过。
+List<Map<String, dynamic>> _parsePostComments(dom.Element plc) {
+  final out = <Map<String, dynamic>>[];
+  for (final box in plc.querySelectorAll('div[id^="comment_"]')) {
+    for (final item in box.querySelectorAll('div.pstl')) {
+      final sta = item.querySelector('div.psta');
+      final sti = item.querySelector('div.psti');
+      if (sti == null) continue;
+
+      var username = '', uid = '';
+      if (sta != null) {
+        for (final a in sta.querySelectorAll('a')) {
+          final text = sanitizeText(a.text).trim();
+          if (text.isEmpty) continue; // 首个链接是头像，文本为空
+          username = text;
+          final m = RegExp(
+            r'space.*?uid[=-](\d+)',
+          ).firstMatch(a.attributes['href'] ?? '');
+          if (m != null) uid = m.group(1)!;
+          break;
+        }
+      }
+
+      // 正文：剔除「详情」「回复」操作链接与时间，只留点评内容
+      final clone = sti.clone(true);
+      for (final el in clone.querySelectorAll('a, span.xg1')) {
+        el.remove();
+      }
+      final message = sanitizeText(
+        clone.text,
+      ).replaceAll(RegExp(r'\s+'), ' ').trim();
+
+      final time = sanitizeText(sti.querySelector('span.xg1')?.text ?? '')
+          .replaceAll(RegExp(r'发表于\s*'), '')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final detail = sti.querySelector('a[href*="findpost"]');
+      final pid = RegExp(
+        r'[?&]pid=(\d+)',
+      ).firstMatch(detail?.attributes['href'] ?? '')?.group(1) ?? '';
+
+      if (message.isEmpty) continue;
+      out.add({
+        'pid': pid,
+        'uid': uid,
+        'username': username,
+        'message': message,
+        'time': time,
+      });
+    }
+  }
+  return out;
 }
 
 /// 评分记录行里的用户名链接。
