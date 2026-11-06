@@ -150,15 +150,12 @@ extension on _EditorPageState {
     final result = await FilePick.pickFiles(
       type: attExts.isNotEmpty ? FileType.custom : FileType.any,
       allowedExtensions: attExts.isNotEmpty ? attExts : null,
-      allowMultiple: true,
-      withReadStream: true,
-      allowCompression: false,
     );
-    if (result == null || result.files.isEmpty) return;
+    if (result.isEmpty) return;
 
     int successCount = 0;
     int failCount = 0;
-    for (final f in result.files) {
+    for (final f in result) {
       final filePath = f.path;
       if (filePath == null) {
         failCount++;
@@ -203,7 +200,7 @@ extension on _EditorPageState {
         'action': 'handleAttachmentUpload',
         'success': successCount,
         'fail': failCount,
-        'totalFiles': result.files.length,
+        'totalFiles': result.length,
         'boundTotal': _aidToAttachment.length,
       }),
     );

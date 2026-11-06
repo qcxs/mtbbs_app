@@ -103,31 +103,25 @@ class _MdImportSheetState extends State<_MdImportSheet> {
   // ==================== 操作 ====================
 
   Future<void> _pickFile() async {
-    FilePickerResult? result;
+    PlatformFile? file;
     try {
-      result = await FilePick.pickFiles(
+      file = await FilePick.pickFile(
         type: FileType.custom,
         allowedExtensions: ['md', 'markdown', 'txt'],
-        // 用 path 读取：withData 会让插件把整份文件读进内存（Android 还会另复制
-        // 一份缓存副本），大文件没有必要
-        withData: false,
-        allowCompression: false,
       );
     } catch (e) {
       if (mounted) showToast('无法打开文件选择器: $e');
       return;
     }
-    if (result == null || result.files.isEmpty) return;
+    if (file == null) return;
 
-    final file = result.files.first;
     final path = file.path;
     String? content;
     try {
-      final bytes = file.bytes;
-      if (bytes != null) {
-        content = utf8.decode(bytes, allowMalformed: true);
-      } else if (path != null) {
+      if (path != null) {
         content = await File(path).readAsString();
+      } else {
+        content = utf8.decode(await file.readAsBytes(), allowMalformed: true);
       }
     } catch (e) {
       if (mounted) showToast('读取文件失败: $e');
@@ -135,7 +129,7 @@ class _MdImportSheetState extends State<_MdImportSheet> {
     } finally {
       await FilePick.cleanupTemp(path);
     }
-    if (content == null || !mounted) return;
+    if (!mounted) return;
 
     _mdCtl.text = content;
     _convert();

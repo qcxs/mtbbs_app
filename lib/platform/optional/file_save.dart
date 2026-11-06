@@ -16,14 +16,10 @@ enum FileSaveOutcome { saved, canceled, unavailable, failed }
 /// **唯一** 供非图片文件 import `file_picker.saveFile` 的地方（图片见
 /// `image_save.dart`，选择文件见 `file_pick.dart`）。
 ///
-/// 平台差异（必须保留）：
-/// - **Android / iOS**：`file_picker.saveFile` 要求**必须传 bytes**，由插件直接
-///   写入用户选中的文档；返回值只是为了展示而拼出的 `Download/<文件名>`，
-///   并不是真实可写路径。因此这里绝不能再 `File(path).write...` 写第二次
-///   （scoped storage 下也会失败）。
-/// - **Windows / Linux**：`saveFile` 只负责选路径，不写文件；调用方拿到路径后
-///   自行写入/复制。
-/// - **macOS**：`saveFile(bytes:)` 会直接抛 `UnsupportedError`，桌面端一律不传。
+/// file_picker 13 起 `saveFile` 的语义统一为「传入 bytes，由插件写入」：
+/// - Android / iOS 由插件写入用户选中的文档（scoped storage 下也不能自己再写）；
+/// - Windows / Linux / macOS 同样由插件落盘，返回 `Uri?`，不再是“只给路径”；
+/// - `type` / `allowedExtensions` 已弃用（默认扩展名取自 [fileName]）。
 ///
 /// - **鸿蒙**：file_picker 的 OH 分支与官方实现语义不同——`initialDirectory` 不是
 ///   “对话框初始目录”，而是**要保存的源文件路径**（原生把该文件复制到用户选中的
@@ -34,9 +30,6 @@ enum FileSaveOutcome { saved, canceled, unavailable, failed }
 abstract final class FileSave {
   FileSave._();
 
-  /// Android / iOS 由 file_picker 直接写入 bytes
-  static bool get _bytesRequired => Platform.isAndroid || Platform.isIOS;
-
   static bool get _isOhos => AppCapabilities.isOhos;
 
   /// 选择保存路径并写入文本（导出 JSON 等）
@@ -44,13 +37,11 @@ abstract final class FileSave {
     String content, {
     required String fileName,
     String dialogTitle = '保存文件',
-    List<String>? allowedExtensions,
   }) {
     return saveBytes(
       Uint8List.fromList(utf8.encode(content)),
       fileName: fileName,
       dialogTitle: dialogTitle,
-      allowedExtensions: allowedExtensions,
     );
   }
 
@@ -59,7 +50,6 @@ abstract final class FileSave {
     Uint8List bytes, {
     required String fileName,
     String dialogTitle = '保存文件',
-    List<String>? allowedExtensions,
   }) async {
     if (_isOhos) {
       return _saveBytesOnOhos(
@@ -68,33 +58,21 @@ abstract final class FileSave {
         dialogTitle: dialogTitle,
       );
     }
-    final picked = await _pickSavePath(
+    return _saveViaDialog(
+      bytes,
       fileName: fileName,
       dialogTitle: dialogTitle,
-      allowedExtensions: allowedExtensions,
-      bytes: bytes,
     );
-    if (picked.error != null) return picked.error!;
-    // Android / iOS：插件已经把 bytes 写入用户选中的文档，不能再写一次
-    if (picked.writtenByPlugin) return FileSaveOutcome.saved;
-    try {
-      await File(picked.path!).writeAsBytes(bytes);
-      return FileSaveOutcome.saved;
-    } catch (e) {
-      AppLogger.w('PAGE', '写入文件失败：$e');
-      return FileSaveOutcome.failed;
-    }
   }
 
   /// 选择保存路径并把已有文件另存。
   ///
-  /// 移动端读入内存后交给 file_picker（插件要求 bytes）；桌面端保留
-  /// `File.copy`，避免大文件整体进内存。
+  /// file_picker 13 的 `saveFile` 只接受 bytes，桌面端也必须先读入内存；
+  /// 大文件（原始缓存库）导出请优先使用事务导出 / 尽力导出 JSON。
   static Future<FileSaveOutcome> copyFile(
     String sourcePath, {
     required String fileName,
     String dialogTitle = '保存文件',
-    List<String>? allowedExtensions,
   }) async {
     if (_isOhos) {
       // 源文件本来就存在于沙箱内，直接把它的路径交给 OH 分支复制
@@ -104,31 +82,11 @@ abstract final class FileSave {
         dialogTitle: dialogTitle,
       );
     }
-    if (_bytesRequired) {
-      try {
-        final bytes = await File(sourcePath).readAsBytes();
-        return saveBytes(
-          bytes,
-          fileName: fileName,
-          dialogTitle: dialogTitle,
-          allowedExtensions: allowedExtensions,
-        );
-      } catch (e) {
-        AppLogger.w('PAGE', '读取待保存文件失败：$e');
-        return FileSaveOutcome.failed;
-      }
-    }
-    final picked = await _pickSavePath(
-      fileName: fileName,
-      dialogTitle: dialogTitle,
-      allowedExtensions: allowedExtensions,
-    );
-    if (picked.error != null) return picked.error!;
     try {
-      await File(sourcePath).copy(picked.path!);
-      return FileSaveOutcome.saved;
+      final bytes = await File(sourcePath).readAsBytes();
+      return saveBytes(bytes, fileName: fileName, dialogTitle: dialogTitle);
     } catch (e) {
-      AppLogger.w('PAGE', '复制文件失败：$e');
+      AppLogger.w('PAGE', '读取待保存文件失败：$e');
       return FileSaveOutcome.failed;
     }
   }
@@ -152,6 +110,7 @@ abstract final class FileSave {
         temp.path,
         fileName: fileName,
         dialogTitle: dialogTitle,
+        bytes: bytes,
       );
     } catch (e) {
       AppLogger.w('PAGE', '鸿蒙另存为失败：$e');
@@ -168,21 +127,28 @@ abstract final class FileSave {
   }
 
   /// 鸿蒙「另存为」：`initialDirectory` 传源文件（OH 分支的原生语义）。
+  ///
+  /// [bytes] 仅供官方实现的签名要求：OH 分支在返回前用 `initialDirectory`
+  /// 指向的源文件复制，**完全忽略 bytes**。已有大文件（缓存库导出）不要为了
+  /// 这个必填参数把整份文件读进内存，传空列表即可。
   static Future<FileSaveOutcome> _saveExistingOnOhos(
     String sourcePath, {
     required String fileName,
     required String dialogTitle,
+    Uint8List? bytes,
   }) async {
     if (!AppCapabilities.isAvailable(AppCapability.filePicker)) {
       return FileSaveOutcome.unavailable;
     }
     try {
-      final path = await FilePicker.platform.saveFile(
+      final uri = await FilePicker.saveFile(
         dialogTitle: dialogTitle,
         fileName: fileName,
+        bytes: bytes ?? Uint8List(0),
         initialDirectory: sourcePath,
+        mimeType: mimeTypeForFileName(fileName),
       );
-      if (path == null) return FileSaveOutcome.canceled;
+      if (uri == null) return FileSaveOutcome.canceled;
       // 插件已在返回前把源文件复制到用户选中的位置，不要再写一次
       return FileSaveOutcome.saved;
     } on MissingPluginException {
@@ -203,67 +169,49 @@ abstract final class FileSave {
     }
   }
 
-  /// 选中的路径（[path]）或失败结果（[error]）；[writtenByPlugin] 表示
-  /// 移动端已由插件写盘，调用方不要再写。
-  static Future<
-    ({String? path, FileSaveOutcome? error, bool writtenByPlugin})
-  >
-  _pickSavePath({
+  /// 官方实现统一的「另存为」：插件负责选路径并写入 [bytes]。
+  static Future<FileSaveOutcome> _saveViaDialog(
+    Uint8List bytes, {
     required String fileName,
     required String dialogTitle,
-    List<String>? allowedExtensions,
-    Uint8List? bytes,
   }) async {
     if (!AppCapabilities.isAvailable(AppCapability.filePicker)) {
-      return (
-        path: null,
-        error: FileSaveOutcome.unavailable,
-        writtenByPlugin: false,
-      );
+      return FileSaveOutcome.unavailable;
     }
-    final writtenByPlugin = _bytesRequired;
     try {
-      final path = await FilePicker.platform.saveFile(
+      final uri = await FilePicker.saveFile(
         dialogTitle: dialogTitle,
         fileName: fileName,
-        type: allowedExtensions == null || allowedExtensions.isEmpty
-            ? FileType.any
-            : FileType.custom,
-        allowedExtensions: allowedExtensions,
-        // 只有移动端传 bytes；桌面端的 saveFile 不接受（macOS 会直接抛错）
-        bytes: writtenByPlugin ? bytes : null,
+        bytes: bytes,
+        mimeType: mimeTypeForFileName(fileName),
       );
-      if (path == null) {
-        return (
-          path: null,
-          error: FileSaveOutcome.canceled,
-          writtenByPlugin: false,
-        );
-      }
-      return (path: path, error: null, writtenByPlugin: writtenByPlugin);
+      return uri == null ? FileSaveOutcome.canceled : FileSaveOutcome.saved;
     } on MissingPluginException {
       AppLogger.w('PAGE', 'file_picker.saveFile 无当前平台实现');
       AppCapabilities.disable(AppCapability.filePicker);
-      return (
-        path: null,
-        error: FileSaveOutcome.unavailable,
-        writtenByPlugin: false,
-      );
+      return FileSaveOutcome.unavailable;
     } on UnimplementedError {
       AppLogger.w('PAGE', 'file_picker.saveFile 无当前平台实现');
       AppCapabilities.disable(AppCapability.filePicker);
-      return (
-        path: null,
-        error: FileSaveOutcome.unavailable,
-        writtenByPlugin: false,
-      );
+      return FileSaveOutcome.unavailable;
     } catch (e) {
       AppLogger.w('PAGE', '另存为失败：$e');
-      return (
-        path: null,
-        error: FileSaveOutcome.failed,
-        writtenByPlugin: false,
-      );
+      return FileSaveOutcome.failed;
     }
   }
+}
+
+/// 按文件名推断 MIME（`saveFile` 的默认值 application/octet-stream 会让
+/// Android 的下载文档类型不匹配，部分文件管理器打不开）。
+String mimeTypeForFileName(String fileName) {
+  final ext = fileName.contains('.')
+      ? fileName.split('.').last.toLowerCase()
+      : '';
+  return switch (ext) {
+    'json' => 'application/json',
+    'txt' || 'md' || 'markdown' => 'text/plain',
+    'png' => 'image/png',
+    'jpg' || 'jpeg' => 'image/jpeg',
+    _ => 'application/octet-stream',
+  };
 }

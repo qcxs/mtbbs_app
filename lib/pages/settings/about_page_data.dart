@@ -89,19 +89,14 @@ extension on _AboutPageState {
         monospace: true,
       );
     }
-    final result = await FilePick.pickFiles(
+    final file = await FilePick.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['json'],
-      withData: true,
     );
-    final files = result?.files;
-    if (files == null || files.isEmpty) return null;
-    final file = files.first;
+    if (file == null) return null;
     final path = file.path;
     try {
-      final bytes = file.bytes;
-      if (bytes != null) return utf8.decode(bytes);
-      if (path != null) return await File(path).readAsString();
+      return utf8.decode(await file.readAsBytes());
     } catch (e) {
       if (mounted) showToast('读取文件失败：$e');
       return null;
@@ -109,8 +104,6 @@ extension on _AboutPageState {
       // 清理 file_picker 复制到缓存的导入副本（Android/iOS）
       await FilePick.cleanupTemp(path);
     }
-    if (mounted) showToast('无法读取文件');
-    return null;
   }
 
   Future<void> _exportText(String text, String prefix) async {
@@ -127,7 +120,6 @@ extension on _AboutPageState {
     final outcome = await FileSave.saveText(
       text,
       fileName: fileName,
-      allowedExtensions: const ['json'],
     );
     if (!mounted) return;
     switch (outcome) {

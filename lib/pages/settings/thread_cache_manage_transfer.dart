@@ -28,7 +28,6 @@ extension on _ThreadCacheManagePageState {
       content,
       fileName: fileName,
       dialogTitle: '导出帖子缓存',
-      allowedExtensions: const ['json'],
     );
     if (!mounted) return;
     switch (outcome) {
@@ -46,19 +45,17 @@ extension on _ThreadCacheManagePageState {
   }
 
   Future<void> _handleImport() async {
-    // 不用 withData：大文件会在选择阶段就整份读入内存，100 MB 上限还没检查
-    // 就已经 OOM。Android 上 file_picker 会把文件复制到缓存并给出 path，
+    // 按 path 读取：避免选择阶段就把整份文件读进内存（100 MB 上限还没检查
+    // 就已经 OOM）。Android 上 file_picker 会把文件复制到缓存并给出 path，
     // 这里先 stat 再读，读完清理副本。
-    final picked = await FilePick.pickFiles(
+    final file = await FilePick.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['json'],
-      withData: false,
     );
-    if (picked == null || picked.files.isEmpty) {
+    if (file == null) {
       if (mounted) showToast('已取消');
       return;
     }
-    final file = picked.files.first;
     final path = file.path;
     String? json;
     try {
@@ -69,12 +66,13 @@ extension on _ThreadCacheManagePageState {
           return;
         }
         json = await File(path).readAsString();
-      } else if (file.bytes != null) {
-        if (file.bytes!.length > 100 * 1024 * 1024) {
+      } else {
+        final bytes = await file.readAsBytes();
+        if (bytes.length > 100 * 1024 * 1024) {
           if (mounted) showToast('文件过大（超过 100 MB）');
           return;
         }
-        json = utf8.decode(file.bytes!, allowMalformed: true);
+        json = utf8.decode(bytes, allowMalformed: true);
       }
     } catch (e) {
       AppLogger.w('THREAD_CACHE', 'read import file failed: $e');
@@ -82,10 +80,6 @@ extension on _ThreadCacheManagePageState {
       return;
     } finally {
       await FilePick.cleanupTemp(path);
-    }
-    if (json == null) {
-      if (mounted) showToast('读取文件失败');
-      return;
     }
     if (!mounted) return;
 
@@ -293,7 +287,6 @@ extension on _ThreadCacheManagePageState {
       content,
       fileName: fileName,
       dialogTitle: '尽力导出 JSON',
-      allowedExtensions: const ['json'],
     );
     if (!mounted) return;
     if (outcome == FileSaveOutcome.saved) {

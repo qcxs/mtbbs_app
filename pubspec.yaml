@@ -37,20 +37,20 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^2.0.0
 
   # 网络
-  dio: ^5.4.0
-  dio_cookie_manager: ^3.1.0
+  dio: ^5.11.1
+  dio_cookie_manager: ^3.5.0
   cookie_jar: ^4.0.0
   path_provider: ^2.1.0
 
   # 存储
-  sembast: ^3.8.9
+  sembast: ^3.10.0
   path: ^1.9.0
 
   # 路由
-  go_router: ^14.0.0
+  go_router: ^18.1.3
 
   # 状态管理
   provider: ^6.1.0
@@ -62,13 +62,13 @@ dependencies:
   flex_seed_scheme: ^4.0.1
 
   # 图片缓存
-  cached_network_image: ^3.3.0
-  flutter_cache_manager: ^3.3.0
+  cached_network_image: ^4.0.3
+  flutter_cache_manager: ^3.5.0
   http: ^1.2.0
 
   # HTML 解析
-  html: ^0.15.4
-  xml: ^6.5.0
+  html: ^0.15.7
+  xml: ^7.0.1
 
   # Markdown 解析（编辑器「导入 Markdown」→ BBCode，见 lib/core/parser/md2bbcode.dart）
   markdown: ^7.3.1
@@ -81,8 +81,8 @@ dependencies:
 
   # WebView（跨平台：Android/iOS/macOS/Windows/Linux/Web）
   flutter_inappwebview: ^6.1.5
-  file_picker: ^8.0.0
-  url_launcher: ^6.3.2
+  file_picker: ^13.3.2
+  url_launcher: ^6.3.3
   photo_view: ^0.15.0
 
   # 保存「生成图片」分享卡到相册（Android/iOS 相册，Windows 图片库）。
@@ -96,7 +96,7 @@ dependencies:
 
   # 分享图右下角二维码：用 qr 编码 + 自绘模块。
   # 不用 pretty_qr_code —— 它断言「单模块 ≥ 2px」，64px 的二维码会直接崩（见 docs/07 #91）。
-  qr: ^3.0.2
+  qr: ^4.0.0
 
   # 内嵌 JS 引擎（QuickJS）：在本地执行站点的人机验证挑战脚本，
   # 免去弹 WebView 打断用户（见 lib/core/app/js_challenge_solver.dart）。
@@ -104,7 +104,7 @@ dependencies:
   flutter_qjs_next: ^1.5.2
 
   # 哈希（编解码工具页的 MD5/SHA-1/SHA-256，见 lib/core/utils/codec_utils.dart）
-  crypto: ^3.0.7
+  crypto: ^3.0.8
 
   # HTML 渲染（BBCode → HTML → Widget）
   # 代码语法高亮
@@ -115,7 +115,8 @@ dependencies:
   flutter_widget_from_html_core: ^0.17.4
 
   # MCP 服务端（只读，本机 Streamable HTTP，双 era 兼容 2026-07-28 / 2025-11-25）
-  # 锁到具体版本：协议与安全默认值随版本变化，升级前先读 docs/09
+  # 锁到具体版本：协议与安全默认值随版本变化，升级前先读 docs/09。
+  # 2.4.3 仅文档/示例修正，但国内镜像尚未同步归档（404），暂留 2.4.2。
   mcp_dart: 2.4.2
 
 # Windows 退出崩溃修复（上游 issue #2733 / PR #2838）。

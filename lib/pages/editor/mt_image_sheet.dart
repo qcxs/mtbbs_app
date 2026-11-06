@@ -150,19 +150,23 @@ class _MtImageSheetState extends State<MtImageSheet> {
 
     final result = await FilePick.pickFiles(
       type: FileType.image,
-      allowMultiple: true,
-      withReadStream: true,
-      allowCompression: false,
     );
-    if (result == null || result.files.isEmpty) return;
+    if (result.isEmpty) return;
 
-    setState(() {
-      for (final f in result.files) {
-        if (f.path != null) {
-          _queue.add(_QueuedFile(path: f.path!, name: f.name, size: f.size));
-        }
-      }
-    });
+    final queued = <_QueuedFile>[];
+    for (final f in result) {
+      final path = f.path;
+      if (path == null) continue;
+      queued.add(
+        _QueuedFile(
+          path: path,
+          name: f.name,
+          size: await f.length() ?? 0,
+        ),
+      );
+    }
+    if (queued.isEmpty) return;
+    setState(() => _queue.addAll(queued));
 
     if (!_uploading && widget.hosting.isAuthed) _processQueue();
   }

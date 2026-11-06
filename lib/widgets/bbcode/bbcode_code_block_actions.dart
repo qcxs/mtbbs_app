@@ -28,7 +28,6 @@ extension on _BbcodeCodeBlockState {
       widget.code,
       fileName: fileName,
       dialogTitle: '保存代码',
-      allowedExtensions: [extension],
     );
     if (!mounted) return;
     switch (outcome) {

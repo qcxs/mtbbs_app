@@ -15,7 +15,10 @@ class ShareQrCode extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final qrImage = QrImage(
-      QrCode.fromData(data: data, errorCorrectLevel: QrErrorCorrectLevel.L),
+      QrCode(
+        payload: QrPayload.fromString(data),
+        errorCorrectLevel: QrErrorCorrectLevel.low,
+      ),
     );
     return Container(
       width: size,

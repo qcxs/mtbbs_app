@@ -177,16 +177,14 @@ class ForumImageController extends ChangeNotifier {
     final result = await FilePick.pickFiles(
       type: exts.isNotEmpty ? FileType.custom : FileType.image,
       allowedExtensions: exts.isNotEmpty ? exts : null,
-      allowMultiple: true,
-      withReadStream: true,
-      // 关闭插件默认压缩：否则 GIF 丢动画、PNG 被转 JPG（docs/07 #14）
-      allowCompression: false,
+      // 新版 file_picker 默认不压缩（compressionQuality = 0），GIF 不会丢动画、
+      // PNG 不会被转 JPG（docs/07 #14）
     );
-    if (result == null || result.files.isEmpty) return;
+    if (result.isEmpty) return;
 
     int success = 0;
     int fail = 0;
-    for (final f in result.files) {
+    for (final f in result) {
       final path = f.path;
       if (path == null) {
         fail++;

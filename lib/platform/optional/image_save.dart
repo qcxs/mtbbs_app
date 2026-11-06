@@ -29,8 +29,8 @@ enum SaveImageOutcome {
 /// - 其他平台（Windows 等）走“另存为”对话框；
 /// - 相册不可用或失败时自动回退到“另存为”。
 ///
-/// 平台差异：Android/iOS 的 `file_picker.saveFile` 要求必须传 bytes，且由插件
-/// 直接写入；桌面端只需返回路径后自行写入（macOS 传 bytes 会抛错）。
+/// 平台差异：file_picker 13 起 `saveFile` 统一要求传 bytes 并由插件写入，
+/// 桌面端不再“只返回路径、自己写盘”。
 ///
 /// 插件缺失时返回 [SaveImageOutcome.unavailable] 并关闭
 /// [AppCapability.saveImage]，由入口隐藏/提示，而不是抛异常。
@@ -97,20 +97,16 @@ abstract final class ImageSave {
     Uint8List bytes,
     String fileName,
   ) async {
-    final writtenByPlugin = Platform.isAndroid || Platform.isIOS;
     try {
-      final path = await FilePicker.platform.saveFile(
+      final uri = await FilePicker.saveFile(
         dialogTitle: '保存图片',
         fileName: '$fileName.png',
-        type: FileType.image,
-        // Android/iOS 必须传 bytes，由插件直接写入；桌面端不传（macOS 会抛错）
-        bytes: writtenByPlugin ? bytes : null,
+        bytes: bytes,
+        mimeType: 'image/png',
       );
-      if (path == null) return SaveImageOutcome.canceled;
-      if (!writtenByPlugin) {
-        await File(path).writeAsBytes(bytes);
-      }
-      return SaveImageOutcome.savedToFile;
+      return uri == null
+          ? SaveImageOutcome.canceled
+          : SaveImageOutcome.savedToFile;
     } on MissingPluginException {
       AppLogger.w('PAGE', 'file_picker.saveFile 无当前平台实现');
       return SaveImageOutcome.unavailable;
@@ -142,13 +138,14 @@ abstract final class ImageSave {
       );
       await temp.writeAsBytes(bytes, flush: true);
 
-      final path = await FilePicker.platform.saveFile(
+      final uri = await FilePicker.saveFile(
         dialogTitle: '保存图片',
         fileName: '$fileName.png',
+        bytes: bytes,
+        mimeType: 'image/png',
         initialDirectory: temp.path,
-        type: FileType.image,
       );
-      return path == null
+      return uri == null
           ? SaveImageOutcome.canceled
           : SaveImageOutcome.savedToFile;
     } on MissingPluginException {
