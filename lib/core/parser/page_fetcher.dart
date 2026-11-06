@@ -28,6 +28,36 @@ class PageFormData {
   /// 编辑模式下已绑定的附件（仅 PC 版，从 a[id^=attachname] 提取）
   final List<Map<String, String>> boundAttachments;
 
+  /// 验证码 idhash（新版字段名 `seccodehash`，旧版为 `seccode`）
+  final String seccodeHash;
+
+  /// 验证码 idhash 对应的提交字段名（`seccodehash` / `seccode`）
+  final String seccodeHashField;
+
+  /// 验证码所属模块（新版隐藏字段 `seccodemodid`，如 `forum::post`）
+  final String seccodeModId;
+
+  /// 验证码图片地址（页面原样，相对地址；空串表示页面未直接给出）
+  final String seccodeImageUrl;
+
+  /// 验证问答 idhash（新版字段名 `secqaahash`，桌面模板只有占位 span）
+  final String secqaaHash;
+
+  /// 验证问答所属模块（新版隐藏字段，如 `forum::post`）
+  final String secqaaModId;
+
+  /// 验证问答题干（页面直接给出时才有值；桌面模板需走 action=update 拉取）
+  final String secqaaQuestion;
+
+  /// 是否需要填写图片验证码
+  bool get seccodeRequired => seccodeHash.isNotEmpty;
+
+  /// 是否需要回答验证问答（52pojie 等站点只开这一种）
+  bool get secqaaRequired => secqaaHash.isNotEmpty;
+
+  /// 页面是否要求任何形式的人机验证
+  bool get captchaRequired => seccodeRequired || secqaaRequired;
+
   /// 图片上传所需的 hash（从页面 JavaScript 中提取）
   final String uploadHash;
 
@@ -59,6 +89,13 @@ class PageFormData {
     this.content = '',
     this.images = const [],
     this.boundAttachments = const [],
+    this.seccodeHash = '',
+    this.seccodeHashField = 'seccodehash',
+    this.seccodeModId = '',
+    this.seccodeImageUrl = '',
+    this.secqaaHash = '',
+    this.secqaaModId = '',
+    this.secqaaQuestion = '',
     this.uploadHash = '',
     this.imageExtensions = const [],
     this.attachmentExtensions = const [],
@@ -125,6 +162,50 @@ class PageFetcher {
     final reppid = _val(doc, 'reppid');
     final noticetrimstr = _val(doc, 'noticetrimstr');
     final noticeauthormsg = _val(doc, 'noticeauthormsg');
+
+    // 验证码：新版 Discuz 用 seccodehash + seccodemodid，旧版用 seccode。
+    // 桌面模板可能只输出占位 <span id="seccode_xxx"></span>（输入区与图片由 JS
+    // 动态生成），因此 hidden 为空时再从占位 span 的 id 后缀取 idhash。
+    final seccodeHashInput = doc.querySelector('input[name="seccodehash"]');
+    final seccodeInput =
+        seccodeHashInput ?? doc.querySelector('input[name="seccode"]');
+    final seccodeSpan = doc.querySelector('span[id^="seccode_"]');
+    final seccodeSpanHash = seccodeSpan == null
+        ? ''
+        : seccodeSpan.id.substring('seccode_'.length).trim();
+    final inlineSeccodeHash =
+        (seccodeInput?.attributes['value'] ?? '').trim();
+    final seccodeHash = inlineSeccodeHash.isNotEmpty
+        ? inlineSeccodeHash
+        : seccodeSpanHash;
+    final seccodeModId = _val(doc, 'seccodemodid').isNotEmpty
+        ? _val(doc, 'seccodemodid')
+        // 编辑页都走 forum/post，桌面模板的 JS 也是按 forum::post 刷新验证码
+        : (seccodeSpanHash.isNotEmpty ? 'forum::post' : '');
+    final seccodeImageUrl = (doc
+            .querySelector('img[src*="mod=seccode"]')
+            ?.attributes['src'] ??
+        '')
+        .replaceAll('&amp;', '&')
+        .trim();
+
+    // 验证问答（secqaa）：与图片验证码并列的另一种人机验证，52pojie 等站点
+    // 只开这一种。桌面模板同样只输出占位 <span id="secqaa_<hash>">，输入框
+    // 由 JS 注入；题库与题面要走 `misc.php?mod=secqaa&action=update` 拉取。
+    final secqaaInput = doc.querySelector('input[name="secqaahash"]');
+    final secqaaSpan = doc.querySelector('span[id^="secqaa_"]');
+    final secqaaSpanHash = secqaaSpan == null
+        ? ''
+        : secqaaSpan.id.substring('secqaa_'.length).trim();
+    final inlineSecqaaHash = (secqaaInput?.attributes['value'] ?? '').trim();
+    final secqaaHash = inlineSecqaaHash.isNotEmpty
+        ? inlineSecqaaHash
+        : secqaaSpanHash;
+    final secqaaQuestion = secqaaHash.isEmpty
+        ? ''
+        : (doc.querySelector('div[id="seccode${secqaaHash}_menu"]')?.text
+                  .trim() ??
+              '');
 
     // 编辑模式：提取标题
     final titleInput = doc.querySelector(
@@ -210,6 +291,8 @@ class PageFetcher {
         'contentLen': content.length,
         'images': images.length,
         'boundAttachments': boundAttachments.length,
+        'seccodeRequired': seccodeHash.isNotEmpty,
+        'secqaaRequired': secqaaHash.isNotEmpty,
         'uploadHash': uploadHash.isNotEmpty,
         'imageExts': imageExtensions.join(','),
         'attachExts': attachmentExtensions.join(','),
@@ -230,6 +313,15 @@ class PageFetcher {
       content: content,
       images: images,
       boundAttachments: boundAttachments,
+      seccodeHash: seccodeHash,
+      seccodeHashField: seccodeHashInput != null
+          ? 'seccodehash'
+          : (seccodeInput != null ? 'seccode' : 'seccodehash'),
+      seccodeModId: seccodeModId,
+      seccodeImageUrl: seccodeImageUrl,
+      secqaaHash: secqaaHash,
+      secqaaModId: secqaaHash.isEmpty ? '' : 'forum::post',
+      secqaaQuestion: secqaaQuestion,
       uploadHash: uploadHash,
       imageExtensions: imageExtensions,
       attachmentExtensions: attachmentExtensions,

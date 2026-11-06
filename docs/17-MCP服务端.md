@@ -168,6 +168,8 @@ lib/mcp/
 - **Windows**：窗口标题标注 `MTBBS（已开启 MCP）`；标题栏一律由 `widgets/layout/window_title_bar.dart` 自绘（含 MCP 徽章与三个窗口按钮）。不用原生标题栏的原因见 docs/07 #61：其配色由 DWM/系统主题决定，App 无法保证可读。
 - **鸿蒙**：`notificationManager` 常驻通知（`SERVICE_INFORMATION` 槽位 + `isOngoing`），原生实现在鸿蒙仓库 `ohos/entry/src/main/ets/plugins/McpStatusNotice.ets`（Dart 侧只维护通道契约，见该文件注释）。通知的 Want 携带 `mcp_tap` 参数回到 `EntryAbility`，再由原生调通道 `onNotificationTap` 弹快捷开关；冷启动时原生先暂存，Dart 首帧后 `getPendingTap` 补取。首次发布时原生调 `requestEnableNotification` 申请通知权限，被拒则静默跳过。平台判定在 Dart 侧用 `Platform.operatingSystem == 'ohos'` 字符串（官方 Flutter 没有 `TargetPlatform.ohos`）。
 
+  **前台限定**：鸿蒙没有能承载「本机 HTTP 服务」的长时任务类型（`DATA_TRANSFER` 要求持续上报进度、10 分钟不更新会被系统取消；`TASK_KEEPING` 仅 2in1 或需受限 ACL），因此 MCP 只在 App 前台可用。`EntryAbility.onBackground()` 会撤销常驻通知、`onForeground()` 恢复，避免出现「通知说服务已开启、实际连不上」的假状态（与 Android 前台服务的语义不同）。
+
 ### 快捷开关入口（弹窗 + 一键开关）
 
 `showMcpQuickDialog()` —— 状态一瞥（状态点 / 端点 / 工具数 / 无令牌告警）+ **一个**开关控件（开关行），右上角可直达 `/settings/mcp`。开/关**只有开关这一处**，不再另设同语义的主按钮，避免"两套入口"。

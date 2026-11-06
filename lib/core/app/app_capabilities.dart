@@ -88,8 +88,8 @@ abstract final class AppCapabilities {
       case AppCapability.filePicker:
         return true;
       case AppCapability.saveImage:
-        // 鸿蒙没有 gal，但 file_picker 的“另存为”可用；
-        // 真正保存失败时由适配器 disable。
+        // 鸿蒙没有 gal，但 file_picker 的“另存为”可用（OH 分支要求先落临时文件，
+        // 由适配器处理）；真正保存失败时由适配器 disable。
         return true;
       case AppCapability.localJsSolver:
         // flutter_qjs_next 没有鸿蒙实现；鸿蒙走纯 Dart ACW 算法兜底。

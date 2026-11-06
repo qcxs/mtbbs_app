@@ -37,6 +37,12 @@ Future<Response<String>> submitEdit(
   required String message,
   String page = '1',
   Map<String, String> attachNew = const {},
+  String seccodeHash = '',
+  String seccodeHashField = 'seccodehash',
+  String seccodeModId = '',
+  String seccodeVerify = '',
+  String secqaaHash = '',
+  String secanswer = '',
 }) {
   return dio.post<String>(
     '/forum.php?mod=post&action=edit&fid=$fid&tid=$tid&pid=$pid'
@@ -58,6 +64,13 @@ Future<Response<String>> submitEdit(
       'page': page,
       'editsubmit': 'yes',
       ...attachNew,
+      ..._seccodeFields(
+        hash: seccodeHash,
+        hashField: seccodeHashField,
+        modId: seccodeModId,
+        verify: seccodeVerify,
+      ),
+      ..._secqaaFields(hash: secqaaHash, answer: secanswer),
     },
   );
 }
@@ -88,6 +101,12 @@ Future<Response<String>> submitNewThread(
   required String subject,
   required String message,
   Map<String, String> attachNew = const {},
+  String seccodeHash = '',
+  String seccodeHashField = 'seccodehash',
+  String seccodeModId = '',
+  String seccodeVerify = '',
+  String secqaaHash = '',
+  String secanswer = '',
 }) {
   return dio.post<String>(
     '/forum.php?mod=post&action=newthread&fid=$fid&topicsubmit=yes&inajax=1',
@@ -102,6 +121,13 @@ Future<Response<String>> submitNewThread(
       'subject': subject,
       'message': message,
       ...attachNew,
+      ..._seccodeFields(
+        hash: seccodeHash,
+        hashField: seccodeHashField,
+        modId: seccodeModId,
+        verify: seccodeVerify,
+      ),
+      ..._secqaaFields(hash: secqaaHash, answer: secanswer),
     },
   );
 }
@@ -119,6 +145,12 @@ Future<Response<String>> submitReply(
   String? noticeauthormsg,
   String? reppid,
   Map<String, String> attachNew = const {},
+  String seccodeHash = '',
+  String seccodeHashField = 'seccodehash',
+  String seccodeModId = '',
+  String seccodeVerify = '',
+  String secqaaHash = '',
+  String secanswer = '',
 }) {
   final data = <String, dynamic>{
     'formhash': formhash,
@@ -140,6 +172,15 @@ Future<Response<String>> submitReply(
     data['reppost'] = reppid;
   }
   data.addAll(attachNew);
+  data.addAll(
+    _seccodeFields(
+      hash: seccodeHash,
+      hashField: seccodeHashField,
+      modId: seccodeModId,
+      verify: seccodeVerify,
+    ),
+  );
+  data.addAll(_secqaaFields(hash: secqaaHash, answer: secanswer));
 
   return dio.post<String>(
     '/forum.php?mod=post&action=reply&fid=$fid&tid=$tid&replysubmit=yes&inajax=1',
@@ -148,4 +189,28 @@ Future<Response<String>> submitReply(
     ),
     data: data,
   );
+}
+
+/// 验证码字段：未启用（hash 为空）时不提交，避免给不需要验证码的站点带脏参数。
+Map<String, dynamic> _seccodeFields({
+  required String hash,
+  required String hashField,
+  required String modId,
+  required String verify,
+}) {
+  if (hash.isEmpty) return const {};
+  return {
+    hashField: hash,
+    if (modId.isNotEmpty) 'seccodemodid': modId,
+    'seccodeverify': verify,
+  };
+}
+
+/// 验证问答字段：字段名固定为 `secqaahash` + `secanswer`（无 modid）。
+Map<String, dynamic> _secqaaFields({
+  required String hash,
+  required String answer,
+}) {
+  if (hash.isEmpty) return const {};
+  return {'secqaahash': hash, 'secanswer': answer};
 }

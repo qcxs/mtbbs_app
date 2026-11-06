@@ -48,6 +48,17 @@ extension on _EditorPageState {
       return;
     }
 
+    if (_session.seccodeRequired &&
+        _session.seccodeCtl.text.trim().isEmpty) {
+      if (mounted) showToast('请输入验证码');
+      return;
+    }
+    if (_session.secqaaRequired &&
+        _session.secqaaCtl.text.trim().isEmpty) {
+      if (mounted) showToast('请输入验证问答答案');
+      return;
+    }
+
     // —— 发布前本地预校验（不改动服务端逻辑） ——
 
     // 一、不兼容 Emoji（4 字节字符）提交后会被站点截断：拦下本次提交，
@@ -104,6 +115,8 @@ extension on _EditorPageState {
         title,
         content,
         appendAids: appendAids,
+        seccodeVerify: _session.seccodeCtl.text.trim(),
+        secanswer: _session.secqaaCtl.text.trim(),
       );
       if (!mounted) return;
       if (result.success) {
@@ -156,6 +169,11 @@ extension on _EditorPageState {
             'error': result.message,
           }),
         );
+        // 验证码 / 验证问答错误后旧答案已失效，清空输入并换一张
+        if (result.message.contains('验证码') ||
+            result.message.contains('验证问答')) {
+          _session.resetCaptcha();
+        }
         showToast('操作失败: ${result.message}');
       }
     } catch (e) {

@@ -8,6 +8,7 @@ extension on _EditorPageState {
     _setState(() {
       _loadingPage = true;
       _pageError = null;
+      _session.clearCaptcha();
     });
     final result = await _session.submitHelper.fetchPage(
       preserveContent: preserveContent,
@@ -24,6 +25,8 @@ extension on _EditorPageState {
         'contentLen': result.content.length,
         'images': result.images.length,
         'boundAttachments': result.boundAttachments.length,
+        'seccodeRequired': result.seccodeRequired,
+        'secqaaRequired': result.secqaaRequired,
         'uploadHash': result.uploadHash.isNotEmpty,
         'fid': result.fid,
         'tid': result.tid,
@@ -93,6 +96,11 @@ extension on _EditorPageState {
     // 异步加载已上传但未绑定的图片和附件
     _images.refresh();
     _refreshAttachmentList();
+
+    // 页面要求人机验证时才拉取，避免给未启用的站点发多余请求
+    if (result.captchaRequired) {
+      _session.loadCaptcha();
+    }
   }
 
   Future<void> _doFetchQuotedPost() async {

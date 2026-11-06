@@ -144,6 +144,24 @@ String encodeQueryComponentForSite(String value, {String? charset}) {
   return buf.toString();
 }
 
+/// 按站点字符集编码 `application/x-www-form-urlencoded` 请求体。
+///
+/// Dio 对 `Map` 形式的 data 固定按 UTF-8 编码，而 Discuz 按**站点字符集**
+/// 解码 POST 字段：GBK 站点（52pojie）提交中文会变成乱码（实测评论正文）。
+/// 手工拼成 query 串后以 String 发送，Dio 不再二次编码。
+String encodeFormBodyForSite(
+  Map<String, dynamic> fields, {
+  String? charset,
+}) {
+  return fields.entries
+      .map(
+        (e) =>
+            '${encodeQueryComponentForSite(e.key, charset: charset)}='
+            '${encodeQueryComponentForSite(e.value?.toString() ?? '', charset: charset)}',
+      )
+      .join('&');
+}
+
 /// 图片"占位图"特征（文件名片段）：URL 含其中任一即视为没有真实图片。
 ///
 /// 用于过滤懒加载占位图（克米 `comiis_loadimages`、`none.png` 等）——

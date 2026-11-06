@@ -120,11 +120,34 @@ class _PageJumpDialogState extends State<_PageJumpDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+        // Android 对话框惯例：中立按钮居左，取消 / 确定居右
+        SizedBox(
+          width: double.infinity,
+          child: Row(
+            children: [
+              // 中立按钮：只显示末页页码，点击后填进输入框（不关闭、不直接跳转）
+              if (widget.totalPages > 0 &&
+                  widget.currentPage != widget.totalPages)
+                TextButton(
+                  onPressed: () {
+                    final text = widget.totalPages.toString();
+                    _tc.value = TextEditingValue(
+                      text: text,
+                      selection: TextSelection.collapsed(offset: text.length),
+                    );
+                  },
+                  child: Text('${widget.totalPages}'),
+                ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+              const SizedBox(width: 4),
+              FilledButton(onPressed: _submit, child: const Text('跳转')),
+            ],
+          ),
         ),
-        FilledButton(onPressed: _submit, child: const Text('跳转')),
       ],
     );
   }

@@ -3,7 +3,7 @@
 > 适用：发帖/评论/回复/修改四种写操作（formhash/posttime/Content-Type 协议）。按需。
 
 > 来源：测试站 discuz.qcxs.top 实测（2026-08-02，账号 user1）。
-> 探针场景：`post.new` / `post.reply`（含 reppid）/ `post.edit`，见 `tool/api_scenarios.dart`。
+> 探针场景：`post.new` / `post.reply`（含 reppid）/ `post.edit` / `post.captcha`，见 `tool/api_scenarios.dart`。
 
 ## 0. 核心机制（四种操作通用）
 
@@ -15,6 +15,8 @@
 | `Content-Type` | **必须显式** `application/x-www-form-urlencoded`（Dio 对 Map 不自动加头，否则 Discuz 收不到 `$_POST` 报"表单验证串不符"） |
 
 **fid 规则**：只有发帖需要真实 fid；评论/回复/修改由 tid 推导（URL 里 `fid=` 空值与无 fid 效果相同，服务端忽略）。
+
+**GBK 站点（52pojie）的表单编码**：Discuz 按**站点字符集**解码 POST 字段，而 Dio 对 `Map` data 固定按 UTF-8 编码 → 中文正文/标题会存成乱码（实测评论成功但内容乱码）。拦截器 `_encodeFormBody`（`services/api_service_client.dart`）在 `Content-Type` 为 form-urlencoded 且站点字符集为 `gbk/gb2312` 时，用 `encodeFormBodyForSite` 把 Map 手工编码成 GBK 百分号串再发送；其余站点保持原 Map。新增写操作只要走站点 Dio + form-urlencoded，就自动生效。
 
 **通用流程**（两步）：
 1. GET 对应页面 → 提取 `formhash`/`posttime`（及 fid）
@@ -115,11 +117,54 @@
 - **实时轮询**：Discuz **没有**"增量拉新消息"接口（`op=checknewpm` 只更新 `newpm` 状态位，不返回内容），客户端只能周期重拉最新一页、按 `pmid` 去重后追加（`PmChatPage` 每 **15s** 一次，前台+页面可见时才跑）。整页重拉是本页最贵的请求，间隔即请求量：**5s 时约 720 次/小时，足以触发站点 WAF 频次限制（403）**；因此实现上还做了：连续失败按 30s→60s→120s 退避（成功即复位）、收到 **403/429 立即暂停自动刷新**并由用户手动刷新解除、`_loadNewest` 单飞（轮询/发送/刷新不叠同一请求）、表情元数据只在进页时加载一次（失败不在每轮重试）。
 - **已读**：加载会话页本身就会清除该会话的未读标记（实测 `message.pm` 的 `isNew` 由 `true` → `false`），无需额外的"标记已读"请求。
 
-## 7. 相关文件
+## 7. 人机验证（seccode / secqaa，可选）
+
+站点开启「发帖/回复验证码」时，发帖/回复/编辑页会渲染验证区。Discuz 有**两种并列形态**，以页面实际字段为准，不要按站点写死：
+
+| 形态 | 开关变量 | 页面标记 | 提交字段 |
+|---|---|---|---|
+| 图片验证码 **seccode** | `seccodecheck = 1` | `input[name=seccodehash]`（旧版 `seccode`）/ `img[src*=mod=seccode]` / `span[id^=seccode_]` | `seccodehash`（或 `seccode`）+ `seccodemodid` + `seccodeverify` |
+| 验证问答 **secqaa** | `secqaacheck = 1` | `input[name=secqaahash]` / `span[id^=secqaa_]`（如 52pojie 的 `secqaa_qS0`） | `secqaahash` + `secanswer`（无 modid） |
+
+两种都可能只输出了**占位 span**（桌面模板由 JS 动态注入输入区）：`<span id="seccode_<hash>">` / `<span id="secqaa_<hash>">`，hash 就是 id 后缀。`#seccheck` 容器在两种模式下都存在，**不能**用它判断是否要验证。
+
+提交时空值一律不提交，避免给未开启验证码的站点带脏参数。
+
+### 7.1 图片验证码（seccode）
+
+**图片与刷新（实测 discuz.qcxs.top）**：
+
+- 图片必须用站点 Dio 请求（同 cookie / UA），且**必须显式带 `Referer`**：该端点会校验来源页，缺失时返回 13 字节 `Access Denied`（text/html 而非图片，会被客户端判为加载失败）。响应 `image/png`；**不能走图片缓存**，也不能用 `CachedNetworkImage`。
+- **首次加载与「换一个」都要先调**：`GET /misc.php?mod=seccode&action=update&idhash={hash}&modid={modId}&{ts}` 返回一段 JS，里面带合法 `misc.php?mod=seccode&update={n}&idhash={hash}`，解析后再用新地址取图。`modid` 必须与提交的 `seccodemodid` 一致（发帖/回复为 `forum::post`），否则会话里的验证码模块为空，提交会被判为验证码错误。
+- **直接构造图片地址不可行**：服务端会校验 `update` 令牌，自造 `update={timestamp}` 实测返回 `Access Denied`。`buildSeccodeImageUrl` 仅作 `action=update` 响应解析失败时的兜底。
+- 校验失败返回 `抱歉，验证码填写错误`。验证码**一次性**，失败后旧码失效，必须清空输入并换图重试。
+
+### 7.2 验证问答（secqaa，实测 52pojie）
+
+- 页面只给占位 `span#secqaa_<hash>` + `<script>updatesecqaa('<hash>', …)</script>`，**题面和输入框都不在 HTML 里**。
+- 题面必须调 `GET /misc.php?mod=secqaa&action=update&idhash={hash}&modid=forum::post&{ts}`：响应是 `application/javascript`，题面夹在 JS 拼接串的 `sectplcode[2] + '题面' + sectplcode[3]` 之间。该请求同时把新题写入会话，`secqaahash` 才能被服务端认可。
+- 站点是 GBK（52pojie）时，题面按站点字符集解码（Dio 按 `content-type` 的 charset 处理），否则中文乱码。
+- 提交：`secqaahash` + `secanswer`。校验失败文案含「验证问答」（如 `验证问答回答错误`），同样**一次性**，失败后换题重试。
+- 题面里可能自带「答案：xxx」提示，那是站点后台配置的题目内容，不是通用规律。客户端据此提供「填充答案」按钮（`parseSecqaaAnswer` 提取，取不到则不显示）。
+
+**客户端链路**：
+
+| 层 | 实现 |
+|---|---|
+| 解析 | `PageFetcher.parsePage` → `seccodeHash/…`、`secqaaHash/secqaaModId/secqaaQuestion`、`seccodeRequired` / `secqaaRequired` / `captchaRequired` |
+| API | `lib/api/forum/seccode/{http,parse,export}.dart`（取图 / 换图 / JS 地址解析）；`lib/api/forum/secqaa/{http,parse,export}.dart`（取题面 / JS 题面解析） |
+| 状态 | `EditorSession` 持有 `seccodeCtl` / `seccodeImage` / `secqaaCtl` / `secqaaQuestion`；`loadCaptcha()` 按页面类型分发，`resetCaptcha()` 同时清空两种 |
+| UI | `CaptchaField` / `CaptchaFields`（`widgets/editor/captcha_field.dart`），完整编辑器与帖子页迷你编辑器共用；验证失败时**不收起**迷你编辑器，允许原地重试 |
+| 提交 | `post/http.dart` 统一追加 `_seccodeFields` / `_secqaaFields`；`editor_submit.dart` 从 `pageData` 读取 |
+
+## 8. 相关文件
 
 | 文件 | 职责 |
 |---|---|
-| `lib/api/forum/post/http.dart` | submitNewThread / submitReply（reppid、attachNew）请求 |
+| `lib/api/forum/post/http.dart` | submitNewThread / submitReply（reppid、attachNew、seccode、secqaa）请求 |
 | `lib/api/forum/post/export.dart` | submitNewPost / submitReply 汇总入口（parseSubmitResponse 解析） |
+| `lib/api/forum/seccode/{http,parse,export}.dart` | 图片验证码获取、换图、JS 地址解析 |
+| `lib/api/forum/secqaa/{http,parse,export}.dart` | 验证问答取题、换题、JS 题面解析 |
+| `lib/core/parser/page_fetcher.dart` | 从编辑页提取 seccodehash / seccodemodid / 图片地址、secqaahash |
 | `lib/pages/editor/editor_submit.dart` | submitEdit（编辑器内联实现，探针 post.edit 复用其逻辑） |
-| `tool/api_scenarios.dart` | post.new / post.reply / post.edit 探针场景 |
+| `tool/scenarios/write_scenarios.dart` | post.new / post.reply / post.edit / post.captcha 探针场景 |

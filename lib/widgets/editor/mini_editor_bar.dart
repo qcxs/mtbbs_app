@@ -41,6 +41,7 @@ class MiniEditorBar extends StatefulWidget {
     this.maxLength,
     this.submitLabel = '发送',
     this.badges = const {},
+    this.captchaField,
   });
 
   /// 正文控制器（通常来自 `EditorSession.contentCtl`；私信页可独立创建）
@@ -86,6 +87,9 @@ class MiniEditorBar extends StatefulWidget {
   /// 工具栏角标：item id → 数量（如「图片」已上传的数量）。
   /// 有角标的项无视隐藏设置强制显示（与完整编辑器一致）。
   final Map<String, int> badges;
+
+  /// 验证码输入行（站点要求验证码时由调用方注入，避免迷你版与完整版各写一套）
+  final Widget? captchaField;
 
   @override
   State<MiniEditorBar> createState() => _MiniEditorBarState();
@@ -166,6 +170,10 @@ class _MiniEditorBarState extends State<MiniEditorBar> {
           _buildTopRow(cs, items, shortcuts),
           const SizedBox(height: 6),
           _buildBody(cs),
+          if (widget.captchaField != null) ...[
+            const SizedBox(height: 6),
+            widget.captchaField!,
+          ],
           const SizedBox(height: 6),
           _buildActionRow(cs),
         ],

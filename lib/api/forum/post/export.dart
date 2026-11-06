@@ -45,6 +45,12 @@ Future<SubmitResult> submitEditPost(
   required String subject,
   required String message,
   Map<String, String> attachNew = const {},
+  String seccodeHash = '',
+  String seccodeHashField = 'seccodehash',
+  String seccodeModId = '',
+  String seccodeVerify = '',
+  String secqaaHash = '',
+  String secanswer = '',
 }) async {
   final resp = await http.submitEdit(
     dio,
@@ -56,6 +62,12 @@ Future<SubmitResult> submitEditPost(
     subject: subject,
     message: message,
     attachNew: attachNew,
+    seccodeHash: seccodeHash,
+    seccodeHashField: seccodeHashField,
+    seccodeModId: seccodeModId,
+    seccodeVerify: seccodeVerify,
+    secqaaHash: secqaaHash,
+    secanswer: secanswer,
   );
   final result = parse.parseEditResponse(
     safeDecode(resp),
@@ -75,6 +87,12 @@ Future<SubmitResult> submitNewPost(
   required String subject,
   required String message,
   Map<String, String> attachNew = const {},
+  String seccodeHash = '',
+  String seccodeHashField = 'seccodehash',
+  String seccodeModId = '',
+  String seccodeVerify = '',
+  String secqaaHash = '',
+  String secanswer = '',
 }) async {
   final resp = await http.submitNewThread(
     dio,
@@ -84,6 +102,12 @@ Future<SubmitResult> submitNewPost(
     subject: subject,
     message: message,
     attachNew: attachNew,
+    seccodeHash: seccodeHash,
+    seccodeHashField: seccodeHashField,
+    seccodeModId: seccodeModId,
+    seccodeVerify: seccodeVerify,
+    secqaaHash: secqaaHash,
+    secanswer: secanswer,
   );
   return parseSubmitResponse(safeDecode(resp));
 }
@@ -101,6 +125,12 @@ Future<SubmitResult> submitReply(
   String? noticeauthormsg,
   String? reppid,
   Map<String, String> attachNew = const {},
+  String seccodeHash = '',
+  String seccodeHashField = 'seccodehash',
+  String seccodeModId = '',
+  String seccodeVerify = '',
+  String secqaaHash = '',
+  String secanswer = '',
 }) async {
   final resp = await http.submitReply(
     dio,
@@ -114,6 +144,12 @@ Future<SubmitResult> submitReply(
     noticeauthormsg: noticeauthormsg,
     reppid: reppid,
     attachNew: attachNew,
+    seccodeHash: seccodeHash,
+    seccodeHashField: seccodeHashField,
+    seccodeModId: seccodeModId,
+    seccodeVerify: seccodeVerify,
+    secqaaHash: secqaaHash,
+    secanswer: secanswer,
   );
   return parseSubmitResponse(safeDecode(resp));
 }

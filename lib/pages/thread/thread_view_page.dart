@@ -41,6 +41,7 @@ import 'package:mtbbs/pages/editor/mt_image_sheet.dart';
 import 'package:mtbbs/services/mt_image_hosting.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
 import 'package:mtbbs/widgets/editor/mini_editor_bar.dart';
+import 'package:mtbbs/widgets/editor/captcha_field.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/auth/providers/auth_provider.dart';

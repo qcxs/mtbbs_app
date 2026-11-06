@@ -253,6 +253,9 @@ extension on _ThreadViewPageState {
       onTapTarget: _replyTargetPid != null ? _showReplyTargetPreview : null,
       // 图片角标：已上传的图片数（有角标时该项强制显示，与完整编辑器一致）
       badges: {if (_images.list.isNotEmpty) 'image': _images.list.length},
+      captchaField: _editorSession.captchaRequired
+          ? CaptchaFields(session: _editorSession)
+          : null,
     );
   }
 

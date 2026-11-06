@@ -128,6 +128,8 @@ class EditorSubmitHelper {
     String title,
     String content, {
     Map<String, String> attachNew = const {},
+    String seccodeVerify = '',
+    String secanswer = '',
   }) async {
     final fid = pageData.fid.isNotEmpty ? pageData.fid : widgetFid;
     final tid = pageData.tid.isNotEmpty ? pageData.tid : widgetTid;
@@ -155,6 +157,12 @@ class EditorSubmitHelper {
         subject: title,
         message: content,
         attachNew: attachNew,
+        seccodeHash: pageData.seccodeHash,
+        seccodeHashField: pageData.seccodeHashField,
+        seccodeModId: pageData.seccodeModId,
+        seccodeVerify: seccodeVerify,
+        secqaaHash: pageData.secqaaHash,
+        secanswer: secanswer,
       );
       AppLogger.i(
         'EDITOR',
@@ -184,6 +192,8 @@ class EditorSubmitHelper {
     String title,
     String content, {
     Set<String> appendAids = const {},
+    String seccodeVerify = '',
+    String secanswer = '',
   }) async {
     final attachNew = parseAttachNew(content, extraAids: appendAids);
 
@@ -209,10 +219,23 @@ class EditorSubmitHelper {
           subject: title,
           message: content,
           attachNew: attachNew,
+          seccodeHash: pageData.seccodeHash,
+          seccodeHashField: pageData.seccodeHashField,
+          seccodeModId: pageData.seccodeModId,
+          seccodeVerify: seccodeVerify,
+          secqaaHash: pageData.secqaaHash,
+          secanswer: secanswer,
         );
       case EditorType.editPost:
       case EditorType.editReply:
-        return submitEdit(pageData, title, content, attachNew: attachNew);
+        return submitEdit(
+          pageData,
+          title,
+          content,
+          attachNew: attachNew,
+          seccodeVerify: seccodeVerify,
+          secanswer: secanswer,
+        );
       case EditorType.comment:
       case EditorType.reply:
         return post_api.submitReply(
@@ -227,6 +250,12 @@ class EditorSubmitHelper {
           noticetrimstr: pageData.noticetrimstr,
           noticeauthormsg: pageData.noticeauthormsg,
           reppid: editorType == EditorType.reply ? pageData.reppid : null,
+          seccodeHash: pageData.seccodeHash,
+          seccodeHashField: pageData.seccodeHashField,
+          seccodeModId: pageData.seccodeModId,
+          seccodeVerify: seccodeVerify,
+          secqaaHash: pageData.secqaaHash,
+          secanswer: secanswer,
         );
     }
   }

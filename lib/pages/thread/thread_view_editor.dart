@@ -145,6 +145,9 @@ extension on _ThreadViewPageState {
     // 同步图片列表与映射（供预览替换 [attachimg] 与工具栏角标）
     _images.setFromPageImages(result.images);
     _images.refresh();
+    if (result.captchaRequired) {
+      _editorSession.loadCaptcha();
+    }
     return true;
   }
 
@@ -163,12 +166,31 @@ extension on _ThreadViewPageState {
       showToast('页面数据未加载，请稍候');
       return;
     }
+    if (_editorSession.seccodeRequired &&
+        _editorSession.seccodeCtl.text.trim().isEmpty) {
+      showToast('请输入验证码');
+      return;
+    }
+    if (_editorSession.secqaaRequired &&
+        _editorSession.secqaaCtl.text.trim().isEmpty) {
+      showToast('请输入验证问答答案');
+      return;
+    }
     _setState(() => _editorSubmitting = true);
     try {
       final result = await _editorSession.submit('', content);
       if (!mounted) return;
       _setState(() => _editorSubmitting = false);
       if (!result.success) {
+        // 验证码 / 验证问答可当场重试：不收起编辑器，清空输入并换一张
+        if (result.message.contains('验证码') ||
+            result.message.contains('验证问答')) {
+          _editorSession.resetCaptcha();
+          showToast(
+            result.message.isNotEmpty ? result.message : '验证码错误，请重试',
+          );
+          return;
+        }
         showToast(result.message.isNotEmpty ? result.message : '提交失败');
         // 服务端拒绝（超出编辑/回复时间、无权限、版块已关闭等）时收起编辑器：
         // 错误提示不会被展开的编辑框挡住，也让用户立刻回到正常读帖态。

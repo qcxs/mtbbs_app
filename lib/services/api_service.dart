@@ -13,6 +13,7 @@ import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/core/utils/formatters.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/url_util.dart';
 
 part 'api_service_client.dart';
 part 'api_service_recovery.dart';

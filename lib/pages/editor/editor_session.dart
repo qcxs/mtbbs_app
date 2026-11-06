@@ -1,11 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
+import 'package:mtbbs/api/forum/seccode/export.dart' as seccode_api;
+import 'package:mtbbs/api/forum/secqaa/export.dart' as secqaa_api;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/page_fetcher.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
+import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/models/editor_snapshot.dart';
 import 'package:mtbbs/pages/editor/editor_submit.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
+import 'package:mtbbs/services/api_service.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 
 /// 编辑器共享内核 — 内容 / 页面数据 / 提交协议。
@@ -38,6 +44,39 @@ class EditorSession extends ChangeNotifier {
 
   final TextEditingController titleCtl = TextEditingController();
   final BBCodeController contentCtl = BBCodeController();
+
+  /// 验证码输入框（页面要求验证码时才有意义）
+  final TextEditingController seccodeCtl = TextEditingController();
+
+  /// 验证问答答案输入框（页面要求验证问答时才有意义）
+  final TextEditingController secqaaCtl = TextEditingController();
+
+  /// 验证码图片字节；null 表示未加载成功
+  Uint8List? seccodeImage;
+  bool seccodeLoading = false;
+  bool seccodeFailed = false;
+
+  /// 验证问答题干；空串表示未加载/加载失败
+  String secqaaQuestion = '';
+  bool secqaaLoading = false;
+  bool secqaaFailed = false;
+
+  /// 防止快速点「换一个」时旧请求覆盖新图片
+  int _seccodeEpoch = 0;
+  int _secqaaEpoch = 0;
+
+  /// 当前页面是否要求填写图片验证码
+  bool get seccodeRequired => pageData.seccodeRequired;
+
+  /// 当前页面是否要求回答验证问答
+  bool get secqaaRequired => pageData.secqaaRequired;
+
+  /// 当前页面是否要求任何形式的人机验证
+  bool get captchaRequired => pageData.captchaRequired;
+
+  /// 验证问答题面里自带的答案提示；空串表示没有（UI 隐藏「填充答案」）
+  String get secqaaAnswerHint =>
+      secqaa_api.secqaaAnswerFromQuestion(secqaaQuestion);
 
   /// 从绑定的 Discuz 页面提取的会话数据（formhash / posttime / uploadHash…）
   PageFormData pageData = const PageFormData();
@@ -100,7 +139,122 @@ class EditorSession extends ChangeNotifier {
     String title,
     String content, {
     Set<String> appendAids = const {},
-  }) => submitHelper.submit(pageData, title, content, appendAids: appendAids);
+  }) => submitHelper.submit(
+    pageData,
+    title,
+    content,
+    appendAids: appendAids,
+    seccodeVerify: seccodeCtl.text.trim(),
+    secanswer: secqaaCtl.text.trim(),
+  );
+
+  // ==================== 人机验证（图片验证码 / 验证问答） ====================
+
+  /// 按页面要求加载对应的人机验证：图片验证码或验证问答。
+  ///
+  /// 首次加载与「换一个」都走这里；两者互斥（拦截页只开一种）。
+  Future<void> loadCaptcha() async {
+    if (seccodeRequired) {
+      await loadSeccodeImage();
+    } else if (secqaaRequired) {
+      await loadSecqaaQuestion();
+    } else {
+      clearCaptcha();
+      notifyListeners();
+    }
+  }
+
+  /// 加载验证码图片（首次加载与「换一个」都走这里）。
+  ///
+  /// 必须先请求 `action=update`：桌面模板页面只有占位 span，服务端不会在
+  /// 页面里下发图片令牌；同时 update 会把验证码按 [PageFormData.seccodeModId]
+  /// 写入会话，保证提交时的模块标识一致。图片与站点会话绑定，必须走
+  /// [ApiService] 的 Dio，且不能被图片缓存复用。
+  Future<void> loadSeccodeImage() async {
+    if (!seccodeRequired) {
+      clearCaptcha();
+      notifyListeners();
+      return;
+    }
+    final epoch = ++_seccodeEpoch;
+    seccodeLoading = true;
+    seccodeFailed = false;
+    notifyListeners();
+
+    Uint8List? bytes;
+    try {
+      final dio = ApiService().dio;
+      bytes = await seccode_api.refreshSeccodeImage(
+        dio,
+        idhash: pageData.seccodeHash,
+        modId: pageData.seccodeModId,
+        fallbackImageUrl: pageData.seccodeImageUrl,
+      );
+    } catch (e) {
+      AppLogger.w('EDITOR', 'seccode load error: $e');
+    }
+
+    if (epoch != _seccodeEpoch) return;
+    seccodeImage = bytes;
+    seccodeFailed = bytes == null;
+    seccodeLoading = false;
+    notifyListeners();
+  }
+
+  /// 加载验证问答题干（首次加载与「换一个」都走这里）。
+  ///
+  /// 题面只出现在 `misc.php?mod=secqaa&action=update` 的 JS 响应里，
+  /// 页面 HTML 只有占位 span。该请求同时把新题写入会话，保证提交时
+  /// `secqaahash` 与服务端一致。
+  Future<void> loadSecqaaQuestion() async {
+    if (!secqaaRequired) {
+      clearCaptcha();
+      notifyListeners();
+      return;
+    }
+    final epoch = ++_secqaaEpoch;
+    secqaaLoading = true;
+    secqaaFailed = false;
+    notifyListeners();
+
+    String question = '';
+    try {
+      question = await secqaa_api.fetchSecqaaQuestion(
+        ApiService().dio,
+        idhash: pageData.secqaaHash,
+        modId: pageData.secqaaModId,
+      );
+    } catch (e) {
+      AppLogger.w('EDITOR', 'secqaa load error: $e');
+    }
+
+    if (epoch != _secqaaEpoch) return;
+    secqaaQuestion = question;
+    secqaaFailed = question.isEmpty;
+    secqaaLoading = false;
+    notifyListeners();
+  }
+
+  /// 提交失败（验证码 / 验证问答错误）后清空输入并换一张新题。
+  void resetCaptcha() {
+    seccodeCtl.clear();
+    secqaaCtl.clear();
+    loadCaptcha();
+  }
+
+  /// 清空人机验证状态（切目标 / 重新抓页面时调用）。
+  void clearCaptcha() {
+    _seccodeEpoch++;
+    _secqaaEpoch++;
+    seccodeCtl.clear();
+    secqaaCtl.clear();
+    seccodeImage = null;
+    seccodeLoading = false;
+    seccodeFailed = false;
+    secqaaQuestion = '';
+    secqaaLoading = false;
+    secqaaFailed = false;
+  }
 
   /// 切换编辑目标（帖子页：评论 ↔ 回复某评论）。
   ///
@@ -112,6 +266,7 @@ class EditorSession extends ChangeNotifier {
     this.pid = pid;
     pageData = const PageFormData();
     quotedPost = null;
+    clearCaptcha();
     notifyListeners();
   }
 
@@ -141,6 +296,8 @@ class EditorSession extends ChangeNotifier {
   void dispose() {
     titleCtl.dispose();
     contentCtl.dispose();
+    seccodeCtl.dispose();
+    secqaaCtl.dispose();
     super.dispose();
   }
 }

@@ -110,6 +110,7 @@ flutter test tool/api_probe_test.dart --dart-define=cmd=cache.list
 | `post.new` | 发布新帖（写操作），`fid=*`、`subject=*`、`message=*` | 是 |
 | `post.reply` | 评论/回复帖子（写操作），`tid=*`、`message=*`、`reppid` | 是 |
 | `post.edit` | 修改帖子/评论（写操作），`tid=*`、`pid=*`、`message=*` | 是 |
+| `post.captcha` | 发帖页人机验证探针（只读），`fid=*`、`refresh=1` 换图；自动区分图片验证码 / 验证问答 | 是 |
 | `favorite.add` | 收藏帖子（写操作），`tid=*`、`note` | 是 |
 | `favorite.delete` | 删除收藏（写操作），`favid=*` | 是 |
 | `score.form` | 解析评分弹窗（写操作前奏），`tid=*`、`pid=*` | 是 |

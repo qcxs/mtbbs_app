@@ -378,6 +378,11 @@ extension on _EditorPageState {
               textInputAction: TextInputAction.next,
             ),
           ),
+        if (_session.captchaRequired)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: CaptchaFields(session: _session),
+          ),
         ValueListenableBuilder<UndoHistoryValue>(
           valueListenable: _undoController,
           builder: (_, undoVal, __) {

@@ -29,6 +29,7 @@ import 'package:mtbbs/widgets/dialog/image_picker_sheet.dart';
 import 'package:mtbbs/widgets/dialog/attachment_picker_sheet.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/quick_reply_dialog.dart';
+import 'package:mtbbs/widgets/editor/captcha_field.dart';
 import 'package:mtbbs/platform/optional/file_pick.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';

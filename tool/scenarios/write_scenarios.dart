@@ -5,7 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:mtbbs/api/forum/post/export.dart' as post_api;
 import 'package:mtbbs/api/forum/post/http.dart' as post_http;
+import 'package:mtbbs/api/forum/seccode/export.dart' as seccode_api;
+import 'package:mtbbs/api/forum/secqaa/export.dart' as secqaa_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as rate_api;
+import 'package:mtbbs/core/parser/page_fetcher.dart';
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/api/home/wall/export.dart' as wall_api;
@@ -110,6 +113,69 @@ final Map<String, ApiScenario> writeScenarios = {
         'tid': r.tid,
         'pid': r.pid,
         'needsApproval': r.needsApproval,
+      };
+    },
+  ),
+  'post.captcha': ApiScenario(
+    desc:
+        '发帖页人机验证探针（只读，不提交）：拉取发帖页 → 解析 seccode / secqaa → '
+        '拉图或拉题面（refresh=1 时先走「换一个」）',
+    params: {
+      'fid': '*版块 ID',
+      'refresh': '1=调用「换一个」后再拉图',
+    },
+    needsLogin: true,
+    run: (a) async {
+      final dio = ApiService().dio;
+      final fid = a['fid'] ?? '';
+      if (fid.isEmpty) throw Exception('缺少必填参数 fid');
+
+      final url = '/forum.php?mod=post&action=newthread&fid=$fid';
+      final resp = await post_http.getNewThreadPage(dio, fid: fid);
+      final page = PageFetcher.parsePage(resp.data ?? '', url: url);
+      if (page.secqaaRequired) {
+        final question = await secqaa_api.fetchSecqaaQuestion(
+          dio,
+          idhash: page.secqaaHash,
+          modId: page.secqaaModId,
+        );
+        return {
+          'success': question.isNotEmpty,
+          'seccodeRequired': false,
+          'secqaaRequired': true,
+          'hash': page.secqaaHash,
+          'question': question,
+        };
+      }
+      if (!page.seccodeRequired) {
+        return {
+          'success': true,
+          'seccodeRequired': false,
+          'secqaaRequired': false,
+        };
+      }
+
+      final useRefresh =
+          a['refresh'] == '1' || page.seccodeImageUrl.isEmpty;
+      final bytes = useRefresh
+          ? await seccode_api.refreshSeccodeImage(
+              dio,
+              idhash: page.seccodeHash,
+              modId: page.seccodeModId,
+              fallbackImageUrl: page.seccodeImageUrl,
+            )
+          : await seccode_api.fetchSeccodeImage(
+              dio,
+              imageUrl: page.seccodeImageUrl,
+            );
+      return {
+        'success': bytes != null,
+        'seccodeRequired': true,
+        'hash': page.seccodeHash,
+        'hashField': page.seccodeHashField,
+        'modId': page.seccodeModId,
+        'imageUrl': page.seccodeImageUrl,
+        'imageBytes': bytes?.length ?? 0,
       };
     },
   ),

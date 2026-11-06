@@ -4,6 +4,31 @@ part of 'api_service.dart';
 const String _browserAccept =
     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
 
+/// 表单请求体按站点字符集编码（仅 GBK 站点需要）。
+///
+/// Dio 对 `Map` 形式的 data 固定按 UTF-8 编码，而 Discuz 按**站点字符集**
+/// 解码 POST 字段：GBK 站点（52pojie）提交中文会变成乱码（实测评论正文）。
+/// 非 GBK 站点保持原 Map，行为完全不变。
+void _encodeFormBody(RequestOptions options) {
+  final data = options.data;
+  if (data is! Map) return;
+  // 头名大小写不敏感：调用方写的是 `Content-Type`，Dio 内部可能保留原样
+  String contentType = '';
+  for (final e in options.headers.entries) {
+    if (e.key.toLowerCase() == Headers.contentTypeHeader) {
+      contentType = (e.value ?? '').toString().toLowerCase();
+      break;
+    }
+  }
+  if (!contentType.startsWith(Headers.formUrlEncodedContentType)) return;
+  final cs = resolveRequestCharset().trim().toLowerCase();
+  if (cs != 'gbk' && cs != 'gb2312') return;
+  options.data = encodeFormBodyForSite(
+    data.map((k, v) => MapEntry(k.toString(), v)),
+    charset: cs,
+  );
+}
+
 /// 客户端构建与请求头处理 —— 创建 Dio、注入拦截器、剔除「浏览方式」Cookie。
 extension on ApiService {
   /// 构建绑定指定 baseUrl + CookieJar 的 Dio（含全部拦截器）。
@@ -71,6 +96,10 @@ extension on ApiService {
       InterceptorsWrapper(
         onRequest: (options, handler) {
           options.extra['_start'] = DateTime.now().millisecondsSinceEpoch;
+          // 表单请求体按**站点字符集**编码：Dio 对 Map data 固定 UTF-8，
+          // GBK 站点（52pojie）会把中文 POST 字段读成乱码（评论/发帖正文）。
+          // 放在日志之前，日志看到的仍是原始字段。
+          _encodeFormBody(options);
           // 浏览器仿真头按**目标站点**取开关：全局 Dio 与跨站作用域 Dio 共用，
           // 不再依赖切站时 push 的模块变量（见 docs/04 设置分层）。
           final host = Uri.tryParse(options.baseUrl)?.host ?? '';
@@ -100,7 +129,13 @@ extension on ApiService {
         onResponse: (response, handler) async {
           final path = response.requestOptions.path;
           final status = response.statusCode ?? 0;
-          final size = (response.data as String?)?.length ?? 0;
+          // 二进制响应（验证码图片 / 附件下载）的 data 是 Uint8List，
+          // 不能按 String 强转，否则拦截器自己抛类型错误，请求被降级为
+          // DioException[unknown]。
+          final data = response.data;
+          final size = data is String
+              ? data.length
+              : (data is List ? data.length : 0);
           final start = response.requestOptions.extra['_start'] as int?;
           final elapsed = start != null
               ? DateTime.now().millisecondsSinceEpoch - start
@@ -138,7 +173,10 @@ extension on ApiService {
           final path = error.requestOptions.path;
           if (error.response != null) {
             final status = error.response!.statusCode ?? 0;
-            final size = (error.response!.data as String?)?.length ?? 0;
+            final data = error.response!.data;
+            final size = data is String
+                ? data.length
+                : (data is List ? data.length : 0);
             if (status == 403) {
               AppLogger.w('DIO', '$path → 403 可能需要重新登录');
             } else if (status == 404) {
