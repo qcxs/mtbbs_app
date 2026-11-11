@@ -2,6 +2,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 
 /// 好友列表响应解析
 ///
@@ -73,12 +74,12 @@ Map<String, dynamic> _parseFriend(dom.Element li) {
   }
 
   // 用户名 + uid
-  // 注意：自己页 h4 内第一个 <a> 是“热度”链接（href 为 spacecp，非 space-uid），
-  // 必须过滤，只取 href 含 space-uid- 的用户名链接。
+  // 注意：自己页 h4 内第一个 <a> 是“热度”链接（href 为 spacecp，非用户空间），
+  // 必须过滤，只取指向用户空间的链接（space-uid-N / mod=space&uid=N）。
   final anchors = li.querySelectorAll('h4 a');
   dom.Element? nameLink;
   for (final a in anchors) {
-    if ((a.attributes['href'] ?? '').contains('space-uid-')) {
+    if (uidFromHref(a.attributes['href'], strict: true) != null) {
       nameLink = a;
       break;
     }
@@ -90,9 +91,8 @@ Map<String, dynamic> _parseFriend(dom.Element li) {
     final name = title.isNotEmpty ? title : text;
     if (name.isNotEmpty) friend['username'] = name;
 
-    final href = nameLink.attributes['href'] ?? '';
-    final m = RegExp(r'uid-(\d+)').firstMatch(href);
-    if (m != null) friend['uid'] = m.group(1);
+    final uid = uidFromHref(nameLink.attributes['href']);
+    if (uid != null) friend['uid'] = uid;
   }
 
   // 用户组 + 积分 / 好友备注（<p class="maxh">）

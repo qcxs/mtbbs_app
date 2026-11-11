@@ -1,6 +1,7 @@
 import 'package:html/parser.dart' as htmlParser;
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 
 /// Discuz 在线用户 HTML 解析
 ///
@@ -65,8 +66,7 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
         final a = li.querySelector('a');
         final username = a?.text.trim() ?? '';
         final href = a?.attributes['href'] ?? '';
-        final uidMatch = RegExp(r'space-uid-(\d+)').firstMatch(href);
-        final uid = uidMatch?.group(1) ?? '';
+        final uid = uidFromHref(href) ?? '';
 
         if (username.isNotEmpty || uid.isNotEmpty) {
           items.add({

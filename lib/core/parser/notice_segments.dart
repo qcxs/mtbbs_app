@@ -13,6 +13,7 @@ library;
 
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 
 /// 从 `dl[id^="notice_"]` 的头像格子里取对方 uid。
 ///
@@ -20,7 +21,7 @@ import 'package:mtbbs/core/app/page_helper.dart';
 /// `space-uid-X.html`），无 authorid 时是 `systempm.png` 系统图标 → 返回空串。
 String noticeAvatarUid(dom.Element dl) {
   final href = dl.querySelector('dd.avt a')?.attributes['href'] ?? '';
-  return RegExp(r'uid[=-](\d+)').firstMatch(href)?.group(1) ?? '';
+  return uidFromHref(href, strict: true) ?? '';
 }
 
 /// 是否为「同类型提醒被折叠」的条目（Discuz 渲染一行
@@ -243,12 +244,9 @@ void _addLink(List<Map<String, dynamic>> out, dom.Element a) {
   final href = a.attributes['href'] ?? '';
   final text = sanitizeText(a.text);
   if (text.isEmpty) return;
-  if (href.contains('space-uid-') || href.contains('space.php?uid=')) {
-    out.add({
-      'type': 'user',
-      'text': text,
-      'uid': RegExp(r'uid[=-](\d+)').firstMatch(href)?.group(1) ?? '',
-    });
+  final uid = uidFromHref(href, strict: true);
+  if (uid != null) {
+    out.add({'type': 'user', 'text': text, 'uid': uid});
     return;
   }
   out.add({

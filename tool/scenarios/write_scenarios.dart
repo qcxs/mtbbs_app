@@ -10,6 +10,7 @@ import 'package:mtbbs/api/forum/secqaa/export.dart' as secqaa_api;
 import 'package:mtbbs/api/forum/viewthread/action/export.dart' as rate_api;
 import 'package:mtbbs/core/parser/page_fetcher.dart';
 import 'package:mtbbs/api/home/favorite/export.dart' as favorite_api;
+import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
 import 'package:mtbbs/api/home/pm/export.dart' as pm_api;
 import 'package:mtbbs/api/home/wall/export.dart' as wall_api;
 import 'package:mtbbs/core/app/site_store.dart';
@@ -120,10 +121,7 @@ final Map<String, ApiScenario> writeScenarios = {
     desc:
         '发帖页人机验证探针（只读，不提交）：拉取发帖页 → 解析 seccode / secqaa → '
         '拉图或拉题面（refresh=1 时先走「换一个」）',
-    params: {
-      'fid': '*版块 ID',
-      'refresh': '1=调用「换一个」后再拉图',
-    },
+    params: {'fid': '*版块 ID', 'refresh': '1=调用「换一个」后再拉图'},
     needsLogin: true,
     run: (a) async {
       final dio = ApiService().dio;
@@ -155,8 +153,7 @@ final Map<String, ApiScenario> writeScenarios = {
         };
       }
 
-      final useRefresh =
-          a['refresh'] == '1' || page.seccodeImageUrl.isEmpty;
+      final useRefresh = a['refresh'] == '1' || page.seccodeImageUrl.isEmpty;
       final bytes = useRefresh
           ? await seccode_api.refreshSeccodeImage(
               dio,
@@ -393,6 +390,30 @@ final Map<String, ApiScenario> writeScenarios = {
       final favid = a['favid'] ?? '';
       if (favid.isEmpty) throw Exception('缺少必填参数 favid');
       return favorite_api.deleteFavorite(ApiService().dio, favid: favid);
+    },
+  ),
+  'follow.add': ApiScenario(
+    desc: '关注用户（写操作！需登录；uid=目标用户；自动拉取资料页取 formhash）',
+    params: {'uid': '*目标用户 uid', 'formhash': 'formhash（可空；空则自动拉取资料页）'},
+    needsLogin: true,
+    run: (a) {
+      final uid = a['uid'] ?? '';
+      if (uid.isEmpty) throw Exception('缺少必填参数 uid');
+      return follow_api.followUser(
+        ApiService().dio,
+        uid: uid,
+        formhash: a['formhash'] ?? '',
+      );
+    },
+  ),
+  'follow.del': ApiScenario(
+    desc: '取消关注用户（写操作！需登录；uid=目标用户）',
+    params: {'uid': '*目标用户 uid'},
+    needsLogin: true,
+    run: (a) {
+      final uid = a['uid'] ?? '';
+      if (uid.isEmpty) throw Exception('缺少必填参数 uid');
+      return follow_api.unfollowUser(ApiService().dio, uid: uid);
     },
   ),
   'message.pm.send': ApiScenario(

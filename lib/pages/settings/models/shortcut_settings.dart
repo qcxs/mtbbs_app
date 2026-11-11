@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/utils/shortcut_helper.dart';
 import 'package:mtbbs/models/managed_item.dart';
 import 'package:mtbbs/pages/settings/models/settings_model.dart';
@@ -93,9 +94,8 @@ Widget _keyBadge(BuildContext context, String currentKey) {
     ),
     child: Text(
       currentKey.isEmpty ? '未设置' : currentKey,
-      style: TextStyle(
+      style: context.appTypography.mono.copyWith(
         fontSize: 12,
-        fontFamily: 'monospace',
         fontWeight: FontWeight.w600,
         color: cs.onSurfaceVariant,
       ),

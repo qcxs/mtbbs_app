@@ -157,7 +157,47 @@
 | UI | `CaptchaField` / `CaptchaFields`（`widgets/editor/captcha_field.dart`），完整编辑器与帖子页迷你编辑器共用；验证失败时**不收起**迷你编辑器，允许原地重试 |
 | 提交 | `post/http.dart` 统一追加 `_seccodeFields` / `_secqaaFields`；`editor_submit.dart` 从 `pageData` 读取 |
 
-## 8. 相关文件
+## 8. 关注 / 取消关注 — uid
+
+Discuz 把「关注」叫「收听」，按钮文案随模板不同（PC 资料页「收听TA / 取消收听」，
+克米移动模板「关注」/ 已关注仅显示图标）。客户端统一显示「关注 / 已关注」。
+
+| 项 | 关注 | 取消关注 |
+|---|---|---|
+| 端点 | `GET /home.php?mod=spacecp&ac=follow&op=add&hash={formhash}&fuid={uid}&inajax=1` | `GET /home.php?mod=spacecp&ac=follow&op=del&fuid={uid}&inajax=1` |
+| 必填参数 | `hash`（= formhash）、`fuid` | `fuid`（服务端不校验 formhash） |
+| 探针场景 | `follow.add`（uid 必填，formhash 可空） | `follow.del`（uid 必填） |
+| 代码 | `lib/api/home/follow/{http,parse,export}.dart`（`followUser` / `unfollowUser`） | 同左 |
+
+页面状态与 formhash 来源（两站一致，2026-11 实测 MT / 52pojie）：
+
+- **资料页**（`home.php?mod=space&uid={uid}&do=profile`，PC 与移动模板结构一致）：
+  `a#followmod` 的 href 即当前状态——含 `op=add&hash=…` = 未关注，含 `op=del` = 已关注。
+  未关注时 `hash` 就在该链接里，直接取出即可，不必额外请求。
+- **空间首页**（PC，`space-uid-*.html`）：`#unfollowflag` / `#followflag` 两个容器
+  靠内联 `display:none` 互斥显示；关注/粉丝列表页则是 `a[id^=a_followmod_]`
+  （`flw_btn_unfo` = 已关注）。`parseFollowState` 已兼容这三种形态。
+- **已关注状态下页面不提供 hash**：此时若要再次关注，`followUser` 会在
+  formhash 为空时重新拉一次资料页；若资料页仍显示已关注，直接返回成功（幂等）。
+- **帖子详情页**：楼主作者区 `a[id^=followmod_{uid}]`（文案「收听TA / 不收听」），
+  同样以 href 含 `op=add&hash=…` / `op=del` 判断状态；主帖卡片右上角渲染
+  「关注 / 已关注」胶囊（仅主帖、非本人、非只读场景）。
+
+响应（`inajax=1`）为 XML + CDATA，**52pojie 是 GBK**（`charset=gbk`，由 Dio 的
+`responseDecoder` 统一解码）：
+
+```html
+<root><![CDATA[<div class="alert_right">成功收听
+<script>…succeedhandle_followmod(…,'成功收听',
+  {'fuid':'1','type':'add','special':'0','from':'list'});</script>
+</div>]]></root>
+```
+
+- 成功以 `'type':'add'|'del'` 判定（文案仅用于提示）；失败为 `.alert_error` /
+  `.alert_info`（如「您已收听该用户」「不能收听自己」）。
+- 失败文案会原样透传给 Toast，不硬编码站点文案。
+
+## 9. 相关文件
 
 | 文件 | 职责 |
 |---|---|
@@ -167,4 +207,5 @@
 | `lib/api/forum/secqaa/{http,parse,export}.dart` | 验证问答取题、换题、JS 题面解析 |
 | `lib/core/parser/page_fetcher.dart` | 从编辑页提取 seccodehash / seccodemodid / 图片地址、secqaahash |
 | `lib/pages/editor/editor_submit.dart` | submitEdit（编辑器内联实现，探针 post.edit 复用其逻辑） |
-| `tool/scenarios/write_scenarios.dart` | post.new / post.reply / post.edit / post.captcha 探针场景 |
+| `lib/api/home/follow/{http,parse,export}.dart` | 关注/取消关注 + 关注状态解析（资料页 `#followmod`） |
+| `tool/scenarios/write_scenarios.dart` | post.new / post.reply / post.edit / post.captcha / follow.add / follow.del 探针场景 |

@@ -82,6 +82,7 @@ void main() {
       'type': String.fromEnvironment('type'),
       'message': String.fromEnvironment('message'),
       'reppid': String.fromEnvironment('reppid'),
+      'formhash': String.fromEnvironment('formhash'),
       'note': String.fromEnvironment('note'),
       'exttype': String.fromEnvironment('exttype'),
       'income': String.fromEnvironment('income'),
@@ -112,16 +113,10 @@ void main() {
 
     final rawCmd = pick('cmd', const String.fromEnvironment('cmd'));
     final cmd = rawCmd.isEmpty ? 'session.list' : rawCmd;
-    final account = pick(
-      'account',
-      const String.fromEnvironment('account'),
-    );
+    final account = pick('account', const String.fromEnvironment('account'));
     final site = pick('site', const String.fromEnvironment('site'));
     final baseUrl = pick('baseUrl', const String.fromEnvironment('baseUrl'));
-    final siteName = pick(
-      'siteName',
-      const String.fromEnvironment('siteName'),
-    );
+    final siteName = pick('siteName', const String.fromEnvironment('siteName'));
     final cookie = pick('cookie', const String.fromEnvironment('cookie'));
     final header = pick('header', const String.fromEnvironment('header'));
     final ua = pick('ua', const String.fromEnvironment('ua'));
@@ -247,12 +242,7 @@ Future<Map<String, dynamic>> runProbe({
       ua: ua,
     );
   } catch (e) {
-    return {
-      'ok': false,
-      'status': 'failed',
-      'cmd': cmd,
-      'error': '初始化失败: $e',
-    };
+    return {'ok': false, 'status': 'failed', 'cmd': cmd, 'error': '初始化失败: $e'};
   }
 
   final sw = Stopwatch()..start();

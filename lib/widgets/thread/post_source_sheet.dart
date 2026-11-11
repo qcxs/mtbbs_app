@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/parser/plain_bbcode.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/app_sheet.dart';
@@ -113,11 +114,10 @@ class _PostSourceSheetState extends State<PostSourceSheet> {
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
                 child: SelectableText(
                   _currentText,
-                  style: TextStyle(
+                  style: context.appTypography.mono.copyWith(
                     fontSize: 12.5,
                     height: 1.55,
                     color: cs.onSurface,
-                    fontFamily: 'monospace',
                   ),
                 ),
               ),

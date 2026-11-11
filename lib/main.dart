@@ -13,6 +13,7 @@ import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/providers/history_provider.dart';
 import 'package:mtbbs/providers/search_history_provider.dart';
 import 'package:mtbbs/providers/editor_history_provider.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/config/nav_config.dart';
 import 'package:mtbbs/config/router.dart';
 import 'package:mtbbs/mcp/mcp_server_controller.dart';
@@ -34,6 +35,7 @@ import 'package:mtbbs/api/forum/misc/export.dart' as forum_misc;
 import 'package:mtbbs/api/home/credit/export.dart' as credit_api;
 import 'package:mtbbs/models/post_preview.dart';
 import 'package:mtbbs/core/app/desktop_window.dart';
+import 'package:mtbbs/core/utils/app_fonts.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/logger.dart';
 import 'package:mtbbs/core/utils/max_screen_size.dart';
@@ -557,7 +559,15 @@ class _NoticeLifecycleWatcherState extends State<_NoticeLifecycleWatcher>
 ThemeData _buildThemeData(ColorScheme cs) {
   return ThemeData(
     useMaterial3: true,
-    fontFamily: 'sans-serif',
+    // 显式按平台指定字体：`sans-serif` 在桌面端不存在，会回退到宋体等不可控字体
+    fontFamily: appFontFamily,
+    fontFamilyFallback: appFontFallback,
+    extensions: [
+      AppTypography(
+        monoFamily: appMonoFontFamily,
+        monoFallback: appMonoFontFallback,
+      ),
+    ],
     colorScheme: cs,
     appBarTheme: AppBarTheme(
       backgroundColor: cs.surface,

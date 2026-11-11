@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
@@ -204,7 +205,7 @@ class PostHtmlWidget extends StatelessWidget {
             // 不支持的宏/语法：退回原始 TeX，保证内容不丢
             onErrorFallback: (_) => Text(
               math.tex,
-              style: mathStyle.copyWith(fontFamily: 'monospace'),
+              style: mathStyle.merge(context.appTypography.mono),
             ),
           );
           if (!math.display) {

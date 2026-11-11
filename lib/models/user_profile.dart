@@ -17,6 +17,12 @@ class UserProfile {
   /// 等级文本（如 `Lv.8`）——克米移动模板独有，PC 模板为空
   final String level;
 
+  /// 当前登录用户是否已关注（收听）该用户
+  final bool followed;
+
+  /// 关注所需 formhash（仅未关注时有值；已关注时为空）
+  final String followHash;
+
   // === 勋章 ===
   final List<Medal> medals;
 
@@ -70,6 +76,8 @@ class UserProfile {
     this.signature = '',
     this.customTitle = '',
     this.level = '',
+    this.followed = false,
+    this.followHash = '',
     this.medals = const [],
     this.friends,
     this.replies,
@@ -120,6 +128,8 @@ class UserProfile {
       signature: _s(p['signature']),
       customTitle: _s(p['customTitle']),
       level: _s(p['level']),
+      followed: p['followed'] == true,
+      followHash: _s(p['followHash']),
       medals: medalsList
           .map((m) => Medal.fromMap(m as Map<String, dynamic>))
           .toList(),
@@ -165,6 +175,8 @@ class UserProfile {
     'signature': signature,
     'customTitle': customTitle,
     'level': level,
+    'followed': followed,
+    'followHash': followHash,
     'medals': medals.map((m) => m.toMap()).toList(),
     'stats': {
       'friends': friends,

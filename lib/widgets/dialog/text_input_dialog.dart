@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 
@@ -117,7 +118,12 @@ class _TextInputDialogState extends State<_TextInputDialog> {
               onChanged: (_) => setState(() {}),
               style: TextStyle(
                 fontSize: widget.monospace ? 11 : 13,
-                fontFamily: widget.monospace ? 'monospace' : null,
+                fontFamily: widget.monospace
+                    ? context.appTypography.monoFamily
+                    : null,
+                fontFamilyFallback: widget.monospace
+                    ? context.appTypography.monoFallback
+                    : null,
               ),
               decoration: InputDecoration(
                 hintText: widget.hintText,

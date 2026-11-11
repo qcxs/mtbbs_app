@@ -38,6 +38,10 @@ class _AppShellState extends State<AppShell> {
   /// 页面缓存：首次切换到某 Tab 时才创建，创建后永久缓存。
   final Map<int, Widget> _tabPageCache = {};
 
+  /// 当前可见的主 Tab 下标。IndexedStack 会把所有 Tab 页面留在树里，
+  /// 页面需要据此判断"自己是否真的在屏幕上"（如消息页不能在后台自动刷新）。
+  final ValueNotifier<int> _activeTab = ValueNotifier<int>(0);
+
   /// 上一次的「站点 + 账号」；变化说明缓存页面属于旧身份
   String _identity = '';
 
@@ -56,6 +60,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void dispose() {
     ThreadCacheService.instance.health.removeListener(_onThreadCacheHealth);
+    _activeTab.dispose();
     super.dispose();
   }
 
@@ -91,7 +96,7 @@ class _AppShellState extends State<AppShell> {
       case 0:
         return const HomePage();
       case 1:
-        return const MessagePage();
+        return MessagePage(activeTab: _activeTab, tabIndex: 1);
       case 2:
         return const GuidePage();
       case 3:
@@ -149,6 +154,8 @@ class _AppShellState extends State<AppShell> {
     final newIndex = navItems.indexWhere((e) => e.path == uri);
     if (newIndex == -1) return;
     _currentIndex = newIndex;
+    // 通知缓存中的 Tab 页面：现在轮到谁显示（IndexedStack 只切 index，不销毁兄弟页面）
+    _activeTab.value = newIndex;
   }
 
   void _onTap(int i) {

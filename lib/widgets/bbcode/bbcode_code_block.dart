@@ -5,6 +5,7 @@ import 'package:flutter_highlight/themes/github.dart';
 import 'package:highlight/highlight.dart' show highlight, Node;
 import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/languages/all.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/platform/optional/file_save.dart';

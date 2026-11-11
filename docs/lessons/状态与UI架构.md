@@ -40,3 +40,7 @@
 58. **首页区块的顺序 + 显隐 + 默认展开共用一个 `ManagedItem` 列表** — `data` 是业务自定义字段的收纳位（这里放 `expanded`），顺序即列表顺序，持久化一个 key（`homeSections`）。设置面板用 `ReorderableListView` + 拖拽手柄 / 默认展开 Switch / 可见性按钮三个控件复用同一份数据。新增区块只需往 `_homeSectionDefaults` 加一行，加载时按 id 白名单过滤损坏数据。
 59. **区块列表不要按"列"分，宽度交给区块内部消化** — 首页曾在宽屏下把区块交替分到左右两列，结果左右高度必然不等（快捷链接 2 行、排行 10 条，差得远），比单列更乱。根因是**区块高度由内容决定，布局阶段无法拉平**；瀑布流能对齐列高但会打乱顺序。现在的做法：单列纵向 + 区块内部自适应宽度（快捷链接按容器宽度加列，版块 `Wrap` 铺开，排行自己按 `maxWidth > 600` 双列）。宽屏只额外增加页面左右边距。
 60. **网格的"列数"要由容器宽度反推，不能写死** — `crossAxisCount: 4` 写死时格子宽度 = 容器宽 / 4，于是宽屏下格子被撑到 100+ px 却"一行还是 4 个"，窄屏又显得挤。改成目标格子宽度驱动：`columns = max(3, ceil(containerWidth / (targetTileWidth + spacing)))`，超宽屏会一直加列而格子尺寸恒定（这里稳定在 53~56px）。首屏"两行"的数量也要跟着算：`initialCount = columns * 2`。
+
+## 桌面端字体
+
+123. **不要在主题里写 `fontFamily: 'sans-serif'`，等宽处也别写 `'monospace'`** — 这两个是 **Android 的系统字体别名**，Windows/macOS/Linux 没有对应的字体族，Flutter 只能走引擎兜底：中文常被回退到**宋体**（小字号发虚），代码块甚至退成比例字体（对不齐、没高亮观感）。Windows 上正确做法是按平台显式指定：界面字体 `Microsoft YaHei UI`（回退 `Microsoft YaHei` → `Segoe UI`），等宽字体 `Cascadia Mono`（回退 `Consolas` → `Courier New`）。macOS 用 `PingFang SC` / `SF Mono`，Linux 用 `Noto Sans CJK SC` / `Noto Sans Mono`；Android / iOS / 鸿蒙返回 `null` 保持系统默认，不改变移动端观感。**分层**：平台取值集中在 `lib/core/utils/app_fonts.dart`，只有 `main.dart` 构造 `ThemeData` 时引用；业务代码不 import 它，等宽字体走主题扩展 `context.appTypography.mono`（`lib/config/app_typography.dart`，未注入主题时自动回退平台默认，widget 测试安全）。新增等宽样式不要再写字面量；`fontFamilyFallback` 非 const，`const TextStyle(...)` 需去掉 `const`。widget 测试用 Ahem 字体，字体改动不会让测试变红，但真实布局宽度会变，桌面端改动需实机截图核对。

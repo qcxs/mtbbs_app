@@ -1,23 +1,17 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 帖子列表解析器共享工具
 ///
 /// 供 thread_parsers/ 下各解析器复用，避免重复实现。
 
-/// 从用户空间链接中提取 uid（如 `space-uid-123.html`、`?uid=123`）
+/// 从用户空间链接中提取 uid（如 `space-uid-123.html`、
+/// `home.php?mod=space&uid=123`、`?uid=123`）
 int? extractUidFromUrl(String url) {
-  try {
-    final uri = Uri.parse(url);
-    final uidStr = uri.queryParameters['uid'];
-    if (uidStr != null) return int.tryParse(uidStr);
-    final m = RegExp(r'space-uid-(\d+)').firstMatch(url);
-    if (m != null) return int.tryParse(m.group(1)!);
-    return null;
-  } catch (_) {
-    return null;
-  }
+  final uid = uidFromHref(url);
+  return uid == null ? null : int.tryParse(uid);
 }
 
 /// 从帖子链接中提取 tid

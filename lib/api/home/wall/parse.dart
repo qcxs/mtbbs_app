@@ -3,6 +3,7 @@ import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/parser/html2bbcode.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 
 /// 用户留言板（`home.php?mod=space&uid={uid}&do=wall`）HTML 解析
 ///
@@ -90,8 +91,7 @@ Map<String, dynamic>? _parseComment(dom.Element dl) {
         dl.querySelector('a[id="author_$cid"]') ?? dl.querySelector('dt a');
     final authorName = sanitizeText(authorLink?.text ?? '');
     final authorHref = authorLink?.attributes['href'] ?? '';
-    final authorUid =
-        RegExp(r'space-uid-(\d+)').firstMatch(authorHref)?.group(1) ?? '';
+    final authorUid = uidFromHref(authorHref) ?? '';
 
     // 时间：dt 内作者名后的 span.xg1.xw0
     final time = sanitizeText(dl.querySelector('span.xg1.xw0')?.text ?? '');

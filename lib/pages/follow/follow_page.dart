@@ -269,7 +269,8 @@ class _FollowPageState extends State<FollowPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.push('/user/$uid'),
+        // uid 为空（老站点/异常模板）时不跳转，避免进入 `/user/` 这种非法路由
+        onTap: uid.isEmpty ? null : () => context.push('/user/$uid'),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
@@ -347,7 +348,7 @@ class _FollowPageState extends State<FollowPage> {
     final cs = Theme.of(context).colorScheme;
     final style = TextStyle(fontSize: 10, color: cs.onSurfaceVariant);
     return InkWell(
-      onTap: count.isNotEmpty
+      onTap: count.isNotEmpty && uid.isNotEmpty
           ? () => _openUserFollow(uid, following: following)
           : null,
       child: Padding(

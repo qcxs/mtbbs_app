@@ -1,6 +1,7 @@
 import 'package:mtbbs/core/app/session_registry.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/app/site_store.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 
 part 'url_router_php.dart';

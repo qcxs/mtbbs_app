@@ -1,5 +1,6 @@
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/api/helpers.dart';
+import 'package:mtbbs/api/home/follow/parse.dart' show parseFollowState;
 import 'package:mtbbs/core/parser/html2bbcode.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
@@ -36,6 +37,13 @@ Map<String, dynamic> parseResponse(String body, int statusCode) {
 
     _parseActivitySection(doc, profile);
     _parseStatsSection(doc, profile);
+  }
+
+  // 关注状态 + 关注所需 formhash（两套模板的按钮都在 #followmod）
+  final followState = parseFollowState(doc);
+  profile['followed'] = followState.followed;
+  if (followState.formhash.isNotEmpty) {
+    profile['followHash'] = followState.formhash;
   }
 
   // 必要内容校验：昵称和 uid 都没有，且页面上无用户内容 DOM → 判定无效

@@ -7,10 +7,12 @@ import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:mtbbs/core/app/site_session.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/settings/settings_repository.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
 import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/api/home/space/export.dart' as space_api;
+import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
 import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/models/user_profile.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -21,6 +23,7 @@ import 'package:mtbbs/widgets/common/pie_chart.dart';
 import 'package:mtbbs/widgets/common/page_actions.dart';
 import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 import 'package:mtbbs/widgets/layout/page_error_widget.dart';
 import 'package:mtbbs/widgets/layout/state_views.dart';
 import 'package:mtbbs/pages/user/user_uid_picker_dialog.dart';
@@ -47,6 +50,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   bool _loading = true;
   String? _error;
   bool _showRawSignature = false;
+
+  /// 关注/取消关注请求进行中（防止重复点击）
+  bool _followBusy = false;
 
   /// 当前页面作用域的站点会话（跨站点打开时 = 目标站默认账号/游客，只读）
   SiteSession _session = const GlobalSiteSession();

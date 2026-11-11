@@ -5,6 +5,7 @@ import 'package:mtbbs/auth/providers/auth_provider.dart';
 import 'package:mtbbs/auth/pages/web_login_page.dart';
 import 'package:mtbbs/auth/widgets/login_sheet.dart' show showLoginSheet;
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
@@ -399,7 +400,7 @@ class _ImportAccountsDialogState extends State<_ImportAccountsDialog> {
           TextField(
             controller: _ctl,
             maxLines: 6,
-            style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+            style: context.appTypography.mono.copyWith(fontSize: 11),
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               isDense: true,

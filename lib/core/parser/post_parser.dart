@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/parser/html2bbcode.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 
 /// 从 table#pidXX.plhin（PC 模板）提取单帖完整数据
@@ -34,9 +35,7 @@ Map<String, dynamic> parsePostFromTable(
     final nameLink = pls.querySelector('.pi .authi a');
     if (nameLink != null) {
       username = sanitizeText(nameLink.text);
-      final href = nameLink.attributes['href'] ?? '';
-      final m = RegExp(r'space.*?uid[=-](\d+)').firstMatch(href);
-      if (m != null) uid = m.group(1)!;
+      uid = uidFromHref(nameLink.attributes['href']) ?? '';
     }
 
     // 用户组
@@ -287,12 +286,10 @@ Map<String, dynamic> parsePostFromTable(
             ? allTds[reasonColIndex].text.trim()
             : '';
         if (nameLink != null) {
-          final href = nameLink.attributes['href'] ?? '';
           // 克米：`space-uid-123`；52pojie：`home.php?mod=space&uid=123`
-          final uidMatch = RegExp(r'space.*?uid[=-](\d+)').firstMatch(href);
           entries.add({
             'username': nameLink.text.trim(),
-            'uid': uidMatch?.group(1) ?? '',
+            'uid': uidFromHref(nameLink.attributes['href']) ?? '',
             'scores': scores,
             'reason': reason,
           });
@@ -356,10 +353,7 @@ List<Map<String, dynamic>> _parsePostComments(dom.Element plc) {
           final text = sanitizeText(a.text).trim();
           if (text.isEmpty) continue; // 首个链接是头像，文本为空
           username = text;
-          final m = RegExp(
-            r'space.*?uid[=-](\d+)',
-          ).firstMatch(a.attributes['href'] ?? '');
-          if (m != null) uid = m.group(1)!;
+          uid = uidFromHref(a.attributes['href']) ?? '';
           break;
         }
       }

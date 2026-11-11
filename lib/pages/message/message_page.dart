@@ -23,7 +23,16 @@ import 'package:mtbbs/pages/message/message_notice_tab.dart';
 /// 每个 Tab 独立管理加载状态和分页，各自封装在独立的 Widget 中。
 /// AppBar 由 AppShell 提供，此处只返回内容体。
 class MessagePage extends StatefulWidget {
-  const MessagePage({super.key});
+  const MessagePage({super.key, this.activeTab, this.tabIndex = 1});
+
+  /// 当前可见的主 Tab 下标（IndexedStack 会缓存全部 Tab 页面，
+  /// 本页必须据此判断自己是否真的在屏幕上）。
+  ///
+  /// 为空表示独立打开（非主壳缓存），始终视为可见。
+  final ValueListenable<int>? activeTab;
+
+  /// 消息页在主 Tab 中的下标
+  final int tabIndex;
 
   @override
   State<MessagePage> createState() => _MessagePageState();
@@ -66,6 +75,28 @@ class _MessagePageState extends State<MessagePage>
   /// 已消费的 [NoticeNavStore.dropRevision]
   int _lastDropRev = 0;
 
+  /// 后台期间攒下的"需要重建拉取"标记，等本页真正可见时再执行。
+  ///
+  /// 不可见的消息页若因未读探测（`_dropStaleSubtypeCounts`）而重新请求
+  /// `do=notice`，服务端会把提醒置为已读 —— 表现为用户还在导读/首页时
+  /// 消息 Tab 的小红点闪一下就被清掉。因此后台只记账、不重建。
+  bool _pendingReload = false;
+
+  bool get _isActive =>
+      widget.activeTab == null || widget.activeTab!.value == widget.tabIndex;
+
+  /// 主 Tab 切换：回到消息页时解除结构冻结；若后台攒了重建标记，此时才真正重建拉取
+  void _onActiveChanged() {
+    if (!mounted || !_isActive) return;
+    if (_pendingReload) {
+      _pendingReload = false;
+      setState(() => _reloadTick++);
+    } else {
+      // 重新按最新未读计算 Tab 顺序（后台期间冻结了结构）
+      setState(() {});
+    }
+  }
+
   /// 重复点击「消息」Tab：整体没有统一主列表（各分组页各有自己的），故直接刷新当前分组
   late final Future<void> Function() _reTap = () async => _refreshCurrentTab();
 
@@ -74,6 +105,7 @@ class _MessagePageState extends State<MessagePage>
     super.initState();
     TabReTap.instance.register('/message', _reTap);
     _nav.addListener(_onNavChanged);
+    widget.activeTab?.addListener(_onActiveChanged);
     _tabCtl = TabController(length: _tabs.length, vsync: this);
     _tabCtl.addListener(_onTabChanged);
   }
@@ -83,6 +115,7 @@ class _MessagePageState extends State<MessagePage>
     TabReTap.instance.unregister('/message', _reTap);
     _tabCtl.removeListener(_onTabChanged);
     _nav.removeListener(_onNavChanged);
+    widget.activeTab?.removeListener(_onActiveChanged);
     _tabCtl.dispose();
     super.dispose();
   }
@@ -189,7 +222,15 @@ class _MessagePageState extends State<MessagePage>
     if (!mounted) return;
     if (_nav.dropRevision != _lastDropRev) {
       _lastDropRev = _nav.dropRevision;
-      _reloadTick++;
+      if (_isActive) {
+        // 正在看消息页：子类型计数已过期，重建当前分组并重新拉取
+        _reloadTick++;
+      } else {
+        // 在其它主 Tab（如导读/首页）：只记账。绝不在这里重建——
+        // IndexedStack 里不可见的消息页一旦重新请求 do=notice，
+        // 服务端就会把那批提醒置为已读，徽标随之被"自动清掉"
+        _pendingReload = true;
+      }
     }
     setState(() {});
   }
@@ -260,12 +301,18 @@ class _MessagePageState extends State<MessagePage>
     final enabled = context.watch<SettingsProvider>().noticeCheckEnabled;
     // 一级 Tab：第 1 项固定；其余「有未读」的稳定前移，避免藏在横向滚动区外
     final baseTabs = _tabs;
-    final tabs = enabled
-        ? prioritizeUnreadTabs(
-            baseTabs,
-            (t) => t.id == 'pm' ? badge.hasNewPm : badge.countOf(t.id) > 0,
-          )
-        : baseTabs;
+    // 后台（IndexedStack 中不可见）时冻结上次的结构：未读计数变化会引起重排，
+    // 重排会让 PageView 重新挂载当前分组页 → 请求 do=notice 把提醒误置已读。
+    // 回到消息页（_isActive）时再按最新未读重新计算。
+    final tabs = (!_isActive && _displayTabs.isNotEmpty)
+        ? _displayTabs
+        : (enabled
+              ? prioritizeUnreadTabs(
+                  baseTabs,
+                  (t) =>
+                      t.id == 'pm' ? badge.hasNewPm : badge.countOf(t.id) > 0,
+                )
+              : baseTabs);
     // 数量或顺序都可能变化 → 先对齐控制器（保留当前选中 Tab）再交给 TabBarView
     final tabCtl = _syncTabController(tabs);
     return Column(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/widgets/common/app_sheet.dart';
@@ -68,8 +69,7 @@ class _McpHelpSheet extends StatelessWidget {
               ),
               child: SelectableText(
                 displaySnippet,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
+                style: context.appTypography.mono.copyWith(
                   fontSize: 12,
                   height: 1.5,
                 ),

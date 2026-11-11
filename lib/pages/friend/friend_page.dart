@@ -241,7 +241,8 @@ class _FriendPageState extends State<FriendPage> {
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                onTap: () => context.push('/user/$uid'),
+                // uid 为空时不跳转，避免进入 `/user/` 非法路由
+                onTap: uid.isEmpty ? null : () => context.push('/user/$uid'),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(

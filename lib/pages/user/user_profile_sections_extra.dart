@@ -43,8 +43,7 @@ extension on _UserProfilePageState {
       final isSelf =
           !_session.temporary &&
           (widget.uid == 'self' ||
-              context.select<AuthProvider, String>((a) => a.uid) ==
-                  widget.uid);
+              context.select<AuthProvider, String>((a) => a.uid) == widget.uid);
 
       add(
         '积分',
@@ -162,13 +161,23 @@ extension on _UserProfilePageState {
   /// 私信 —— 置于头部右侧空白区（人气/关注/粉丝已并入下方统计瓦片）。
   ///
   /// 人气为移动独有（已并入瓦片）；私信仅他人视角（自己主页入口在「我的」页）。
+  /// 关注/已关注：他人视角提供，文案随状态切换（Discuz 原名「收听」）。
   List<Widget> _headerActions() {
     if (widget.uid.isEmpty) return const [];
     final isSelf =
         !_session.temporary &&
         (context.select<AuthProvider, String>((a) => a.uid) == widget.uid);
+    final followed = _profile!['followed'] == true;
 
     return [
+      if (!isSelf && _uidNum != null)
+        _actionItem(
+          icon: followed
+              ? Icons.person_add_alt_1
+              : Icons.person_add_alt_1_outlined,
+          label: _followBusy ? '处理中' : (followed ? '已关注' : '关注'),
+          onTap: _followBusy ? null : _toggleFollow,
+        ),
       _actionItem(
         icon: Icons.forum_outlined,
         label: '留言板',
@@ -195,6 +204,59 @@ extension on _UserProfilePageState {
           },
         ),
     ];
+  }
+
+  /// 关注 / 取消关注（仅他人主页）。
+  ///
+  /// - 未关注 → 直接请求（无参数操作，不弹确认框），成功后按钮变「已关注」
+  /// - 已关注 → 二次确认后取消关注（与收藏删除等破坏性操作一致）
+  /// - 已关注状态下的「已关注」按钮图标为实心，未关注为描边
+  Future<void> _toggleFollow() async {
+    if (_followBusy || _profile == null) return;
+    if (!context.read<AuthProvider>().isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    if (_guardReadOnly()) return;
+
+    final followed = _profile!['followed'] == true;
+    final nickname = _profile!['nickname'] as String? ?? '该用户';
+    if (followed) {
+      final ok = await showConfirmDialog(
+        context,
+        title: '取消关注',
+        message: '确定不再关注 $nickname 吗？',
+        confirmText: '取消关注',
+        danger: true,
+      );
+      if (ok != true) return;
+    }
+
+    _setState(() => _followBusy = true);
+    try {
+      final result = followed
+          ? await follow_api.unfollowUser(_dio, uid: widget.uid)
+          : await follow_api.followUser(
+              _dio,
+              uid: widget.uid,
+              formhash: _profile!['followHash']?.toString() ?? '',
+            );
+      if (!mounted) return;
+      if (result['success'] == true) {
+        _setState(() {
+          _followBusy = false;
+          _profile!['followed'] = !followed;
+        });
+        showToast(followed ? '已取消关注' : '已关注');
+      } else {
+        _setState(() => _followBusy = false);
+        showToast(result['message']?.toString() ?? '操作失败');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _setState(() => _followBusy = false);
+      showToast('操作失败：$e');
+    }
   }
 
   /// 单个操作项 —— 胶囊样式（图标 + 文案 + 计数），固定宽度以便排成两列网格
@@ -306,11 +368,10 @@ extension on _UserProfilePageState {
           if (_showRawSignature)
             SelectableText(
               sig,
-              style: TextStyle(
+              style: context.appTypography.mono.copyWith(
                 fontSize: 11,
                 color: _cs.onSurfaceVariant,
                 height: 1.5,
-                fontFamily: 'monospace',
               ),
             )
           else

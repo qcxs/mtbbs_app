@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mtbbs/api/home/follow/export.dart' as follow_api;
+import 'package:mtbbs/api/home/follow/parse.dart' show parseFollowHref;
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/app_capabilities.dart';
 import 'package:provider/provider.dart';
 import 'package:mtbbs/models/thread_detail.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -11,6 +14,7 @@ import 'package:mtbbs/widgets/bbcode/post_html_widget.dart';
 import 'package:mtbbs/widgets/common/app_sheet.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
+import 'package:mtbbs/widgets/dialog/confirm_dialog.dart';
 
 /// 帖子卡片操作类型（PopupMenu）
 enum PostCardAction { showBbcode, editPost, viewTime, rate, saveImage }
@@ -66,6 +70,23 @@ class ThreadPostCard extends StatefulWidget {
 class _ThreadPostCardState extends State<ThreadPostCard> {
   /// 单帖临时禁用所有样式
   bool _disableStyle = false;
+
+  /// 关注状态本地覆盖（服务端 followUrl 为准，操作成功后立即切换）
+  bool? _followedOverride;
+
+  /// 关注请求进行中
+  bool _followBusy = false;
+
+  @override
+  void didUpdateWidget(covariant ThreadPostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 换帖（翻页/刷新）后以新服务端数据为准
+    if (oldWidget.post.pid != widget.post.pid ||
+        oldWidget.post.followUrl != widget.post.followUrl) {
+      _followedOverride = null;
+      _followBusy = false;
+    }
+  }
 
   /// 合并全局设置 + 单帖开关 + 页面级全局开关的禁用标签
   Set<String> get _effectiveDisabledTags {
@@ -125,7 +146,10 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                   Expanded(
                     child: Text(
                       totalScore,
-                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurfaceVariant,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -196,11 +220,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  UserAvatar(
-                    uid: c.uid,
-                    nickname: c.username,
-                    radius: 12,
-                  ),
+                  UserAvatar(uid: c.uid, nickname: c.username, radius: 12),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -464,6 +484,8 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
                             stickTopColor,
                             stickTopColor.withValues(alpha: 0.12),
                           ),
+                        // 楼主关注入口（仅主帖、非本人、可写场景）
+                        if (_showFollowChip) _buildFollowChip(context),
                       ],
                     ),
                   ),
@@ -576,6 +598,102 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
     );
   }
 
+  /// 是否展示楼主关注入口：仅主帖、已登录、非本人、非只读（离线/跨站点临时会话）
+  bool get _showFollowChip =>
+      widget.post.isOp &&
+      !widget.readOnly &&
+      widget.isLoggedIn &&
+      widget.post.uid.isNotEmpty &&
+      widget.post.uid != widget.currentUid &&
+      widget.post.followUrl.isNotEmpty;
+
+  bool get _followedNow =>
+      _followedOverride ?? parseFollowHref(widget.post.followUrl).followed;
+
+  /// 作者关注小胶囊：「关注」/「已关注」，操作成功后本地即时切换
+  Widget _buildFollowChip(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final followed = _followedNow;
+    final fg = followed ? cs.onSurfaceVariant : cs.primary;
+    return GestureDetector(
+      onTap: _followBusy ? null : _toggleFollowAuthor,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: followed
+              ? cs.surfaceContainerHigh
+              : cs.primary.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: followed
+                ? cs.outlineVariant.withValues(alpha: 0.6)
+                : cs.primary.withValues(alpha: 0.35),
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(followed ? Icons.check : Icons.add, size: 10, color: fg),
+            const SizedBox(width: 2),
+            Text(
+              _followBusy ? '处理中' : (followed ? '已关注' : '关注'),
+              style: TextStyle(fontSize: 10, color: fg),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 关注 / 取消关注楼主（取消需二次确认）
+  Future<void> _toggleFollowAuthor() async {
+    if (_followBusy) return;
+    if (!widget.isLoggedIn) {
+      showToast('请先登录');
+      return;
+    }
+    final followed = _followedNow;
+    if (followed) {
+      final ok = await showConfirmDialog(
+        context,
+        title: '取消关注',
+        message: '确定不再关注 ${widget.post.username} 吗？',
+        confirmText: '取消关注',
+        danger: true,
+      );
+      if (ok != true) return;
+      if (!mounted) return;
+    }
+
+    setState(() => _followBusy = true);
+    final dio = SiteScope.read(context).dio;
+    try {
+      final result = followed
+          ? await follow_api.unfollowUser(dio, uid: widget.post.uid)
+          : await follow_api.followUser(
+              dio,
+              uid: widget.post.uid,
+              formhash: parseFollowHref(widget.post.followUrl).formhash,
+            );
+      if (!mounted) return;
+      final success = result['success'] == true;
+      setState(() {
+        _followBusy = false;
+        if (success) _followedOverride = !followed;
+      });
+      showToast(
+        success
+            ? (followed ? '已取消关注' : '已关注')
+            : (result['message']?.toString() ?? '操作失败'),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _followBusy = false);
+      showToast('操作失败：$e');
+    }
+  }
+
   Widget _badge(String text, Color textColor, Color bgColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -641,8 +759,7 @@ class _RatingTable extends StatelessWidget {
             children: [
               _cell(Text('用户', style: _headerStyle(cs))),
               ...columns.map(
-                (c) =>
-                    _cell(Text(c.toString(), style: _headerStyle(cs))),
+                (c) => _cell(Text(c.toString(), style: _headerStyle(cs))),
               ),
               if (hasReason) _cell(Text('理由', style: _headerStyle(cs))),
             ],

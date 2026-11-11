@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/mcp/tools/mcp_tool_definition.dart';
@@ -251,8 +252,7 @@ Widget _groupTools(
         if (i > 0) const SizedBox(height: 10),
         Text(
           tools[i].name,
-          style: TextStyle(
-            fontFamily: 'monospace',
+          style: context.appTypography.mono.copyWith(
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: enabled ? cs.onSurface : cs.onSurfaceVariant,

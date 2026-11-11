@@ -4,6 +4,7 @@ import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/app/page_helper.dart';
 import 'package:mtbbs/core/parser/html2bbcode.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 
 /// 私人消息列表 HTML 解析
 ///
@@ -77,8 +78,7 @@ Map<String, dynamic>? _parsePmItem(dom.Element dl) {
     // 头像链接 → uid
     final avatarLink = dl.querySelector('dd.avt a');
     final avatarHref = avatarLink?.attributes['href'] ?? '';
-    final uidMatch = RegExp(r'uid[=-](\d+)').firstMatch(avatarHref);
-    final uid = uidMatch?.group(1) ?? '';
+    final uid = uidFromHref(avatarHref, strict: true) ?? '';
 
     // 用户名（发送者或接收者）
     // 两种模式：
@@ -217,7 +217,7 @@ Map<String, dynamic> parsePmView(String body, int statusCode) {
   if (header != null) {
     final link = _findUserLink(header);
     if (link != null) {
-      uid = _uidFromHref(link.attributes['href'] ?? '');
+      uid = uidFromHref(link.attributes['href'], strict: true) ?? '';
       username = sanitizeText(link.text);
     }
   }
@@ -305,7 +305,8 @@ Map<String, dynamic>? _parseViewItem(dom.Element dl) {
 
     // 发送者 uid / 头像：来自 dd.m.avt 的头像链接
     final avatarLink = dl.querySelector('dd.m.avt a');
-    final senderUid = _uidFromHref(avatarLink?.attributes['href'] ?? '');
+    final senderUid =
+        uidFromHref(avatarLink?.attributes['href'], strict: true) ?? '';
     final avatar = dl.querySelector('dd.m.avt img')?.attributes['src'] ?? '';
 
     // 是否自己发的：模板条件 authorid == 当前 uid 时渲染 <span class="xi2 xw1">您</span>
@@ -377,21 +378,10 @@ String extractFormhash(String body) {
   return doc.querySelector('input[name="formhash"]')?.attributes['value'] ?? '';
 }
 
-/// 在容器内找到指向用户空间（`uid=N` / `space-uid-N`）的链接
+/// 在容器内找到指向用户空间的链接
 dom.Element? _findUserLink(dom.Element container) {
   for (final a in container.querySelectorAll('a')) {
-    if (_uidFromHref(a.attributes['href'] ?? '').isNotEmpty) return a;
+    if (uidFromHref(a.attributes['href'], strict: true) != null) return a;
   }
   return null;
-}
-
-/// 从 href 提取用户 uid。
-///
-/// 只认用户空间链接的两种写法（`mod=space&uid=N` / `space-uid-N.html`），
-/// 不能只匹配 `uid=N`——删除菜单等链接（`…&deletepm_deluid[]=1&uid=1`）也含 `uid=`。
-String _uidFromHref(String href) {
-  final m1 = RegExp(r'mod=space&uid=(\d+)').firstMatch(href);
-  if (m1 != null) return m1.group(1)!;
-  final m2 = RegExp(r'space-uid-(\d+)').firstMatch(href);
-  return m2?.group(1) ?? '';
 }

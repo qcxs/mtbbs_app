@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/core/utils/codec_utils.dart';
 import 'package:mtbbs/core/utils/url_router.dart';
@@ -216,7 +217,7 @@ class _CodecPageState extends State<CodecPage> {
             maxLines: 8,
             keyboardType: TextInputType.multiline,
             textInputAction: TextInputAction.newline,
-            style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+            style: context.appTypography.mono.copyWith(fontSize: 13),
             decoration: const InputDecoration(
               labelText: '输入内容',
               hintText: '粘贴要处理的文本',
@@ -267,10 +268,9 @@ class _CodecPageState extends State<CodecPage> {
                 ? Text('—', style: TextStyle(color: cs.onSurfaceVariant))
                 : SelectableText(
                     text,
-                    style: TextStyle(
+                    style: context.appTypography.mono.copyWith(
                       fontSize: 13,
                       height: 1.5,
-                      fontFamily: 'monospace',
                       color: hasError ? cs.error : cs.onSurface,
                     ),
                   ),

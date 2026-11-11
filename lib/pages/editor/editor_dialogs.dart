@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/utils/clipboard_helper.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_controller.dart';
 import 'package:mtbbs/widgets/bbcode/bbcode_toolbar.dart';
@@ -122,9 +123,8 @@ void showRawBbcodeDialog(BuildContext context, String bbcode) {
       content: SingleChildScrollView(
         child: SelectableText(
           bbcode,
-          style: const TextStyle(
+          style: context.appTypography.mono.copyWith(
             fontSize: 12,
-            fontFamily: 'monospace',
             height: 1.5,
           ),
         ),

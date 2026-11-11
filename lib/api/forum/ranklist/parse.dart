@@ -2,6 +2,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/api/helpers.dart';
 import 'package:mtbbs/core/parser/xml_helper.dart';
 import 'package:mtbbs/core/utils/logger.dart';
+import 'package:mtbbs/core/utils/uid_util.dart';
 
 /// 排行榜条目
 class RankItem {
@@ -272,13 +273,8 @@ String _extractTid(String url) {
   return uri?.queryParameters['tid'] ?? '';
 }
 
-/// 从 space URL 提取 uid
-String _extractUid(String url) {
-  final m = RegExp(r'space-uid-(\d+)').firstMatch(url);
-  if (m != null) return m.group(1)!;
-  final uri = Uri.tryParse(url);
-  return uri?.queryParameters['uid'] ?? '';
-}
+/// 从用户空间 URL 提取 uid
+String _extractUid(String url) => uidFromHref(url) ?? '';
 
 /// 从 "8回复" 中提取数字
 String _extractCount(String text) {

@@ -26,11 +26,10 @@ UrlRouteResult? _matchPseudoStatic(
     return _r(site, '帖子详情', _threadPath(tid, page));
   }
 
-  // space-uid-456.html
-  final spaceMatch = RegExp(r'space-uid-(\d+)').firstMatch(url);
-  if (spaceMatch != null) {
-    final uid = spaceMatch.group(1)!;
-    return _r(site, '用户主页', '/user/$uid');
+  // space-uid-456.html / md?mod=space&uid=456 等用户空间写法
+  final spaceUid = uidFromHref(url, strict: true);
+  if (spaceUid != null) {
+    return _r(site, '用户主页', '/user/$spaceUid');
   }
 
   // forum-{fid}-{page}.html

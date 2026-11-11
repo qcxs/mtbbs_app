@@ -86,8 +86,7 @@ extension on _BbcodeCodeBlockState {
   }) {
     final isDark = cs.brightness == Brightness.dark;
     final theme = isDark ? monokaiSublimeTheme : githubTheme;
-    final baseStyle = TextStyle(
-      fontFamily: 'monospace',
+    final baseStyle = context.appTypography.mono.copyWith(
       fontSize: widget.fontSize,
       height: _kLineHeight,
       color: theme['root']?.color,
@@ -98,8 +97,7 @@ extension on _BbcodeCodeBlockState {
     // 按实际位数取宽（行号右对齐，额外 6px 作为左侧留白），避免槽过宽
     final gutterWidth = digits * widget.fontSize * _kCharWidthRatio + 6;
 
-    final numberStyle = TextStyle(
-      fontFamily: 'monospace',
+    final numberStyle = context.appTypography.mono.copyWith(
       fontSize: widget.fontSize,
       height: _kLineHeight,
       color: cs.codeBlockBarText.withValues(alpha: 0.55),

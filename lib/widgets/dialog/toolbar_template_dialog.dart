@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/config/toolbar_config.dart';
 import 'package:mtbbs/models/managed_item.dart';
 
@@ -123,7 +124,7 @@ class _ToolbarTemplateDialogState extends State<_ToolbarTemplateDialog> {
                 controller: _templateCtl,
                 maxLines: 4,
                 minLines: 2,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: context.appTypography.mono.copyWith(fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: '模板',
                   helperText: r'用 ${selectText} 代表选中文字（无选中时为空）',
