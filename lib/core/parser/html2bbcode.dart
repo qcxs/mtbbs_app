@@ -82,21 +82,30 @@ class Html2BBCode {
   }
 
   String _format(String text) {
-    // [code] 内部空行与缩进属于代码语义，不能进空白收敛规则
-    final codes = <String>[];
+    // [code]/[md] 内部空行与缩进属于语义，不能进空白收敛规则：
+    // - [code] 的缩进/空行是代码本身
+    // - [md] 的 `\n\n` 是 Markdown 段落 / 列表 / 表格的分隔，缩进是嵌套层级
+    final blocks = <String>[];
     var out = text.replaceAllMapped(
+      RegExp(r'\[md\][\s\S]*?\[/md\]', caseSensitive: false),
+      (m) {
+        blocks.add(m.group(0)!);
+        return '\x00BLOCK${blocks.length - 1}\x00';
+      },
+    );
+    out = out.replaceAllMapped(
       RegExp(r'\[code\][\s\S]*?\[/code\]', caseSensitive: false),
       (m) {
-        codes.add(m.group(0)!);
-        return '\x00CODE${codes.length - 1}\x00';
+        blocks.add(m.group(0)!);
+        return '\x00BLOCK${blocks.length - 1}\x00';
       },
     );
     out = out
         .replaceAll(RegExp(r'\n{2,}'), '\n')
         .replaceAll(RegExp(r'[ \t]+'), ' ')
         .trim();
-    for (var i = 0; i < codes.length; i++) {
-      out = out.replaceFirst('\x00CODE$i\x00', codes[i]);
+    for (var i = 0; i < blocks.length; i++) {
+      out = out.replaceFirst('\x00BLOCK$i\x00', blocks[i]);
     }
     return out;
   }

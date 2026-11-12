@@ -144,6 +144,15 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
 
   // ---- 滚动 ----
   final ScrollController _scrollController = ScrollController();
+
+  /// 宽屏右栏评论区的独立滚动控制器。
+  ///
+  /// 必须显式提供：桌面端 [ScrollBehavior] 会给每个滚动视图套一层自动
+  /// `Scrollbar`。滚动视图没有 controller 时，这层 Scrollbar 会回退去找
+  /// `PrimaryScrollController`（由 ModalRoute 提供），但桌面端滚动视图并不会
+  /// 继承它，于是悬停时触发
+  /// 「The Scrollbar's ScrollController has no ScrollPosition attached」断言。
+  final ScrollController _commentScrollController = ScrollController();
   final GlobalKey _commentAnchorKey = GlobalKey();
 
   // ---- pid 定位 ----
@@ -258,6 +267,7 @@ class _ThreadViewPageState extends State<ThreadViewPage> {
     _images.dispose();
     _editorSession.dispose();
     _scrollController.dispose();
+    _commentScrollController.dispose();
     super.dispose();
   }
 

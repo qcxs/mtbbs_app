@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:markdown/markdown.dart' as md;
 import 'package:mtbbs/core/utils/string_utils.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 
@@ -74,6 +75,10 @@ class BBCode2Html {
   final bool _autoDetectUrls;
   final bool _emitCodePlaceholder;
 
+  /// 当前渲染上下文所属站点是否原生支持 `[md]…[/md]`（见
+  /// `SiteStore.supportsMdTag`）。false 时 `[md]` 只当普通标记剥掉、不解析。
+  final bool _supportsMd;
+
   /// [convert] 后填充的 [code] 块内容（索引对应 HTML 中的
   /// `data-code-index`）。渲染层按索引取出原始代码文本，
   /// 交给代码高亮组件（[BbcodeCodeBlock]）渲染。
@@ -101,12 +106,14 @@ class BBCode2Html {
     String? baseUrl,
     bool autoDetectUrls = true,
     bool emitCodePlaceholder = false,
+    bool supportsMd = false,
   }) : _emojiMap = emojiMap,
        _smilieIdMap = smilieIdMap,
        _disabledTags = disabledTags,
        _baseUrl = baseUrl,
        _autoDetectUrls = autoDetectUrls,
-       _emitCodePlaceholder = emitCodePlaceholder;
+       _emitCodePlaceholder = emitCodePlaceholder,
+       _supportsMd = supportsMd;
 
   /// 归一化/校验颜色值。
   ///

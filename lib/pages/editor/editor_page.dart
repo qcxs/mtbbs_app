@@ -52,6 +52,7 @@ import 'package:mtbbs/widgets/editor/editor_line_metrics.dart';
 import 'package:mtbbs/widgets/editor/editor_selection_toolbar.dart';
 import 'package:mtbbs/widgets/editor/block_marker_gutter.dart';
 import 'package:mtbbs/core/parser/bbcode_anchors.dart';
+import 'package:mtbbs/core/parser/bbcode_blocks.dart';
 import 'package:mtbbs/core/parser/bbcode_source_lines.dart';
 import 'package:mtbbs/core/parser/bbcode_selection_highlight.dart';
 

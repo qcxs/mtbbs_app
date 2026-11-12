@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mtbbs/config/brand_colors.dart';
 import 'package:mtbbs/core/app/emoji_loader.dart';
 import 'package:mtbbs/core/app/site_scope.dart';
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/config/app_typography.dart';
 import 'package:mtbbs/core/parser/bbcode2html.dart';
 import 'package:mtbbs/core/utils/cache_utils.dart';
@@ -125,6 +126,13 @@ class PostHtmlWidget extends StatelessWidget {
     final textSize =
         fontSize ?? context.select<SettingsProvider, double>((s) => s.fontSize);
 
+    // 行内代码的等宽字体族链（主题注入；测试环境回退到平台默认）
+    final mono = context.appTypography.mono;
+    final monoFamilies = <String>[
+      if (mono.fontFamily != null) mono.fontFamily!,
+      ...?mono.fontFamilyFallback,
+    ];
+
     final converter = BBCode2Html(
       // 表情数据由 EmojiService 按站点维护且几乎不变，渲染层直接获取
       emojiMap: EmojiService().map,
@@ -133,6 +141,8 @@ class PostHtmlWidget extends StatelessWidget {
       // 必须用页面所属会话，而非全局当前站点：同页可能以临时身份访问他站
       baseUrl: SiteScope.of(context).baseUrl,
       autoDetectUrls: autoDetectUrls,
+      // [md] 只有服务端原生支持的站点（52pojie）才解析，MT 等站点按普通文本
+      supportsMd: SiteStore.supportsMdTag(SiteScope.of(context).host),
       // [code] 还原为占位元素，由 customWidgetBuilder 原地替换为高亮组件
       emitCodePlaceholder: true,
     );
@@ -172,7 +182,11 @@ class PostHtmlWidget extends StatelessWidget {
         color: cs.onSurface,
         height: 1.6,
       ),
-      customStylesBuilder: (element) => _stylesFor(element, cs),
+      customStylesBuilder: (element) => _stylesFor(
+        element,
+        cs,
+        monoFamilies: monoFamilies,
+      ),
       customWidgetBuilder: (element) {
         // 硬换行 → 块级间隔：既完成换行，又提供段间距（见 _kParagraphGapRatio）。
         // 段内自动折行不经过这里，故只有“段落”被撑开。

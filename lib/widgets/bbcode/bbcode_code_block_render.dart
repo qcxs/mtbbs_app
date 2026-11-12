@@ -103,12 +103,16 @@ extension on _BbcodeCodeBlockState {
       color: cs.codeBlockBarText.withValues(alpha: 0.55),
     );
 
-    Widget number(int index) => SizedBox(
-      width: gutterWidth,
-      child: Text(
-        '${index + 1}',
-        textAlign: TextAlign.right,
-        style: numberStyle,
+    // 行号只用于定位，不属于代码内容：禁用选区，避免复制代码时把
+    // 「1 2 3…」一起带走（否则粘贴到编辑器里还得手工删行号）。
+    Widget number(int index) => SelectionContainer.disabled(
+      child: SizedBox(
+        width: gutterWidth,
+        child: Text(
+          '${index + 1}',
+          textAlign: TextAlign.right,
+          style: numberStyle,
+        ),
       ),
     );
 

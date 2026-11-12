@@ -197,7 +197,12 @@ extension on _ThreadViewPageState {
           onTitleTap: _isCacheMode ? null : _showFloorJumpDialog,
         ),
         const Divider(height: 1),
-        Expanded(child: SingleChildScrollView(child: _buildCommentContent())),
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _commentScrollController,
+            child: _buildCommentContent(),
+          ),
+        ),
       ],
     );
   }

@@ -1,8 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:mtbbs/core/app/site_scope.dart';
+import 'package:mtbbs/core/app/site_session.dart';
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/bbcode_list_edit.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
@@ -82,6 +85,26 @@ double? _fontSizeOf(String s) {
     if (rich.text.toPlainText().contains(s)) {
       return rich.text.style?.fontSize;
     }
+  }
+  return null;
+}
+
+/// 取「包含指定文本」的 TextSpan（用于检查行内片段自身的样式）
+TextSpan? _spanOf(String s) {
+  TextSpan? search(InlineSpan span) {
+    if (span is! TextSpan) return null;
+    if ((span.text ?? '').contains(s)) return span;
+    for (final c in span.children ?? const <InlineSpan>[]) {
+      final r = search(c);
+      if (r != null) return r;
+    }
+    return null;
+  }
+
+  for (final el in find.byType(RichText).evaluate()) {
+    final rich = el.widget as RichText;
+    final r = search(rich.text);
+    if (r != null) return r;
   }
   return null;
 }
@@ -680,6 +703,37 @@ void main() {
         find.textContaining(r'\badmacro', findRichText: true),
         findsOneWidget,
       );
+    });
+  });
+
+  group('⑮ 行内代码（[md] 反引号）', () {
+    testWidgets('行内代码带主题等宽字体 + 淡底，可与正文区分', (tester) async {
+      // [md] 只在 52pojie 解析；用跨站会话模拟该站点
+      final session = FixedSiteSession(
+        host: 'www.52pojie.cn',
+        baseUrl: 'https://www.52pojie.cn',
+        charset: 'utf-8',
+        accountName: null,
+        uid: '',
+        username: '',
+        dio: Dio(),
+      );
+      await tester.pumpWidget(
+        SiteScope(
+          session: session,
+          child: _post('[md]正文前 `inline_code` 正文后[/md]'),
+        ),
+      );
+      await _settle(tester);
+
+      final span = _spanOf('inline_code');
+      expect(span, isNotNull);
+      // 底色（flutter_widget_from_html 的行内 background-color 落在
+      // TextStyle.background 上）——没有它时行内代码与正文无法区分。
+      expect(span!.style?.background, isNotNull);
+      // 字体不能停在 Courier/monospace 别名：Windows 无此字体族会退成比例字体
+      expect(span.style?.fontFamily, isNotNull);
+      expect(span.style?.fontFamily, isNot('Courier'));
     });
   });
 }

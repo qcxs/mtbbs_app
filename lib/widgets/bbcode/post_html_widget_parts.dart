@@ -19,7 +19,12 @@ String _cssColor(Color c) {
 /// BBCode 各容器/元素的主题样式（对应 flutter_html 时代的 `style` map）
 ///
 /// 列表（`[list]`）在转换层已展开为带前缀的普通段落，不产生 `ul/ol/li`。
-Map<String, String>? _stylesFor(dom.Element element, ColorScheme cs) {
+/// [monoFamilies] 为等宽字体族链（来自主题），用于行内代码。
+Map<String, String>? _stylesFor(
+  dom.Element element,
+  ColorScheme cs, {
+  List<String>? monoFamilies,
+}) {
   final classes = element.classes;
 
   // 容器类（由 BBCode2Html 输出的 class 决定）
@@ -53,6 +58,21 @@ Map<String, String>? _stylesFor(dom.Element element, ColorScheme cs) {
   switch (element.localName) {
     case 'a':
       return {'color': _cssColor(cs.linkColor), 'text-decoration': 'underline'};
+    case 'code':
+      // 行内代码（`[md]` 反引号片段）：渲染器只给 `Courier`/`monospace`，
+      // 而 Windows 没有这两个字体族、会退化成普通比例字体，再加上没有底色，
+      // 结果与正文完全无法区分（docs/07 #123）。这里补主题等宽字体 + 淡底。
+      return {
+        'background-color': _cssColor(
+          cs.onSurface.withValues(
+            alpha: cs.brightness == Brightness.dark ? 0.18 : 0.08,
+          ),
+        ),
+        if (monoFamilies != null && monoFamilies.isNotEmpty)
+          'font-family': monoFamilies
+              .map((f) => f.contains(' ') ? '"$f"' : f)
+              .join(','),
+      };
     case 'blockquote':
       return {
         'background-color': _cssColor(cs.quoteBg),

@@ -33,6 +33,9 @@ enum BbBlockKind {
   /// 代码块（内容原样，不参与分块）
   code,
 
+  /// Markdown 源（`[md]`，52pojie）：内容原样，交由渲染层按 Markdown 解析
+  markdown,
+
   /// 列表（`[list]` / `[list=1]` / `[list=a]`）
   list,
 
@@ -66,6 +69,7 @@ const _containerTags = <String>{
   'free',
   'hide',
   'code',
+  'md',
   'list',
   'table',
   'align',
@@ -180,6 +184,8 @@ BbBlockKind bbBlockKindOf(String tag) {
       return BbBlockKind.hide;
     case 'code':
       return BbBlockKind.code;
+    case 'md':
+      return BbBlockKind.markdown;
     case 'list':
       return BbBlockKind.list;
     case 'table':
@@ -217,14 +223,16 @@ List<BbBlock> splitBbcodeBlocks(String input) {
   final stack = <({String tag, int start})>[];
   var blockStart = -1;
   var blockTag = '';
-  var inCode = false;
+  // 正处于「内容原样」的容器内（[code] / [md]）：其中的标记一律不参与分块。
+  // 否则 Markdown 里的 `[x]`、`[quote]` 甚至未闭合标签都会撕碎块边界。
+  String? rawTag;
 
   for (final m in _tagPattern.allMatches(input)) {
     final isClose = m.group(1) == '/';
     final tag = m.group(2)!.toLowerCase();
 
-    // [code] 内是原样内容：除其自身闭合标签外，其余标记一律不参与分块
-    if (inCode && !(isClose && tag == 'code')) continue;
+    // 原样容器内：除其自身闭合标签外，其余标记一律不参与分块
+    if (rawTag != null && !(isClose && tag == rawTag)) continue;
 
     if (_standaloneTags.contains(tag)) {
       // 自闭合块级原子：仅在最外层自成一块
@@ -248,7 +256,7 @@ List<BbBlock> splitBbcodeBlocks(String input) {
         blockTag = tag;
       }
       stack.add((tag: tag, start: m.start));
-      if (tag == 'code') inCode = true;
+      if (tag == 'code' || tag == 'md') rawTag = tag;
       continue;
     }
 
@@ -256,7 +264,7 @@ List<BbBlock> splitBbcodeBlocks(String input) {
     final idx = stack.lastIndexWhere((e) => e.tag == tag);
     if (idx < 0) continue; // 孤立闭标签 → 忽略
     stack.removeRange(idx, stack.length);
-    if (tag == 'code') inCode = false;
+    if (tag == rawTag) rawTag = null;
     if (stack.isEmpty && blockStart >= 0) {
       ranges.add((start: blockStart, end: m.end, tag: blockTag));
       blockStart = -1;

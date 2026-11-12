@@ -27,6 +27,7 @@ void main() {
     '[hide]隐藏[/hide]\n[free]免费[/free]\n[align=center]居中[/align]',
     '未闭合 [quote]引用\n[img]没有闭标签',
     '[url=https://a.com][img]https://a.com/x.png[/img][/url]',
+    '[md]# 标题\n\n- 甲\n- 乙\n\n```\ncode\n```\n[/md]',
   ];
 
   group('无损不变量', () {
@@ -136,6 +137,18 @@ void main() {
     test('未闭合标签内部不切（畸形输入也不撕开）', () {
       const src = '[quote]第一行\n第二行\n第三行';
       expect(bbAnchors(src).length, 1);
+    });
+
+    test('markdown 块整体成一个锚点（不被空行切碎）', () {
+      const src = '[md]# 标题\n\n第一段\n\n- 甲\n- 乙\n[/md]\n后文';
+      final a = bbAnchors(src);
+      expect(a.map((e) => e.kind).toList(), [
+        BbBlockKind.markdown,
+        BbBlockKind.text,
+      ]);
+      // 块尾换行被并入前一个锚点（空白不单独成锚点）
+      expect(a.first.raw, '[md]# 标题\n\n第一段\n\n- 甲\n- 乙\n[/md]\n');
+      expect(a.first.label, isNotEmpty);
     });
   });
 

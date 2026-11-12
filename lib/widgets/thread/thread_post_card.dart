@@ -579,7 +579,7 @@ class _ThreadPostCardState extends State<ThreadPostCard> {
             itemBuilder: (_) => [
               const PopupMenuItem(
                 value: PostCardAction.showBbcode,
-                child: Text('查看', style: TextStyle(fontSize: 13)),
+                child: Text('借鉴一下', style: TextStyle(fontSize: 13)),
               ),
               if (widget.post.postTime.length < 15)
                 PopupMenuItem(

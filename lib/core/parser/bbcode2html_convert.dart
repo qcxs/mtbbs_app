@@ -44,6 +44,24 @@ extension BBCode2HtmlConvert on BBCode2Html {
       },
     );
 
+    // ========== 1.5 保护 [md] 块（Markdown 原文，渲染时再转 HTML） ==========
+    // 必须晚于 [code]/[appdata]：公式与附件以 [appdata] 内嵌在 Markdown 里，
+    // 先变成占位符，Markdown 解析器就不会看到 JSON 里的 `*` / `_` / `[]`。
+    //
+    // 只有服务端原生支持 `[md]` 的站点（52pojie）才解析 Markdown；其它站点
+    // （含 MT）保持原样：标签本身作为文字显示出来，内容不做 Markdown 解析。
+    // 不要把标签删掉 —— 用户需要看到"这里有 [md]"，否则会以为标签凭空消失。
+    final mdBlocks = <String>[];
+    if (_supportsMd) {
+      html = html.replaceAllMapped(
+        RegExp(r'\[md\]([\s\S]*?)\[/md\]', caseSensitive: false),
+        (m) {
+          mdBlocks.add(unescapeHtml(m.group(1)!));
+          return '\x00MD${mdBlocks.length - 1}\x00';
+        },
+      );
+    }
+
     // ========== 2. 移除被禁用的标签（保留内容） ==========
     // 放在 [code]/[appdata] 保护之后：两者都已是占位符，既不会被剥离误伤，
     // 代码块内部也保持原样（代码要原样显示，不该被样式标签清理）
@@ -262,6 +280,14 @@ extension BBCode2HtmlConvert on BBCode2Html {
     // ========== 4. 表情替换 ==========
     html = _replaceEmoji(html);
 
+    // ========== 4.5 展开 [md] 块：Markdown → HTML ==========
+    for (int i = 0; i < mdBlocks.length; i++) {
+      html = html.replaceFirst(
+        '\x00MD$i\x00',
+        _renderMarkdownBlock(mdBlocks[i]),
+      );
+    }
+
     // ========== 5. 换行 ==========
     html = html.replaceAll('\n', '<br>');
 
@@ -300,5 +326,38 @@ extension BBCode2HtmlConvert on BBCode2Html {
     html = _resolveContentImages(html);
 
     return html;
+  }
+
+  /// `[md]` 块内容 → HTML（交给 flutter_widget_from_html 渲染）
+  ///
+  /// 代码块与图片复用正文既有占位机制，保证高亮、图片缓存与画廊顺序一致：
+  /// - `<pre><code>` → `\x00CODE*`（step 7 落地为 `data-code-index`）
+  /// - `<img>` → 图片发射点（step 8 落地并登记 [imageUrls]）
+  String _renderMarkdownBlock(String markdown) {
+    var html = md.markdownToHtml(
+      markdown,
+      extensionSet: md.ExtensionSet.gitHubFlavored,
+    );
+    html = html.replaceAllMapped(
+      RegExp(r'<pre><code[^>]*>([\s\S]*?)</code></pre>'),
+      (m) {
+        codeBlocks.add(unescapeHtml(m.group(1)!));
+        return '\x00CODE${codeBlocks.length - 1}\x00';
+      },
+    );
+    html = html.replaceAllMapped(RegExp(r'<img\b[^>]*>'), (m) {
+      final tag = m.group(0)!;
+      final src = RegExp(r'''src=["']([^"']*)["']''').firstMatch(tag);
+      final url = _resolveUrl(unescapeHtml(src?.group(1) ?? ''));
+      if (url.isEmpty) return '';
+      return _emitContentImage(url, '<img src="$url" />');
+    });
+    html = html.replaceAllMapped(
+      RegExp(r'''<a href=["']([^"']*)["']'''),
+      (m) =>
+          '<a href="${_resolveUrl(unescapeHtml(m.group(1)!))}" target="_blank"',
+    );
+    // 块间换行按 HTML 语义当空格；否则会在 step 5 被转成多余的 <br>
+    return html.replaceAll('\r\n', '\n').replaceAll('\n', ' ');
   }
 }

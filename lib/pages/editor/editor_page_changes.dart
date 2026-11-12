@@ -41,6 +41,9 @@ extension on _EditorPageState {
   /// 高亮，且不依赖任何全局偏移补偿。
   String _highlightInAnchor(BbAnchor a, TextSelection selection, String color) {
     if (!selection.isValid || selection.isCollapsed) return a.raw;
+    // Markdown 源里插入 `[backcolor]` 会被 Markdown 原样当文本渲染（还会破坏
+    // 代码围栏），所以这类锚点不高亮 —— 宁可少一层视觉提示，也不能改坏内容。
+    if (a.kind == BbBlockKind.markdown) return a.raw;
     final from = selection.start.clamp(a.start, a.end) - a.start;
     final to = selection.end.clamp(a.start, a.end) - a.start;
     if (from >= to) return a.raw;

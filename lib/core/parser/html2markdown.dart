@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:html/dom.dart' as dom;
+import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/md2bbcode.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
 import 'package:mtbbs/models/md_convert_templates.dart';
@@ -23,14 +24,33 @@ String htmlToMarkdown(dom.Element root) {
   return math.restoreMarkdown(markdown);
 }
 
-/// Parsedown 容器 → 展示用 BBCode（[Html2BBCode] 直接拼接）
+/// Parsedown 容器 → 展示用内容
+///
+/// 52pojie 站点直接输出 `[md]…[/md]`（服务端原生支持），保留逆向还原出的
+/// Markdown，由渲染层用 `package:markdown` 解析；公式 / 附件仍以
+/// `[appdata]` 形式内嵌，渲染层会先保护它们再解析 Markdown。
+///
+/// 其它站点（或测试环境未初始化站点）回退到 BBCode：
+/// `Parsedown HTML →（本模块）Markdown → markdownToBbcode → BBCode`。
 String parsedownHtmlToBbcode(dom.Element root) {
   final math = _MathCollector();
   final attachments = _AttachmentCollector();
   final markdown = _Html2Markdown(math, attachments: attachments).convert(root);
   if (markdown.trim().isEmpty) return '';
+  if (_siteSupportsMdTag()) {
+    final md = attachments.restore(math.restoreBbcode(markdown)).trim();
+    return '[md]$md[/md]';
+  }
   final bbcode = markdownToBbcode(markdown, templates: _displayTemplates);
   return attachments.restore(math.restoreBbcode(bbcode));
+}
+
+/// 是否由服务端原生渲染 `[md]…[/md]`。
+///
+/// 目前只有 52pojie 的 Markdown 插件支持，其余站点发 `[md]` 只会当成纯文本。
+bool _siteSupportsMdTag() {
+  final store = SiteStore.instance;
+  return store.sites.isNotEmpty && SiteStore.supportsMdTag(store.host);
 }
 
 /// 普通附件（`<ignore_js_op>` 内 `a[href*=mod=attachment]`）收集器
@@ -280,30 +300,59 @@ class _Html2Markdown {
   String _list(dom.Element el, {required bool ordered, required int depth}) {
     final buf = StringBuffer();
     final indent = '    ' * depth; // 4 空格对无序/有序 marker 都安全
+    final contentIndent = '$indent    ';
     var index = 0;
     for (final li in el.children) {
       if (li.localName != 'li') continue;
       index++;
-      final text = StringBuffer();
-      final nested = <dom.Element>[];
+      // 列表项内可能混排行内流与块级内容（Parsedown 允许 `- 文字` 下缩进的
+      // 代码块 / 表格）。块级节点必须按块输出并缩进挂在项下；若走 `_inline`，
+      // 会被摊平成一行文字，代码块与表格结构全部丢失（docs/07 #124）。
+      final parts = <String>[];
+      final inlineRun = StringBuffer();
+
+      void flushInline() {
+        final text = inlineRun
+            .toString()
+            .replaceAll(RegExp(r'\s*\n\s*'), ' ')
+            .trim();
+        inlineRun.clear();
+        if (text.isNotEmpty) parts.add(text);
+      }
+
       for (final child in li.nodes) {
         if (child is dom.Element &&
             (child.localName == 'ul' || child.localName == 'ol')) {
-          nested.add(child);
+          flushInline();
+          // 用相对深度生成，缩进由下方 contentIndent 统一添加
+          parts.add(
+            _list(
+              child,
+              ordered: child.localName == 'ol',
+              depth: 0,
+            ).trim(),
+          );
+        } else if (_isBlockNode(child)) {
+          flushInline();
+          final block = _block(child).trim();
+          if (block.isNotEmpty) parts.add(block);
         } else {
-          text.write(_inline(child));
+          inlineRun.write(_inline(child));
         }
       }
-      final body = text.toString().replaceAll(RegExp(r'\s*\n\s*'), ' ').trim();
-      buf.writeln('$indent${ordered ? '$index.' : '-'} $body');
-      for (final child in nested) {
-        buf.write(
-          _list(
-            child,
-            ordered: child.localName == 'ol',
-            depth: depth + 1,
-          ),
-        );
+      flushInline();
+
+      final lines = <String>[];
+      for (var i = 0; i < parts.length; i++) {
+        if (i > 0) lines.add('');
+        lines.addAll(parts[i].split('\n'));
+      }
+
+      buf.write('$indent${ordered ? '$index.' : '-'}');
+      if (lines.isNotEmpty) buf.write(' ${lines.first}');
+      buf.writeln();
+      for (final line in lines.skip(1)) {
+        buf.writeln(line.trim().isEmpty ? '' : '$contentIndent$line');
       }
     }
     return buf.toString();

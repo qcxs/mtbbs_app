@@ -73,6 +73,7 @@ const _kindLabels = <BbBlockKind, String>{
   BbBlockKind.free: '免费内容',
   BbBlockKind.hide: '隐藏内容',
   BbBlockKind.code: '代码块',
+  BbBlockKind.markdown: 'Markdown',
   BbBlockKind.list: '列表',
   BbBlockKind.table: '表格',
   BbBlockKind.align: '对齐块',

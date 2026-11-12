@@ -74,6 +74,27 @@ void main() {
       expect(out, contains('2. 二'));
     });
 
+    test('列表项内嵌代码块 / 表格：按块缩进保留，不摊平成一行', () {
+      // 52pojie thread-2113652：Parsedown 允许 `<li>` 内直接放 <pre>/<table>。
+      // 原实现把非嵌套列表的子节点一律 _inline，代码块和表格结构全部丢失。
+      final out = md(
+        '<div class="parsedown-markdown"><ol>'
+        '<li>第一项'
+        '<pre><em class="CopyMyCode"> 复制代码</em>'
+        '<code class="language-plain">line1\nline2</code></pre>'
+        '</li>'
+        '<li>第二项'
+        '<table><thead><tr><th>A</th><th>B</th></tr></thead>'
+        '<tbody><tr><td>1</td><td>2</td></tr></tbody></table>'
+        '</li>'
+        '</ol></div>',
+      );
+      expect(out, contains('    ```plain'));
+      expect(out, contains('    line1'));
+      expect(out, contains('    | A | B |'));
+      expect(out, isNot(contains('第一项line1')));
+    });
+
     test('表格（thead/th）', () {
       final out = md(
         '<div class="parsedown-markdown">'

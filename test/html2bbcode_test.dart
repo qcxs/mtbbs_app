@@ -340,6 +340,46 @@ void main() {
     });
   });
 
+  group('Html2BBCode - 52pojie [md] 站点分支', () {
+    tearDown(() => SiteStore.instance.switchTo(0));
+
+    test('52pojie 站点输出 [md] 包裹的 Markdown', () {
+      SiteStore.instance.switchTo(1);
+      final result = Html2BBCode().convert(
+        '<div class="parsedown-markdown"><h2>标题</h2><p>正文</p></div>',
+      );
+      expect(result, startsWith('[md]'));
+      expect(result, endsWith('[/md]'));
+      expect(result, contains('## 标题'));
+      expect(result, contains('正文'));
+    });
+
+    test('其它站点仍输出 BBCode', () {
+      final result = Html2BBCode().convert(
+        '<div class="parsedown-markdown"><h2>标题</h2></div>',
+      );
+      expect(result, isNot(contains('[md]')));
+      expect(result, contains('标题'));
+    });
+
+    test('[md] 内的空行 / 缩进不被空白收敛规则破坏', () {
+      // _format 原本把 \n{2,} 收敛成 \n、[ \t]+ 收敛成空格，
+      // 会把 Markdown 的段落分隔和嵌套缩进抹掉，导致渲染层解析失败。
+      SiteStore.instance.switchTo(1);
+      final result = Html2BBCode().convert(
+        '<div class="parsedown-markdown">'
+        '<h2>标题</h2><p>正文</p>'
+        '<ul><li>甲<ul><li>乙</li></ul></li></ul>'
+        '<pre><em class="CopyMyCode">复制代码</em>'
+        '<code class="language-plain">line1\nline2</code></pre>'
+        '</div>',
+      );
+      expect(result, contains('## 标题\n\n正文'));
+      expect(result, contains('    - 乙'));
+      expect(result, contains('```plain\nline1\nline2\n```'));
+    });
+  });
+
   group('Html2BBCode - 真实帖子段落转换', () {
     test('段落 + 加粗 + 字体', () {
       const html =

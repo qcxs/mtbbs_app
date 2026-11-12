@@ -288,4 +288,52 @@ void main() {
       expect(converter.codeBlocks.single, appdata);
     });
   });
+
+  group('BBCode2Html - [md] 块（52pojie Markdown）', () {
+    test('Markdown 转 HTML：标题 / 列表 / 表格 / 代码 / 图片', () {
+      final converter = BBCode2Html(
+        baseUrl: 'https://www.52pojie.cn',
+        emitCodePlaceholder: true,
+        supportsMd: true,
+      );
+      final html = converter.convert(
+        '[md]# 标题\n\n- 甲\n- 乙\n\n'
+        '| A | B |\n| --- | --- |\n| 1 | 2 |\n\n'
+        '```dart\nfinal a = 1;\n```\n\n'
+        '![图](https://attach.52pojie.cn/a.jpg)[/md]',
+      );
+      expect(html, contains('<h1>标题</h1>'));
+      expect(html, contains('<li>'));
+      expect(html, contains('<table>'));
+      expect(html, contains('data-code-index="0"'));
+      expect(html, contains('data-img-index="0"'));
+      expect(converter.codeBlocks.single.trim(), 'final a = 1;');
+      expect(converter.imageUrls, hasLength(1));
+      expect(html, isNot(contains('[md]')));
+      expect(html.contains('\x00'), isFalse);
+    });
+
+    test('[md] 内的 [appdata] 公式不受 Markdown 解析影响', () {
+      final converter = BBCode2Html(supportsMd: true);
+      final html = converter.convert(
+        '[md]行内公式 [appdata]{"type":"math","tex":"x^2","display":false}[/appdata] 结束[/md]',
+      );
+      expect(html, contains('bbcode-math'));
+      expect(converter.mathBlocks.single.tex, 'x^2');
+      expect(html, isNot(contains('[appdata]')));
+      expect(html.contains('\x00'), isFalse);
+    });
+
+    test('非 52 站点（默认 supportsMd=false）不解析 Markdown，标签原样可见', () {
+      final converter = BBCode2Html();
+      final html = converter.convert('[md]# 标题\n\n- 甲\n- 乙[/md]');
+      expect(html, isNot(contains('<h1>')));
+      expect(html, isNot(contains('<li>')));
+      // 标签不能消失：用户要知道这里原本有 [md] 包裹
+      expect(html, contains('[md]'));
+      expect(html, contains('[/md]'));
+      expect(html, contains('# 标题'));
+      expect(html, contains('- 甲'));
+    });
+  });
 }

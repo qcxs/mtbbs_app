@@ -77,6 +77,10 @@ void main() {
       '[code][list][/code]',
       '[code][/list][/code]',
       '[code][code][/code]',
+      // md 内容原样：Markdown 里出现方括号 / 块级标记 / 换行都不参与分块
+      '[md]# 标题\n\n- 甲\n- 乙\n\n[quote]不是引用[/quote]\n[/md]',
+      '[md]正文[list]不是列表[/list][/md]',
+      '[md]未闭合',
       // 畸形：未闭合 → 降级为文本
       '[quote]没有闭合',
       '[quote]未闭合[list]也没闭合',
@@ -267,6 +271,36 @@ void main() {
       final blocks = splitBbcodeBlocks('[code][/list][/code]后文');
       expect(blocks.map((b) => b.tag), ['code', '']);
       expect(blocks.first.raw, '[code][/list][/code]');
+    });
+  });
+
+  group('md 内容原样', () {
+    test('多行 Markdown 整体成一个块（编辑器预览不被空行切碎）', () {
+      const src = '[md]# 标题\n\n- 甲\n- 乙\n\n| a | b |\n[/md]';
+      final blocks = splitBbcodeBlocks(src);
+      expect(blocks, hasLength(1));
+      expect(blocks.single.tag, 'md');
+      expect(blocks.single.kind, BbBlockKind.markdown);
+      expect(blocks.single.raw, src);
+    });
+
+    test('md 内的块级标记不切块', () {
+      final blocks = splitBbcodeBlocks(
+        '[md][quote]不是引用[/quote]\n[code]x[/code][/md]后文',
+      );
+      expect(blocks.map((b) => b.tag), ['md', '']);
+      expect(blocks.first.raw, '[md][quote]不是引用[/quote]\n[code]x[/code][/md]');
+    });
+
+    test('md 内未配对的块级标签不影响边界', () {
+      final blocks = splitBbcodeBlocks('[md][list]没闭合[/md]后文');
+      expect(blocks.map((b) => b.tag), ['md', '']);
+    });
+
+    test('未闭合 md 不产出块，整段为文本', () {
+      final blocks = splitBbcodeBlocks('[md]# 标题\n\n正文');
+      expect(blocks, hasLength(1));
+      expect(blocks.single.isText, isTrue);
     });
   });
 

@@ -45,6 +45,16 @@ class PostSourceSheet extends StatefulWidget {
 class _PostSourceSheetState extends State<PostSourceSheet> {
   PostSourceView _view = PostSourceView.bbcode;
 
+  /// 显式控制器：`Scrollbar` 与滚动视图必须共用同一个，否则桌面端悬停会触发
+  /// 「Scrollbar's ScrollController has no ScrollPosition attached」断言。
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   /// 纯 BBCode 只算一次：抽屉内切换视角时不重复解析长正文
   late final String _plainBbcode = toPlainBbcode(widget.bbcode);
 
@@ -110,7 +120,9 @@ class _PostSourceSheetState extends State<PostSourceSheet> {
           ),
           Expanded(
             child: Scrollbar(
+              controller: _scrollController,
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
                 child: SelectableText(
                   _currentText,
