@@ -168,10 +168,11 @@ class _MdToBbcodeRenderer {
   // ==================== 块级 ====================
 
   String _heading(md.Element el, int level) {
-    final clamped = level > 3 ? 3 : level;
     var text = _children(el);
-    if (autoNumbering) text = '${_headingNumber(clamped)} $text';
-    final template = switch (clamped) {
+    if (autoNumbering) {
+      text = '${_headingNumber(level > 3 ? 3 : level)} $text';
+    }
+    final template = switch (level) {
       1 => t.heading1,
       2 => t.heading2,
       _ => t.heading3,
@@ -179,9 +180,21 @@ class _MdToBbcodeRenderer {
     return '${_fill(template, {
       'text': text,
       'level': '$level',
-      'size': '${4 - clamped}',
+      'size': '${_sizeForLevel(level)}',
     })}\n';
   }
+
+  /// 标题字号对齐 52pojie 的 Markdown 渲染（Parsedown HTML 的浏览器默认字号，
+  /// 以 16px 正文为基准）：h1=2em、h2=1.5em、h3=1.17em、h4=1em、h5=0.83em、
+  /// h6=0.67em。对应 Discuz `[size]`（App 与 HTML `<font size>` 同为 1~7 级）。
+  static int _sizeForLevel(int level) => switch (level) {
+        1 => 6,
+        2 => 5,
+        3 => 4,
+        4 => 3,
+        5 => 2,
+        _ => 1,
+      };
 
   String _headingNumber(int level) {
     _headingCounters[level - 1]++;

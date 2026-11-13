@@ -41,6 +41,11 @@ class SiteStore extends ChangeNotifier {
   /// （`BBCode2Html.supportsMd`）共用这一处判定。
   static bool supportsMdTag(String host) => host == 'www.52pojie.cn';
 
+  /// 该站点是否支持 Discuz 群组（圈子）入口。
+  ///
+  /// 目前只在 MT 论坛实测到圈子（`group.php`），其它论坛未适配，首页不显示入口。
+  static bool supportsGroups(String host) => host == 'bbs.binmt.cc';
+
   /// 当前站点 baseUrl
   String get baseUrl => current.baseUrl;
 

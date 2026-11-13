@@ -112,7 +112,8 @@ class MdConvertTemplates {
   /// 注意：模板里的 `${xxx}` 是**占位符**，在普通字符串中必须写成 `\${xxx}`，
   /// 否则会被 Dart 当成字符串插值。
   static const defaults = MdConvertTemplates(
-    // 标题层级映射到 Discuz 的 [size]：h1=3、h2=2、h3+=1（4 - level，上限 3）
+    // 标题字号对齐 52pojie 的 Markdown 渲染：h1~h6 → [size=6..1]
+    // （具体映射见 md2bbcode.dart 的 _sizeForLevel）
     heading1: '[size=\${size}][b]\${text}[/b][/size]',
     heading2: '[size=\${size}][b]\${text}[/b][/size]',
     heading3: '[size=\${size}][b]\${text}[/b][/size]',

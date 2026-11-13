@@ -28,6 +28,15 @@
       { "id": "my_friends",     "name": "我的好友",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=friend" },
       { "id": "notices",        "name": "消息提醒",   "url": "https://bbs.binmt.cc/home.php?mod=space&do=notice" },
       { "id": "app",            "name": "app开源地址","url": "https://github.com/qcxs/mtbbs_app" }
+    ],
+    "www.52pojie.cn": [
+      { "id": "home",           "name": "首页",       "url": "https://www.52pojie.cn/" },
+      { "id": "down",           "name": "爱盘",       "url": "https://down.52pojie.cn/" },
+      { "id": "rules",          "name": "站点总版规", "url": "https://www.52pojie.cn/thread-143136-1-1.html" },
+      { "id": "notice",         "name": "站点公告",   "url": "https://www.52pojie.cn/forum-13-1.html" },
+      { "id": "faq",            "name": "站点帮助",   "url": "https://www.52pojie.cn/misc.php?mod=faq" },
+      { "id": "violation",      "name": "违规怎么办", "url": "https://www.52pojie.cn/thread-309877-1-1.html" },
+      { "id": "app",            "name": "app开源地址","url": "https://github.com/qcxs/mtbbs_app" }
     ]
   }
 }

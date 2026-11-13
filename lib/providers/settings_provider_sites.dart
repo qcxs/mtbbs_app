@@ -11,6 +11,8 @@ extension SettingsSites on SettingsProvider {
 
   Future<void> deleteSite(int index) async {
     if (index < 0 || index >= _sites.length) return;
+    // 内置默认站点（MT / 52）不可删除，UI 未拦截时也不允许落库
+    if (SiteConfig.isDefaultSite(_sites[index])) return;
     _sites.removeAt(index);
     if (_currentSiteIndex >= _sites.length) {
       _currentSiteIndex = _sites.length - 1;

@@ -19,11 +19,22 @@ void main() {
     final out = conv('# 一级\n\n## 二级 **粗** *斜* ~~删~~\n');
     // ignore: avoid_print
     print('--- 标题与行内样式 ---\n$out');
-    expect(out, contains('[size=3][b]一级[/b][/size]'));
+    expect(out, contains('[size=6][b]一级[/b][/size]'));
     expect(out, contains('二级 [b]粗[/b] [i]斜[/i] [s]删[/s]'));
-    expect(out, contains('[size=2]'));
+    expect(out, contains('[size=5]'));
     expect(out, isNot(contains('<br>')));
     expect(out, isNot(contains('<')));
+  });
+
+  test('标题字号对齐 52 的 Markdown 渲染（h1~h6 → size 6~1）', () {
+    final out = conv(
+      '# 一\n\n## 二\n\n### 三\n\n#### 四\n\n##### 五\n\n###### 六\n',
+    );
+    // ignore: avoid_print
+    print('--- 标题层级 ---\n$out');
+    for (var level = 1; level <= 6; level++) {
+      expect(out, contains('[size=${7 - level}][b]'));
+    }
   });
 
   test('标题自动编号', () {

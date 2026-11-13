@@ -4,7 +4,6 @@ import 'package:html/dom.dart' as dom;
 import 'package:mtbbs/core/app/site_store.dart';
 import 'package:mtbbs/core/parser/md2bbcode.dart';
 import 'package:mtbbs/core/utils/url_util.dart';
-import 'package:mtbbs/models/md_convert_templates.dart';
 
 /// Parsedown HTML → Markdown 文本（逆向还原）
 ///
@@ -41,7 +40,7 @@ String parsedownHtmlToBbcode(dom.Element root) {
     final md = attachments.restore(math.restoreBbcode(markdown)).trim();
     return '[md]$md[/md]';
   }
-  final bbcode = markdownToBbcode(markdown, templates: _displayTemplates);
+  final bbcode = markdownToBbcode(markdown);
   return attachments.restore(math.restoreBbcode(bbcode));
 }
 
@@ -116,33 +115,6 @@ class _MathItem {
 
   const _MathItem(this.tex, this.display);
 }
-
-/// 展示用模板：只在「帖子阅读」场景使用。
-///
-/// [MdConvertTemplates.defaults] 的标题号（`4 - level` → 3/2/1）是为
-/// **发帖回写 Discuz** 设计的；在本 App 的 `[size]` 映射（1→10px … 3→14px）下，
-/// 标题会比正文还小。阅读场景按层级放大：h1=32px、h2=24px、h3=18px。
-const _displayTemplates = MdConvertTemplates(
-  heading1: '[size=6][b]\${text}[/b][/size]',
-  heading2: '[size=5][b]\${text}[/b][/size]',
-  heading3: '[size=4][b]\${text}[/b][/size]',
-  paragraph: '\${text}',
-  strong: '[b]\${text}[/b]',
-  em: '[i]\${text}[/i]',
-  del: '[s]\${text}[/s]',
-  highlight: '[color=#000000][backcolor=#FFFF00]\${text}[/backcolor][/color]',
-  codespan: '[color=#333333][backcolor=#f4f4f4]\${text}[/backcolor][/color]',
-  code: '[code]\${text}\n[/code]',
-  blockquote: '[quote]\${text}[/quote]',
-  hr: '[hr]',
-  link: '[url=\${href}]\${text}[/url]',
-  image: '[img]\${href}[/img]',
-  list: '[\${tag}]\n\${body}[/list]',
-  listitem: '[*]\${text}',
-  table: '[table]\${header}\${body}[/table]',
-  tablerow: '[tr]\${content}[/tr]',
-  tablecell: '[td]\${content}[/td]',
-);
 
 /// Parsedown DOM → Markdown 的递归转换器
 ///

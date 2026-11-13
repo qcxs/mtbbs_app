@@ -7,6 +7,7 @@ import 'package:mtbbs/mcp/mcp.dart';
 import 'package:mtbbs/providers/settings_provider.dart';
 import 'package:mtbbs/widgets/common/toast_utils.dart';
 import 'package:mtbbs/widgets/common/user_avatar.dart';
+import 'package:mtbbs/pages/settings/site_management.dart';
 import 'package:mtbbs/pages/settings/user_management_dialog.dart';
 import 'package:mtbbs/pages/settings/widgets/dialogs.dart';
 
@@ -83,6 +84,13 @@ class ProfilePage extends StatelessWidget {
                     context.read<SettingsProvider>(),
                   ),
                 ),
+                // 切换站点：图标与首页站点条一致（dns），避免和右侧「切换账号」
+                // 的 swap_horiz 混淆
+                IconButton(
+                  icon: const Icon(Icons.dns, size: 20),
+                  tooltip: '切换站点',
+                  onPressed: () => SiteManagement.showPicker(context, settings),
+                ),
                 IconButton(
                   icon: const Icon(Icons.swap_horiz, size: 20),
                   tooltip: '切换账号',
@@ -142,13 +150,6 @@ class ProfilePage extends StatelessWidget {
                   title: const Text('我的收藏'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/favorite'),
-                ),
-                const Divider(height: 1, indent: 56),
-                ListTile(
-                  leading: const Icon(Icons.groups_outlined),
-                  title: const Text('圈子'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/groups'),
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(

@@ -215,7 +215,7 @@ void main() {
       expect(out, isNot(contains('下载次数')));
     });
 
-    test('标题按阅读层级放大', () {
+    test('标题按 52 渲染层级（h2~h4 → size 5/4/3）', () {
       final out = conv(
         '<div class="parsedown-markdown">'
         '<h2>一级</h2><h3>二级</h3><h4>三级</h4>'
@@ -223,7 +223,7 @@ void main() {
       );
       expect(out, contains('[size=5][b]一级[/b][/size]'));
       expect(out, contains('[size=4][b]二级[/b][/size]'));
-      expect(out, contains('[size=4][b]三级[/b][/size]'));
+      expect(out, contains('[size=3][b]三级[/b][/size]'));
     });
 
     test('引用嵌套折叠为单层 [quote]，不残留字面标签', () {

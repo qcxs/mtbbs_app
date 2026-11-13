@@ -241,6 +241,50 @@ void main() {
       expect(tableSize.height, greaterThan(0));
     });
 
+    testWidgets('表格宽度随内容自适应：内容短且列均衡时占满，列内容悬殊时收缩', (tester) async {
+      // 短内容、列内容量相近 → 占满正文宽度，避免缩成一条
+      await tester.pumpWidget(
+        _post('[table][tr][td]是[/td][td]否[/td][/tr][/table]'),
+      );
+      await _settle(tester);
+      expect(tester.getSize(find.byType(HtmlTable)).width, closeTo(800, 1));
+
+      // `#` 列内容极少、说明列较长 → 不撑满（撑满会让 `#` 列被平分得过宽）
+      await tester.pumpWidget(
+        _post(
+          '[table][tr][td]#[/td][td]组件[/td]'
+          '[td]说明说明说明说明说明说明说明说明[/td][/tr][/table]',
+        ),
+      );
+      await _settle(tester);
+      expect(tester.getSize(find.byType(HtmlTable)).width, lessThan(800));
+    });
+
+    testWidgets('多列长内容表格不超出可用宽度（宽屏左栏场景）', (tester) async {
+      // 真实案例：5 列 + 长备注，内容自然宽度远大于宽屏左栏（左栏只有窗口的 3/5）。
+      // 表格必须按左栏可用宽度换行，而不是按内容宽度溢出到评论栏。
+      const bbcode =
+          '[table]'
+          '[tr][td]网盘名称[/td][td]官方网址[/td][td]必须登录下载[/td]'
+          '[td]非会员限速[/td][td]备注说明[/td][/tr]'
+          '[tr][td]小飞机网盘[/td][td]https://www.feejii.com/[/td][td]否[/td]'
+          '[td]全程不限速[/td]'
+          '[td]论坛签约合作网盘，用户可通过专属通道免费扩容至 1TB，'
+          '支持大文件稳定传输[/td][/tr]'
+          '[/table]';
+      await tester.pumpWidget(
+        _wrap(
+          const SizedBox(
+            width: 560,
+            child: PostHtmlWidget(bbcode: bbcode, fontSize: 16),
+          ),
+        ),
+      );
+      await _settle(tester);
+      expect(tester.getSize(find.byType(HtmlTable)).width, closeTo(560, 1));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('表格嵌套表格 + 双层 code', (tester) async {
       const bbcode =
           '[table][tr]'

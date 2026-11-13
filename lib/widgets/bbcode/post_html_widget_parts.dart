@@ -20,10 +20,14 @@ String _cssColor(Color c) {
 ///
 /// 列表（`[list]`）在转换层已展开为带前缀的普通段落，不产生 `ul/ol/li`。
 /// [monoFamilies] 为等宽字体族链（来自主题），用于行内代码。
+/// [availableWidth] 为正文可用宽度（随窗口尺寸变化），用于表格宽度决策。
+/// [fontSize] 为正文字号，用于估算表格内容宽度。
 Map<String, String>? _stylesFor(
   dom.Element element,
   ColorScheme cs, {
   List<String>? monoFamilies,
+  double availableWidth = 0,
+  double fontSize = 16,
 }) {
   final classes = element.classes;
 
@@ -80,10 +84,23 @@ Map<String, String>? _stylesFor(
         'margin': '0',
       };
     case 'table':
+      // 宽度策略（随可用宽度实时变化，不写死列数）：
+      // - 内容能装下（估算不换行宽度 ≤ 可用宽度×0.92）且各列内容量不悬殊：
+      //   占满正文宽度，短表格不再缩成一条、内容均衡的表格宽度整齐
+      // - 否则按内容自适应：但**压缩优先**——用 max-width 把表格钉在可用宽度内，
+      //   内容自动折行；只有不可断词（长 URL 等）的最窄宽度都装不下时才横向滚动
+      final width = _tableWidth(
+        element,
+        availableWidth: availableWidth,
+        fontSize: fontSize,
+      );
+      final bounded = availableWidth.isFinite && availableWidth > 0;
       return {
         'border': '1px solid ${_cssColor(cs.outlineVariant)}',
         'margin': '0',
         'padding': '0',
+        if (bounded) 'max-width': '${availableWidth.floor()}px',
+        'width': ?width,
       };
     case 'td':
       // 不设 text-align：单元格内 [align] 已被 BBCode2Html 转成
@@ -92,12 +109,99 @@ Map<String, String>? _stylesFor(
         'border': '1px solid ${_cssColor(cs.outlineVariant)}',
         'padding': '4px 8px',
       };
+    case 'th':
+      // Markdown 表格的表头（`[md]` 路径产生 th）
+      return {
+        'border': '1px solid ${_cssColor(cs.outlineVariant)}',
+        'padding': '4px 8px',
+        'font-weight': 'bold',
+      };
     case 'hr':
       return {
         'height': '1px',
         'background-color': _cssColor(cs.outlineVariant),
         'margin': '8px 0',
       };
+  }
+  return null;
+}
+
+/// 表格是否应占满正文宽度，返回 `'100%'` 或 null（保持内容自适应）。
+///
+/// 估算各列「单行不换行」所需宽度：
+/// - 内容能装下才考虑撑满（撑满后渲染器会把富余宽度平均分给各列，
+///   所以内容本身放不下时撑满反而会挤掉可读性）
+/// - 各列内容量相差悬殊时也不撑满（例如 `#` 列旁边的长描述列，
+///   平均分列会让 `#` 列宽得离谱）
+///
+/// 阈值 0.92 预留边距，2.5 为列内容量比例上限，均为观感折中值。
+String? _tableWidth(
+  dom.Element table, {
+  required double availableWidth,
+  required double fontSize,
+}) {
+  if (!availableWidth.isFinite || availableWidth <= 0) return null;
+  final weights = _tableColumnWeights(table);
+  if (weights.isEmpty) return null;
+
+  // 中文 ≈ 1em，其余 ≈ 0.55em；每列再计入左右 padding 与边框
+  final estimated =
+      weights.fold(0.0, (sum, w) => sum + w) * fontSize + weights.length * 18;
+  var maxWeight = 0.0;
+  var minWeight = double.infinity;
+  for (final w in weights) {
+    if (w > maxWeight) maxWeight = w;
+    if (w < minWeight) minWeight = w;
+  }
+  if (estimated > availableWidth * 0.92) return null;
+  if (maxWeight / (minWeight < 0.1 ? 0.1 : minWeight) > 2.5) return null;
+  return '100%';
+}
+
+/// 各列内容量（按字符宽度加权，取整列最大值）。
+///
+/// 返回列表长度即列数；嵌套表格的行不计入外层。
+List<double> _tableColumnWeights(dom.Element table) {
+  var columns = 0;
+  final weights = <int, double>{};
+  for (final row in table.querySelectorAll('tr')) {
+    if (_nearestTable(row) != table) continue; // 排除嵌套表格的行
+    var col = 0;
+    for (final cell in row.children) {
+      if (cell.localName != 'td' && cell.localName != 'th') continue;
+      final span = int.tryParse(cell.attributes['colspan'] ?? '') ?? 1;
+      final perColumn = _weightedLength(cell) / (span > 0 ? span : 1);
+      for (var i = 0; i < span; i++) {
+        weights.update(
+          col + i,
+          (v) => v > perColumn ? v : perColumn,
+          ifAbsent: () => perColumn,
+        );
+      }
+      col += span;
+    }
+    if (col > columns) columns = col;
+  }
+  return List.generate(columns, (i) => weights[i] ?? 1);
+}
+
+/// 文本宽度加权值：中日韩等全角字符按 1，拉丁字符按 0.55
+double _weightedLength(dom.Element element) {
+  var v = 0.0;
+  for (final rune in element.text.runes) {
+    v += _isWideRune(rune) ? 1.0 : 0.55;
+  }
+  return v < 1 ? 1 : v;
+}
+
+bool _isWideRune(int rune) =>
+    (rune >= 0x2E80 && rune <= 0x9FFF) ||
+    (rune >= 0x3000 && rune <= 0x303F) ||
+    (rune >= 0xFF00 && rune <= 0xFFEF);
+
+dom.Element? _nearestTable(dom.Element element) {
+  for (var p = element.parent; p != null; p = p.parent) {
+    if (p.localName == 'table') return p;
   }
   return null;
 }
@@ -190,8 +294,9 @@ class BbcodeImage extends StatelessWidget {
         // 同一张图会按不同尺寸各解一份、互相挤占 imageCache（返回时重解码，见 docs/07 #91）。
         // 用"屏幕宽 + 图片最大宽度"这个与布局无关的量，全场景命中同一条目。
         final screenWidth = MediaQuery.sizeOf(context).width;
-        final intended =
-            (explicitWidth ?? 0) > maxImageWidth ? explicitWidth! : maxImageWidth;
+        final intended = (explicitWidth ?? 0) > maxImageWidth
+            ? explicitWidth!
+            : maxImageWidth;
         final decodeWidth = intended < screenWidth ? intended : screenWidth;
         final image = CachedNetworkImage(
           imageUrl: url,
@@ -224,11 +329,8 @@ class BbcodeImage extends StatelessWidget {
             sourceInfo: '帖子图片',
           ),
           child: _ZoomableImage(
-            onOpenViewer: () => showImageViewer(
-              context,
-              imageUrls: urls,
-              initialIndex: index,
-            ),
+            onOpenViewer: () =>
+                showImageViewer(context, imageUrls: urls, initialIndex: index),
             // 显式尺寸：固定盒宽，加载中/加载失败也保持占位宽度，避免状态切换跳动
             // 未指定尺寸：上限盒宽，加载中按上限占位，解码后收敛到原始像素宽
             child: hasExplicitWidth

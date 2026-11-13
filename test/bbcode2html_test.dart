@@ -307,10 +307,27 @@ void main() {
       expect(html, contains('<table>'));
       expect(html, contains('data-code-index="0"'));
       expect(html, contains('data-img-index="0"'));
-      expect(converter.codeBlocks.single.trim(), 'final a = 1;');
+      expect(converter.codeBlocks.single, 'final a = 1;');
       expect(converter.imageUrls, hasLength(1));
       expect(html, isNot(contains('[md]')));
       expect(html.contains('\x00'), isFalse);
+    });
+
+    test('[md] 围栏代码块末尾不多出空行', () {
+      final converter = BBCode2Html(
+        supportsMd: true,
+        emitCodePlaceholder: true,
+      );
+      converter.convert(
+        '[md]```text\n'
+        'navicat.exe  0x00400000\n'
+        'libcc.dll    0x180000000\n'
+        'libcf.dll    0x180000000\n'
+        '```[/md]',
+      );
+      final lines = converter.codeBlocks.single.split('\n');
+      expect(lines, hasLength(3));
+      expect(lines.last, 'libcf.dll    0x180000000');
     });
 
     test('[md] 内的 [appdata] 公式不受 Markdown 解析影响', () {

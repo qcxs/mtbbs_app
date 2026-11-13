@@ -152,118 +152,137 @@ class PostHtmlWidget extends StatelessWidget {
     // 本段 BBCode（= 一帖/一楼）的全部正文图片，供画廊左右滑动
     final imageUrls = converter.imageUrls;
 
-    final htmlWidget = HtmlWidget(
-      html,
-      // flutter_widget_from_html 按 html 字符串缓存 widget 树，html 不变就
-      // 不重建、也不会重跑 customWidgetBuilder。而 [code] 原文是走
-      // `codeBlocks` 旁路注入的（HTML 里只有占位 div），代码变化时 html
-      // 完全相同 → 缓存命中 → 代码块沿用旧内容；同理，只影响注入参数
-      // （字号/图片宽度/代码块行数）的设置变更也不会生效。
-      // 用「html + 注入参数 + 代码原文」的指纹作 key，任一变化即整体重建。
-      key: ValueKey(
-        Object.hashAll([
+    // 表格宽度策略需要正文可用宽度（随窗口尺寸变化），故用 LayoutBuilder 取约束。
+    // 宽度取整分桶后进 key：窗口拖动时避免每个像素都重建整棵 HTML 树。
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final htmlWidget = HtmlWidget(
           html,
-          textSize,
-          maxImageWidth,
-          codeBlockMaxLines,
-          ...codeBlocks,
-          // 公式原文同样旁路注入（HTML 里只有占位元素），必须进指纹
-          for (final m in mathBlocks) '${m.display}:${m.tex}',
-        ]),
-      ),
-      // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
-      buildAsync: false,
-      // height 即 CSS line-height（渲染器按 line-height 语义处理）。
-      // 解析层会清掉空行使 BBCode 紧凑，段与段之间只剩单个 \n → 单个 <br>，
-      // 段落间距因此等于行间距；而 <br> 是文本里的换行符、非盒子，CSS 无法单独
-      // 撑开它。故统一放宽行高来缓解"串行"。中文正文 1.6 较舒适。
-      textStyle: TextStyle(
-        fontSize: textSize,
-        color: cs.onSurface,
-        height: 1.6,
-      ),
-      customStylesBuilder: (element) => _stylesFor(
-        element,
-        cs,
-        monoFamilies: monoFamilies,
-      ),
-      customWidgetBuilder: (element) {
-        // 硬换行 → 块级间隔：既完成换行，又提供段间距（见 _kParagraphGapRatio）。
-        // 段内自动折行不经过这里，故只有“段落”被撑开。
-        if (element.localName == 'br') {
-          return SizedBox(height: textSize * _kParagraphGapRatio);
-        }
-        // [code] 占位 div → 代码高亮组件（块级）
-        final codeIndex = element.attributes['data-code-index'];
-        if (codeIndex != null) {
-          final i = int.tryParse(codeIndex) ?? -1;
-          if (i < 0 || i >= codeBlocks.length) return const SizedBox.shrink();
-          return BbcodeCodeBlock(
-            code: codeBlocks[i],
-            // 代码块跟随正文字号，上限同步设置项上限（曾封顶 16，字号调大后代码块不跟）
-            fontSize: textSize.clamp(11, 32).toDouble(),
-            maxLines: codeBlockMaxLines,
-          );
-        }
-        // [appdata] math 占位 → LaTeX 公式组件
-        final mathIndex = element.attributes['data-math-index'];
-        if (mathIndex != null) {
-          final i = int.tryParse(mathIndex) ?? -1;
-          if (i < 0 || i >= mathBlocks.length) return const SizedBox.shrink();
-          final math = mathBlocks[i];
-          final mathStyle = TextStyle(fontSize: textSize, color: cs.onSurface);
-          final widget = Math.tex(
-            _normalizeMathTex(math.tex),
-            mathStyle: math.display ? MathStyle.display : MathStyle.text,
-            textStyle: mathStyle,
-            // 不支持的宏/语法：退回原始 TeX，保证内容不丢
-            onErrorFallback: (_) => Text(
-              math.tex,
-              style: mathStyle.merge(context.appTypography.mono),
-            ),
-          );
-          if (!math.display) {
-            return InlineCustomWidget(
-              alignment: PlaceholderAlignment.baseline,
-              baseline: TextBaseline.alphabetic,
-              child: widget,
-            );
-          }
-          // 长公式不撑破屏幕，块级公式允许横向滚动
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: widget,
-          );
-        }
-        // img → 表情内联 / 帖子图片块级
-        if (element.localName == 'img') {
-          final src = element.attributes['src'] ?? '';
-          if (src.isEmpty) return const SizedBox.shrink();
-          if (element.attributes['data-type'] == 'emoji') {
-            return InlineCustomWidget(
-              alignment: PlaceholderAlignment.middle,
-              child: _EmojiImage(url: src),
-            );
-          }
-          // data-img-index 是这张图在正文图片里的文档序（与 imageUrls 同下标）
-          final imgIndex =
-              int.tryParse(element.attributes['data-img-index'] ?? '') ?? -1;
-          return BbcodeImage(
-            url: src,
-            explicitWidth: double.tryParse(element.attributes['width'] ?? ''),
-            maxImageWidth: maxImageWidth.toDouble(),
-            galleryUrls: imageUrls,
-            galleryIndex: imgIndex,
-          );
-        }
-        return null;
-      },
-      onTapUrl: (url) {
-        _handleLinkTap(context, url);
-        return true;
+          // flutter_widget_from_html 按 html 字符串缓存 widget 树，html 不变就
+          // 不重建、也不会重跑 customWidgetBuilder。而 [code] 原文是走
+          // `codeBlocks` 旁路注入的（HTML 里只有占位 div），代码变化时 html
+          // 完全相同 → 缓存命中 → 代码块沿用旧内容；同理，只影响注入参数
+          // （字号/图片宽度/代码块行数）的设置变更也不会生效。
+          // 用「html + 注入参数 + 代码原文」的指纹作 key，任一变化即整体重建。
+          key: ValueKey(
+            Object.hashAll([
+              html,
+              textSize,
+              maxImageWidth,
+              codeBlockMaxLines,
+              // 表格占满与否取决于可用宽度，宽度变化必须让 HTML 树重建
+              (availableWidth / 16).round(),
+              ...codeBlocks,
+              // 公式原文同样旁路注入（HTML 里只有占位元素），必须进指纹
+              for (final m in mathBlocks) '${m.display}:${m.tex}',
+            ]),
+          ),
+          // 关闭异步构建：帖子正文需要与滚动同步构建，且便于测试确定性
+          buildAsync: false,
+          // height 即 CSS line-height（渲染器按 line-height 语义处理）。
+          // 解析层会清掉空行使 BBCode 紧凑，段与段之间只剩单个 \n → 单个 <br>，
+          // 段落间距因此等于行间距；而 <br> 是文本里的换行符、非盒子，CSS 无法单独
+          // 撑开它。故统一放宽行高来缓解"串行"。中文正文 1.6 较舒适。
+          textStyle: TextStyle(
+            fontSize: textSize,
+            color: cs.onSurface,
+            height: 1.6,
+          ),
+          customStylesBuilder: (element) => _stylesFor(
+            element,
+            cs,
+            monoFamilies: monoFamilies,
+            availableWidth: availableWidth,
+            fontSize: textSize,
+          ),
+          customWidgetBuilder: (element) {
+            // 硬换行 → 块级间隔：既完成换行，又提供段间距（见 _kParagraphGapRatio）。
+            // 段内自动折行不经过这里，故只有“段落”被撑开。
+            if (element.localName == 'br') {
+              return SizedBox(height: textSize * _kParagraphGapRatio);
+            }
+            // [code] 占位 div → 代码高亮组件（块级）
+            final codeIndex = element.attributes['data-code-index'];
+            if (codeIndex != null) {
+              final i = int.tryParse(codeIndex) ?? -1;
+              if (i < 0 || i >= codeBlocks.length)
+                return const SizedBox.shrink();
+              return BbcodeCodeBlock(
+                code: codeBlocks[i],
+                // 代码块跟随正文字号，上限同步设置项上限（曾封顶 16，字号调大后代码块不跟）
+                fontSize: textSize.clamp(11, 32).toDouble(),
+                maxLines: codeBlockMaxLines,
+              );
+            }
+            // [appdata] math 占位 → LaTeX 公式组件
+            final mathIndex = element.attributes['data-math-index'];
+            if (mathIndex != null) {
+              final i = int.tryParse(mathIndex) ?? -1;
+              if (i < 0 || i >= mathBlocks.length)
+                return const SizedBox.shrink();
+              final math = mathBlocks[i];
+              final mathStyle = TextStyle(
+                fontSize: textSize,
+                color: cs.onSurface,
+              );
+              final widget = Math.tex(
+                _normalizeMathTex(math.tex),
+                mathStyle: math.display ? MathStyle.display : MathStyle.text,
+                textStyle: mathStyle,
+                // 不支持的宏/语法：退回原始 TeX，保证内容不丢
+                onErrorFallback: (_) => Text(
+                  math.tex,
+                  style: mathStyle.merge(context.appTypography.mono),
+                ),
+              );
+              if (!math.display) {
+                return InlineCustomWidget(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: widget,
+                );
+              }
+              // 长公式不撑破屏幕，块级公式允许横向滚动
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: widget,
+              );
+            }
+            // img → 表情内联 / 帖子图片块级
+            if (element.localName == 'img') {
+              final src = element.attributes['src'] ?? '';
+              if (src.isEmpty) return const SizedBox.shrink();
+              if (element.attributes['data-type'] == 'emoji') {
+                return InlineCustomWidget(
+                  alignment: PlaceholderAlignment.middle,
+                  child: _EmojiImage(url: src),
+                );
+              }
+              // data-img-index 是这张图在正文图片里的文档序（与 imageUrls 同下标）
+              final imgIndex =
+                  int.tryParse(element.attributes['data-img-index'] ?? '') ??
+                  -1;
+              return BbcodeImage(
+                url: src,
+                explicitWidth: double.tryParse(
+                  element.attributes['width'] ?? '',
+                ),
+                maxImageWidth: maxImageWidth.toDouble(),
+                galleryUrls: imageUrls,
+                galleryIndex: imgIndex,
+              );
+            }
+            return null;
+          },
+          onTapUrl: (url) {
+            _handleLinkTap(context, url);
+            return true;
+          },
+        );
+        // 选区作用域见 [selectable] 的说明
+        return selectable ? SelectionArea(child: htmlWidget) : htmlWidget;
       },
     );
-    // 选区作用域见 [selectable] 的说明
-    return selectable ? SelectionArea(child: htmlWidget) : htmlWidget;
   }
 }

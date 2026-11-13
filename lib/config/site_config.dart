@@ -13,6 +13,14 @@ class SiteConfig {
   /// 默认站点列表（首次运行或重置时使用）
   /// 优先从 [DefaultConfig] 加载，失败时回退到内嵌硬编码。
   static List<Site> defaultSites() => DefaultConfig.instance.defaultSites;
+
+  /// 是否为内置默认站点（MT论坛 / 吾爱破解等）。
+  ///
+  /// 内置站点是 App 的默认配置：不允许删除，也不允许编辑；需要恢复默认值
+  /// 时走「重置站点配置」（[SettingsProvider.restoreDefaultSites]）。
+  static bool isDefaultSite(Site site) => defaultSites().any(
+    (d) => d.baseUrl == site.baseUrl || d.host == site.host,
+  );
 }
 
 /// 单个站点配置

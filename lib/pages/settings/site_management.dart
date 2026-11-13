@@ -88,31 +88,48 @@ class SiteManagement {
                       );
                     }
                   },
-                  secondary: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.edit_outlined,
-                          size: 18,
-                          color: cs.onSurfaceVariant,
+                  // 内置站点（MT / 52 等）是 App 默认配置：不可编辑、不可删除
+                  secondary: SiteConfig.isDefaultSite(site)
+                      ? Tooltip(
+                          message: '内置站点，不可修改',
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Icon(
+                              Icons.lock_outline,
+                              size: 18,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.edit_outlined,
+                                size: 18,
+                                color: cs.onSurfaceVariant,
+                              ),
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                _editSite(context, settings, i);
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: cs.error,
+                              ),
+                              onPressed: () => _deleteSite(
+                                context,
+                                settings,
+                                site.name,
+                                i,
+                              ),
+                            ),
+                          ],
                         ),
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          _editSite(context, settings, i);
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: cs.error,
-                        ),
-                        onPressed: () =>
-                            _deleteSite(context, settings, site.name, i),
-                      ),
-                    ],
-                  ),
                 );
               }),
             ),
@@ -169,6 +186,11 @@ class SiteManagement {
     String name,
     int index,
   ) {
+    if (index < 0 || index >= SiteStore.instance.sites.length) return;
+    if (SiteConfig.isDefaultSite(SiteStore.instance.sites[index])) {
+      showToast('内置站点不可删除');
+      return;
+    }
     if (SiteStore.instance.sites.length <= 1) {
       showToast('至少保留一个站点');
       return;
@@ -211,7 +233,12 @@ class SiteManagement {
     SettingsProvider settings,
     int index,
   ) {
+    if (index < 0 || index >= SiteStore.instance.sites.length) return;
     final site = SiteStore.instance.sites[index];
+    if (SiteConfig.isDefaultSite(site)) {
+      showToast('内置站点不可修改');
+      return;
+    }
     showDialog(
       context: context,
       builder: (_) =>

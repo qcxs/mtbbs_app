@@ -77,6 +77,14 @@ class _SiteHeader extends StatelessWidget {
                 onPressed: () => context.push('/search/result?filter=digest'),
               ),
             ],
+            // 圈子（Discuz 群组）：目前只在 MT 论坛实测可用，其它站点不显示
+            if (SiteStore.supportsGroups(site.host))
+              IconButton(
+                icon: const Icon(Icons.groups_outlined, size: 20),
+                tooltip: '圈子',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => context.push('/groups'),
+              ),
             IconButton(
               icon: const Icon(Icons.swap_horiz, size: 20),
               tooltip: '切换站点',

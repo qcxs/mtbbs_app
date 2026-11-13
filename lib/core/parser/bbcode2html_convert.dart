@@ -341,7 +341,11 @@ extension BBCode2HtmlConvert on BBCode2Html {
     html = html.replaceAllMapped(
       RegExp(r'<pre><code[^>]*>([\s\S]*?)</code></pre>'),
       (m) {
-        codeBlocks.add(unescapeHtml(m.group(1)!));
+        // 围栏代码块按 CommonMark 在 `</code>` 前带一个收尾换行；
+        // 原样交给高亮组件会多渲染一行空行（含行号），这里只去掉这一个换行
+        final code = unescapeHtml(m.group(1)!)
+            .replaceFirst(RegExp(r'\r?\n$'), '');
+        codeBlocks.add(code);
         return '\x00CODE${codeBlocks.length - 1}\x00';
       },
     );
